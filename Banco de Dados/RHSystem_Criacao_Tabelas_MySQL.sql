@@ -1,5 +1,6 @@
 -- ============================================================
--- RHSystem - Modelo MySQL
+-- RHSystem - Modelo MySQL (v2)
+-- Requer MySQL 8.0.16 ou superior (CHECK aplicadas)
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS rh_system
@@ -9,11 +10,13 @@ CREATE DATABASE IF NOT EXISTS rh_system
 USE rh_system;
 
 -- ============================================================
--- LIMPEZA
+-- LIMPEZA (apaga os dados - usar apenas em desenvolvimento/teste)
 -- ============================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS FERIADOS;
+DROP TABLE IF EXISTS FERIAS;
 DROP TABLE IF EXISTS BENEFICIOS_FUNCIONARIOS;
 DROP TABLE IF EXISTS BENEFICIOS;
 DROP TABLE IF EXISTS FORMULARIOS_RESPOSTAS;
@@ -68,8 +71,11 @@ CREATE TABLE CARGOS (
 -- ============================================================
 -- 3. FUNCIONARIOS
 -- ============================================================
--- ID_GESTOR recebe FK posteriormente porque FUNCIONARIOS e
--- GESTORES possuem uma dependência circular no modelo.
+-- ID_GESTOR e ID_SETOR recebem FK posteriormente (secao 6)
+-- porque FUNCIONARIOS, SETORES e GESTORES possuem dependencia
+-- circular no modelo.
+-- EMAIL_CORPORATIVO fica aqui; dados pessoais ficam em
+-- FUNCIONARIOS_DETALHES.
 
 CREATE TABLE FUNCIONARIOS (
     ID_FUNCIONARIO INT AUTO_INCREMENT PRIMARY KEY,
@@ -78,8 +84,7 @@ CREATE TABLE FUNCIONARIOS (
     DATA_ADMISSAO DATE NOT NULL,
     DATA_DESLIGAMENTO DATE,
     ATIVO BOOLEAN NOT NULL DEFAULT TRUE,
-    EMAIL VARCHAR(150),
-    TELEFONE VARCHAR(30),
+    EMAIL_CORPORATIVO VARCHAR(150),
     ID_CARGO INT,
     ID_SETOR INT,
     ID_GESTOR INT,
@@ -91,14 +96,18 @@ CREATE TABLE FUNCIONARIOS (
 
     CONSTRAINT FK_FUNCIONARIOS_NIVEIS_ACESSO
         FOREIGN KEY (ID_NIVEL_ACESSO)
-        REFERENCES NIVEIS_DE_ACESSO(ID_NIVEL_ACESSO)
+        REFERENCES NIVEIS_DE_ACESSO(ID_NIVEL_ACESSO),
+
+    CONSTRAINT UQ_FUNCIONARIOS_EMAIL_CORPORATIVO UNIQUE (EMAIL_CORPORATIVO),
+    CONSTRAINT CHK_FUNCIONARIOS_DATAS CHECK (DATA_DESLIGAMENTO IS NULL OR DATA_DESLIGAMENTO >= DATA_ADMISSAO),
+    CONSTRAINT CHK_FUNCIONARIOS_ATIVO_DESLIGAMENTO CHECK (ATIVO = FALSE OR DATA_DESLIGAMENTO IS NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- 4. SETORES
 -- ============================================================
--- ID_GESTOR recebe FK posteriormente porque SETORES e GESTORES
--- também formam uma dependência circular.
+-- ID_GESTOR (gestor responsavel pelo setor) recebe FK
+-- posteriormente, pela dependencia circular com GESTORES.
 
 CREATE TABLE SETORES (
     ID_SETOR INT AUTO_INCREMENT PRIMARY KEY,
@@ -112,24 +121,19 @@ CREATE TABLE SETORES (
 -- ============================================================
 -- 5. GESTORES
 -- ============================================================
+-- O setor do gestor e definido em SETORES.ID_GESTOR e o nivel
+-- de acesso em FUNCIONARIOS.ID_NIVEL_ACESSO, evitando dados
+-- duplicados e divergentes.
 
 CREATE TABLE GESTORES (
     ID_GESTOR INT AUTO_INCREMENT PRIMARY KEY,
     ID_FUNCIONARIO INT NOT NULL,
-    ID_SETOR INT,
-    ID_NIVEL_ACESSO INT,
 
     CONSTRAINT FK_GESTORES_FUNCIONARIOS
         FOREIGN KEY (ID_FUNCIONARIO)
         REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-    CONSTRAINT FK_GESTORES_SETORES
-        FOREIGN KEY (ID_SETOR)
-        REFERENCES SETORES(ID_SETOR),
-
-    CONSTRAINT FK_GESTORES_NIVEIS_ACESSO
-        FOREIGN KEY (ID_NIVEL_ACESSO)
-        REFERENCES NIVEIS_DE_ACESSO(ID_NIVEL_ACESSO)
+    CONSTRAINT UQ_GESTORES_FUNCIONARIO UNIQUE (ID_FUNCIONARIO)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -154,47 +158,44 @@ ALTER TABLE SETORES
 -- ============================================================
 -- 7. FUNCIONARIOS_DETALHES
 -- ============================================================
+-- Dados pessoais e de contato (LGPD: restringir o acesso).
+-- Relacao 1:1 com FUNCIONARIOS.
 
 CREATE TABLE FUNCIONARIOS_DETALHES (
     ID_FUNCIONARIO_DETALHES INT AUTO_INCREMENT PRIMARY KEY,
     ID_FUNCIONARIO INT NOT NULL,
-    NOME VARCHAR(150),
-    DATA_NASCIMENTO DATE,
-    DATA_ADMISSAO DATE,
-    DATA_DESLIGAMENTO DATE,
-    ATIVO BOOLEAN DEFAULT TRUE,
-    EMAIL VARCHAR(150),
+    CPF CHAR(11) NOT NULL,
+    RG VARCHAR(20),
+    RG_ORGAO_EMISSOR VARCHAR(20),
+    EMAIL_PESSOAL VARCHAR(150),
     TELEFONE VARCHAR(30),
-    ID_CARGO INT,
-    ID_NIVEL_ACESSO INT,
-    ID_GESTOR INT,
+    CEP CHAR(8),
+    LOGRADOURO VARCHAR(150),
+    NUMERO VARCHAR(10),
+    COMPLEMENTO VARCHAR(100),
+    BAIRRO VARCHAR(100),
+    CIDADE VARCHAR(100),
+    UF CHAR(2),
 
     CONSTRAINT FK_FUNCIONARIOS_DETALHES_FUNCIONARIOS
         FOREIGN KEY (ID_FUNCIONARIO)
         REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-    CONSTRAINT FK_FUNCIONARIOS_DETALHES_CARGOS
-        FOREIGN KEY (ID_CARGO)
-        REFERENCES CARGOS(ID_CARGO),
-
-    CONSTRAINT FK_FUNCIONARIOS_DETALHES_NIVEIS_ACESSO
-        FOREIGN KEY (ID_NIVEL_ACESSO)
-        REFERENCES NIVEIS_DE_ACESSO(ID_NIVEL_ACESSO),
-
-    CONSTRAINT FK_FUNCIONARIOS_DETALHES_GESTORES
-        FOREIGN KEY (ID_GESTOR)
-        REFERENCES GESTORES(ID_GESTOR)
+    CONSTRAINT UQ_FUNCIONARIOS_DETALHES_FUNCIONARIO UNIQUE (ID_FUNCIONARIO),
+    CONSTRAINT UQ_FUNCIONARIOS_DETALHES_CPF UNIQUE (CPF),
+    CONSTRAINT CHK_FUNCIONARIOS_DETALHES_CPF CHECK (CPF REGEXP '^[0-9]{11}$'),
+    CONSTRAINT CHK_FUNCIONARIOS_DETALHES_CEP CHECK (CEP IS NULL OR CEP REGEXP '^[0-9]{8}$')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- 8. USUARIOS
 -- ============================================================
+-- Nome e e-mail (login) vem de FUNCIONARIOS.NOME e
+-- FUNCIONARIOS.EMAIL_CORPORATIVO.
 
 CREATE TABLE USUARIOS (
     ID_USUARIO INT AUTO_INCREMENT PRIMARY KEY,
     ID_FUNCIONARIO INT NOT NULL,
-    NOME VARCHAR(150) NOT NULL,
-    EMAIL VARCHAR(150) NOT NULL,
     SENHA VARCHAR(255) NOT NULL,
     ATIVO BOOLEAN NOT NULL DEFAULT TRUE,
     DATA_HORA_ULTIMO_LOGIN DATETIME,
@@ -203,8 +204,7 @@ CREATE TABLE USUARIOS (
         FOREIGN KEY (ID_FUNCIONARIO)
         REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-    CONSTRAINT UQ_USUARIOS_FUNCIONARIO UNIQUE (ID_FUNCIONARIO),
-    CONSTRAINT UQ_USUARIOS_EMAIL UNIQUE (EMAIL)
+    CONSTRAINT UQ_USUARIOS_FUNCIONARIO UNIQUE (ID_FUNCIONARIO)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -222,7 +222,9 @@ CREATE TABLE AVISOS (
 
     CONSTRAINT FK_AVISOS_FUNCIONARIOS
         FOREIGN KEY (ID_FUNCIONARIO)
-        REFERENCES FUNCIONARIOS(ID_FUNCIONARIO)
+        REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
+
+    CONSTRAINT CHK_AVISOS_DATAS CHECK (DATA_PUBLICACAO IS NULL OR DATA_EXPIRACAO IS NULL OR DATA_EXPIRACAO >= DATA_PUBLICACAO)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -244,7 +246,8 @@ CREATE TABLE AVISOS_VISUALIZACOES (
         FOREIGN KEY (ID_FUNCIONARIO)
         REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-    CONSTRAINT UQ_AVISOS_VISUALIZACOES_AVISO_FUNCIONARIO UNIQUE (ID_AVISO, ID_FUNCIONARIO)
+    CONSTRAINT UQ_AVISOS_VISUALIZACOES_AVISO_FUNCIONARIO UNIQUE (ID_AVISO, ID_FUNCIONARIO),
+    CONSTRAINT CHK_AVISOS_VISUALIZACOES_DATA CHECK (VISUALIZADO = FALSE OR DATA_VISUALIZACAO IS NOT NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -264,7 +267,7 @@ CREATE TABLE PONTOS (
         FOREIGN KEY (ID_FUNCIONARIO)
         REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-    CONSTRAINT CHK_PONTOS_HORAS_TRABALHADAS CHECK (HORAS_TRABALHADAS IS NULL OR HORAS_TRABALHADAS >= 0),
+    CONSTRAINT CHK_PONTOS_HORAS_TRABALHADAS CHECK (HORAS_TRABALHADAS IS NULL OR HORAS_TRABALHADAS BETWEEN 0 AND 24),
     CONSTRAINT CHK_PONTOS_CARGA_HORARIA CHECK (CARGA_HORARIA IS NULL OR CARGA_HORARIA > 0),
     CONSTRAINT CHK_PONTOS_HORARIOS CHECK (HORA_ENTRADA IS NULL OR HORA_SAIDA IS NULL OR HORA_ENTRADA <> HORA_SAIDA)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -279,7 +282,7 @@ CREATE TABLE PONTOS_MANUTENCOES (
     ID_FUNCIONARIO INT NOT NULL,
     JUSTIFICATIVA TEXT NOT NULL,
     DATA_SOLICITACAO DATETIME,
-    STATUS_SOLICITACAO VARCHAR(30),
+    STATUS_SOLICITACAO VARCHAR(30) NOT NULL DEFAULT 'PENDENTE',
     DATA_ANALISE DATETIME,
     ID_GESTOR INT,
     OBSERVACAO TEXT,
@@ -294,7 +297,10 @@ CREATE TABLE PONTOS_MANUTENCOES (
 
     CONSTRAINT FK_PONTOS_MANUTENCOES_GESTORES
         FOREIGN KEY (ID_GESTOR)
-        REFERENCES GESTORES(ID_GESTOR)
+        REFERENCES GESTORES(ID_GESTOR),
+
+    CONSTRAINT CHK_PONTOS_MANUTENCOES_STATUS CHECK (STATUS_SOLICITACAO IN ('PENDENTE', 'APROVADA', 'REJEITADA')),
+    CONSTRAINT CHK_PONTOS_MANUTENCOES_DATAS CHECK (DATA_SOLICITACAO IS NULL OR DATA_ANALISE IS NULL OR DATA_ANALISE >= DATA_SOLICITACAO)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -345,6 +351,7 @@ CREATE TABLE ADVERTENCIAS (
 -- ============================================================
 -- 15. BANCOS_HORAS
 -- ============================================================
+-- QUANTIDADE e sempre positiva; o sinal e dado pelo tipo.
 
 CREATE TABLE BANCOS_HORAS (
     ID_BANCO_HORAS INT AUTO_INCREMENT PRIMARY KEY,
@@ -358,7 +365,8 @@ CREATE TABLE BANCOS_HORAS (
         FOREIGN KEY (ID_FUNCIONARIO)
         REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-    CONSTRAINT CHK_BANCOS_HORAS_QUANTIDADE CHECK (QUANTIDADE IS NULL OR QUANTIDADE >= 0)
+    CONSTRAINT CHK_BANCOS_HORAS_QUANTIDADE CHECK (QUANTIDADE IS NULL OR QUANTIDADE >= 0),
+    CONSTRAINT CHK_BANCOS_HORAS_TIPO CHECK (TIPO_LANCAMENTO IS NULL OR TIPO_LANCAMENTO IN ('CREDITO', 'DEBITO'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -400,7 +408,8 @@ CREATE TABLE TREINAMENTOS_FUNCIONARIOS (
 
     CONSTRAINT UQ_TREINAMENTOS_FUNCIONARIOS_TREINAMENTO_FUNCIONARIO UNIQUE (ID_TREINAMENTO, ID_FUNCIONARIO),
     CONSTRAINT CHK_TREINAMENTOS_FUNCIONARIOS_NOTA CHECK (NOTA IS NULL OR NOTA BETWEEN 0 AND 100),
-    CONSTRAINT CHK_TREINAMENTOS_FUNCIONARIOS_DATAS CHECK (DATA_INICIO IS NULL OR DATA_CONCLUSAO IS NULL OR DATA_CONCLUSAO >= DATA_INICIO)
+    CONSTRAINT CHK_TREINAMENTOS_FUNCIONARIOS_DATAS CHECK (DATA_INICIO IS NULL OR DATA_CONCLUSAO IS NULL OR DATA_CONCLUSAO >= DATA_INICIO),
+    CONSTRAINT CHK_TREINAMENTOS_FUNCIONARIOS_STATUS CHECK (STATUS_TREINAMENTO IS NULL OR STATUS_TREINAMENTO IN ('INSCRITO', 'EM_ANDAMENTO', 'CONCLUIDO', 'REPROVADO', 'CANCELADO'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -464,33 +473,33 @@ CREATE TABLE FORMULARIOS_PERGUNTAS (
         REFERENCES FORMULARIOS(ID_FORMULARIO),
 
     CONSTRAINT UQ_FORMULARIOS_PERGUNTAS_FORMULARIO_ORDEM UNIQUE (ID_FORMULARIO, ORDEM),
+    CONSTRAINT UQ_FORMULARIOS_PERGUNTAS_PERGUNTA_FORMULARIO UNIQUE (ID_FORMULARIO_PERGUNTA, ID_FORMULARIO),
     CONSTRAINT CHK_FORMULARIOS_PERGUNTAS_ORDEM CHECK (ORDEM IS NULL OR ORDEM > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- 21. FORMULARIOS_RESPOSTAS
 -- ============================================================
--- A resposta referencia diretamente a pergunta do formulario.
+-- A resposta guarda a pergunta e o formulario, permitindo ver os
+-- tres niveis na mesma tabela. A FK composta garante que o
+-- formulario informado e o mesmo formulario da pergunta
+-- (chave unica UQ_FORMULARIOS_PERGUNTAS_PERGUNTA_FORMULARIO).
 
 CREATE TABLE FORMULARIOS_RESPOSTAS (
     ID_FORMULARIO_RESPOSTA INT AUTO_INCREMENT PRIMARY KEY,
+    ID_FORMULARIO_PERGUNTA INT NOT NULL,
     ID_FORMULARIO INT NOT NULL,
-    ID_FORMULARIO_PERGUNTA INT,
     ID_FUNCIONARIO INT NOT NULL,
     RESPOSTA TEXT,
     DATA_RESPOSTA DATETIME,
 
-    CONSTRAINT FK_FORMULARIOS_RESPOSTAS_FORMULARIOS
-        FOREIGN KEY (ID_FORMULARIO)
-        REFERENCES FORMULARIOS(ID_FORMULARIO),
+    CONSTRAINT FK_FORMULARIOS_RESPOSTAS_PERGUNTAS
+        FOREIGN KEY (ID_FORMULARIO_PERGUNTA, ID_FORMULARIO)
+        REFERENCES FORMULARIOS_PERGUNTAS(ID_FORMULARIO_PERGUNTA, ID_FORMULARIO),
 
     CONSTRAINT FK_FORMULARIOS_RESPOSTAS_FUNCIONARIOS
         FOREIGN KEY (ID_FUNCIONARIO)
-        REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
-
-    CONSTRAINT FK_FORMULARIOS_RESPOSTAS_PERGUNTAS
-        FOREIGN KEY (ID_FORMULARIO_PERGUNTA)
-        REFERENCES FORMULARIOS_PERGUNTAS(ID_FORMULARIO_PERGUNTA)
+        REFERENCES FUNCIONARIOS(ID_FUNCIONARIO)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -500,7 +509,9 @@ CREATE TABLE FORMULARIOS_RESPOSTAS (
 CREATE TABLE BENEFICIOS (
     ID_BENEFICIO INT AUTO_INCREMENT PRIMARY KEY,
     NOME_BENEFICIO VARCHAR(100) NOT NULL,
-    DESCRICAO VARCHAR(255)
+    DESCRICAO VARCHAR(255),
+
+    CONSTRAINT UQ_BENEFICIOS_NOME UNIQUE (NOME_BENEFICIO)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -525,114 +536,182 @@ CREATE TABLE BENEFICIOS_FUNCIONARIOS (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- ÍNDICES AUXILIARES
+-- 24. FERIAS
 -- ============================================================
+-- Cada linha e um periodo de gozo (a mesma competencia pode ter
+-- ate 3 linhas, no caso de fracionamento).
+-- Regras entre linhas (fracionamento, sobreposicao, limite de 30
+-- dias por periodo aquisitivo) ficam na aplicacao; o select 6
+-- de validacao detecta sobreposicoes.
 
-CREATE INDEX IDX_FUNCIONARIOS_ID_CARGO
-    ON FUNCIONARIOS(ID_CARGO);
+CREATE TABLE FERIAS (
+    ID_FERIAS INT AUTO_INCREMENT PRIMARY KEY,
+    ID_FUNCIONARIO INT NOT NULL,
+    DATA_INICIO_PERIODO_AQUISITIVO DATE NOT NULL,
+    DATA_FIM_PERIODO_AQUISITIVO DATE NOT NULL,
+    DATA_INICIO DATE NOT NULL,
+    DATA_FIM DATE NOT NULL,
+    ABONO_PECUNIARIO BOOLEAN NOT NULL DEFAULT FALSE,
+    DIAS_ABONO TINYINT NOT NULL DEFAULT 0,
+    STATUS_FERIAS VARCHAR(30) NOT NULL DEFAULT 'SOLICITADA',
+    DATA_SOLICITACAO DATETIME,
+    DATA_ANALISE DATETIME,
+    ID_GESTOR INT,
+    OBSERVACAO TEXT,
 
-CREATE INDEX IDX_FUNCIONARIOS_ID_SETOR
-    ON FUNCIONARIOS(ID_SETOR);
+    CONSTRAINT FK_FERIAS_FUNCIONARIOS
+        FOREIGN KEY (ID_FUNCIONARIO)
+        REFERENCES FUNCIONARIOS(ID_FUNCIONARIO),
 
-CREATE INDEX IDX_FUNCIONARIOS_ID_GESTOR
-    ON FUNCIONARIOS(ID_GESTOR);
+    CONSTRAINT FK_FERIAS_GESTORES
+        FOREIGN KEY (ID_GESTOR)
+        REFERENCES GESTORES(ID_GESTOR),
+
+    CONSTRAINT CHK_FERIAS_PERIODO_AQUISITIVO CHECK (DATA_FIM_PERIODO_AQUISITIVO >= DATA_INICIO_PERIODO_AQUISITIVO),
+    CONSTRAINT CHK_FERIAS_INICIO_APOS_AQUISITIVO CHECK (DATA_INICIO > DATA_FIM_PERIODO_AQUISITIVO),
+    CONSTRAINT CHK_FERIAS_DURACAO CHECK (DATEDIFF(DATA_FIM, DATA_INICIO) + 1 BETWEEN 5 AND 30),
+    CONSTRAINT CHK_FERIAS_ABONO CHECK (
+        (ABONO_PECUNIARIO = FALSE AND DIAS_ABONO = 0)
+        OR (ABONO_PECUNIARIO = TRUE AND DIAS_ABONO BETWEEN 1 AND 10)
+    ),
+    CONSTRAINT CHK_FERIAS_STATUS CHECK (STATUS_FERIAS IN ('SOLICITADA', 'APROVADA', 'REJEITADA', 'EM_GOZO', 'CONCLUIDA', 'CANCELADA')),
+    CONSTRAINT CHK_FERIAS_DATAS_ANALISE CHECK (DATA_SOLICITACAO IS NULL OR DATA_ANALISE IS NULL OR DATA_ANALISE >= DATA_SOLICITACAO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 25. FERIADOS
+-- ============================================================
+-- Carga anual: cada ano tem seus proprios registros (inclusive os
+-- feriados fixos e os moveis, como Sexta-feira Santa), o que
+-- preserva o historico e permite consultar feriados de anos
+-- passados. Dia, mes e ano ficam em DATA_FERIADO (DAY(), MONTH()
+-- e YEAR() extraem cada parte).
+-- TIPO_FERIADO define a abrangencia:
+--   NACIONAL / EMPRESA : UF e MUNICIPIO nulos
+--   ESTADUAL           : UF obrigatoria
+--   MUNICIPAL          : UF e MUNICIPIO obrigatorios
+
+CREATE TABLE FERIADOS (
+    ID_FERIADO INT AUTO_INCREMENT PRIMARY KEY,
+    NOME_FERIADO VARCHAR(100) NOT NULL,
+    DATA_FERIADO DATE NOT NULL,
+    TIPO_FERIADO VARCHAR(30) NOT NULL,
+    UF CHAR(2),
+    MUNICIPIO VARCHAR(100),
+    ATIVO BOOLEAN NOT NULL DEFAULT TRUE,
+    DESCRICAO VARCHAR(255),
+
+    CONSTRAINT UQ_FERIADOS_DATA_NOME UNIQUE (DATA_FERIADO, NOME_FERIADO),
+    CONSTRAINT CHK_FERIADOS_TIPO CHECK (TIPO_FERIADO IN ('NACIONAL', 'ESTADUAL', 'MUNICIPAL', 'EMPRESA')),
+    CONSTRAINT CHK_FERIADOS_ABRANGENCIA CHECK (
+        (TIPO_FERIADO IN ('NACIONAL', 'EMPRESA') AND UF IS NULL AND MUNICIPIO IS NULL)
+        OR (TIPO_FERIADO = 'ESTADUAL' AND UF IS NOT NULL AND MUNICIPIO IS NULL)
+        OR (TIPO_FERIADO = 'MUNICIPAL' AND UF IS NOT NULL AND MUNICIPIO IS NOT NULL)
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- INDICES AUXILIARES
+-- ============================================================
+-- Indices de FK simples nao sao criados aqui porque o InnoDB
+-- ja os cria automaticamente. Apenas indices compostos uteis.
 
 CREATE INDEX IDX_PONTOS_FUNCIONARIO_DATA
     ON PONTOS(ID_FUNCIONARIO, DATA);
 
-CREATE INDEX IDX_HOLERITES_FUNCIONARIO_ANO_MES
-    ON HOLERITES(ID_FUNCIONARIO, ANO, MES);
+CREATE INDEX IDX_FERIAS_FUNCIONARIO_INICIO
+    ON FERIAS(ID_FUNCIONARIO, DATA_INICIO);
 
-CREATE INDEX IDX_TREINAMENTOS_FUNCIONARIO
-    ON TREINAMENTOS_FUNCIONARIOS(ID_FUNCIONARIO);
+-- ============================================================
+-- DADOS INICIAIS - FERIADOS NACIONAIS DE 2026 (opcional)
+-- A carga deve ser repetida a cada ano com as datas do ano.
+-- Carnaval e Corpus Christi sao pontos facultativos e nao foram
+-- incluidos; cadastre como EMPRESA se a empresa os adotar.
+-- ============================================================
 
-CREATE INDEX IDX_BENEFICIOS_FUNCIONARIOS_ID_FUNCIONARIO
-    ON BENEFICIOS_FUNCIONARIOS(ID_FUNCIONARIO);
+INSERT INTO FERIADOS (NOME_FERIADO, DATA_FERIADO, TIPO_FERIADO) VALUES
+    ('Confraternizacao Universal', '2026-01-01', 'NACIONAL'),
+    ('Sexta-feira Santa', '2026-04-03', 'NACIONAL'),
+    ('Tiradentes', '2026-04-21', 'NACIONAL'),
+    ('Dia do Trabalho', '2026-05-01', 'NACIONAL'),
+    ('Independencia do Brasil', '2026-09-07', 'NACIONAL'),
+    ('Nossa Senhora Aparecida', '2026-10-12', 'NACIONAL'),
+    ('Finados', '2026-11-02', 'NACIONAL'),
+    ('Proclamacao da Republica', '2026-11-15', 'NACIONAL'),
+    ('Dia da Consciencia Negra', '2026-11-20', 'NACIONAL'),
+    ('Natal', '2026-12-25', 'NACIONAL');
 
 -- ============================================================
 -- SELECTS DE VALIDACAO
 -- RHSystem
--- ============================================================
--- 1. FUNCIONARIOS
--- Validar datas de admissao, desligamento e situacao
+-- Foco em inconsistencias que as constraints NAO impedem.
+-- Cada select deve retornar 0 linhas.
 -- ============================================================
 
-SELECT
-    ID_FUNCIONARIO,
-    NOME,
-    DATA_ADMISSAO,
-    DATA_DESLIGAMENTO,
-    ATIVO
-FROM FUNCIONARIOS
-WHERE
-    (DATA_DESLIGAMENTO IS NOT NULL
-     AND DATA_DESLIGAMENTO < DATA_ADMISSAO)
-    OR
-    (ATIVO = TRUE
-     AND DATA_DESLIGAMENTO IS NOT NULL);
-
-
 -- ============================================================
--- 2. USUARIOS
--- Verificar e-mails duplicados
+-- 1. FUNCIONARIOS sem FUNCIONARIOS_DETALHES
 -- ============================================================
 
 SELECT
-    EMAIL,
-    COUNT(*) AS QUANTIDADE
-FROM USUARIOS
-GROUP BY EMAIL
-HAVING COUNT(*) > 1;
+    F.ID_FUNCIONARIO,
+    F.NOME
+FROM FUNCIONARIOS F
+LEFT JOIN FUNCIONARIOS_DETALHES D
+    ON D.ID_FUNCIONARIO = F.ID_FUNCIONARIO
+WHERE D.ID_FUNCIONARIO IS NULL;
 
 
 -- ============================================================
--- 3. FUNCIONARIOS_DETALHES
--- Verificar funcionarios com mais de um registro de detalhes
--- ============================================================
-
-SELECT
-    ID_FUNCIONARIO,
-    COUNT(*) AS QUANTIDADE_REGISTROS
-FROM FUNCIONARIOS_DETALHES
-GROUP BY ID_FUNCIONARIO
-HAVING COUNT(*) > 1;
-
-
--- ============================================================
--- 4. AVISOS
--- Verificar datas de publicacao e expiracao inconsistentes
+-- 2. USUARIOS ativos vinculados a funcionarios inativos
 -- ============================================================
 
 SELECT
-    ID_AVISO,
-    TITULO,
-    DATA_PUBLICACAO,
-    DATA_EXPIRACAO
-FROM AVISOS
-WHERE DATA_PUBLICACAO IS NOT NULL
-  AND DATA_EXPIRACAO IS NOT NULL
-  AND DATA_EXPIRACAO < DATA_PUBLICACAO;
+    U.ID_USUARIO,
+    U.ID_FUNCIONARIO,
+    F.NOME,
+    F.ATIVO
+FROM USUARIOS U
+JOIN FUNCIONARIOS F
+    ON F.ID_FUNCIONARIO = U.ID_FUNCIONARIO
+WHERE U.ATIVO = TRUE
+  AND F.ATIVO = FALSE;
 
 
 -- ============================================================
--- 5. AVISOS_VISUALIZACOES
--- Verificar avisos visualizados sem data de visualizacao
+-- 3. USUARIOS sem e-mail corporativo (impossibilita o login)
 -- ============================================================
 
 SELECT
-    ID_AVISO_VISUALIZACAO,
-    ID_AVISO,
-    ID_FUNCIONARIO,
-    VISUALIZADO,
-    DATA_VISUALIZACAO
-FROM AVISOS_VISUALIZACOES
-WHERE VISUALIZADO = TRUE
-  AND DATA_VISUALIZACAO IS NULL;
+    U.ID_USUARIO,
+    U.ID_FUNCIONARIO,
+    F.NOME
+FROM USUARIOS U
+JOIN FUNCIONARIOS F
+    ON F.ID_FUNCIONARIO = U.ID_FUNCIONARIO
+WHERE F.EMAIL_CORPORATIVO IS NULL
+   OR TRIM(F.EMAIL_CORPORATIVO) = '';
 
 
 -- ============================================================
--- 6. PONTOS
--- Verificar horarios de entrada e saida inconsistentes
+-- 4. FUNCIONARIOS ativos com gestor que e funcionario inativo
+-- ============================================================
+
+SELECT
+    F.ID_FUNCIONARIO,
+    F.NOME,
+    G.ID_GESTOR,
+    FG.NOME AS NOME_GESTOR
+FROM FUNCIONARIOS F
+JOIN GESTORES G
+    ON G.ID_GESTOR = F.ID_GESTOR
+JOIN FUNCIONARIOS FG
+    ON FG.ID_FUNCIONARIO = G.ID_FUNCIONARIO
+WHERE F.ATIVO = TRUE
+  AND FG.ATIVO = FALSE;
+
+
+-- ============================================================
+-- 5. PONTOS com saida anterior a entrada
 -- Considera jornadas que nao atravessam a meia-noite
 -- ============================================================
 
@@ -650,60 +729,83 @@ WHERE HORA_ENTRADA IS NOT NULL
 
 
 -- ============================================================
--- 7. HOLERITES
--- Verificar holerites duplicados por funcionario e competencia
+-- 6. FERIAS sobrepostas do mesmo funcionario
+-- (considera apenas ferias solicitadas, aprovadas ou em gozo)
 -- ============================================================
 
 SELECT
+    A.ID_FUNCIONARIO,
+    A.ID_FERIAS AS ID_FERIAS_A,
+    B.ID_FERIAS AS ID_FERIAS_B,
+    A.DATA_INICIO AS INICIO_A,
+    A.DATA_FIM AS FIM_A,
+    B.DATA_INICIO AS INICIO_B,
+    B.DATA_FIM AS FIM_B
+FROM FERIAS A
+JOIN FERIAS B
+    ON B.ID_FUNCIONARIO = A.ID_FUNCIONARIO
+   AND B.ID_FERIAS > A.ID_FERIAS
+   AND A.DATA_INICIO <= B.DATA_FIM
+   AND B.DATA_INICIO <= A.DATA_FIM
+WHERE A.STATUS_FERIAS IN ('SOLICITADA', 'APROVADA', 'EM_GOZO')
+  AND B.STATUS_FERIAS IN ('SOLICITADA', 'APROVADA', 'EM_GOZO');
+
+
+-- ============================================================
+-- 7. FERIAS ativas de funcionarios desligados
+-- ============================================================
+
+SELECT
+    FE.ID_FERIAS,
+    FE.ID_FUNCIONARIO,
+    F.NOME,
+    F.DATA_DESLIGAMENTO,
+    FE.DATA_INICIO,
+    FE.STATUS_FERIAS
+FROM FERIAS FE
+JOIN FUNCIONARIOS F
+    ON F.ID_FUNCIONARIO = FE.ID_FUNCIONARIO
+WHERE FE.STATUS_FERIAS IN ('SOLICITADA', 'APROVADA', 'EM_GOZO')
+  AND F.DATA_DESLIGAMENTO IS NOT NULL
+  AND FE.DATA_INICIO > F.DATA_DESLIGAMENTO;
+
+
+-- ============================================================
+-- 8. PONTOS registrados em feriado nacional ativo
+-- (para conferencia de jornada e adicional de feriado)
+-- ============================================================
+
+SELECT
+    P.ID_PONTO,
+    P.ID_FUNCIONARIO,
+    P.DATA,
+    FD.NOME_FERIADO
+FROM PONTOS P
+JOIN FERIADOS FD
+    ON FD.DATA_FERIADO = P.DATA
+WHERE FD.ATIVO = TRUE
+  AND FD.TIPO_FERIADO = 'NACIONAL';
+
+
+-- ============================================================
+-- 9. HOLERITES sem arquivo ou sem data de publicacao
+-- ============================================================
+
+SELECT
+    ID_HOLERITE,
     ID_FUNCIONARIO,
     ANO,
     MES,
-    COUNT(*) AS QUANTIDADE_HOLERITES
+    DATA_PUBLICACAO,
+    CAMINHO_ARQUIVO
 FROM HOLERITES
-GROUP BY
-    ID_FUNCIONARIO,
-    ANO,
-    MES
-HAVING COUNT(*) > 1;
+WHERE CAMINHO_ARQUIVO IS NULL
+   OR TRIM(CAMINHO_ARQUIVO) = ''
+   OR DATA_PUBLICACAO IS NULL;
 
 
 -- ============================================================
--- 8. ADVERTENCIAS
--- Verificar status fora dos valores permitidos
--- ============================================================
-
-SELECT
-    ID_ADVERTENCIA,
-    ID_FUNCIONARIO,
-    TIPO_ADVERTENCIA,
-    STATUS_ADVERTENCIA
-FROM ADVERTENCIAS
-WHERE STATUS_ADVERTENCIA IS NOT NULL
-  AND STATUS_ADVERTENCIA NOT IN (
-      'PENDENTE',
-      'APLICADA',
-      'CANCELADA'
-  );
-
-
--- ============================================================
--- 9. TREINAMENTOS_FUNCIONARIOS
--- Verificar notas fora do intervalo de 0 a 100
--- ============================================================
-
-SELECT
-    ID_TREINAMENTO_FUNCIONARIO,
-    ID_TREINAMENTO,
-    ID_FUNCIONARIO,
-    NOTA
-FROM TREINAMENTOS_FUNCIONARIOS
-WHERE NOTA IS NOT NULL
-  AND (NOTA < 0 OR NOTA > 100);
-
-
--- ============================================================
--- 10. TREINAMENTOS_CERTIFICADOS
--- Verificar certificados sem dados de emissao ou validacao
+-- 10. TREINAMENTOS_CERTIFICADOS sem dados de emissao ou validacao
 -- ============================================================
 
 SELECT
@@ -719,8 +821,7 @@ WHERE DATA_EMISSAO IS NULL
 
 
 -- ============================================================
--- 11. FORMULARIOS_PERGUNTAS
--- Verificar perguntas sem ordem valida
+-- 11. FORMULARIOS_PERGUNTAS sem ordem definida
 -- ============================================================
 
 SELECT
@@ -729,24 +830,7 @@ SELECT
     TEXTO_PERGUNTA,
     ORDEM
 FROM FORMULARIOS_PERGUNTAS
-WHERE ORDEM IS NULL
-   OR ORDEM <= 0;
-
-
--- ============================================================
--- 12. BENEFICIOS_FUNCIONARIOS
--- Verificar associacoes duplicadas entre funcionarios e beneficios
--- ============================================================
-
-SELECT
-    ID_FUNCIONARIO,
-    ID_BENEFICIO,
-    COUNT(*) AS QUANTIDADE_ASSOCIACOES
-FROM BENEFICIOS_FUNCIONARIOS
-GROUP BY
-    ID_FUNCIONARIO,
-    ID_BENEFICIO
-HAVING COUNT(*) > 1;
+WHERE ORDEM IS NULL;
 
 
 -- ============================================================
