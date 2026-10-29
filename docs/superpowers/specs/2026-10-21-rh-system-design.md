@@ -1,6 +1,6 @@
 # RH-System: design
 
-Data: 2026-10-21 · Status: aprovado pelo Miguel em 2026-10-21 (seções 1 a 13); em 2026-10-28 a abordagem do banco mudou para scripts SQL versionados (seções 2, 3, 4, 5, 7, 8, 10, 11, 12 e 13.4 atualizadas, aguardando nova aprovação) · Tipo: TCC, com demo publicada no Azure
+Data: 2026-10-21 · Status: aprovado pelo Miguel em 2026-10-21 (seções 1 a 13); em 2026-10-28 a abordagem do banco mudou para scripts SQL versionados (seções 2, 3, 4, 5, 7, 8, 10, 11, 12 e 13.4 atualizadas, aguardando nova aprovação; em 2026-10-29 foram incorporadas as decisões sobre formulários, treinamentos, férias, benefícios, documentos e atestado, também aguardando aprovação) · Tipo: TCC, com demo publicada no Azure
 
 ## 1. Objetivo e contexto
 
@@ -10,11 +10,11 @@ Sistema web de RH para cadastro e acompanhamento de colaboradores, ponto, comuni
 
 ### Funcionalidades por perfil
 
-**RH (acesso total):** gerenciar colaboradores (adicionar, editar, inativar, visualizar), importar colaboradores por Excel, criar formulários e quiz (entrevista de emprego automática, formulário de admissão, avaliação de funcionários para superiores e vice-versa), ponto (calendário do Brasil com feriados municipais cadastráveis, visualização e edição por funcionário), advertências, avisos simples e detalhados, holerites por funcionário, TAD (treinamentos de onboarding e similares), calendário do RH, notificações por e-mail e log de auditoria.
+**RH (acesso total):** gerenciar colaboradores (adicionar, editar, inativar, visualizar), importar colaboradores por Excel, criar formulários (entrevista de emprego automática por link público, formulário de admissão, avaliação de funcionários para superiores e vice-versa; sem quiz, decisão de 2026-10-29), ponto (calendário do Brasil com feriados municipais cadastráveis, visualização e edição por funcionário), advertências, avisos simples e detalhados, holerites por funcionário, TAD (treinamentos de onboarding e similares), calendário do RH, notificações por e-mail e log de auditoria.
 
 **Funcionário (acesso básico):** bater ponto, pedir manutenção de ponto (justificativa obrigatória), apresentar atestado, ver banco de horas, saldo de férias e próximo pagamento, pedir férias, ver holerites recebidos, ver aniversariantes, ver avisos, responder formulários pendentes, ver benefícios e emitir certificado após concluir um TAD.
 
-**Gestor:** tudo do funcionário, mais o painel da equipe do **setor** de que é responsável. Da equipe vê contato, contrato, jornada, ponto, treinamentos, formulários respondidos e advertências. Faz a primeira etapa de aprovação de ajustes de ponto e de férias e registra advertências. **Não vê** CPF, endereço, holerites nem documentos, e não edita o cadastro (decisão do dono em 2026-10-21, seguindo o Figma).
+**Gestor:** tudo do funcionário, mais o painel da equipe do **setor** de que é responsável. Da equipe vê contato, contrato, jornada, ponto, treinamentos, formulários respondidos, advertências e atestados (o arquivo; decisão de 2026-10-29). Faz a primeira etapa de aprovação de ajustes de ponto e de férias e registra advertências. **Não vê** CPF, endereço, holerites nem documentos, e não edita o cadastro (decisão do dono em 2026-10-21, seguindo o Figma).
 
 ## 2. Stack e restrições
 
@@ -69,18 +69,18 @@ O banco é mantido por **scripts SQL versionados** (decisão do dono em 2026-10-
 3. `NIVEIS_DE_ACESSO` **permanece**. Um script semeia três níveis com os nomes `RH`, `Funcionario` e `Funcionario Gestor` (confirmados pelo dono em 2026-10-28), que o Domain mapeia pelo nome para `Perfil.RH`, `Perfil.Funcionario` e `Perfil.Gestor`; funcionário sem nível ou com nível desconhecido não entra (403). `USUARIOS` guarda só a ligação com o funcionário, o hash da senha e o último login; **nome e e-mail de login vêm de `FUNCIONARIOS` (`EMAIL_CORPORATIVO`)**, e não pode existir usuário sem funcionário.
 4. Inativar não apaga: o funcionário continua no banco com holerites e histórico, e perde o login.
 
-**Autorização.** Cada caso de uso recebe o usuário logado e passa por **um filtro de escopo único**: RH vê tudo; Gestor vê a equipe do setor, **só os campos permitidos** (contato, contrato, jornada, ponto, treinamentos, formulários e advertências); Funcionário vê só a si mesmo. CPF, endereço, holerites e documentos são só do RH e do próprio colaborador. A restrição vale também por **campo**: cada perfil recebe um DTO diferente, e esconder o dado só na tela não conta. Os testes de integração cobrem uma matriz de perfil por endpoint, verificando linhas e campos.
+**Autorização.** Cada caso de uso recebe o usuário logado e passa por **um filtro de escopo único**: RH vê tudo; Gestor vê a equipe do setor, **só os campos permitidos** (contato, contrato, jornada, ponto, treinamentos, formulários, advertências e atestados); Funcionário vê só a si mesmo. CPF, endereço, holerites e documentos são só do RH e do próprio colaborador. A restrição vale também por **campo**: cada perfil recebe um DTO diferente, e esconder o dado só na tela não conta. Os testes de integração cobrem uma matriz de perfil por endpoint, verificando linhas e campos.
 
 **Arquivos** (holerite, atestado, certificado) ficam no Blob Storage, e o banco guarda só a referência. O download passa por um endpoint que valida o escopo e devolve um link temporário. Nunca há link público.
 
 **O que falta no esquema, por fatia** (cada item vira um script novo; o desenho detalhado vem no plano da fatia; o mapeamento do Figma está na seção 13.3 e as diferenças em relação ao v2, na 13.4):
 - Fundação: refresh tokens (nova tabela), auditoria (com IP e origem), importações em lote, fila de e-mails e tarefas agendadas.
 - Colaboradores: documentos do colaborador e configuração da empresa (nome, UF e município). **Sem unidades** (decisão do dono em 2026-10-28).
-- Ponto: segunda etapa de aprovação do ajuste e atestados (as várias marcações por dia já existem em `PONTOS_MARCACOES`).
+- Ponto: segunda etapa de aprovação do ajuste e atestados, com arquivo e validação só pelo RH (as várias marcações por dia já existem em `PONTOS_MARCACOES`).
 - Comunicação e documentos: holerites com tipo e agendamento, advertências com ciência e contestação.
-- Formulários: ciclos de avaliação, atribuição a quem deve responder (gera os "pendentes"), respondentes externos, pontuação do quiz.
-- TAD: módulos, progresso, inscrições em turmas.
-- Gestão: segunda etapa de aprovação de férias, pedidos de benefício e dependentes, regra e exceções de pagamento.
+- Formulários: atribuição a quem deve responder, com prazo (gera os "pendentes"), alternativas das perguntas de múltipla escolha, respondentes externos e formulário anônimo (o RH marca; decisão de 2026-10-29). **Sem quiz e sem pontuação.** **Formulário recorrente** (dono, 2026-10-29): o RH escolhe um intervalo e o formulário reabre sozinho para as pessoas responderem de novo; **sem histórico**: só a rodada atual importa, sem tabela de rodadas.
+- TAD: módulos e progresso por módulo. **Sem turmas presenciais, sem prova final e sem nota** (decisão de 2026-10-29); a inscrição em opcionais usa o status `INSCRITO`, que já existe.
+- Gestão: segunda etapa de aprovação de férias (com 13º adiantado e "sugerir outra data"), pedidos de benefício, dependentes, trajeto do vale-transporte e regra de pagamento. Exceções de pagamento: guardadas em tabela pequena (mês e data; dono, 2026-10-29).
 - Já existem no esquema do grupo e são aproveitados: `PONTOS` e `PONTOS_MARCACOES`, `FERIAS`, `FERIADOS` (por UF e município), `BANCOS_HORAS`, `AVISOS`, `HOLERITES`, `ADVERTENCIAS`, `TREINAMENTOS` e certificados, `FORMULARIOS`, `BENEFICIOS`.
 
 ## 5. Autenticação, e-mails e auditoria
@@ -141,16 +141,16 @@ A ordem segue as dependências. Se o escopo precisar encolher, o corte é por fa
 | # | Fatia | Depende de |
 |---|---|---|
 | 0 | **Esqueleto:** solution em camadas, `docker compose`, scripts SQL versionados com o executor, teste de fumaça do provider, login, shell do React, CI, deploy no Azure (a base de scripts congela neste deploy) | |
-| 1 | **Colaboradores e base transversal:** escopo por perfil (linhas e campos), auditoria, e-mail com fila e agendador, convite, redefinição de senha, cadastros de apoio (cargos, setores, unidades), cadastro com os campos do Figma, ficha, documentos do colaborador, edição, inativação | 0 |
+| 1 | **Colaboradores e base transversal:** escopo por perfil (linhas e campos), auditoria, e-mail com fila e agendador, convite, redefinição de senha, cadastros de apoio (cargos, setores; sem unidades, decisão de 2026-10-28), cadastro com os campos do Figma, ficha, documentos do colaborador, edição, inativação | 0 |
 | 2 | **Importação por Excel** | 1 |
 | 3 | **Ponto:** quatro marcações por dia, espelho, ajustes em duas etapas (gestor e RH), atestado, feriados (nacionais e estaduais automáticos, municipais cadastrados), banco de horas com consolidação diária e as telas de ponto da equipe do gestor | 1 |
 | 4 | **Comunicação e documentos:** avisos (simples, detalhados, agendados, com leitura), aniversariantes, holerites (tipos e agendamento), advertências (ciência e contestação) | 1 |
-| 5 | **Formulários e quiz:** entrevista com link público, admissão, avaliações por ciclo, pesquisa, sugestões, quiz, assistente de 4 etapas e pendentes | 1 |
-| 6 | **TAD:** treinamentos com módulos e progresso, inscrições, quiz final e certificado em PDF com código de validação | 5 (usa o quiz) |
-| 7 | **Gestão:** férias em duas etapas, benefícios (pedidos e dependentes), painéis do RH e do gestor, calendário do RH ("próximos dias"), próximo pagamento | 3, 4 |
+| 5 | **Formulários:** entrevista com link público, admissão, avaliações por ciclo, pesquisa, sugestões, formulário anônimo (o RH marca), assistente de 4 etapas e pendentes | 1 |
+| 6 | **TAD:** treinamentos com módulos e progresso, inscrição em opcionais e certificado em PDF com código de validação (conclui ao terminar os módulos; sem prova final e sem nota, decisão de 2026-10-29) | 1 |
+| 7 | **Gestão:** férias em duas etapas (com 13º adiantado e "sugerir outra data"), benefícios (pedidos, dependentes e trajeto do vale-transporte), painéis do RH e do gestor, calendário do RH ("próximos dias"), próximo pagamento | 3, 4 |
 | 8 | **Fechamento:** DER/MER atualizado a partir dos scripts, scripts revisados com o grupo, seed completo da demo, testes de ponta a ponta, ensaio da banca | todas |
 
-**Próximo pagamento (fatia 7).** O RH cadastra uma **regra padrão** (dia do mês, por exemplo "todo dia 30") e pode lançar **exceções de data para um mês específico**, que valem mais que a regra. A regra é única para a empresa toda. Se o mês não tem o dia, vale o último dia do mês. Se a data cair em fim de semana ou feriado, o pagamento **antecipa para o dia útil anterior**. As duas últimas regras são padrões propostos, a confirmar na revisão deste spec.
+**Próximo pagamento (fatia 7).** O RH cadastra uma **regra padrão** (dia do mês, por exemplo "todo dia 30") e pode lançar **exceções de data para um mês específico**, que valem mais que a regra. A regra é única para a empresa toda. Se o mês não tem o dia, vale o último dia do mês. Se a data cair em fim de semana ou feriado, o pagamento **antecipa para o dia útil anterior**. As duas últimas regras eram padrões propostos e foram aceitas pelo dono em 2026-10-29. **Em 2026-10-29** o dono aceitou a regra padrão e decidiu **guardar** as exceções por mês (tabela pequena: mês e data).
 
 **Fonte dos feriados nacionais (fatia 3).** A escolha entre calcular por regra no código (incluindo os móveis, derivados da Páscoa) e usar uma biblioteca ou API é feita na fatia 3, com a licença conferida.
 
@@ -171,19 +171,19 @@ Cálculo de folha de pagamento (o RH sobe o PDF do holerite), integração com r
 | Mapeamento | EF Core 9 com Pomelo 9.0.0, sem migrations |
 | Repositório | Duas pastas, `back-end/` e `front-end/` |
 | Equipe do gestor | O setor de que ele é responsável (regra da aplicação; o esquema do grupo mantém `GESTORES` e `FUNCIONARIOS.ID_GESTOR`) |
-| O que o gestor vê | Contato, contrato, jornada, ponto, treinamentos, formulários e advertências da equipe; sem CPF, endereço, holerites e documentos; não edita o cadastro |
+| O que o gestor vê | Contato, contrato, jornada, ponto, treinamentos, formulários, advertências e atestados da equipe (atestados desde 2026-10-29); sem CPF, endereço, holerites e documentos; não edita o cadastro |
 | Importação com erro | Tudo ou nada |
 | E-mails | Os 6 eventos da seção 5 |
 | Ambiente Azure | Ao fim da fatia 0, após confirmar a conta |
 | Holerite | O RH sobe o PDF |
-| Próximo pagamento | Regra padrão mais exceções |
+| Próximo pagamento | Regra padrão mais exceções por mês, guardadas (dono, 2026-10-29) |
 | Relógio de ponto físico | Fora do escopo; o ponto é só pelo sistema |
 | Sessão no navegador | Refresh token no `localStorage` (o usuário não perde o login ao fechar a aba) |
 | Usuário inativo | Com a senha certa vê "Seu acesso está desativado. Fale com o RH." (403); com a senha errada, a resposta genérica |
 | Documentação da API | Gerada pela própria API; ligada no Azure na demo |
 | Níveis de acesso | `RH`, `Funcionario` e `Funcionario Gestor` |
 | Unidades (filiais) | Não haverá: a empresa é um lugar só, e o feriado municipal vale para todos (dono, 2026-10-28) |
-| Aprovação de férias e de ajuste de ponto | Duas etapas, gestor e depois RH, como no Figma; o grupo acrescenta os status e reescreve os dois triggers (dono, 2026-10-28). O RH poder decidir direto, como o Figma mostra, a confirmar |
+| Aprovação de férias e de ajuste de ponto | Duas etapas, gestor e depois RH, como no Figma; o grupo acrescenta os status e reescreve os dois triggers (dono, 2026-10-28). **Mudou em 2026-10-29:** sem status novos e sem mexer nos triggers; a etapa do gestor fica em colunas e o status só muda na decisão final. O gestor sempre valida (se recusa, o pedido acaba na hora); se estiver ausente, o RH liga uma chave, por gestor, que faz o gestor aprovar automaticamente os pedidos da equipe dele (férias e ajuste de ponto). Os pedidos de quem é gestor não têm etapa do gestor: só o RH decide, e quem do RH decide fica também em `GESTORES`. Para os demais pedidos não há "RH decide direto" |
 | E-mail do aviso | Todo aviso publicado manda e-mail (evento 2 da seção 5); a opção "enviar por e-mail também" do Figma não existe (dono, 2026-10-28) |
 | Inativar funcionário | Continua como o banco do grupo faz: desativa usuário e benefícios e cancela férias futuras, sem aviso e sem registro próprio dessas consequências (dono, 2026-10-28) |
 | Holerites | Com tipo (mensal, 13º, férias), criado pelo Kauan, que também ajusta a chave única de um holerite por pessoa por mês; sem "novo" ou "visto" (dono, 2026-10-28) |
@@ -191,7 +191,20 @@ Cálculo de folha de pagamento (o RH sobe o PDF do holerite), integração com r
 | Triggers do grupo | Por enquanto não se mexe neles (dono, 2026-10-28), salvo a correção do Kauan nos de ponto |
 | Horário padrão da empresa | Um só para todos (entrada, saída e tolerância), criado pelo Kauan; o atraso é medido contra ele (dono, 2026-10-28) |
 | Advertências | Com ciência e contestação: o funcionário confirma ou contesta com texto, e o RH analisa; status novo `CONTESTADA` (dono, 2026-10-28) |
-| Arquivos SQL do grupo | Movidos para `Banco de Dados/Scripts/` (V001 a V003), com autorização do dono em 2026-10-28; o dono numera as versões e avisa o grupo |
+| Arquivos SQL do grupo | Serão movidos para `Banco de Dados/Scripts/` (V001 a V003) na Task 4 do plano da fatia 0 (ainda não feito), com autorização do dono em 2026-10-28; o dono numera as versões e avisa o grupo |
+| Formulários (2026-10-29) | Sem tipo quiz e sem prova final. Perguntas: múltipla escolha, resposta curta e longa, escala de 1 a 5 e envio de arquivo; cortadas: eliminatória, nota dada pelo RH e resposta certa com pontos. Quem deve responder e prazo; entrevista por link público; avaliação por ciclo; o RH marca cada formulário como anônimo ou não; o anônimo não tem envio de arquivo nem link público; formulário recorrente apaga as respostas antigas ao reabrir (dono, 2026-10-29) |
+| Treinamentos (2026-10-29) | Com módulos e progresso, sem prova final e **sem nota** (nem escala nem mínima); conclui ao terminar os módulos e o certificado sai; só online (sem modalidade e sem turmas presenciais), só "inscrever-se" nos opcionais; pode ficar em rascunho ou ser publicado com acesso liberado só na data de início (dono, 2026-10-29; Figma, tela 26); vale para todos, setores ou pessoas escolhidas, sem "por cargo" (Figma, tela 26). O RH escolhe, por treinamento, se emite certificado: a caixa "Emitir certificado" do Figma (tela 25) fica (dono, 2026-10-29) |
+| Férias (2026-10-29) | 13º adiantado (sim ou não) e "sugerir outra data" do gestor ficam; se a pessoa recusa as datas sugeridas, o pedido encerra e ela é orientada a conversar melhor com o gestor antes de abrir outro (dono, 2026-10-29) |
+| Benefícios (2026-10-29) | Pedido de adesão (resposta do RH em até 5 dias úteis), dependentes e trajeto do vale-transporte entram (dono, 2026-10-29) |
+| Documentos e atestados (2026-10-29) | Documentos do colaborador entram (só RH e o próprio colaborador veem). Atestado: o gestor da equipe vê o arquivo, só o RH valida; validado vira "Falta Compensada" e não desconta do banco de horas; o RH pode recusar com motivo (a pessoa vê "recusado" e o motivo, e o dia segue como falta); o atestado pode ser de dias inteiros ou de algumas horas (dono, 2026-10-29) |
+| Tabelas novas (2026-10-29) | Finalidade aprovada: documentos, atestados, dependentes, trajeto do vale-transporte, módulos, progresso por módulo, alternativas das perguntas, quem deve responder e o registro de participação em formulário anônimo. Também aprovada: exceções de pagamento (mês e data). Escritas como scripts `V006` a `V029` a pedido do dono (2026-10-29), para o Kauan conferir depois. Sem triggers nas tabelas novas: as regras ficam na aplicação (decisão da sessão, por delegação do dono, 2026-10-29). Sem tabela de rodadas: o formulário recorrente não guarda histórico (dono, 2026-10-29) |
+| Caixa de sugestões (2026-10-29) | Usa o tipo de formulário `OUTRO`, sem mudar o banco (dono, 2026-10-29) |
+| Rascunho de aviso (2026-10-29) | Coluna `ENVIADO` (sim ou não) em `AVISOS`: o rascunho fica com `ENVIADO = não`; sem mexer nos triggers de aviso (ideia do dono, 2026-10-29) |
+| Desligamento agendado (2026-10-29) | O RH pode registrar a data de desligamento antes; a aplicação guarda a data e só a grava em `FUNCIONARIOS` no dia seguinte ao último dia de trabalho, depois de consolidar esse dia, porque o banco inativa a pessoa assim que há data de desligamento e passa a recusar a batida e o banco de horas dela (dono, 2026-10-29; a regra do dia seguinte é da sessão) |
+| Ações diretas do RH (2026-10-29) | Registrar férias pela ficha e corrigir batida não passam pela segunda etapa (dono, 2026-10-29) |
+| Ajuste de ponto (2026-10-29) | Um pedido pode trazer **várias batidas**; o pedido é um só (dono, 2026-10-29). A correção pedida fica numa tabela nova de itens, uma linha por batida; um pedido cobre um dia, como no Figma (telas 13 e 55), e a correção é uma batida ou um período (entrada e saída) |
+| Dependentes e trajeto do vale-transporte (2026-10-29) | Dependente: nome, parentesco e data de nascimento. Trajeto: origem, destino e linhas ou meios de transporte. Se faltar campo, vira um script novo (dono, 2026-10-29) |
+| Holerite (2026-10-29) | O trigger que recusa competência futura é ajustado pelo Kauan para aceitá-la no tipo férias (única exceção ao "não mexer em triggers"); holerite errado guarda versões, porque o banco não deixa apagar (decisão da sessão, por delegação do dono, 2026-10-29) |
 
 ## 11. Riscos
 
@@ -204,15 +217,15 @@ Cálculo de folha de pagamento (o RH sobe o PDF do holerite), integração com r
 7. **Agendador e plano do App Service.** Se o Always On não estiver disponível no plano barato, as publicações agendadas e a consolidação do banco de horas podem não rodar. Conferir antes do deploy da fatia 0 (seção 7).
 8. **Esquema do grupo ainda em mudança e desalinhamento entre SQL e C#.** Mitigado pelo teste que compara o mapeamento com o banco e pelo congelamento da `V001` e da `V002` no primeiro deploy.
 9. **Triggers: executor de scripts e Azure.** O executor trata `DELIMITER` por conta própria e é testado contra o arquivo real de triggers (a ferramenta pronta, DbUp ou Flyway, não teve o tratamento de triggers confirmado). Criar triggers e funções no Azure pode exigir configuração do servidor (não verificado).
-10. **Triggers do grupo desalinhados com as tabelas (em correção pelo Kauan).** `TRG_PONTOS_BEFORE_INSERT` e `TRG_PONTOS_BEFORE_UPDATE` usam colunas removidas de `PONTOS` em 2026-10-28. O teste que aplica os scripts reais é a prova, e a Task 4 do plano tem um ramo de decisão se ainda falhar.
+10. **Triggers do grupo desalinhados com as tabelas (corrigidos em 2026-10-29, o Kauan valida).** `TRG_PONTOS_BEFORE_INSERT` e `TRG_PONTOS_BEFORE_UPDATE` usavam colunas removidas de `PONTOS` em 2026-10-28; o dono autorizou a correção direto no arquivo, com comentário explicando (o script aplicava só 13 dos 36 triggers; agora aplica os 36 num MySQL 8.4.13). O teste que aplica os scripts reais continua sendo a prova, e a Task 4 do plano tem um ramo de decisão se ainda falhar (por exemplo, se o Kauan subir uma versão própria).
 
 ## 12. Pendências
 
 - Figma conectado e mapeado em texto (seção 13). Falta ver as capturas de tela das telas principais e os fluxos do protótipo.
 - Confirmar qual conta do SENAI tem os créditos (antes do deploy da fatia 0).
-- O `pesquisador` foi testado e funcionou. O `revisor-de-plano` ainda não rodou: o plano passa por ele antes de executar.
-- Confirmar as regras de pagamento em fim de semana e feriado (seção 8).
-- Definir quem aprova os pedidos de ajuste de ponto e de férias de um gestor (o Figma não mostra um gestor acima dele) e se o responsável do setor conta como membro da própria equipe. Decidir na fatia 1.
+- O `pesquisador` foi testado e funcionou. O `revisor-de-plano` rodou sobre o roadmap, o spec e a lista do Kauan (2026-10-28 e 2026-10-29); cada plano de fatia passa por ele antes de executar.
+- Regras de pagamento em fim de semana e feriado: aceitas pelo dono em 2026-10-29 (seção 8).
+- Pedidos de ajuste de ponto e de férias de um gestor: só o RH decide (dono, 2026-10-29). Ainda a decidir, na fatia 1: se o responsável do setor conta como membro da própria equipe.
 - Confirmar os eventos de e-mail adicionais da seção 5.
 - Combinar com o grupo o fluxo dos scripts SQL (quem escreve cada script, nomes `Vnnn__descricao.sql`, a `V001` sem `DROP`, mover os arquivos atuais para `Banco de Dados/Scripts/`) e confirmar os nomes dos três níveis de acesso. **A base v2 ainda não está 100% pronta:** avisar o grupo de que `NIVEIS_DE_ACESSO`, `FUNCIONARIOS` e `USUARIOS` são usadas já na fatia 0 e que o teste de mapeamento quebra se mudarem sem aviso.
 - Confirmar com o grupo se `FUNCIONARIOS.ID_GESTOR` pode diferir do gestor do setor (seção 4).
@@ -252,8 +265,8 @@ Cálculo de folha de pagamento (o RH sobe o PDF do holerite), integração com r
 - **Fatia 3 (ponto):**
   - Quatro marcações por dia (entrada, saída para o almoço, volta, saída), espelho por colaborador com total, banco de horas e faltas. **Com horário padrão da empresa** (um só para todos, criado pelo Kauan; decisão do dono em 2026-10-28): o atraso é medido contra esse horário, e o Figma mostra "44 h semanais, das 08:00 às 17:48" e "Atraso de 14 min".
   - Banco de horas "atualizado até ontem", o que indica consolidação diária. **Só lançamentos automáticos** (decisão do dono em 2026-10-28): o botão "Lançar no banco de horas" do Figma fica escondido, e a consolidação é recalculável por dia.
-  - Pedido de ajuste com justificativa em **duas etapas: gestor e depois RH**, com e-mail em cada etapa. O RH também pode aprovar direto.
-  - Atestado enviado pelo funcionário e validado pelo RH.
+  - Pedido de ajuste com justificativa e **várias batidas no mesmo pedido** (dono, 2026-10-29), em **duas etapas: gestor e depois RH**, com e-mail em cada etapa. Se o gestor estiver ausente, o RH liga uma chave de aprovação automática do gestor (dono, 2026-10-29); não há "RH aprova direto". Pedido de quem é gestor: só o RH decide.
+  - Atestado enviado pelo funcionário e validado só pelo RH; o gestor da equipe vê o arquivo. Validado, o dia vira "Falta Compensada" e não desconta do banco de horas; recusado, a pessoa vê o motivo e o dia segue como falta; vale para dias inteiros e para algumas horas (dono, 2026-10-29).
   - Feriados nacionais e estaduais **importados automaticamente**. Municipais são cadastrados pelo RH, valem para todos (**sem unidades**) e têm "repetir todo ano"; os estaduais seguem a UF da empresa (configuração).
   - Exportar para a folha, espelho em PDF.
 - **Fatia 4 (comunicação e documentos):**
@@ -262,16 +275,16 @@ Cálculo de folha de pagamento (o RH sobe o PDF do holerite), integração com r
   - Advertências verbal ou escrita, aplicadas pelo RH ou pelo gestor. O colaborador confirma a ciência ou contesta com texto, e o RH responde por e-mail.
   - Aniversariantes dos próximos 14 dias na tela inicial.
 - **Fatia 5 (formulários):**
-  - Tipos: entrevista, admissão, avaliação (gestor avalia a equipe e a equipe avalia o gestor, por ciclo), quiz, pesquisa de clima e sugestões.
+  - Tipos: entrevista, admissão, avaliação (gestor avalia a equipe e a equipe avalia o gestor, por ciclo), pesquisa de clima e sugestões (que usam o tipo `OUTRO`). **Sem quiz** (dono, 2026-10-29).
   - Assistente de 4 etapas com prévia ao vivo e verificação antes de publicar.
-  - Perguntas: múltipla escolha, eliminatória, resposta curta e longa, nota dada pelo RH, quiz com pontuação, escala de 1 a 5 e envio de arquivo.
-  - Publicação por link público (candidatos que **não são funcionários**), setores ou pessoas, agendada, com prazo e nota mínima.
+  - Perguntas: múltipla escolha, resposta curta e longa, escala de 1 a 5 e envio de arquivo. **Cortadas em 2026-10-29:** eliminatória, nota dada pelo RH e quiz com pontuação (resposta certa e pontos).
+  - Publicação por link público (candidatos que **não são funcionários**), setores ou pessoas, agendada, com prazo. O RH pode marcar o formulário como **anônimo** (2026-10-29). Sem nota mínima.
   - Resultado por e-mail ao RH e convite automático dos aprovados.
 - **Fatia 6 (TAD):**
-  - Modalidade online, híbrido ou presencial, obrigatório ou opcional, com prazo.
-  - Módulos de conteúdo (vídeo, texto, link, PDF, aula presencial) e progresso por módulo.
-  - Inscrição em opcionais e em turmas presenciais.
-  - Quiz final criado em Formulários, nota mínima e certificado em PDF com código (por exemplo `LGPD-2026-00482`).
+  - Só online, sem modalidade (dono, 2026-10-29); obrigatório ou opcional, com prazo.
+  - Módulos de conteúdo (vídeo, texto, link e PDF; sem aula presencial, decidido em 2026-10-29) e progresso por módulo.
+  - Inscrição em opcionais. **Sem turmas presenciais** (2026-10-29).
+  - Certificado em PDF com código (por exemplo `LGPD-2026-00482`), emitido quando a pessoa termina os módulos, **se o RH deixou marcada a caixa "Emitir certificado"** daquele treinamento (dono, 2026-10-29). **Sem prova final, sem nota e sem nota mínima** (2026-10-29): o quiz final e a nota que o Figma mostra ficam escondidos.
   - Incluir quem for admitido até o fim do prazo e lembrete 7 dias antes.
 - **Fatia 7 (gestão):**
   - Férias com as regras CLT do protótipo: até 3 partes (uma de pelo menos 14 dias e as outras de pelo menos 5), abono de até 10 dias, adiantamento do 13º, pedido com 30 dias de antecedência, não começar nos 2 dias antes de feriado ou fim de semana, e pagamento até 2 dias antes. Fluxo gestor e depois RH, com opção "sugerir outra data".
@@ -284,13 +297,13 @@ Cálculo de folha de pagamento (o RH sobe o PDF do holerite), integração com r
 Referência: versão de 2026-10-28 (25 tabelas, 36 triggers e 8 funções). Os números de linha dos links são da versão de 2026-10-21 e podem ter se deslocado: vale o nome da tabela.
 
 - `ADVERTENCIAS` aceita `PENDENTE`, `APLICADA` e `CANCELADA` ([linha 348](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L348)). O Figma usa Aguardando ciência, Ciente e Contestada, mais o tipo Verbal ou Escrita e o texto da contestação.
-- `FORMULARIOS.TIPO_FORMULARIO` aceita `ENTREVISTA`, `ADMISSAO`, `AVALIACAO`, `PESQUISA` e `OUTRO`, sem quiz nem sugestão ([linha 456](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L456)).
+- `FORMULARIOS.TIPO_FORMULARIO` aceita `ENTREVISTA`, `ADMISSAO`, `AVALIACAO`, `PESQUISA` e `OUTRO`, sem quiz (cortado em 2026-10-29) e sem tipo sugestão (a caixa de sugestões usa `OUTRO`, decidido em 2026-10-29) ([linha 483](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L483)).
 - `HOLERITES` não tem tipo nem agendamento ([linhas 310-316](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L310-L316)).
 - `BENEFICIOS_FUNCIONARIOS` guarda só o vínculo ativo ([linhas 521-526](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L521-L526)), sem pedido de adesão, dependente ou trajeto.
 - `PONTOS` (um registro por funcionário por dia) e `PONTOS_MARCACOES` (várias batidas com data e hora) atendem às quatro marcações do Figma. `PONTOS_MANUTENCOES` tem uma única aprovação, por um gestor, com status `PENDENTE`, `APROVADA` e `REJEITADA` ([linhas 279-288](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L279-L288)), contra as duas etapas (gestor e RH) do Figma.
 - `FERIAS` existe, com duração de 5 a 30 dias, abono de até 10 dias e uma aprovação por gestor ([linhas 547-560](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L547-L560)); o Figma pede duas etapas (gestor e RH).
 - `FERIADOS` existe, por tipo (`NACIONAL`, `ESTADUAL`, `MUNICIPAL`, `EMPRESA`) com UF e município ([linhas 594-602](../../../Banco%20de%20Dados/RHSystem_Criacao_Tabelas_MySQL.sql#L594-L602)); o Figma fala em "vale para" uma unidade.
-- Não existem tabelas para unidades, documentos do colaborador, dependentes, atestados, ciclos de avaliação, módulos de treinamento com progresso, inscrições em turmas, refresh tokens, auditoria, importações e fila de e-mails.
+- Não existem tabelas para unidades, documentos do colaborador, dependentes, atestados, módulos de treinamento com progresso, refresh tokens, auditoria, importações e fila de e-mails.
 
 ### 13.5 Implicações técnicas (a incorporar nas seções 5, 7 e 11)
 
@@ -305,6 +318,6 @@ Referência: versão de 2026-10-28 (25 tabelas, 36 triggers e 8 funções). Os n
 
 - **Fatia 3:** regras de hora extra e banco de horas, formato do "exportar para a folha". **Decidido em 2026-10-28:** a validação da sequência das marcações (ENTRADA e SAIDA alternadas, em ordem) e o cálculo das horas ficam **com a aplicação**, apoiados nas funções do grupo, e não em trigger; `FN_VERIFICAR_CONSISTENCIA_PONTO` e o select de validação do script detectam o que passar.
 - **Fatia 4:** envio de holerites em lote (um PDF por colaborador, 101 de cada vez, seria inviável).
-- **Fatia 5:** anonimato das avaliações e da pesquisa de clima, e como a "verificação de dado sensível" funciona.
+- **Fatia 5:** anonimato **decidido em 2026-10-29** (o RH marca cada formulário como anônimo ou não); falta decidir como a "verificação de dado sensível" funciona.
 - **Fatia 6:** onde ficam os vídeos (arquivo no Blob ou link externo).
 - **Fatia 7:** confirmar as regras de férias do protótipo.
