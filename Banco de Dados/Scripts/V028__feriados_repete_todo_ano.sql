@@ -1,0 +1,38 @@
+-- ============================================================
+-- V028 - Feriados: "repetir todo ano"
+-- Item 26 de docs/pedidos-para-o-kauan.md
+-- ============================================================
+-- POR QUE
+--   No Figma (ponto e feriados), ao cadastrar um feriado municipal o RH
+--   pode marcar "Repetir todos os anos".
+--
+-- O QUE O BANCO JA TEM E POR QUE NAO MUDEI O DESENHO
+--   FERIADOS e de CARGA ANUAL (comentario do proprio script): cada ano tem
+--   os seus registros, o que preserva o historico e deixa consultar
+--   feriados de anos passados. A chave unica e (DATA_FERIADO,
+--   NOME_FERIADO), entao o mesmo nome em outro ano cabe sem problema.
+--   Mantive isso, em vez de trocar por "dia e mes sem ano".
+--
+-- O QUE ESTE SCRIPT FAZ
+--   Acrescenta REPETE_TODO_ANO (sim/nao, padrao nao). O AGENDADOR da
+--   aplicacao cria os registros do ano seguinte para os feriados
+--   marcados (copiando nome, dia e mes, tipo, UF e municipio), e nao
+--   duplica um registro que ja exista (pela chave unica).
+--
+-- LIMITES (a aplicacao trata)
+--   - So faz sentido para feriado de DATA FIXA (ex.: aniversario da
+--     cidade). Feriado movel nao deve ser marcado.
+--   - Um feriado em 29/02 nao existe em ano nao bissexto.
+--   - A chave unica e (data, nome): se o RH RENOMEAR um feriado que repete,
+--     o agendador pode recriar o nome antigo no ano seguinte a partir de
+--     um registro velho. Copie sempre do registro mais recente.
+--   - Nao pus CHECK por tipo de feriado: o Figma oferece isso para o
+--     municipal, mas o feriado da EMPRESA tambem pode repetir. Se quiser
+--     restringir, e um CHECK a mais num script novo.
+--
+-- NENHUM TRIGGER E ALTERADO POR ESTE SCRIPT (os triggers de FERIADOS
+-- continuam validando UF e municipio normalmente nas linhas copiadas).
+-- ============================================================
+
+ALTER TABLE FERIADOS
+    ADD COLUMN REPETE_TODO_ANO BOOLEAN NOT NULL DEFAULT FALSE;
