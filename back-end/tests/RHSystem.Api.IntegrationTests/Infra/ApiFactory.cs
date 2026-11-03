@@ -1,3 +1,5 @@
+using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +33,8 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
 
     public const string ChaveJwt = "chave-de-teste-com-mais-de-32-bytes-0123456789";
 
+    public const string OrigemPermitida = "https://app.exemplo.com.br";
+
     public const string EmailRh = "rh@empresa.com.br";
     public const string EmailComCargo = "colaborador@empresa.com.br";
     public const string EmailUsuarioInativo = "usuario.inativo@empresa.com.br";
@@ -57,10 +61,14 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:Audiencia", "rh-system-teste-web");
         builder.UseSetting("Documentacao:Habilitada", "true");
         builder.UseSetting("Testes:RotasDeTeste", "true");
+        builder.UseSetting("Autenticacao:LimiteLoginPorMinuto", "1000"); // só o teste do limite usa 5
+        builder.UseSetting("Database:AplicarScriptsAoIniciar", "false"); // o banco já vem com os scripts
+        builder.UseSetting("Cors:OrigensPermitidas:0", OrigemPermitida);
         builder.ConfigureServices(servicos =>
         {
             servicos.RemoveAll<IRelogio>();
             servicos.AddSingleton<IRelogio>(Relogio);
+            servicos.AddSingleton<IStartupFilter, IpDeOrigemParaTeste>();
         });
     }
 
@@ -107,4 +115,19 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
 
         await CriarUsuarioAsync(EmailSemNivel, nivel: null);
     }
+}
+
+/// <summary>O servidor de teste não tem IP de origem; aqui ele passa a vir de 127.0.0.1 (o proxy confiável por padrão), como numa conexão de verdade.</summary>
+internal sealed class IpDeOrigemParaTeste : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> proximo) =>
+        app =>
+        {
+            app.Use((contexto, seguinte) =>
+            {
+                contexto.Connection.RemoteIpAddress ??= IPAddress.Loopback;
+                return seguinte();
+            });
+            proximo(app);
+        };
 }

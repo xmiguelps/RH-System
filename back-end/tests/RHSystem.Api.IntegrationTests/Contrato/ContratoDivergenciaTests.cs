@@ -22,6 +22,7 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "renovarSessao",
         "sair",
         "obterUsuarioLogado",
+        "verificarSaude",
     ];
 
     private async Task<JsonNode> DocumentoGeradoAsync()

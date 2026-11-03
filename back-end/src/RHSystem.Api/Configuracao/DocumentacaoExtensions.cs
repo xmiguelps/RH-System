@@ -1,9 +1,11 @@
+using Scalar.AspNetCore;
+
 namespace RHSystem.Api.Configuracao;
 
 /// <summary>
-/// O documento OpenAPI nativo do .NET, gerado pela própria API. Só existe com <c>Documentacao:Habilitada=true</c> e é servido SEM login (a
-/// rota fica fora de qualquer família e sem política de autorização). O contrato, e não este documento, é a fonte de verdade: o teste de
-/// divergência confere um contra o outro.
+/// O documento OpenAPI nativo do .NET, gerado pela própria API, e uma UI (Scalar) que LÊ esse documento (não gera um segundo, como o
+/// Swashbuckle faz). Só existem com <c>Documentacao:Habilitada=true</c> e são servidos SEM login (fora de qualquer família de rota e sem
+/// política de autorização). O contrato, e não este documento, é a fonte de verdade: o teste de divergência confere um contra o outro.
 /// </summary>
 public static class DocumentacaoExtensions
 {
@@ -23,7 +25,8 @@ public static class DocumentacaoExtensions
     {
         if (app.Configuration.GetValue<bool>(Chave))
         {
-            app.MapOpenApi().AllowAnonymous();
+            app.MapOpenApi().AllowAnonymous(); // /openapi/v1.json
+            app.MapScalarApiReference(opcoes => opcoes.WithTitle("RH-System: API")).AllowAnonymous(); // /scalar/v1, lendo o documento acima
         }
 
         return app;

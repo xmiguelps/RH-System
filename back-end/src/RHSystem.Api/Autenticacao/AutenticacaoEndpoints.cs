@@ -9,6 +9,9 @@ namespace RHSystem.Api.Autenticacao;
 /// As rotas de <c>/api/auth</c>. Os <c>operationId</c> (<c>WithName</c>) e os códigos de resposta são os de
 /// <c>contrato/fontes/10-fatia-0-autenticacao.yaml</c>: a API declara todos, porque o gerador só descreve o que se declara.
 /// </summary>
+/// <summary>Marca a categoria dos logs das rotas de autenticação.</summary>
+internal sealed class LogDeAutenticacao;
+
 public static class AutenticacaoEndpoints
 {
     public static IEndpointRouteBuilder MapAutenticacao(this IEndpointRouteBuilder rotas)
@@ -18,11 +21,12 @@ public static class AutenticacaoEndpoints
         grupo.MapPost("/entrar", Entrar)
             .WithName("entrar")
             .AllowAnonymous()
+            .RequireRateLimiting(LimiteDeTentativasExtensions.PoliticaDeLogin)
             .Produces<SessaoResposta>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status429TooManyRequests) // o limitador é da Task 9; o código já está no contrato
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         grupo.MapPost("/renovar", Renovar)
@@ -52,8 +56,11 @@ public static class AutenticacaoEndpoints
 
     // O corpo é obrigatório no contrato (requestBody.required): sem parâmetro anulável, o documento gerado também o declara obrigatório.
     // Corpo ausente ou JSON inválido vira 400 pelo tratador global; campo vazio, pela validação abaixo.
-    private static async Task<IResult> Entrar(EntrarComando comando, EntrarCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> Entrar(EntrarComando comando, EntrarCasoDeUso casoDeUso, ILogger<LogDeAutenticacao> log, HttpContext http, CancellationToken ct)
     {
+        // Cada tentativa deixa o IP no log (nunca o e-mail nem a senha).
+        log.LogInformation("Tentativa de login vinda do IP {Ip}", http.Connection.RemoteIpAddress);
+
         var erros = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(comando.Email))
         {
