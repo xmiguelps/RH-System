@@ -4,7 +4,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Colaboradores;
 using RHSystem.Infrastructure.Autenticacao;
+using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Persistencia;
 
@@ -45,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
         services.AddScoped<IRefreshTokenRepositorio, RefreshTokenRepositorio>();
         services.AddScoped<IUnidadeDeTrabalho, UnidadeDeTrabalho>();
+        services.AddScoped<IGeradorDeMatriculas, GeradorDeMatriculas>();
 
         services.AddSingleton<ISenhaHasher, SenhaHasher>();
         services.AddSingleton<IRelogio, RelogioDoSistema>();
