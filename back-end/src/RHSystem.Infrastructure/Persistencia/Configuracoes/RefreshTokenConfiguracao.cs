@@ -16,9 +16,9 @@ public class RefreshTokenConfiguracao : IEntityTypeConfiguration<RefreshToken>
 
         // CRIADO_EM tem DEFAULT (UTC_TIMESTAMP(6)) no banco; a aplicação sempre informa o valor (relógio dela). Mapeado como gerado na
         // inclusão: sem isso o EF mandaria 0001-01-01 quando o valor não fosse preenchido.
-        builder.Property(r => r.CriadoEm).HasColumnName("CRIADO_EM").ValueGeneratedOnAdd();
-        builder.Property(r => r.ExpiraEm).HasColumnName("EXPIRA_EM");
-        builder.Property(r => r.RevogadoEm).HasColumnName("REVOGADO_EM");
+        builder.Property(r => r.CriadoEm).HasColumnName("CRIADO_EM").HasConversion(ConversoresDeTempo.Utc).ValueGeneratedOnAdd();
+        builder.Property(r => r.ExpiraEm).HasColumnName("EXPIRA_EM").HasConversion(ConversoresDeTempo.Utc);
+        builder.Property(r => r.RevogadoEm).HasColumnName("REVOGADO_EM").HasConversion(ConversoresDeTempo.Utc);
 
         builder.HasOne<Usuario>().WithMany().HasForeignKey(r => r.UsuarioId);
         builder.HasIndex(r => r.TokenHash).IsUnique();
