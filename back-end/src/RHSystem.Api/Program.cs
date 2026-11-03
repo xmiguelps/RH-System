@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using RHSystem.Api.Autenticacao;
 using RHSystem.Api.Configuracao;
 using RHSystem.Api.Saude;
@@ -16,12 +15,8 @@ builder.Services.AdicionarLimiteDeTentativas(builder.Configuration);
 builder.Services.AdicionarSaude();
 builder.Services.AdicionarDocumentacao(builder.Configuration);
 
-// Enums saem como texto ("RH", "Gestor"), não como número; números só como número (o contrato diz integer).
-builder.Services.ConfigureHttpJsonOptions(opcoes =>
-{
-    opcoes.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    opcoes.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
-});
+// O JSON do contrato (CONVENCOES.md, seção 3): enums como texto, números só como número, instante em UTC com Z, data e hora do dia.
+builder.Services.ConfigureHttpJsonOptions(opcoes => JsonDoContrato.Configurar(opcoes.SerializerOptions));
 
 var app = builder.Build();
 

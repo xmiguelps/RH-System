@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Comum;
+using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Persistencia;
 
@@ -36,7 +37,34 @@ internal static class RotasDeTeste
         });
 
         MapErros(grupo.MapGroup("/erros"));
+        MapJson(grupo.MapGroup("/json"));
     }
+
+    /// <summary>Uma rota por tipo de valor do JSON do contrato (ver <c>JsonDoContratoTests</c>); as de POST devolvem o que leram.</summary>
+    private static void MapJson(RouteGroupBuilder json)
+    {
+        json.MapGet("/instante", () => Results.Ok(new InstanteDeTeste(new DateTime(2026, 10, 7, 12, 42, 0, DateTimeKind.Utc))));
+        json.MapGet("/instante-sem-kind", () => Results.Ok(new InstanteDeTeste(new DateTime(2026, 10, 7, 12, 42, 0, DateTimeKind.Unspecified))));
+        json.MapPost("/instante", (InstanteDeTeste corpo) => Results.Ok(corpo));
+        json.MapGet("/data-e-hora", () => Results.Ok(new DataEHoraDeTeste(new DateOnly(2026, 10, 7), new TimeOnly(8, 5))));
+        json.MapPost("/data-e-hora", (DataEHoraDeTeste corpo) => Results.Ok(corpo));
+        json.MapGet(
+            "/enums",
+            () => Results.Ok(new
+            {
+                acao = AuditoriaAcao.AcessoNegado,
+                area = AuditoriaArea.Colaboradores,
+                perfil = Perfil.RH,
+                perfis = new[] { Perfil.Funcionario, Perfil.Gestor, Perfil.RH },
+            }));
+        json.MapPost("/enums", (EnumsDeTeste corpo) => Results.Ok(corpo));
+    }
+
+    internal sealed record InstanteDeTeste(DateTime Quando);
+
+    internal sealed record DataEHoraDeTeste(DateOnly Dia, TimeOnly Horario);
+
+    internal sealed record EnumsDeTeste(AuditoriaAcao? Acao, Perfil? Perfil);
 
     /// <summary>Uma rota por tipo de falha que a API sabe traduzir (ver <c>ErrosPadraoTests</c>).</summary>
     private static void MapErros(RouteGroupBuilder erros)
