@@ -17,9 +17,16 @@ public class Funcionario
 
     public bool Ativo { get; private set; } = true;
 
+    /// <summary>Cinco dígitos (<c>00482</c>), gerada pelo sistema; sem matrícula ainda (por exemplo o administrador do seed), é nula.</summary>
+    public string? Matricula { get; private set; }
+
     public NivelDeAcesso? NivelDeAcesso { get; private set; }
 
+    public int? CargoId { get; private set; }
+
     public Cargo? Cargo { get; private set; }
+
+    public int? SetorId { get; private set; }
 
     public Setor? Setor { get; private set; }
 
@@ -37,4 +44,18 @@ public class Funcionario
         };
 
     public void Inativar() => Ativo = false;
+
+    /// <summary>
+    /// Só aceita o formato que o <c>CHECK</c> do banco aceita: exatamente cinco dígitos ASCII (<c>^[0-9]{5}$</c>, sem espaço nem
+    /// quebra de linha). Quem gera o número é o contador <c>SEQUENCIAS</c>.
+    /// </summary>
+    public void AtribuirMatricula(string matricula)
+    {
+        if (matricula is null || matricula.Length != 5 || !matricula.All(c => c is >= '0' and <= '9'))
+        {
+            throw new ArgumentException("A matrícula tem exatamente 5 dígitos (por exemplo 00482).", nameof(matricula));
+        }
+
+        Matricula = matricula;
+    }
 }
