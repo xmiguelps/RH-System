@@ -65,6 +65,11 @@ public class MySqlFixture : IAsyncLifetime
     /// </summary>
     public async Task<string> NovoBancoAsync()
     {
+        // Cada banco de teste tem o próprio usuário, logo o próprio pool de conexões, e o pool de um teste já terminado só se limpa quando
+        // alguém o usa de novo: sem isto as conexões ociosas se acumulam (a suíte inteira chegou a 146 de 151) e os testes do fim falham com
+        // "Too many connections". Os testes da coleção rodam em fila, então, quando um pede o próximo banco, as conexões do anterior já estão ociosas.
+        await MySqlConnection.ClearAllPoolsAsync();
+
         var sufixo = Guid.NewGuid().ToString("N")[..12];
         var banco = $"rh_t_{sufixo}";
         var usuario = $"u_{sufixo}";
