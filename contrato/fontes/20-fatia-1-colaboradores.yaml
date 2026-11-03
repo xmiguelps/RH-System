@@ -1,0 +1,3452 @@
+# Fatia 1: colaboradores e base transversal.
+# Telas com print: RH 01, 02, 03, 09, 10, 29, 30, 31 e gestor 52 (aba Dados).
+# Telas sem print (descritas aqui): convite, redefinição e troca de senha, "Meus documentos".
+# As abas Ponto, Férias, Holerites, Treinamentos e Advertências da ficha são de outras fatias.
+tags:
+  - name: Colaboradores
+    description: Lista, cadastro, ficha (aba Dados), edição, desligamento agendado, readmissão e a equipe do gestor.
+  - name: Documentos do colaborador
+    description: Aba Documentos da ficha (RH) e a tela "Meus documentos" (a própria pessoa).
+  - name: Cadastros de apoio
+    description: Cargos, setores, gestores (com a marcação de gestor ausente) e benefícios do catálogo.
+  - name: Empresa
+    description: Configuração da empresa (nome, UF, município, horário padrão e dia de pagamento), em Cadastros, Empresa (só o RH altera).
+  - name: Usuários do sistema
+    description: Logins de acesso ao portal, com convite, ativar e desativar.
+  - name: Auditoria
+    description: Log de tudo o que acontece no portal (só leitura) e exportação em CSV.
+  - name: Senha e convite
+    description: Convite de acesso, "esqueci minha senha" e troca de senha.
+
+paths:
+  # ------------------------------------------------------------------
+  # Colaboradores (RH)
+  # ------------------------------------------------------------------
+  /api/rh/funcionarios:
+    get:
+      tags: [Colaboradores]
+      operationId: listarFuncionarios
+      summary: Lista os colaboradores, com busca e filtros por situação, setor e contrato.
+      description: |
+        Tela 01 (Colaboradores). Só o perfil `RH`.
+
+        **Busca (`busca`):** procura no nome (parte do nome, sem diferenciar maiúsculas nem acentos), no CPF
+        (só os dígitos contam; pontos e traço são ignorados) e na matrícula.
+
+        **Situação (`situacao`)** corresponde às abas da tela: `ATIVO` (padrão: pessoas ativas cuja admissão já
+        começou, **inclusive** quem está de férias ou com atestado), `EM_ADMISSAO` (ativas com data de admissão
+        no futuro; não existe coluna para isso, é só a data) e `INATIVO`. Cada linha traz a mesma `situacao`.
+
+        **Etiqueta "Situação hoje" de cada linha** (duas partes, para não haver duas definições da mesma coisa):
+        `situacao` (cadastral, acima) e `situacaoHoje`, que é o `SituacaoHoje` de `CONVENCOES.md`, seção 10
+        (`TRABALHANDO`, `FERIAS`, `ATESTADO`, `SEM_REGISTRO`, `AINDA_NAO_COMECOU`, `SEM_EXPEDIENTE`). `situacaoHoje`
+        vem `null` quando `situacao` não é `ATIVO` (pessoa em admissão ou inativa não tem expediente a considerar).
+        **A etiqueta que a tela mostra:** `situacao = INATIVO` mostra "Inativo"; `EM_ADMISSAO` mostra "Em admissão";
+        para `ATIVO`, `situacaoHoje = FERIAS` mostra "Férias", `ATESTADO` mostra "Atestado" e qualquer outro valor
+        mostra "Ativo".
+
+        **Totais (`totais`)** são da empresa inteira e **ignoram** todos os filtros: alimentam a frase
+        "101 ativos, 3 em admissão e 7 inativos" e os números das abas (o Figma mostra "2 em admissão"; o cenário de
+        demonstração de hoje tem 3, porque duas pessoas foram importadas hoje, ver `ELENCO.md`). `total` (da paginação)
+        respeita os filtros. Os três totais contam **cadastros**: quem volta à empresa pela readmissão sai de `inativos`
+        e passa a `emAdmissao` ou `ativos`, conforme a nova data de admissão. No cenário de demonstração a aba "Em
+        admissão" tem 3 pessoas: Rafael Torres (104, começa em 2026-10-13), Tiago Nogueira (105) e Aline Carvalho (202),
+        estes dois importados hoje (fatia 2) e com início em 2026-10-19.
+
+        Ordenação padrão: `NOME` crescente. A etiqueta "Experiência" do Figma **não existe** (decisão do dono).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+        - name: situacao
+          in: query
+          description: Aba da lista. Padrão `ATIVO`.
+          schema: { $ref: '#/components/schemas/FuncionarioSituacao' }
+        - name: setorId
+          in: query
+          description: Só as pessoas deste setor.
+          schema: { type: integer }
+        - name: tipoContrato
+          in: query
+          description: Só as pessoas com este tipo de contrato.
+          schema: { $ref: '#/components/schemas/FuncionarioTipoContrato' }
+        - name: ordenarPor
+          in: query
+          description: Coluna da ordenação. Padrão `NOME`.
+          schema: { type: string, enum: [NOME, DATA_ADMISSAO], default: NOME }
+        - $ref: '#/components/parameters/Direcao'
+      responses:
+        '200':
+          description: Uma página de colaboradores e os totais por situação.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioListaRespostaRh' }
+              example:
+                itens:
+                  - id: 12
+                    nome: Bruno Lima
+                    emailCorporativo: bruno.lima@empresa.com.br
+                    cargo: Analista pleno
+                    setor: Financeiro
+                    dataAdmissao: '2022-03-14'
+                    situacao: ATIVO
+                    situacaoHoje: ATESTADO
+                  - id: 4
+                    nome: Carla Mendes
+                    emailCorporativo: carla.mendes@empresa.com.br
+                    cargo: Assistente administrativa
+                    setor: Administrativo
+                    dataAdmissao: '2023-08-02'
+                    situacao: ATIVO
+                    situacaoHoje: SEM_REGISTRO
+                  - id: 2
+                    nome: Sofia Ramos
+                    emailCorporativo: sofia.ramos@empresa.com.br
+                    cargo: Analista de RH
+                    setor: Recursos Humanos
+                    dataAdmissao: '2020-11-11'
+                    situacao: ATIVO
+                    situacaoHoje: TRABALHANDO
+                pagina: 1
+                tamanhoPagina: 20
+                total: 101
+                totalPaginas: 6
+                totais: { ativos: 101, emAdmissao: 3, inativos: 7 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Colaboradores]
+      operationId: criarFuncionario
+      summary: Cadastra um colaborador e, se marcado, envia o convite de acesso.
+      description: |
+        Tela 02 (Adicionar colaborador, painel lateral). Só o perfil `RH`.
+
+        Grava o colaborador, os dados pessoais (CPF e telefone), os benefícios escolhidos e, com
+        `enviarConvite = true`, cria o login e coloca o e-mail de convite na fila (ver "Senha e convite").
+        Tudo na mesma transação. **Ninguém recebe senha:** o login nasce sem senha utilizável.
+        O convite depende das **tabelas novas da aplicação** de convite (`V033`, com a marca de senha provisória `V032`) e de
+        fila de e-mails (`V035`).
+
+        **Regras**
+        - A **matrícula** é **gerada pelo sistema** (contador `SEQUENCIAS`, script `V030`) e é somente leitura (não vem no corpo).
+        - O **gestor** é o gestor do setor escolhido (a tela mostra o nome, que vem de `GET /api/rh/setores`).
+          Setor sem gestor deixa o colaborador sem gestor (os pedidos de ponto e de férias dele vão direto ao RH,
+          `CONVENCOES.md`, seção 9).
+        - Cargo, setor e benefícios precisam existir (senão 400 no campo).
+        - CPF: 11 dígitos sem pontuação, com os dígitos verificadores corretos (a tela mostra a máscara).
+        - O banco é a rede de segurança (422 com `regraDoBanco`): `O gestor informado e um funcionario inativo.`
+          (gestor do setor inativo, `codigo: GESTOR_DO_SETOR_INATIVO`), `CPF invalido.`,
+          `Nao e possivel ativar beneficio para funcionario inativo.`.
+        - Em admissão: se `dataAdmissao` for futura, a pessoa aparece em "Em admissão" até o dia.
+        - **Quem já trabalhou na empresa e volta não é cadastrado de novo: é readmitido** (decisão do dono, 2026-10-30;
+          `POST /api/rh/funcionarios/{funcionarioId}/readmissao`, botão "Readmitir" da ficha de quem está inativo). O banco
+          exige CPF e e-mail corporativo **únicos entre todos os cadastros, inclusive os inativos**
+          (`UQ_FUNCIONARIOS_DETALHES_CPF`, `Criacao_Tabelas:186`; `UQ_FUNCIONARIOS_EMAIL_CORPORATIVO`, `:102`; os dois
+          `UNIQUE` não têm condição de ativo). Por isso um CPF ou e-mail que já pertence a um cadastro **inativo** dá 409
+          `CPF_JA_CADASTRADO` ou `EMAIL_JA_CADASTRADO` com `cadastroExistente` (`ativo = false`), e o texto manda usar
+          "Readmitir" na ficha daquela pessoa. Se o cadastro existente está ativo, o 409 só avisa do conflito.
+
+        **Caixas "Depois de salvar" (tela 02), na mesma gravação do cadastro (tudo ou nada: se uma falhar, ninguém é cadastrado):**
+        - `incluirNoOnboarding = true` ("Incluir no treinamento Onboarding 2026"): a API inscreve a pessoa em cada treinamento
+          de onboarding em vigor, **com o mesmo efeito** de `POST /api/rh/funcionarios/{funcionarioId}/treinamentos/onboarding`
+          (`incluirFuncionarioNoOnboarding`, fatia 6; os treinamentos em vigor vêm de `GET /api/rh/treinamentos/onboarding`,
+          que o front usa para o texto da caixa e para desligá-la quando a lista vem vazia). Sem treinamento de onboarding
+          em vigor: 422 `SEM_TREINAMENTO_DE_ONBOARDING`. Padrão `false`.
+        - `formularioAdmissaoId` ("Enviar o formulário de admissão"): o id de um formulário de admissão **publicado**
+          (o front o lista com `GET /api/rh/formularios?tipo=ADMISSAO&situacao=PUBLICADO`, fatia 5). A API inclui a pessoa
+          como destinatária dele, **com o mesmo efeito** de `POST /api/rh/formularios/{formularioId}/destinatarios`
+          (`adicionarDestinatariosFormulario`, fatia 5). `null` (padrão) não envia nada. Formulário que não existe, que não é
+          de admissão ou que não está publicado: 400 em `formularioAdmissaoId`. Formulário que não é "para pessoas escolhidas"
+          ou que já encerrou: 422 `FORMULARIO_NAO_E_POR_PESSOAS` ou `FORMULARIO_ENCERRADO` (os mesmos de
+          `adicionarDestinatariosFormulario`).
+        - **Nenhum e-mail sai por estas duas caixas** (lista fechada de e-mails, `CONVENCOES.md`, seção 12): a pessoa vê o
+          treinamento e o formulário ao entrar no portal; o e-mail que ela recebe é o do convite de acesso.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FuncionarioCriarComando' }
+            example:
+              nome: Rafael Torres
+              cpf: '84639271069'
+              dataNascimento: '1995-02-09'
+              telefone: '11991234567'
+              emailCorporativo: rafael.torres@empresa.com.br
+              dataAdmissao: '2026-10-13'
+              tipoContrato: CLT
+              cargoId: 2
+              setorId: 1
+              perfil: Funcionario
+              beneficioIds: [1, 2, 5]
+              enviarConvite: true
+              incluirNoOnboarding: true
+              formularioAdmissaoId: 11
+      responses:
+        '201':
+          description: Colaborador cadastrado. Devolve a ficha completa.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioFichaRh' }
+              example:
+                id: 104
+                matricula: '00503'
+                nome: Rafael Torres
+                emailCorporativo: rafael.torres@empresa.com.br
+                cpf: '84639271069'
+                telefone: '11991234567'
+                dataNascimento: '1995-02-09'
+                rg: null
+                rgOrgaoEmissor: null
+                emailPessoal: null
+                endereco: { cep: null, logradouro: null, numero: null, complemento: null, bairro: null, cidade: null, uf: null }
+                cargo: { id: 2, nome: Vendedor }
+                setor: { id: 1, nome: Comercial }
+                gestor: { gestorId: 1, funcionarioId: 7, nome: Carlos Ribeiro }
+                tipoContrato: CLT
+                jornadaSemanalHoras: 44
+                dataAdmissao: '2026-10-13'
+                perfil: Funcionario
+                ativo: true
+                situacao: EM_ADMISSAO
+                situacaoHoje: null
+                desligamento: null
+                beneficios:
+                  - { beneficioId: 1, nome: Vale-refeição, quantidadeDependentes: 0 }
+                  - { beneficioId: 2, nome: Plano de saúde, quantidadeDependentes: 0 }
+                  - { beneficioId: 5, nome: Seguro de vida, quantidadeDependentes: 0 }
+                acesso: { situacao: CONVITE_ENVIADO, ativo: true }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '409': { $ref: '#/components/responses/Erro409ColaboradorDuplicado' }
+        '422':
+          description: Regra de negócio ou do banco. Nada foi cadastrado. Os códigos conhecidos estão em `examples`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                gestorInativo:
+                  summary: O gestor do setor está inativo
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O gestor do setor escolhido está inativo. Troque o gestor do setor em Cadastros antes de continuar.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: GESTOR_DO_SETOR_INATIVO
+                    regraDoBanco: O gestor informado e um funcionario inativo.
+                semOnboarding:
+                  summary: A caixa de onboarding está marcada, mas nenhum treinamento de onboarding está publicado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não há treinamento de onboarding publicado. Desmarque a caixa ou publique o treinamento.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: SEM_TREINAMENTO_DE_ONBOARDING
+                formularioEncerrado:
+                  summary: O formulário de admissão escolhido já encerrou
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O formulário de admissão escolhido já foi encerrado. Escolha outro.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_ENCERRADO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}:
+    get:
+      tags: [Colaboradores]
+      operationId: obterFichaDoFuncionario
+      summary: Mostra a ficha do colaborador (aba Dados), com CPF e telefone completos.
+      description: |
+        Tela 03 (Ficha, aba Dados). Só o perfil `RH`; vê **tudo**, inclusive CPF e telefone **completos, sem
+        máscara** (decisão do dono, 2026-10-30; o Figma mostra máscara, vale o documento).
+
+        Cabeçalho da tela: "cargo, setor, matrícula" (a matrícula é gerada pelo sistema e só se lê) e a etiqueta de
+        situação, que sai de `situacao` e `situacaoHoje` pela mesma regra da lista (`GET /api/rh/funcionarios`: inativo,
+        em admissão, férias, atestado ou ativo). `jornadaSemanalHoras` é a carga
+        semanal do cargo (o horário é o da empresa, em `GET /api/eu/empresa`). Os cartões de resumo da aba
+        (banco de horas, férias etc.) vêm de `GET .../indicadores`. As outras abas são de outras fatias.
+        O campo "Unidade" do Figma **não existe** (sem unidades).
+
+        **Botões do cabeçalho conforme `situacao`:** "Inativar" (`POST .../desligamento`) só para quem **não** está
+        `INATIVO`; "Readmitir" (`POST .../readmissao`) **só** para quem está `INATIVO` (o Figma só desenha o
+        "Inativar"; o "Readmitir" é novo, decisão do dono, 2026-10-30).
+
+        Quem foi criado antes da fatia 1 (o administrador do seed) pode não ter dados pessoais: `cpf` vem `null`
+        e a edição o exige.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: A ficha do colaborador.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioFichaRh' }
+              example:
+                id: 12
+                matricula: '00482'
+                nome: Bruno Lima
+                emailCorporativo: bruno.lima@empresa.com.br
+                cpf: '12348237130'
+                telefone: '11987654410'
+                dataNascimento: '1990-06-18'
+                rg: '45.678.912-3'
+                rgOrgaoEmissor: SSP-SP
+                emailPessoal: bruno.lima@email.com
+                endereco:
+                  cep: '01310100'
+                  logradouro: Avenida Paulista
+                  numero: '1578'
+                  complemento: apto 42
+                  bairro: Bela Vista
+                  cidade: São Paulo
+                  uf: SP
+                cargo: { id: 8, nome: Analista pleno }
+                setor: { id: 2, nome: Financeiro }
+                gestor: { gestorId: 2, funcionarioId: 8, nome: Marina Costa }
+                tipoContrato: CLT
+                jornadaSemanalHoras: 44
+                dataAdmissao: '2022-03-14'
+                perfil: Funcionario
+                ativo: true
+                situacao: ATIVO
+                situacaoHoje: ATESTADO
+                desligamento: null
+                beneficios:
+                  - { beneficioId: 1, nome: Vale-refeição, quantidadeDependentes: 0 }
+                  - { beneficioId: 2, nome: Plano de saúde, quantidadeDependentes: 1 }
+                  - { beneficioId: 4, nome: Vale-transporte, quantidadeDependentes: 0 }
+                  - { beneficioId: 5, nome: Seguro de vida, quantidadeDependentes: 0 }
+                acesso: { situacao: SENHA_DEFINIDA, ativo: true }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    put:
+      tags: [Colaboradores]
+      operationId: editarFuncionario
+      summary: Altera os dados cadastrais do colaborador (botão "Editar dados").
+      description: |
+        Tela 03, botão "Editar dados". Só o perfil `RH` (o gestor **não** edita cadastro). É uma substituição
+        completa dos campos editáveis: o front carrega a ficha, a pessoa altera e o front devolve tudo.
+
+        Mesmas regras do cadastro (CPF válido e único, e-mail corporativo único). Efeitos:
+        - Trocar o **e-mail corporativo** troca o e-mail de login (a pessoa precisa usar o novo).
+        - Trocar o **setor** refaz o gestor da pessoa (o gestor do novo setor); se o gestor do novo setor for a
+          própria pessoa, ela fica sem gestor (o banco recusa "gestor de si mesmo").
+        - `beneficioIds` é a lista de benefícios **ativos** desejada: os que entram são ativados (aprovados),
+          os que saem são desativados. Pedidos de adesão pendentes (fatia 7) não são tocados.
+        - Quem não tinha dados pessoais (administrador do seed) passa a tê-los ao salvar.
+        - Não existe edição de matrícula, de situação nem de nível de acesso do **próprio** RH logado
+          (`422 NAO_PODE_ALTERAR_O_PROPRIO_PERFIL`), para ninguém tirar o próprio acesso sem querer.
+        - Quem **gerencia um setor** precisa ter o nível `Gestor`: trocar o `perfil` dessa pessoa para outro valor dá
+          422 `GESTOR_PRECISA_TER_PERFIL_GESTOR` (o RH tira a pessoa do setor antes, em `PUT /api/rh/setores/{setorId}`).
+        - Inativar é feito em `/desligamento`; quem está inativo e volta à empresa é **readmitido** em `/readmissao`
+          (esta rota não reativa ninguém).
+        Erros de trigger possíveis (422 com `regraDoBanco`): `O gestor informado e um funcionario inativo.`,
+        `CPF invalido.`, `Nao e possivel ativar beneficio para funcionario inativo.`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FuncionarioEditarComando' }
+            example:
+              nome: Bruno Lima
+              cpf: '12348237130'
+              dataNascimento: '1990-06-18'
+              telefone: '11987654410'
+              emailCorporativo: bruno.lima@empresa.com.br
+              emailPessoal: bruno.lima@email.com
+              rg: '45.678.912-3'
+              rgOrgaoEmissor: SSP-SP
+              endereco:
+                cep: '01310100'
+                logradouro: Avenida Paulista
+                numero: '1578'
+                complemento: apto 42
+                bairro: Bela Vista
+                cidade: São Paulo
+                uf: SP
+              dataAdmissao: '2022-03-14'
+              tipoContrato: CLT
+              cargoId: 8
+              setorId: 2
+              perfil: Funcionario
+              beneficioIds: [1, 2, 4, 5]
+      responses:
+        '200':
+          description: Dados alterados. Devolve a ficha atualizada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioFichaRh' }
+              example:
+                id: 12
+                matricula: '00482'
+                nome: Bruno Lima
+                emailCorporativo: bruno.lima@empresa.com.br
+                cpf: '12348237130'
+                telefone: '11987654410'
+                dataNascimento: '1990-06-18'
+                rg: '45.678.912-3'
+                rgOrgaoEmissor: SSP-SP
+                emailPessoal: bruno.lima@email.com
+                endereco:
+                  cep: '01310100'
+                  logradouro: Avenida Paulista
+                  numero: '1578'
+                  complemento: apto 42
+                  bairro: Bela Vista
+                  cidade: São Paulo
+                  uf: SP
+                cargo: { id: 8, nome: Analista pleno }
+                setor: { id: 2, nome: Financeiro }
+                gestor: { gestorId: 2, funcionarioId: 8, nome: Marina Costa }
+                tipoContrato: CLT
+                jornadaSemanalHoras: 44
+                dataAdmissao: '2022-03-14'
+                perfil: Funcionario
+                ativo: true
+                situacao: ATIVO
+                situacaoHoje: ATESTADO
+                desligamento: null
+                beneficios:
+                  - { beneficioId: 1, nome: Vale-refeição, quantidadeDependentes: 0 }
+                  - { beneficioId: 2, nome: Plano de saúde, quantidadeDependentes: 1 }
+                  - { beneficioId: 4, nome: Vale-transporte, quantidadeDependentes: 0 }
+                  - { beneficioId: 5, nome: Seguro de vida, quantidadeDependentes: 0 }
+                acesso: { situacao: SENHA_DEFINIDA, ativo: true }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Erro409ColaboradorDuplicado' }
+        '422':
+          description: Regra de negócio ou do banco. Os códigos conhecidos estão em `examples`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                gestorInativo:
+                  summary: O gestor do setor está inativo
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O gestor do setor escolhido está inativo. Troque o gestor do setor em Cadastros antes de continuar.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: GESTOR_DO_SETOR_INATIVO
+                    regraDoBanco: O gestor informado e um funcionario inativo.
+                proprioPerfil:
+                  summary: O RH tentou mudar o próprio nível de acesso
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Você não pode alterar o seu próprio nível de acesso.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: NAO_PODE_ALTERAR_O_PROPRIO_PERFIL
+                gestorPrecisaTerPerfilGestor:
+                  summary: A pessoa gerencia um setor e o nível novo não é Gestor
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Carlos Ribeiro gerencia o setor Comercial e precisa ter o nível Gestor. Tire-o do setor antes de mudar o nível.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: GESTOR_PRECISA_TER_PERFIL_GESTOR
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}/indicadores:
+    get:
+      tags: [Colaboradores]
+      operationId: obterIndicadoresDoFuncionario
+      summary: Mostra os cartões de resumo da ficha (banco de horas, férias, advertências, próximo pagamento).
+      description: |
+        Tela 03: os quatro cartões abaixo dos dados pessoais, na aba Dados. Só o perfil `RH`.
+
+        **Cada número é calculado por outra fatia; esta rota só os junta** (para a aba Dados ter um lugar só de onde ler).
+        O valor é o mesmo da rota indicada, e cada campo vem `null` enquanto a fatia que o calcula não existir (o front
+        mostra "—"). Nenhuma dessas fatias define este schema; elas só preenchem o que está aqui.
+
+        | Campo | Fatia | De onde vem (mesmo valor) |
+        |---|---|---|
+        | `bancoDeHorasMinutos` | 3 (ponto) | `saldoMinutos` de `GET /api/rh/funcionarios/{funcionarioId}/ponto/banco-de-horas` |
+        | `feriasDisponiveisDias` | 7 (gestão) | `resumo.diasDisponiveis` de `GET /api/rh/funcionarios/{funcionarioId}/ferias` |
+        | `advertenciasQuantidade` | 4 (comunicação) | advertências **não canceladas do ano corrente (2026)** da pessoa; **não é** o `total` de `GET /api/rh/funcionarios/{funcionarioId}/advertencias`, que traz todos os anos |
+        | `proximoPagamento` | 7 (gestão) | `pagamento.data` de `GET /api/eu/pagamento/proximo` (a data é da empresa, igual para todos) |
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: Os valores dos cartões.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioIndicadoresRh' }
+              example:
+                bancoDeHorasMinutos: 380
+                feriasDisponiveisDias: 18
+                advertenciasQuantidade: 0
+                proximoPagamento: '2026-11-06'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}/desligamento:
+    post:
+      tags: [Colaboradores]
+      operationId: inativarFuncionario
+      summary: Inativa o colaborador (botão "Inativar"), a partir do último dia de trabalho.
+      description: |
+        Tela 03, botão "Inativar". Só o perfil `RH`. O front pede a data do **último dia de trabalho** (padrão: hoje).
+
+        **Confirmação na tela:** a tela pede que a pessoa que está desligando **digite "desativar"** para confirmar.
+        É proteção **só da interface**: a API **não** recebe nem confere essa palavra (não há campo no corpo).
+
+        **Como funciona (decidido: regra do roadmap, fatia 1):** o banco inativa a pessoa assim que há data de desligamento
+        e então recusa a batida de ponto e o lançamento do banco de horas dela. Por isso a API **guarda a data
+        como desligamento agendado** e só a grava no colaborador **no dia seguinte ao último dia de trabalho**
+        (a partir da fatia 3, depois de o banco de horas daquele dia fechar; se esse momento já passou, grava na
+        hora). Resposta: a ficha com `desligamento.situacao = AGENDADO` ou, se já foi gravado, `EFETIVADO`.
+        O desligamento agendado e a tarefa que o efetiva no dia seguinte são **tabelas novas da aplicação** (desligamento
+        agendado, script `V034`; tarefas agendadas, script `V036`).
+
+        Ao efetivar, o banco faz sozinho o que o grupo definiu: desativa o login, desativa os benefícios e cancela
+        as férias futuras (`SOLICITADA` ou `APROVADA`), **sem aviso à pessoa e sem registro próprio dessas
+        consequências** (decisão do dono, 2026-10-28). Nada é apagado: a pessoa continua no banco com o histórico.
+        **Não há reativação** do cadastro por esta família de rotas: quem volta à empresa é **readmitido**
+        (`POST /api/rh/funcionarios/{funcionarioId}/readmissao`, decisão do dono, 2026-10-30), sobre o mesmo cadastro
+        (o CPF e o e-mail continuam ocupados por ele, por isso não se cadastra de novo).
+
+        Se a pessoa é **gestor de um setor**, o setor continua apontando para ela depois de inativa: ao **efetivar**, os
+        pedidos de ponto e de férias que **já esperavam por ela** passam para a etapa do RH, e os pedidos novos da equipe
+        vão direto ao RH (`CONVENCOES.md`, seção 9, "gestor desligado") até o RH escolher outro gestor em
+        `PUT /api/rh/setores/{setorId}`.
+
+        O último dia não pode ser anterior à data de admissão (400 em `ultimoDiaDeTrabalho`).
+        Já inativa ou com desligamento já registrado: 409.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FuncionarioInativarComando' }
+            example: { ultimoDiaDeTrabalho: '2026-11-13' }
+      responses:
+        '200':
+          description: Desligamento registrado. Devolve a ficha atualizada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioFichaRh' }
+              example:
+                id: 12
+                matricula: '00482'
+                nome: Bruno Lima
+                emailCorporativo: bruno.lima@empresa.com.br
+                cpf: '12348237130'
+                telefone: '11987654410'
+                dataNascimento: '1990-06-18'
+                rg: '45.678.912-3'
+                rgOrgaoEmissor: SSP-SP
+                emailPessoal: bruno.lima@email.com
+                endereco:
+                  cep: '01310100'
+                  logradouro: Avenida Paulista
+                  numero: '1578'
+                  complemento: apto 42
+                  bairro: Bela Vista
+                  cidade: São Paulo
+                  uf: SP
+                cargo: { id: 8, nome: Analista pleno }
+                setor: { id: 2, nome: Financeiro }
+                gestor: { gestorId: 2, funcionarioId: 8, nome: Marina Costa }
+                tipoContrato: CLT
+                jornadaSemanalHoras: 44
+                dataAdmissao: '2022-03-14'
+                perfil: Funcionario
+                ativo: true
+                situacao: ATIVO
+                situacaoHoje: ATESTADO
+                desligamento: { ultimoDiaDeTrabalho: '2026-11-13', situacao: AGENDADO }
+                beneficios:
+                  - { beneficioId: 1, nome: Vale-refeição, quantidadeDependentes: 0 }
+                  - { beneficioId: 2, nome: Plano de saúde, quantidadeDependentes: 1 }
+                  - { beneficioId: 4, nome: Vale-transporte, quantidadeDependentes: 0 }
+                  - { beneficioId: 5, nome: Seguro de vida, quantidadeDependentes: 0 }
+                acesso: { situacao: SENHA_DEFINIDA, ativo: true }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409':
+          description: A pessoa já está inativa ou já tem desligamento registrado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Este colaborador já está inativo ou já tem um desligamento registrado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: DESLIGAMENTO_JA_REGISTRADO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    delete:
+      tags: [Colaboradores]
+      operationId: cancelarDesligamentoAgendado
+      summary: Cancela um desligamento agendado que ainda não foi gravado.
+      description: |
+        Só o perfil `RH`. Funciona **só** enquanto `desligamento.situacao = AGENDADO`. Depois de `EFETIVADO`
+        a pessoa já está inativa: não se cancela, e quem volta à empresa é **readmitido** (`POST .../readmissao`,
+        decisão do dono, 2026-10-30); responde 422.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '204': { description: 'Desligamento agendado cancelado.' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Não há desligamento agendado para cancelar (nunca houve, ou já foi gravado).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Não há desligamento agendado para cancelar.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: SEM_DESLIGAMENTO_AGENDADO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}/readmissao:
+    post:
+      tags: [Colaboradores]
+      operationId: readmitirFuncionario
+      summary: Readmite um colaborador inativo (botão "Readmitir"), com nova data de admissão.
+      description: |
+        Ficha de quem está **inativo** (tela 03, botão "Readmitir"; o botão não existe no Figma, decisão do dono,
+        2026-10-30). Só o perfil `RH`. É uma **nova admissão sobre o mesmo cadastro**: o mesmo `id`, o mesmo CPF, o mesmo
+        e-mail corporativo e a mesma matrícula; o histórico (ponto, férias, holerites, advertências, documentos,
+        treinamentos) **continua na ficha**. É por isso que o CPF e o e-mail de quem está inativo não se cadastram de novo:
+        `POST /api/rh/funcionarios` dá 409 e manda usar esta rota.
+
+        **O que a API faz (tudo ou nada, na mesma gravação):**
+        - o cadastro volta a ficar ativo com a nova `dataAdmissao`, o `cargoId`, o `setorId` e o `tipoContrato` do corpo; o
+          gestor é o do setor escolhido, como no cadastro; o desligamento anterior sai do cadastro (as datas do vínculo
+          anterior, admissão e último dia de trabalho, ficam **só no log de auditoria**, em "o que mudou", porque o banco
+          guarda um único par de datas por cadastro). Data de admissão futura: a pessoa fica em "Em admissão" até o dia
+          (`situacao = EM_ADMISSAO`);
+        - **não restaura** os benefícios nem as férias cancelados na inativação: a pessoa volta **sem benefícios** (o RH os
+          dá de novo em "Editar dados") e sem férias futuras;
+        - o nível de acesso é o que a pessoa tinha, exceto `Gestor`, que volta como `Funcionario`; se algum setor ainda
+          apontava para ela como gestora, o apontamento é desfeito (o RH escolhe o gestor do setor de novo, se quiser, em
+          `PUT /api/rh/setores/{setorId}`);
+        - `incluirNoOnboarding` e `formularioAdmissaoId` valem como no cadastro (`POST /api/rh/funcionarios`: mesmo efeito,
+          mesmos erros 400 e 422, **nenhum e-mail** por essas caixas);
+        - entra na auditoria como `ALTEROU` da área `COLABORADORES`.
+
+        **O login não volta sozinho:** a inativação o desativou, e quem o libera é o botão "Ativar" de Usuários do sistema
+        (`POST /api/rh/usuarios/{funcionarioId}/ativar`, que passa a valer porque o cadastro está ativo de novo). O **convite só
+        se reenvia a quem nunca definiu a senha** (`acesso.situacao` diferente de `SENHA_DEFINIDA`): para essas pessoas,
+        `enviarConvite = true` faz de uma vez o "Ativar" e o "Reenviar convite" (o link do convite não valeria com o login
+        desativado), com o e-mail de convite na fila. Quem já definiu a senha entra com ela depois do "Ativar", e
+        `enviarConvite = true` para ela dá 422 `SENHA_JA_DEFINIDA` (o front só mostra a caixa quando faz sentido). Padrão
+        `false`. O convite depende das **tabelas novas da aplicação** de convite (`V033`, com a marca de senha provisória `V032`) e de
+        fila de e-mails (`V035`).
+
+        **Erros:** a nova `dataAdmissao` não pode ser anterior ao último dia de trabalho do vínculo anterior (400 em
+        `dataAdmissao`); cadastro que **já está ativo** (inclusive com desligamento só agendado: cancele-o antes): 409
+        `FUNCIONARIO_JA_ATIVO`; gestor do setor escolhido inativo: 422 `GESTOR_DO_SETOR_INATIVO`; sem treinamento de
+        onboarding quando a caixa está marcada: 422 `SEM_TREINAMENTO_DE_ONBOARDING`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FuncionarioReadmitirComando' }
+            example:
+              dataAdmissao: '2026-11-03'
+              cargoId: 2
+              setorId: 1
+              tipoContrato: CLT
+              incluirNoOnboarding: true
+              formularioAdmissaoId: null
+              enviarConvite: false
+      responses:
+        '200':
+          description: Colaborador readmitido. Devolve a ficha atualizada (o exemplo mostra a pessoa logo depois de readmitida, com a nova data no futuro e o login ainda desativado).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioFichaRh' }
+              example:
+                id: 201
+                matricula: '00417'
+                nome: Henrique Alves
+                emailCorporativo: henrique.alves@empresa.com.br
+                cpf: '29384756083'
+                telefone: '11994411208'
+                dataNascimento: '1988-04-25'
+                rg: '33.215.874-0'
+                rgOrgaoEmissor: SSP-SP
+                emailPessoal: henrique.alves@email.com
+                endereco:
+                  cep: '04538132'
+                  logradouro: Avenida Brigadeiro Faria Lima
+                  numero: '2277'
+                  complemento: null
+                  bairro: Jardim Paulistano
+                  cidade: São Paulo
+                  uf: SP
+                cargo: { id: 2, nome: Vendedor }
+                setor: { id: 1, nome: Comercial }
+                gestor: { gestorId: 1, funcionarioId: 7, nome: Carlos Ribeiro }
+                tipoContrato: CLT
+                jornadaSemanalHoras: 44
+                dataAdmissao: '2026-11-03'
+                perfil: Funcionario
+                ativo: true
+                situacao: EM_ADMISSAO
+                situacaoHoje: null
+                desligamento: null
+                beneficios: []
+                acesso: { situacao: SENHA_DEFINIDA, ativo: false }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409':
+          description: O cadastro já está ativo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Este colaborador já está ativo. Só se readmite quem está inativo.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FUNCIONARIO_JA_ATIVO
+        '422':
+          description: Regra de negócio ou do banco. Nada foi alterado. Os códigos conhecidos estão em `examples`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                gestorInativo:
+                  summary: O gestor do setor escolhido está inativo
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O gestor do setor escolhido está inativo. Troque o gestor do setor em Cadastros antes de continuar.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: GESTOR_DO_SETOR_INATIVO
+                    regraDoBanco: O gestor informado e um funcionario inativo.
+                senhaJaDefinida:
+                  summary: Convite pedido para quem já definiu a senha
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Esta pessoa já definiu a senha. Desmarque o convite e libere o acesso em Usuários do sistema (Ativar).
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: SENHA_JA_DEFINIDA
+                semOnboarding:
+                  summary: A caixa de onboarding está marcada, mas nenhum treinamento de onboarding está publicado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não há treinamento de onboarding publicado. Desmarque a caixa ou publique o treinamento.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: SEM_TREINAMENTO_DE_ONBOARDING
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Colaboradores (gestor): a equipe, a ficha da equipe (aba Dados)
+  # ------------------------------------------------------------------
+  /api/gestor/equipe:
+    get:
+      tags: [Colaboradores]
+      operationId: listarEquipeDoGestor
+      summary: Lista a equipe do gestor (as pessoas do setor dele, sem ele) com a situação de hoje de cada uma.
+      description: |
+        É **a lista da equipe** do contrato: as outras fatias não criam outra. Serve ao quadro "Hoje" e à tabela "Pessoas da
+        equipe" da tela 51, a quem precisa **escolher uma pessoa da equipe** (por exemplo, a advertência da tela 60,
+        fatia 4) e às contagens do dia. Só o perfil `Gestor`; é sempre **a equipe dele**.
+
+        **Quem é a equipe (definição única):** as pessoas **ativas, com a admissão já começada**, do setor de que ele é o
+        gestor, **sem o próprio gestor** (decidido pela tela 51: "8 pessoas"; o gestor não conta como membro da própria
+        equipe). Um gestor responde por **um setor**. Quem ainda está em admissão entra na equipe no dia da admissão; quem
+        é inativado sai. Sem paginação (a equipe é de um setor); ordem: nome, de A a Z.
+
+        **`situacaoHoje`** de cada pessoa é o `SituacaoHoje` de `CONVENCOES.md`, seção 10: `TRABALHANDO` é quem **já
+        registrou entrada hoje** (mesmo que já tenha saído); `SEM_REGISTRO` é quem não registrou depois do horário
+        padrão de entrada mais a tolerância (`GET /api/eu/empresa`); antes disso, `AINDA_NAO_COMECOU`. Quem precisar
+        só de quem está sem registro filtra os `itens` por `situacaoHoje = SEM_REGISTRO`.
+
+        **`contagensHoje`** são os números do dia, no schema `PresencaContagens` da base (a única forma de contar situações
+        de hoje, `CONVENCOES.md`, seção 10), calculados desta mesma lista: a soma dos seis valores é `total`. **`diaUtil`**
+        (boolean, ao lado) diz se hoje tem expediente. **Dia sem expediente** (sábado, domingo ou feriado): `diaUtil = false`
+        e quem **já bateu entrada** continua `TRABALHANDO` (a batida vence); todos os outros ficam em `SEM_EXPEDIENTE`.
+        Quem usa estes números (a lista da equipe da tela 51, o quadro "Hoje" e a fatia 7) **não** repete a lista nem as
+        contagens: lê daqui. As bolinhas do menu (pendências da equipe e pedidos de ajuste de ponto) **não** vêm daqui: são
+        de `GET /api/gestor/contadores-do-menu` (fatia 7).
+
+        Gestor sem setor (perfil `Gestor` que ainda não foi escolhido como gestor de um setor): `setor: null`, `total: 0`,
+        todas as contagens em 0 e `itens` vazio. Quem é do RH e só decide pedidos de gestores não usa esta rota (403).
+      x-perfis: [Gestor]
+      responses:
+        '200':
+          description: A equipe e as contagens de hoje.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioEquipeResposta' }
+              example:
+                setor: { id: 1, nome: Comercial }
+                total: 8
+                diaUtil: true
+                contagensHoje: { trabalhando: 6, ferias: 1, atestado: 0, semRegistro: 1, aindaNaoComecou: 0, semExpediente: 0 }
+                itens:
+                  - { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true, situacaoHoje: SEM_REGISTRO }
+                  - { id: 25, nome: Fernanda Lopes, cargo: Executiva de contas, setor: Comercial, ativo: true, situacaoHoje: TRABALHANDO }
+                  - { id: 26, nome: Gustavo Reis, cargo: Vendedor, setor: Comercial, ativo: true, situacaoHoje: TRABALHANDO }
+                  - { id: 27, nome: Helena Prates, cargo: Assistente comercial, setor: Comercial, ativo: true, situacaoHoje: TRABALHANDO }
+                  - { id: 28, nome: Igor Batista, cargo: Estagiário, setor: Comercial, ativo: true, situacaoHoje: TRABALHANDO }
+                  - { id: 22, nome: Júlia Nunes, cargo: Vendedora, setor: Comercial, ativo: true, situacaoHoje: TRABALHANDO }
+                  - { id: 23, nome: Larissa Moura, cargo: Vendedora, setor: Comercial, ativo: true, situacaoHoje: FERIAS }
+                  - { id: 24, nome: Pedro Santos, cargo: Vendedor, setor: Comercial, ativo: true, situacaoHoje: TRABALHANDO }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/equipe/{funcionarioId}:
+    get:
+      tags: [Colaboradores]
+      operationId: obterFichaDaEquipe
+      summary: Mostra a ficha de uma pessoa da equipe (aba Dados), sem CPF e com telefone mascarado.
+      description: |
+        Tela 52 (Painel da equipe, ficha, aba Dados). Só o perfil `Gestor`, e só pessoas **da equipe dele** (a lista de
+        `GET /api/gestor/equipe`: o setor em que ele é o gestor, pessoas ativas com a admissão já começada, **sem o próprio
+        gestor**; decidido: o gestor não conta como membro da própria equipe, a equipe da tela 51 tem 8 pessoas). Fora do
+        escopo (outro setor, o próprio gestor, quem ainda está em admissão ou quem já está inativo): **404**.
+
+        Este é um schema **à parte** do do RH: não existem aqui CPF, RG, endereço, e-mail pessoal, matrícula,
+        benefícios nem documentos (decisão do dono). O telefone vem em `telefoneMascarado`
+        (`(11) 9****-7783`: mostra o DDD e os 4 últimos dígitos). O gestor **não edita** o cadastro: a tela diz
+        "Só o RH altera dados cadastrais".
+
+        Os cartões de resumo vêm de `GET .../indicadores`. As abas Ponto, Férias, Treinamentos e Advertências e o
+        botão "Registrar advertência" são de outras fatias.
+      x-perfis: [Gestor]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: A ficha (versão do gestor).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioFichaGestor' }
+              example:
+                id: 21
+                nome: Diego Farias
+                cargo: Vendedor
+                setor: Comercial
+                ativo: true
+                situacaoHoje: SEM_REGISTRO
+                emailCorporativo: diego.farias@empresa.com.br
+                telefoneMascarado: '(11) 9****-7783'
+                dataAdmissao: '2023-08-08'
+                tipoContrato: CLT
+                jornadaSemanalHoras: 44
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/equipe/{funcionarioId}/indicadores:
+    get:
+      tags: [Colaboradores]
+      operationId: obterIndicadoresDaEquipe
+      summary: Mostra os cartões de resumo da ficha da equipe (banco de horas, férias, treinamentos, advertências).
+      description: |
+        Tela 52: os quatro cartões no alto da aba Dados. Só o perfil `Gestor`, só a equipe dele (fora do escopo: 404).
+
+        **Cada número é calculado por outra fatia; esta rota só os junta.** O valor é o mesmo da rota indicada, e cada
+        campo vem `null` enquanto a fatia que o calcula não existir (o front mostra "—"). Ver também a nota de
+        `GET /api/rh/funcionarios/{funcionarioId}/indicadores`.
+
+        | Campo | Fatia | De onde vem (mesmo valor) |
+        |---|---|---|
+        | `bancoDeHorasMinutos` | 3 (ponto) | `resumo.saldoBancoHorasMinutos` de `GET /api/gestor/equipe/{funcionarioId}/ponto` |
+        | `feriasDisponiveisDias` | 7 (gestão) | `resumo.diasDisponiveis` de `GET /api/gestor/equipe/{funcionarioId}/ferias` |
+        | `treinamentosPendentes` | 6 (treinamentos) | `resumo.pendentes` de `GET /api/gestor/equipe/{funcionarioId}/treinamentos` (obrigatório não concluído; treinamento não tem prazo) |
+        | `advertenciasQuantidade` | 4 (comunicação) | advertências **não canceladas do ano corrente (2026)** da pessoa (a mesma regra de `porPessoa` em `GET /api/gestor/advertencias/resumo`) |
+      x-perfis: [Gestor]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: Os valores dos cartões.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuncionarioIndicadoresGestor' }
+              example:
+                bancoDeHorasMinutos: -225
+                feriasDisponiveisDias: 22
+                treinamentosPendentes: 2
+                advertenciasQuantidade: 2
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Documentos do colaborador (RH)
+  # ------------------------------------------------------------------
+  /api/rh/funcionarios/{funcionarioId}/documentos:
+    get:
+      tags: [Documentos do colaborador]
+      operationId: listarDocumentosDoFuncionario
+      summary: Lista os documentos da ficha do colaborador.
+      description: |
+        Tela 09 (Ficha, aba Documentos). Só o perfil `RH`. Lista curta, **sem paginação** (`itens` só).
+        Ordem: mais recentes primeiro. "Só o RH e o próprio colaborador conseguem ver": o gestor **não** vê
+        documentos (não existe rota dele). **Sem o botão "Lembrar"** nas linhas `PENDENTE` (decisão do dono, 2026-10-30:
+        não existe lembrete de documento; não há rota nem e-mail para isso).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: Os documentos da pessoa.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentoColaboradorListaResposta' }
+              example:
+                itens:
+                  - id: 61
+                    tipo: IDENTIDADE
+                    descricao: null
+                    dataValidade: null
+                    situacao: ENVIADO
+                    nomeArquivoOriginal: rg-bruno-lima.pdf
+                    pedidoEmUtc: null
+                    enviadoEmUtc: '2022-03-14T13:20:00Z'
+                  - id: 64
+                    tipo: COMPROVANTE_DE_RESIDENCIA
+                    descricao: Comprovante atualizado
+                    dataValidade: '2027-10-01'
+                    situacao: PENDENTE
+                    nomeArquivoOriginal: null
+                    pedidoEmUtc: '2026-10-01T12:00:00Z'
+                    enviadoEmUtc: null
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Documentos do colaborador]
+      operationId: adicionarDocumentoDoFuncionario
+      summary: Anexa um documento à ficha, ou pede para a pessoa enviar.
+      description: |
+        Tela 10 (modal "Adicionar documento"). Só o perfil `RH`. Envio em `multipart/form-data`.
+
+        - `modo = ANEXAR_AGORA` ("Você já tem o arquivo"): `arquivo` é obrigatório; o documento nasce `ENVIADO`.
+        - `modo = PEDIR_PARA_ENVIAR`: **não** manda arquivo; o documento nasce `PENDENTE`, com a data do pedido, e a
+          pessoa o vê em "Meus documentos", onde envia o arquivo. **Nenhum e-mail sai** (lista fechada de e-mails,
+          `CONVENCOES.md`, seção 12: não existe e-mail de pedido nem lembrete de documento): a frase da tela 10
+          "Ela recebe um aviso e envia pelo portal" deve falar só em "envia pelo portal". **Como a pessoa fica sabendo:**
+          pela **bolinha no menu** ("Meus documentos"), que é `documentosPendentes` nos contadores de
+          `GET /api/eu/contadores-do-menu` (fatia 7): quantos documentos `PENDENTE` ela tem.
+        - Arquivo: PDF, JPG ou PNG, **até 10 MB** (o tipo é conferido pelo conteúdo, não pela extensão). O arquivo
+          vai para o armazenamento de arquivos; o banco guarda só a referência. Só é gravado depois de a regra do
+          banco aprovar.
+        - Cada chamada cria um documento novo (não substitui um pendente do mesmo tipo).
+        - O envio entra na auditoria (sem o conteúdo do arquivo).
+        Erros de arquivo (tipo, tamanho, faltando ou sobrando) voltam como 400 em `arquivo`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/DocumentoColaboradorNovoForm' }
+            encoding:
+              arquivo: { contentType: 'application/pdf, image/jpeg, image/png' }
+            example:
+              modo: ANEXAR_AGORA
+              tipo: COMPROVANTE_DE_RESIDENCIA
+              descricao: Comprovante de residência atualizado
+              dataValidade: '2027-10-01'
+              arquivo: comprovante-outubro-2026.pdf
+      responses:
+        '201':
+          description: Documento criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentoColaborador' }
+              example:
+                id: 70
+                tipo: COMPROVANTE_DE_RESIDENCIA
+                descricao: Comprovante de residência atualizado
+                dataValidade: '2027-10-01'
+                situacao: ENVIADO
+                nomeArquivoOriginal: comprovante-outubro-2026.pdf
+                pedidoEmUtc: null
+                enviadoEmUtc: '2026-10-07T12:38:10Z'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}/documentos/{documentoId}/download:
+    get:
+      tags: [Documentos do colaborador]
+      operationId: baixarDocumentoDoFuncionario
+      summary: Devolve um link temporário para ver o documento (botão "Ver").
+      description: |
+        Tela 09, botão "Ver". Só o perfil `RH`. Devolve `LinkTemporario` (o arquivo nunca passa pela API de
+        negócio; o link vale poucos minutos e baixa como anexo). O download entra na auditoria.
+        Documento `PENDENTE` não tem arquivo: 422 `DOCUMENTO_SEM_ARQUIVO`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+        - $ref: '#/components/parameters/ParamDocumentoColaboradorId'
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: https://arquivos.exemplo.com.br/download/7c1f9a3e5b2d4c8aa6e0?expira=1791377400&assinatura=assinatura-de-exemplo
+                expiraEmUtc: '2026-10-07T12:50:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O documento ainda está pendente e não tem arquivo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Este documento ainda não foi enviado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: DOCUMENTO_SEM_ARQUIVO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Meus documentos (qualquer pessoa logada, só os dela)
+  # ------------------------------------------------------------------
+  /api/eu/documentos:
+    get:
+      tags: [Documentos do colaborador]
+      operationId: listarMeusDocumentos
+      summary: Lista os meus documentos (os já enviados e os que o RH pediu).
+      description: |
+        Tela "Meus documentos" (**não existe no Figma**, desenhada em estilo simples: uma lista com tipo,
+        validade, situação e, nos pedidos, o botão "Enviar arquivo"). Qualquer pessoa logada vê **só os dela**.
+        Mesmo schema da ficha do RH, sem paginação. A bolinha do menu que avisa que há documento pedido é
+        `documentosPendentes` de `GET /api/eu/contadores-do-menu` (fatia 7): o número de documentos `PENDENTE` desta lista.
+      x-perfis: [Funcionario, Gestor, RH]
+      responses:
+        '200':
+          description: Os documentos da pessoa logada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentoColaboradorListaResposta' }
+              example:
+                itens:
+                  - id: 64
+                    tipo: COMPROVANTE_DE_RESIDENCIA
+                    descricao: Comprovante atualizado
+                    dataValidade: '2027-10-01'
+                    situacao: PENDENTE
+                    nomeArquivoOriginal: null
+                    pedidoEmUtc: '2026-10-01T12:00:00Z'
+                    enviadoEmUtc: null
+                  - id: 61
+                    tipo: IDENTIDADE
+                    descricao: null
+                    dataValidade: null
+                    situacao: ENVIADO
+                    nomeArquivoOriginal: rg-bruno-lima.pdf
+                    pedidoEmUtc: null
+                    enviadoEmUtc: '2022-03-14T13:20:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/documentos/{documentoId}/arquivo:
+    post:
+      tags: [Documentos do colaborador]
+      operationId: enviarMeuDocumento
+      summary: Envia o arquivo de um documento que o RH pediu.
+      description: |
+        Tela "Meus documentos", botão "Enviar arquivo". Qualquer pessoa logada, **só documentos dela**
+        (de outra pessoa: 404). Só vale para documento `PENDENTE` (que o RH pediu): o documento passa a `ENVIADO`
+        e a data do envio é gravada. Documento já `ENVIADO`: 422 `DOCUMENTO_NAO_PEDIDO`. A pessoa **não cria**
+        documento por conta própria. Arquivo: PDF, JPG ou PNG, até 10 MB.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamDocumentoColaboradorId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/DocumentoColaboradorEnvioForm' }
+            encoding:
+              arquivo: { contentType: 'application/pdf, image/jpeg, image/png' }
+            example: { arquivo: comprovante-de-residencia.pdf }
+      responses:
+        '200':
+          description: Arquivo recebido. Devolve o documento atualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentoColaborador' }
+              example:
+                id: 64
+                tipo: COMPROVANTE_DE_RESIDENCIA
+                descricao: Comprovante atualizado
+                dataValidade: '2027-10-01'
+                situacao: ENVIADO
+                nomeArquivoOriginal: comprovante-de-residencia.pdf
+                pedidoEmUtc: '2026-10-01T12:00:00Z'
+                enviadoEmUtc: '2026-10-07T12:30:30Z'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O documento não está pendente.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Este documento não está aguardando envio.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: DOCUMENTO_NAO_PEDIDO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/documentos/{documentoId}/download:
+    get:
+      tags: [Documentos do colaborador]
+      operationId: baixarMeuDocumento
+      summary: Devolve um link temporário para ver um documento meu.
+      description: |
+        Tela "Meus documentos". Só documentos da própria pessoa (de outra: 404). Devolve `LinkTemporario`.
+        Documento `PENDENTE`: 422 `DOCUMENTO_SEM_ARQUIVO`.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamDocumentoColaboradorId'
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: https://arquivos.exemplo.com.br/download/b84d2e6f1a3c4957c0d1?expira=1791377400&assinatura=assinatura-de-exemplo
+                expiraEmUtc: '2026-10-07T12:50:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O documento ainda está pendente e não tem arquivo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Este documento ainda não foi enviado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: DOCUMENTO_SEM_ARQUIVO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Cadastros de apoio: cargos
+  # ------------------------------------------------------------------
+  /api/rh/cargos:
+    get:
+      tags: [Cadastros de apoio]
+      operationId: listarCargos
+      summary: Lista os cargos, com a carga semanal e quantas pessoas têm cada um.
+      description: |
+        Tela 29, cadastro "Cargos" (e as opções do campo "Cargo" no cadastro do colaborador, com
+        `tamanhoPagina = 100`). Só o perfil `RH`. `busca` procura no nome e na descrição. Ordem: nome.
+        `quantidadePessoas` conta as pessoas **ativas** com o cargo. O número no menu lateral do cadastro ("14")
+        é o `total` (para só saber o total, peça `tamanhoPagina = 1`).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+      responses:
+        '200':
+          description: Uma página de cargos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CargoListaResposta' }
+              example:
+                itens:
+                  - { id: 1, nome: Analista financeiro pleno, descricao: 'Contas a pagar e a receber, conciliação', cargaSemanalHoras: 44, quantidadePessoas: 6 }
+                  - { id: 2, nome: Vendedor, descricao: Atendimento e vendas na loja, cargaSemanalHoras: 44, quantidadePessoas: 22 }
+                  - { id: 7, nome: Estagiário, descricao: 'Apoio às áreas, contrato de estágio', cargaSemanalHoras: 30, quantidadePessoas: 7 }
+                pagina: 1
+                tamanhoPagina: 20
+                total: 14
+                totalPaginas: 1
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Cadastros de apoio]
+      operationId: criarCargo
+      summary: Cria um cargo (botão "Novo cargo").
+      description: |
+        Tela 30 (modal "Novo cargo"). Só o perfil `RH`. Nome único (sem diferenciar maiúsculas): repetido dá 409
+        `NOME_JA_CADASTRADO`. A carga horária é **semanal** (ex.: 44) e vale para todas as pessoas do cargo; é
+        com ela que o ponto calcula o saldo (o ponto de um dia usa a carga semanal dividida por 5).
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CargoComando' }
+            example: { nome: Analista de compras, descricao: 'Cotações, pedidos e relação com fornecedores', cargaSemanalHoras: 44 }
+      responses:
+        '201':
+          description: Cargo criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CargoItem' }
+              example: { id: 15, nome: Analista de compras, descricao: 'Cotações, pedidos e relação com fornecedores', cargaSemanalHoras: 44, quantidadePessoas: 0 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '409': { $ref: '#/components/responses/Erro409CadastroNomeRepetido' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/cargos/{cargoId}:
+    put:
+      tags: [Cadastros de apoio]
+      operationId: editarCargo
+      summary: Altera um cargo (botão "Editar").
+      description: |
+        Tela 29, botão "Editar" (abre o mesmo modal da tela 30). Só o perfil `RH`. Substitui nome, descrição e
+        carga semanal. A nova carga vale para os dias de ponto **criados depois**; os pontos já gravados não mudam.
+        **Não existe exclusão de cargo** (o Figma só tem "Editar").
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamCargoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CargoComando' }
+            example: { nome: Vendedor, descricao: Atendimento e vendas na loja, cargaSemanalHoras: 40 }
+      responses:
+        '200':
+          description: Cargo alterado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CargoItem' }
+              example: { id: 2, nome: Vendedor, descricao: Atendimento e vendas na loja, cargaSemanalHoras: 40, quantidadePessoas: 22 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Erro409CadastroNomeRepetido' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Cadastros de apoio: setores
+  # ------------------------------------------------------------------
+  /api/rh/setores:
+    get:
+      tags: [Cadastros de apoio]
+      operationId: listarSetores
+      summary: Lista os setores, com o gestor e quantas pessoas há em cada um.
+      description: |
+        Tela 29, cadastro "Setores" ("Áreas e seus gestores"), e as opções do campo "Setor" no cadastro do
+        colaborador (com `tamanhoPagina = 100`; o campo "Gestor" do cadastro mostra o `gestor` do setor escolhido).
+        Só o perfil `RH`. `busca` procura no nome e na descrição. Lista curta, todos os setores numa página; ordem: nome.
+        `quantidadePessoas` conta as pessoas **ativas, com a admissão já começada**, do setor, **inclusive o gestor**
+        (quem ainda está em admissão não conta). O número do menu lateral é o `total` (o Figma mostra "6"; o cenário de
+        hoje tem 7, com Compras). Cada setor tem **um** gestor, ou nenhum, e um gestor responde por **um** setor; **só quem
+        tem o nível `Gestor` gerencia um setor** (`CONVENCOES.md`, seção 9).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+      responses:
+        '200':
+          description: Uma página de setores.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetorListaResposta' }
+              example:
+                itens:
+                  - id: 4
+                    nome: Administrativo
+                    descricao: Rotinas administrativas e atendimento interno
+                    gestor: null
+                    quantidadePessoas: 12
+                  - id: 1
+                    nome: Comercial
+                    descricao: Vendas e relacionamento com clientes
+                    gestor: { gestorId: 1, funcionarioId: 7, nome: Carlos Ribeiro }
+                    quantidadePessoas: 9
+                  - id: 7
+                    nome: Compras
+                    descricao: Cotações e fornecedores
+                    gestor: null
+                    quantidadePessoas: 0
+                  - id: 2
+                    nome: Financeiro
+                    descricao: Contas, folha e conciliação
+                    gestor: { gestorId: 2, funcionarioId: 8, nome: Marina Costa }
+                    quantidadePessoas: 7
+                  - id: 6
+                    nome: Logística
+                    descricao: Recebimento, separação e expedição
+                    gestor: { gestorId: 3, funcionarioId: 9, nome: Paulo Vieira }
+                    quantidadePessoas: 44
+                  - id: 3
+                    nome: Recursos Humanos
+                    descricao: Admissão, folha, benefícios e relações com colaboradores
+                    gestor: null
+                    quantidadePessoas: 5
+                  - id: 5
+                    nome: Tecnologia
+                    descricao: Sistemas internos e integrações
+                    gestor: null
+                    quantidadePessoas: 24
+                pagina: 1
+                tamanhoPagina: 20
+                total: 7
+                totalPaginas: 1
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Cadastros de apoio]
+      operationId: criarSetor
+      summary: Cria um setor, com o gestor opcional.
+      description: |
+        Tela 29, cadastro "Setores". Só o perfil `RH`. Nome único: repetido dá 409 `NOME_JA_CADASTRADO`.
+        `gestorFuncionarioId` (`null` = sem gestor) é a pessoa que gerencia o setor: veja a regra em
+        `PUT /api/rh/setores/{setorId}` (inclusive o 409 `GESTOR_JA_RESPONDE_POR_OUTRO_SETOR`: **um gestor responde por
+        um setor só**, e o 422 `GESTOR_PRECISA_TER_PERFIL_GESTOR`: **só quem tem o nível `Gestor`** gerencia um setor; quem
+        é `RH` não). **Não existe exclusão de setor.**
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetorComando' }
+            example: { nome: Compras, descricao: Cotações e fornecedores, gestorFuncionarioId: null }
+      responses:
+        '201':
+          description: Setor criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetorItem' }
+              example:
+                id: 7
+                nome: Compras
+                descricao: Cotações e fornecedores
+                gestor: null
+                quantidadePessoas: 0
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '409': { $ref: '#/components/responses/Erro409Setor' }
+        '422': { $ref: '#/components/responses/Erro422Setor' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/setores/{setorId}:
+    put:
+      tags: [Cadastros de apoio]
+      operationId: editarSetor
+      summary: Altera um setor e troca o gestor dele.
+      description: |
+        Tela 29, cadastro "Setores". Só o perfil `RH`. Substitui nome, descrição e gestor.
+
+        **Trocar o gestor** (`gestorFuncionarioId`; `null` tira o gestor do setor):
+        - a pessoa precisa estar ativa (senão 422 `FUNCIONARIO_INATIVO`, regra do banco);
+        - **só quem tem o nível `Gestor` gerencia um setor** (`CONVENCOES.md`, seção 9): se a pessoa escolhida é do `RH`,
+          422 `GESTOR_PRECISA_TER_PERFIL_GESTOR` (a pessoa do RH que decide pedidos de gestores é cadastrada, sem setor, em
+          `POST /api/rh/gestores`). A API não recusa quem tem o nível `Funcionario`: ele é promovido a `Gestor`;
+        - se ela ainda não está em Gestores, a API a cadastra como gestor sozinha;
+        - o gestor de **todas as pessoas do setor** é refeito (menos o do próprio gestor, que fica sem gestor: o
+          banco recusa "gestor de si mesmo");
+        - quem **deixa de ser** gestor deste setor (porque o RH o tirou ou trocou por outra pessoa) volta ao nível
+          `Funcionario` e continua no setor como membro da equipe; o gestor dele passa a ser o gestor novo do setor (ou
+          fica vazio, se o setor ficou sem gestor);
+        - **os pedidos de ponto e de férias que já esperavam pelo gestor antigo passam para a etapa do RH**, tanto ao tirar
+          o gestor quanto ao trocar por outro (`CONVENCOES.md`, seção 9; férias com sugestão de data em andamento continuam
+          esperando a resposta da pessoa e, respondida, seguem para o RH). Os pedidos já decididos não mudam, e os pedidos
+          **novos** seguem o gestor novo (ou o RH, se o setor ficou sem gestor).
+
+        **Um gestor responde por um setor só** (decidido pelo dono, 2026-10-30; antes esta rota permitia vários). O que
+        isso muda no cadastro:
+        - se a pessoa escolhida já é gestor de **outro** setor: 409 `GESTOR_JA_RESPONDE_POR_OUTRO_SETOR` (o RH precisa
+          antes tirar o gestor do outro setor, com `gestorFuncionarioId = null` nele, ou escolher outra pessoa);
+        - `GET /api/rh/gestores` traz `setor` (um objeto ou `null`), não mais uma lista de setores;
+        - a regra é da API: o banco não a impõe (`SETORES.ID_GESTOR` não é único).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamSetorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetorComando' }
+            example: { nome: Comercial, descricao: Vendas e relacionamento com clientes, gestorFuncionarioId: 7 }
+      responses:
+        '200':
+          description: Setor alterado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetorItem' }
+              example:
+                id: 1
+                nome: Comercial
+                descricao: Vendas e relacionamento com clientes
+                gestor: { gestorId: 1, funcionarioId: 7, nome: Carlos Ribeiro }
+                quantidadePessoas: 9
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Erro409Setor' }
+        '422': { $ref: '#/components/responses/Erro422Setor' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Cadastros de apoio: gestores e "gestor ausente"
+  # ------------------------------------------------------------------
+  /api/rh/gestores:
+    get:
+      tags: [Cadastros de apoio]
+      operationId: listarGestores
+      summary: Lista os gestores, o setor de cada um e quem está ausente.
+      description: |
+        Tela 29, cadastro "Gestores" ("Quem gerencia cada setor"). Só o perfil `RH`. Lista curta, **sem paginação**, na
+        ordem de `gestorId`. Cada linha: a pessoa, o **setor** que gerencia (um só; `null` para quem é gestor sem setor, como o RH que decide
+        os pedidos de gestores), o tamanho da equipe (a equipe de `GET /api/gestor/equipe`: pessoas ativas do setor, com
+        a admissão já começada, **sem** ele; o número do menu lateral é a quantidade de `itens`; o Figma mostra "6", o
+        cenário de hoje tem 5: três gestores de setor e duas pessoas do RH) e a marcação de
+        **gestor ausente** (decisão do dono, 2026-10-29, antes chamada "chave de aprovação automática"): quando o gestor
+        está ausente, o RH o marca e a etapa do gestor é aprovada sozinha nos pedidos de ponto e de férias da equipe
+        dele (o RH ainda decide depois). Para ligar e desligar, veja `PUT /api/rh/gestores/{gestorId}/ausencia`.
+
+        **`soDecidePedidosDeGestores`** separa os dois tipos de linha: `false` para quem **gerencia um setor** (perfil
+        `Gestor`); `true` para a pessoa do RH cadastrada **só para decidir os pedidos de gestores** (o trigger do banco
+        exige uma linha em Gestores em quem decide). Essa pessoa não tem setor nem equipe, não é gestora de setor e não
+        usa as rotas `/api/gestor/...`; a tela mostra, no lugar do setor, "Só decide pedidos de gestores".
+
+        **Quem é gestor:** quem tem linha em Gestores, está ativo **e** gerencia um setor ou é do RH cadastrado para decidir
+        pedidos de gestores. Não é o mesmo que o perfil `Gestor` sozinho. Quem deixou de gerenciar um setor e voltou ao
+        nível `Funcionario` mantém a linha no banco (os pedidos antigos a referenciam), mas deixa de contar como gestor e
+        não aparece nesta lista.
+
+        `ausente` é a marcação do RH; `ausenteAte` é a data de volta (opcional); `ausenteHoje` diz se a marcação vale
+        **hoje**: `ausente` **e** (sem data de volta **ou** hoje antes dessa data). Vale **até o dia anterior** à data de
+        volta (decisão do dono). Passada a data de volta, `ausente` continua `true` no cadastro, mas `ausenteHoje` vira
+        `false` (a API não desliga a marcação sozinha); a tela mostra "Ausente" só com `ausenteHoje = true`.
+        O "Níveis de acesso" do Figma **não existe** (decisão do dono, 2026-10-30).
+      x-perfis: [RH]
+      responses:
+        '200':
+          description: Os gestores.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GestorListaResposta' }
+              example:
+                itens:
+                  - gestorId: 1
+                    funcionario: { id: 7, nome: Carlos Ribeiro, cargo: Gerente comercial, setor: Comercial, ativo: true }
+                    setor: { id: 1, nome: Comercial }
+                    soDecidePedidosDeGestores: false
+                    quantidadeEquipe: 8
+                    ausente: false
+                    ausenteAte: null
+                    ausenteHoje: false
+                  - gestorId: 2
+                    funcionario: { id: 8, nome: Marina Costa, cargo: Gerente financeira, setor: Financeiro, ativo: true }
+                    setor: { id: 2, nome: Financeiro }
+                    soDecidePedidosDeGestores: false
+                    quantidadeEquipe: 6
+                    ausente: false
+                    ausenteAte: null
+                    ausenteHoje: false
+                  - gestorId: 3
+                    funcionario: { id: 9, nome: Paulo Vieira, cargo: Gerente de logística, setor: Logística, ativo: true }
+                    setor: { id: 6, nome: Logística }
+                    soDecidePedidosDeGestores: false
+                    quantidadeEquipe: 43
+                    ausente: true
+                    ausenteAte: '2026-10-19'
+                    ausenteHoje: true
+                  - gestorId: 4
+                    funcionario: { id: 1, nome: Ana Souza, cargo: Gerente de RH, setor: Recursos Humanos, ativo: true }
+                    setor: null
+                    soDecidePedidosDeGestores: true
+                    quantidadeEquipe: 0
+                    ausente: false
+                    ausenteAte: null
+                    ausenteHoje: false
+                  - gestorId: 5
+                    funcionario: { id: 2, nome: Sofia Ramos, cargo: Analista de RH, setor: Recursos Humanos, ativo: true }
+                    setor: null
+                    soDecidePedidosDeGestores: true
+                    quantidadeEquipe: 0
+                    ausente: false
+                    ausenteAte: null
+                    ausenteHoje: false
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Cadastros de apoio]
+      operationId: cadastrarGestor
+      summary: Cadastra uma pessoa como gestor, sem ligá-la a um setor.
+      description: |
+        Tela 29, cadastro "Gestores". Só o perfil `RH`. Serve para cadastrar **quem do RH vai decidir os pedidos de
+        gestores**: o banco exige que quem decide seja também um gestor cadastrado (decisão do dono, 2026-10-29).
+        **Só aceita quem tem o nível `RH`** (a linha nasce com `soDecidePedidosDeGestores = true`, sem setor): quem tem outro
+        nível dá 422 `GESTOR_SEM_SETOR_SO_PARA_RH`. Para pôr alguém como gestor **de um setor**, use
+        `PUT /api/rh/setores/{setorId}` (que cadastra sozinho e promove `Funcionario` a `Gestor`).
+        A pessoa precisa estar ativa (422 `FUNCIONARIO_INATIVO`, regra do banco: `Nao e possivel cadastrar como
+        gestor um funcionario inativo.`) e não pode já ser gestor (409 `GESTOR_JA_CADASTRADO`). O nível dela não muda.
+
+        **Quem é gestor:** quem tem linha em Gestores, está ativo e gerencia um setor ou é do RH cadastrado aqui (ver
+        `GET /api/rh/gestores`). É essa linha que o banco exige em quem decide um pedido; por isso quem do RH decide os
+        pedidos de gestores precisa estar aqui, mesmo sem setor (`CONVENCOES.md`, seção 9). O nível `Gestor` sozinho não
+        faz ninguém gerenciar um setor.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GestorCadastrarComando' }
+            example: { funcionarioId: 2 }
+      responses:
+        '201':
+          description: Gestor cadastrado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GestorItem' }
+              example:
+                gestorId: 5
+                funcionario: { id: 2, nome: Sofia Ramos, cargo: Analista de RH, setor: Recursos Humanos, ativo: true }
+                setor: null
+                soDecidePedidosDeGestores: true
+                quantidadeEquipe: 0
+                ausente: false
+                ausenteAte: null
+                ausenteHoje: false
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '409':
+          description: A pessoa já é gestor.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Esta pessoa já está cadastrada como gestor.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: GESTOR_JA_CADASTRADO
+        '422':
+          description: A pessoa está inativa ou não é do RH. Os códigos estão em `examples`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                funcionarioInativo:
+                  summary: A pessoa escolhida está inativa
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: A pessoa escolhida está inativa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FUNCIONARIO_INATIVO
+                    regraDoBanco: Nao e possivel cadastrar como gestor um funcionario inativo.
+                soParaRh:
+                  summary: A pessoa não tem o nível RH (para gerenciar um setor, use o cadastro de setores)
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Só quem é do RH é cadastrado como gestor sem setor. Para gerenciar um setor, escolha a pessoa no cadastro de Setores.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: GESTOR_SEM_SETOR_SO_PARA_RH
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/gestores/{gestorId}/ausencia:
+    put:
+      tags: [Cadastros de apoio]
+      operationId: configurarAusenciaDoGestor
+      summary: Marca ou desmarca um gestor como ausente (a etapa dele passa a ser aprovada sozinha).
+      description: |
+        Tela 29, cadastro "Gestores" ("gestor ausente"; antes "chave de aprovação automática"). Só o perfil `RH`.
+        O RH marca quando o gestor está ausente **por qualquer motivo, a qualquer momento**: vale **por gestor** (toda a
+        equipe dele) e para **pedidos de ponto e de férias** (`CONVENCOES.md`, seção 9). **Esta é a única rota dessa
+        marcação**; as fatias 3 e 7 só usam o efeito dela.
+
+        - `ausente = true`: marca; `ausenteAte` (opcional) é a **data de volta** do gestor, que precisa ser **depois de
+          hoje** (senão 400 em `ausenteAte`); a marcação vale até o dia anterior a ela. Sem data, vale até o RH desmarcar.
+        - `ausente = false`: desmarca; `ausenteAte` precisa vir `null` (senão 400).
+
+        **Efeito (escolha de engenharia, a avisar o dono):**
+        - **Enquanto marcado**, os pedidos **novos** da equipe dele nascem com a etapa do gestor já aprovada
+          ("aprovada automaticamente"; o pedido registra que foi automática) e seguem para `etapa: RH`: quem decide é o RH,
+          que ainda pode recusar (o RH pode recusar o que o gestor aprovou).
+        - **Ao marcar**, a API também aprova, **na mesma operação**, a etapa do gestor dos pedidos de ponto e de férias que
+          **já estavam parados esperando por ele** (`etapa: GESTOR`): eles passam para a etapa do RH. **Exceção:** pedido de
+          férias com **sugestão de data em andamento** (o gestor sugeriu outra data e a pessoa ainda não respondeu) não é
+          aprovado, porque depende da resposta da pessoa. A resposta diz quantos pedidos passaram assim
+          (`pedidosAprovadosAgora`).
+        - **Ao desmarcar** (ou ao chegar a data de volta), **só os pedidos novos** voltam ao normal; o que já foi aprovado
+          automaticamente continua aprovado.
+        - **Não muda** os pedidos que já não teriam etapa do gestor (de quem é gestor, de quem não tem gestor ativo e de
+          quem tem gestor desligado): esses vão direto ao RH de qualquer jeito.
+        - O que marcar e desmarcar entra na auditoria.
+
+        **Só vale para quem gerencia um setor.** Para a pessoa do RH cadastrada só para decidir pedidos de gestores
+        (`soDecidePedidosDeGestores = true`) não há etapa do gestor para aprovar sozinha: a marcação é recusada com 422
+        `GESTOR_SEM_EQUIPE`. Marcar, desmarcar e a data de volta valem para qualquer motivo de ausência.
+
+        No banco, a marcação é `GESTORES.APROVACAO_AUTOMATICA` e `GESTORES.APROVACAO_AUTOMATICA_ATE` (script V011; o
+        nome das colunas não mudou).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamGestorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GestorAusenciaComando' }
+            example: { ausente: true, ausenteAte: '2026-10-19' }
+      responses:
+        '200':
+          description: Marcação atualizada (o exemplo é a de Paulo Vieira, feita em 2026-10-06, quando nenhum pedido esperava por ele).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GestorAusenciaResposta' }
+              example:
+                gestorId: 3
+                funcionario: { id: 9, nome: Paulo Vieira, cargo: Gerente de logística, setor: Logística, ativo: true }
+                setor: { id: 6, nome: Logística }
+                soDecidePedidosDeGestores: false
+                quantidadeEquipe: 43
+                ausente: true
+                ausenteAte: '2026-10-19'
+                ausenteHoje: true
+                pedidosAprovadosAgora: { ajustesDePonto: 0, ferias: 0 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A pessoa só decide pedidos de gestores e não tem equipe.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Ana Souza só decide pedidos de gestores e não tem equipe. Não há etapa do gestor para aprovar sozinha.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: GESTOR_SEM_EQUIPE
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Cadastros de apoio: benefícios do catálogo
+  # ------------------------------------------------------------------
+  /api/rh/beneficios:
+    get:
+      tags: [Cadastros de apoio]
+      operationId: listarBeneficiosDoCatalogo
+      summary: Lista os benefícios do catálogo ("O que a empresa oferece").
+      description: |
+        Tela 29, cadastro "Benefícios" (e as caixas "Benefícios" do cadastro do colaborador, com
+        `tamanhoPagina = 100`). Só o perfil `RH`. `busca` procura no nome e na descrição.
+        `quantidadePessoas` conta as pessoas com o benefício **ativo**. Os pedidos de adesão e os dependentes são da
+        fatia 7. O número do menu lateral é o `total` (o Figma mostra "6"; o catálogo de hoje tem 7). Ordem: `id` (a
+        ordem em que foram cadastrados). Os ids do catálogo de demonstração são 1 Vale-refeição,
+        2 Plano de saúde, 3 Plano odontológico, 4 Vale-transporte, 5 Seguro de vida, 6 Auxílio-creche e 7 Vale-cultura
+        (`ELENCO.md`); a fatia 7 só usa ids e nomes daqui.
+
+        **O catálogo ganhou três marcas** (decisão do dono, 2026-10-30), que o RH marca em Cadastros, Benefícios, e que a
+        fatia 7 usa na tela "Benefícios" do funcionário (tela 44): `opcional` (a própria pessoa pode pedir; é o que
+        aparece em "Disponíveis para você"), `aceitaDependentes` (o pedido deixa incluir dependentes, como no plano de
+        saúde) e `aceitaTrajeto` (o pedido pede o trajeto, como no vale-transporte). No catálogo de demonstração só os
+        benefícios 3 (Plano odontológico) e 6 (Auxílio-creche) são `opcional`: são os dois "Disponíveis para você" que a
+        tela 44 mostra ao Bruno, que já tem o 1, o 2, o 4 e o 5 (os "Seus benefícios" das telas 44 e 46).
+        **Depende do script SQL `V031`**: três colunas booleanas em `BENEFICIOS`, `OPCIONAL`, `ACEITA_DEPENDENTES` e
+        `ACEITA_TRAJETO` (a tabela tinha só nome e descrição, `Criacao_Tabelas:536-542`). Nascem `FALSE`: o benefício que já existia
+        fica "só o RH concede, sem dependentes e sem trajeto", e a API grava o valor que o RH marcou.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+      responses:
+        '200':
+          description: Uma página de benefícios.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficioCatalogoListaResposta' }
+              example:
+                itens:
+                  - { id: 1, nome: Vale-refeição, descricao: Crédito no cartão para refeições, opcional: false, aceitaDependentes: false, aceitaTrajeto: false, quantidadePessoas: 96 }
+                  - { id: 2, nome: Plano de saúde, descricao: 'Consultas, exames e internação, com coparticipação', opcional: false, aceitaDependentes: true, aceitaTrajeto: false, quantidadePessoas: 88 }
+                  - { id: 3, nome: Plano odontológico, descricao: Consultas e tratamentos com dentistas da rede, opcional: true, aceitaDependentes: true, aceitaTrajeto: false, quantidadePessoas: 41 }
+                  - { id: 4, nome: Vale-transporte, descricao: Crédito para o deslocamento até o trabalho, opcional: false, aceitaDependentes: false, aceitaTrajeto: true, quantidadePessoas: 73 }
+                  - { id: 5, nome: Seguro de vida, descricao: 'Cobertura em caso de morte ou invalidez, paga pela empresa', opcional: false, aceitaDependentes: false, aceitaTrajeto: false, quantidadePessoas: 99 }
+                  - { id: 6, nome: Auxílio-creche, descricao: Reembolso de creche ou pré-escola para quem tem filhos de até 6 anos, opcional: true, aceitaDependentes: true, aceitaTrajeto: false, quantidadePessoas: 12 }
+                  - { id: 7, nome: Vale-cultura, descricao: Crédito mensal para cultura e lazer, opcional: false, aceitaDependentes: false, aceitaTrajeto: false, quantidadePessoas: 0 }
+                pagina: 1
+                tamanhoPagina: 20
+                total: 7
+                totalPaginas: 1
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Cadastros de apoio]
+      operationId: criarBeneficioDoCatalogo
+      summary: Cria um benefício do catálogo.
+      description: |
+        Tela 29, cadastro "Benefícios". Só o perfil `RH`. Nome único (409 `NOME_JA_CADASTRADO`). O corpo traz as três marcas
+        do catálogo (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`), que **dependem do
+        script SQL `V031`** (colunas `OPCIONAL`, `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` em `BENEFICIOS`).
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BeneficioCatalogoComando' }
+            example: { nome: Vale-cultura, descricao: Crédito mensal para cultura e lazer, opcional: false, aceitaDependentes: false, aceitaTrajeto: false }
+      responses:
+        '201':
+          description: Benefício criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficioCatalogoItem' }
+              example: { id: 7, nome: Vale-cultura, descricao: Crédito mensal para cultura e lazer, opcional: false, aceitaDependentes: false, aceitaTrajeto: false, quantidadePessoas: 0 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '409': { $ref: '#/components/responses/Erro409CadastroNomeRepetido' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/beneficios/{beneficioId}:
+    put:
+      tags: [Cadastros de apoio]
+      operationId: editarBeneficioDoCatalogo
+      summary: Altera um benefício do catálogo.
+      description: |
+        Tela 29, cadastro "Benefícios". Só o perfil `RH`. Substitui nome, descrição e as três marcas do catálogo
+        (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`; dependem do script SQL `V031`).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamBeneficioCatalogoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BeneficioCatalogoComando' }
+            example: { nome: Plano odontológico, descricao: 'Consultas, limpeza e tratamentos com dentistas da rede', opcional: true, aceitaDependentes: true, aceitaTrajeto: false }
+      responses:
+        '200':
+          description: Benefício alterado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficioCatalogoItem' }
+              example: { id: 3, nome: Plano odontológico, descricao: 'Consultas, limpeza e tratamentos com dentistas da rede', opcional: true, aceitaDependentes: true, aceitaTrajeto: false, quantidadePessoas: 41 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Erro409CadastroNomeRepetido' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    delete:
+      tags: [Cadastros de apoio]
+      operationId: excluirBeneficioDoCatalogo
+      summary: Exclui um benefício do catálogo que nunca foi usado.
+      description: |
+        Tela 29, cadastro "Benefícios" (o Figma da tela 31 mostra o evento "Excluiu: Benefício Vale-cultura" na auditoria).
+        Só o perfil `RH`. Só exclui benefício **sem nenhum vínculo** (nunca foi dado a ninguém, nem como pedido);
+        senão 409 `CADASTRO_EM_USO`. O evento entra na auditoria.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamBeneficioCatalogoId'
+      responses:
+        '204': { description: 'Benefício excluído.' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409':
+          description: O benefício já tem vínculos e não pode ser excluído.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Este benefício já foi dado a colaboradores e não pode ser excluído.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: CADASTRO_EM_USO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Empresa
+  # ------------------------------------------------------------------
+  /api/eu/empresa:
+    get:
+      tags: [Empresa]
+      operationId: obterEmpresa
+      summary: Mostra a configuração da empresa (nome, UF, município, horário padrão, dia de pagamento).
+      description: |
+        Qualquer pessoa logada. O **nome** aparece no menu de todas as telas ("Portal de RH, [Nome da empresa]"); o
+        horário padrão é usado pelo ponto; o dia de pagamento, pelo "próximo pagamento". Nada aqui é sigiloso.
+        Fica em `/api/eu` por ser lida por todos os perfis; só o RH altera (`PUT /api/rh/empresa`), na tela
+        Cadastros, Empresa.
+
+        A tabela nasce **vazia**: enquanto o RH não configurar (a demonstração já vem configurada pelo seed),
+        **ler** a empresa responde 404 com `codigo: EMPRESA_NAO_CONFIGURADA`; o front mostra "Portal de RH" sem o nome.
+        Uma **outra** operação que precisa da empresa (por exemplo, registrar ponto) responde **422** com o mesmo
+        `codigo` (`CONVENCOES.md`, seção 11).
+      x-perfis: [Funcionario, Gestor, RH]
+      responses:
+        '200':
+          description: A configuração.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmpresaConfiguracao' }
+              example:
+                nomeEmpresa: Comercial Aurora Ltda
+                uf: SP
+                municipio: São Paulo
+                horarioEntrada: '08:00'
+                horarioSaida: '17:48'
+                toleranciaAtrasoMinutos: 10
+                diaPagamento: 6
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404':
+          description: A empresa ainda não foi configurada.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Não encontrado.
+                status: 404
+                detail: A empresa ainda não foi configurada.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: EMPRESA_NAO_CONFIGURADA
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/empresa:
+    put:
+      tags: [Empresa]
+      operationId: salvarEmpresa
+      summary: Cria ou altera a configuração da empresa.
+      description: |
+        Só o perfil `RH`. A empresa tem **uma única configuração**: o primeiro `PUT` a cria, os seguintes a
+        substituem. A **tela não existe no Figma**; decidido (dono, 2026-10-30): fica em **Cadastros, Empresa** (um item novo
+        do menu lateral de Cadastros, só para o RH), com um formulário simples com estes campos.
+
+        - `uf` escolhe os feriados estaduais; `municipio`, os municipais (valem para todos: **sem unidades**).
+        - `horarioEntrada` e `horarioSaida`: o horário padrão de **todos** (formato `HH:mm`); a saída pode ser
+          menor que a entrada (turno que atravessa a meia-noite), por isso a API não compara.
+        - `toleranciaAtrasoMinutos`: de 0 a 120; o atraso é medido contra a entrada mais a tolerância.
+        - `diaPagamento`: dia do mês da regra padrão (mês sem esse dia: vale o último; fim de semana ou feriado:
+          antecipa para o dia útil anterior; as exceções por mês são da fatia 7).
+        Entra na auditoria.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmpresaConfiguracao' }
+            example:
+              nomeEmpresa: Comercial Aurora Ltda
+              uf: SP
+              municipio: São Paulo
+              horarioEntrada: '08:00'
+              horarioSaida: '17:48'
+              toleranciaAtrasoMinutos: 10
+              diaPagamento: 6
+      responses:
+        '200':
+          description: Configuração salva.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmpresaConfiguracao' }
+              example:
+                nomeEmpresa: Comercial Aurora Ltda
+                uf: SP
+                municipio: São Paulo
+                horarioEntrada: '08:00'
+                horarioSaida: '17:48'
+                toleranciaAtrasoMinutos: 10
+                diaPagamento: 6
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Usuários do sistema (cadastro mínimo, tela 29)
+  # ------------------------------------------------------------------
+  /api/rh/usuarios:
+    get:
+      tags: [Usuários do sistema]
+      operationId: listarUsuariosDoSistema
+      summary: Lista os logins de acesso ao portal, com a situação de cada um.
+      description: |
+        Tela 29, cadastro "Usuários do sistema" ("Logins de acesso ao portal"). Só o perfil `RH`. Decisão do dono
+        (2026-10-30): **mínimo**, sem apagar. Cada linha é um **colaborador ativo ou em admissão**, inclusive quem
+        ainda não recebeu convite; **inativos não aparecem** (perdem o login sozinhos; no Figma o número do menu é
+        103, igual aos 101 ativos mais os 2 em admissão; o cenário de hoje tem 104, com 3 em admissão). O número do
+        menu lateral é o `total`. Quem foi **readmitido** volta a aparecer aqui, com o login ainda desativado até o
+        "Ativar" (`POST /api/rh/funcionarios/{funcionarioId}/readmissao`).
+        `busca` procura no nome e no e-mail corporativo.
+
+        `situacao`: `SEM_CONVITE` (ainda não tem login), `CONVITE_ENVIADO` (convite válido, senha ainda não
+        definida), `CONVITE_EXPIRADO` (venceu: reenviar) e `SENHA_DEFINIDA`. `ativo` diz se o login está
+        liberado (`false` em `SEM_CONVITE`). Ordem: nome.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+        - name: situacao
+          in: query
+          description: Só os logins nesta situação.
+          schema: { $ref: '#/components/schemas/UsuarioSistemaSituacao' }
+        - name: ativo
+          in: query
+          description: Só os logins liberados (`true`) ou só os desativados (`false`).
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Uma página de logins.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioSistemaListaResposta' }
+              example:
+                itens:
+                  - funcionarioId: 12
+                    nome: Bruno Lima
+                    emailCorporativo: bruno.lima@empresa.com.br
+                    perfil: Funcionario
+                    situacao: SENHA_DEFINIDA
+                    ativo: true
+                    ultimoLoginEmUtc: '2026-10-07T11:58:00Z'
+                    conviteEnviadoEmUtc: '2022-03-14T12:00:00Z'
+                  - funcionarioId: 104
+                    nome: Rafael Torres
+                    emailCorporativo: rafael.torres@empresa.com.br
+                    perfil: Funcionario
+                    situacao: CONVITE_ENVIADO
+                    ativo: true
+                    ultimoLoginEmUtc: null
+                    conviteEnviadoEmUtc: '2026-10-05T15:30:00Z'
+                  - funcionarioId: 200
+                    nome: Lucas Prado
+                    emailCorporativo: lucas.prado@empresa.com.br
+                    perfil: Funcionario
+                    situacao: SEM_CONVITE
+                    ativo: false
+                    ultimoLoginEmUtc: null
+                    conviteEnviadoEmUtc: null
+                pagina: 1
+                tamanhoPagina: 20
+                total: 104
+                totalPaginas: 6
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/usuarios/{funcionarioId}/convite:
+    post:
+      tags: [Usuários do sistema]
+      operationId: enviarConviteDeAcesso
+      summary: Envia ou reenvia o convite de acesso ao portal.
+      description: |
+        Tela 29 ("Reenviar convite") e menu "..." da ficha. Só o perfil `RH`. Cria o login se ainda não existe
+        (sem senha utilizável), invalida o convite anterior e coloca o e-mail na fila. O link vale 7 dias. Depende das
+        **tabelas novas da aplicação** de convite (token, `V033`) e de fila de e-mails (`V035`), e da marca de senha provisória
+        em `USUARIOS` (`V032`), que a API liga ao criar o login por convite e desliga quando a pessoa define a senha.
+        A pessoa precisa estar **ativa** (422 `FUNCIONARIO_INATIVO`) e ter **e-mail corporativo** (sem ele, 422
+        `FUNCIONARIO_SEM_EMAIL_CORPORATIVO`: o RH completa o cadastro antes).
+        Quem já definiu a senha **não** recebe convite: 422 `SENHA_JA_DEFINIDA` (a pessoa usa "Esqueci minha
+        senha"). Quem tem o **login desativado** (`ativo: false` em Usuários do sistema) também não recebe: 422
+        `USUARIO_DESATIVADO` (o RH usa "Ativar" antes, porque o link de um login desativado não funcionaria).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: Convite colocado na fila. Devolve o login atualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioSistemaItem' }
+              example:
+                funcionarioId: 200
+                nome: Lucas Prado
+                emailCorporativo: lucas.prado@empresa.com.br
+                perfil: Funcionario
+                situacao: CONVITE_ENVIADO
+                ativo: true
+                ultimoLoginEmUtc: null
+                conviteEnviadoEmUtc: '2026-10-07T12:40:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A pessoa está inativa, não tem e-mail corporativo ou já definiu a senha.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                inativo:
+                  summary: Colaborador inativo
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não é possível enviar convite a um colaborador inativo.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FUNCIONARIO_INATIVO
+                    regraDoBanco: Nao e possivel criar usuario para funcionario inativo.
+                semEmailCorporativo:
+                  summary: Colaborador sem e-mail corporativo
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Esta pessoa não tem e-mail corporativo cadastrado. Edite o cadastro antes de enviar o convite.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FUNCIONARIO_SEM_EMAIL_CORPORATIVO
+                senhaDefinida:
+                  summary: Já definiu a senha
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Esta pessoa já definiu a senha. Se ela esqueceu, use "Esqueci minha senha" na tela de entrada.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: SENHA_JA_DEFINIDA
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/usuarios/{funcionarioId}/ativar:
+    post:
+      tags: [Usuários do sistema]
+      operationId: ativarUsuarioDoSistema
+      summary: Libera o login de um colaborador (botão "Ativar").
+      description: |
+        Tela 29, botão "Ativar". Só o perfil `RH`. Só para quem **já tem login** (`situacao` diferente de
+        `SEM_CONVITE`, senão 422 `SEM_USUARIO`: envie o convite). Só reativa login de colaborador **ativo**
+        (422 `FUNCIONARIO_INATIVO`, regra do banco: `Nao e possivel reativar usuario de funcionario inativo.`).
+        Já liberado: devolve o login como está.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: Login liberado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioSistemaItem' }
+              example:
+                funcionarioId: 12
+                nome: Bruno Lima
+                emailCorporativo: bruno.lima@empresa.com.br
+                perfil: Funcionario
+                situacao: SENHA_DEFINIDA
+                ativo: true
+                ultimoLoginEmUtc: '2026-10-07T11:58:00Z'
+                conviteEnviadoEmUtc: '2022-03-14T12:00:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/Erro422FuncionarioInativo' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/usuarios/{funcionarioId}/desativar:
+    post:
+      tags: [Usuários do sistema]
+      operationId: desativarUsuarioDoSistema
+      summary: Bloqueia o login de um colaborador (botão "Desativar").
+      description: |
+        Tela 29, botão "Desativar". Só o perfil `RH`. O login fica bloqueado e as sessões abertas da pessoa são
+        encerradas (os refresh tokens são revogados). **Não apaga nada**; "Ativar" desfaz. Quem tenta entrar com a
+        senha certa vê "Seu acesso está desativado. Fale com o RH." (403 do login). O RH **não** desativa o
+        próprio login (422 `NAO_PODE_DESATIVAR_A_SI_MESMO`). Sem login (`SEM_CONVITE`): 422 `SEM_USUARIO`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamColaboradorId'
+      responses:
+        '200':
+          description: Login bloqueado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioSistemaItem' }
+              example:
+                funcionarioId: 12
+                nome: Bruno Lima
+                emailCorporativo: bruno.lima@empresa.com.br
+                perfil: Funcionario
+                situacao: SENHA_DEFINIDA
+                ativo: false
+                ultimoLoginEmUtc: '2026-10-07T11:58:00Z'
+                conviteEnviadoEmUtc: '2022-03-14T12:00:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A pessoa não tem login, ou o RH tentou desativar o próprio login.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                semUsuario:
+                  summary: Ainda não tem login
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Esta pessoa ainda não tem login. Envie o convite primeiro.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: SEM_USUARIO
+                proprioLogin:
+                  summary: O RH tentou desativar o próprio login
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Você não pode desativar o seu próprio login.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: NAO_PODE_DESATIVAR_A_SI_MESMO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Auditoria
+  # ------------------------------------------------------------------
+  /api/rh/auditoria:
+    get:
+      tags: [Auditoria]
+      operationId: listarEventosDeAuditoria
+      summary: Lista os eventos do log de auditoria, do mais recente ao mais antigo.
+      description: |
+        Tela 31 (Log de auditoria). Só o perfil `RH`. **Só leitura**: não existe rota para editar nem apagar um
+        evento; o texto da tela diz "Nenhuma tela do sistema edita ou apaga estes registros" (decisão do dono).
+
+        **Filtros:** período (`de` e `ate`, datas de calendário no fuso -03:00, **inclusive**; sem eles, vale o
+        padrão "Últimos 7 dias" até hoje), `busca` (procura no nome de quem fez e na descrição do registro),
+        `area` e `acao`. O rodapé "Mostrando 12 de 1.284 registros dos últimos 7 dias" usa `total`.
+        Ordem fixa: do mais recente para o mais antigo.
+
+        **`apenasAlteracoes` (painel do RH):** com `apenasAlteracoes = true` a lista traz só o que **mudou algum dado** e
+        deixa de fora as **marcações de ponto** (`area = PONTO` com `acao = REGISTROU`), os **downloads** (`BAIXOU`), os
+        **logins** (`ENTROU`) e os **acessos negados** (`ACESSO_NEGADO`); o resto entra (criou, alterou, excluiu, inativou,
+        pediu ajuste, aprovou, recusou, publicou, importou e o envio de e-mail da lista fechada). Combina com os demais
+        filtros. A tela 31 **não** tem esse filtro; quem o usa é o quadro "Últimas alterações" do painel do RH (tela 00), que
+        chama `GET /api/rh/auditoria?apenasAlteracoes=true` e mostra as primeiras linhas (a fatia 7 só cita a rota, não
+        copia o schema).
+
+        **O que entra:** criar, alterar e excluir (com antes e depois), login e acesso negado, ponto, envio de
+        e-mail (da lista fechada de e-mails, `CONVENCOES.md`, seção 12), importação e download de arquivos, de **todas as
+        fatias** (cada fatia registra os seus eventos). Os cancelamentos automáticos da inativação **não** têm registro
+        próprio (decisão do dono). **Nunca** aparecem senha, hash nem token; valores de colunas sensíveis não são
+        gravados (ver `AuditoriaMudanca.valorOculto`). O log é uma **tabela nova da aplicação** (auditoria; script `V037`).
+
+        **Formulário anônimo (privacidade, decisão do dono, 2026-10-30):** a auditoria **não pode permitir descobrir quem
+        respondeu nem quem ainda não participou**. Por isso:
+        - o lembrete de um formulário anônimo (o manual do RH e o automático de 7 dias antes do prazo) entra **só como o
+          fato de ter sido enviado** ("Lembrete do formulário anônimo ... enviado"): **nunca** o nome de quem recebeu **nem
+          quantas pessoas receberam**, nem em `descricao` nem em `registroAfetado` nem em `mudancas`;
+        - **responder** e **participar** de um formulário anônimo **não geram evento** com nome e hora (a participação
+          existe no banco sem ligar a pessoa à resposta; a auditoria não pode refazer essa ligação);
+        - o que o RH faz com o formulário (criar, publicar, encerrar, excluir) entra normalmente, com o autor.
+        Nos demais formulários, o lembrete pode trazer o nome do destinatário.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+        - name: de
+          in: query
+          description: Primeiro dia do período (inclusive). Padrão 6 dias antes de `ate`.
+          schema: { type: string, format: date }
+        - name: ate
+          in: query
+          description: Último dia do período (inclusive). Padrão hoje.
+          schema: { type: string, format: date }
+        - name: area
+          in: query
+          description: Só eventos desta área ("Todas as áreas" = sem o parâmetro).
+          schema: { $ref: '#/components/schemas/AuditoriaArea' }
+        - name: acao
+          in: query
+          description: Só eventos desta ação ("Todas as ações" = sem o parâmetro).
+          schema: { $ref: '#/components/schemas/AuditoriaAcao' }
+        - name: apenasAlteracoes
+          in: query
+          description: |
+            `true`: só eventos que mudam algum dado, **sem** marcação de ponto (`PONTO` com `REGISTROU`), download (`BAIXOU`),
+            login (`ENTROU`) nem acesso negado (`ACESSO_NEGADO`). Usado pelo quadro "Últimas alterações" do painel do RH.
+            Padrão `false` (tudo o que o filtro de período mostra).
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Uma página de eventos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditoriaListaResposta' }
+              example:
+                itens:
+                  - id: 48215
+                    quandoUtc: '2026-10-07T12:41:44Z'
+                    ator: { funcionarioId: 1, nome: Ana Souza, tipo: PESSOA, perfil: RH, desligado: false }
+                    area: IMPORTACAO
+                    acao: IMPORTOU
+                    descricao: 'Planilha novos-colaboradores-outubro-corrigido.xlsx (2 colaboradores cadastrados)'
+                  - id: 48213
+                    quandoUtc: '2026-10-07T12:38:12Z'
+                    ator: { funcionarioId: 1, nome: Ana Souza, tipo: PESSOA, perfil: RH, desligado: false }
+                    area: COLABORADORES
+                    acao: ALTEROU
+                    descricao: Cargo de Bruno Lima
+                  - id: 48212
+                    quandoUtc: '2026-10-07T12:12:03Z'
+                    ator: { funcionarioId: 2, nome: Sofia Ramos, tipo: PESSOA, perfil: RH, desligado: false }
+                    area: CADASTROS
+                    acao: CRIOU
+                    descricao: Setor Compras
+                  - id: 48199
+                    quandoUtc: '2026-10-07T01:47:20Z'
+                    ator: { funcionarioId: 201, nome: Henrique Alves, tipo: PESSOA, perfil: Funcionario, desligado: true }
+                    area: ACESSO
+                    acao: ACESSO_NEGADO
+                    descricao: Tentativa de login com usuário bloqueado
+                pagina: 1
+                tamanhoPagina: 20
+                total: 1284
+                totalPaginas: 65
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/auditoria/exportacao:
+    get:
+      tags: [Auditoria]
+      operationId: exportarAuditoria
+      summary: Baixa o log de auditoria filtrado em CSV (botão "Exportar CSV").
+      description: |
+        Tela 31, botão "Exportar CSV". Só o perfil `RH`. Aceita os **mesmos filtros da tela** (`de`, `ate`,
+        `busca`, `area`, `acao`; o `apenasAlteracoes` é só do painel e não existe aqui), mas **sem paginação**: exporta
+        todos os eventos do filtro. Devolve o arquivo com
+        `Content-Disposition: attachment`. A exportação entra na auditoria. O nome da rota segue o padrão
+        `.../exportacao` das exportações (`CONVENCOES.md`, seção 11; antes era `/exportar`).
+
+        Formato (escolha da sessão): UTF-8 com BOM, separador `;` (abre direto no Excel em português), primeira
+        linha com os títulos `Quando;Quem;Perfil;Área;Ação;O que aconteceu;Registro afetado;Origem;IP`. `Quando`
+        no fuso -03:00 (`dd/MM/yyyy HH:mm:ss`); `Perfil`, `Área`, `Ação` e `Origem` com os **rótulos da tela**
+        ("Colaborador", "Colaboradores", "Alterou", "Portal no navegador" ou "Automático"), não com os códigos. Célula que começa com `=`, `+`, `-` ou `@` é neutralizada
+        (decisão 9 do roadmap).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Busca'
+        - name: de
+          in: query
+          description: Primeiro dia do período (inclusive). Padrão 6 dias antes de `ate`.
+          schema: { type: string, format: date }
+        - name: ate
+          in: query
+          description: Último dia do período (inclusive). Padrão hoje.
+          schema: { type: string, format: date }
+        - name: area
+          in: query
+          description: Só eventos desta área.
+          schema: { $ref: '#/components/schemas/AuditoriaArea' }
+        - name: acao
+          in: query
+          description: Só eventos desta ação.
+          schema: { $ref: '#/components/schemas/AuditoriaAcao' }
+      responses:
+        '200':
+          description: O arquivo CSV.
+          headers:
+            Content-Disposition:
+              description: 'Anexo, por exemplo `attachment; filename="auditoria-2026-10-07.csv"`.'
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string }
+              example: |
+                Quando;Quem;Perfil;Área;Ação;O que aconteceu;Registro afetado;Origem;IP
+                07/10/2026 09:38:12;Ana Souza;RH;Colaboradores;Alterou;Cargo de Bruno Lima;Colaborador Bruno Lima, matrícula 00482;Portal no navegador;10.0.4.23
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/auditoria/{eventoId}:
+    get:
+      tags: [Auditoria]
+      operationId: obterEventoDeAuditoria
+      summary: Mostra os detalhes de um evento (registro afetado, origem e o que mudou).
+      description: |
+        Tela 31, botão "Detalhes" (a linha se expande). Só o perfil `RH`. `mudancas` traz a tabela
+        Campo / Antes / Depois (vazia quando o evento não altera dados, como um login).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/ParamAuditoriaEventoId'
+      responses:
+        '200':
+          description: O evento com os detalhes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditoriaEventoDetalhe' }
+              example:
+                id: 48213
+                quandoUtc: '2026-10-07T12:38:12Z'
+                ator: { funcionarioId: 1, nome: Ana Souza, tipo: PESSOA, perfil: RH, desligado: false }
+                area: COLABORADORES
+                acao: ALTEROU
+                descricao: Cargo de Bruno Lima
+                registroAfetado: Colaborador Bruno Lima, matrícula 00482
+                origem: { canal: PORTAL, ip: 10.0.4.23 }
+                mudancas:
+                  - { campo: Cargo, antes: Analista, depois: Analista pleno, valorOculto: false }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ------------------------------------------------------------------
+  # Senha e convite (telas que não existem no Figma)
+  # ------------------------------------------------------------------
+  /api/auth/senha/esqueci:
+    post:
+      tags: [Senha e convite]
+      operationId: solicitarRedefinicaoDeSenha
+      summary: Pede um link por e-mail para redefinir a senha ("Esqueci minha senha").
+      description: |
+        Tela "Esqueci minha senha" (**não existe no Figma**: um campo de e-mail e um botão, a partir do login).
+        Pública. **Resposta uniforme:** sempre 202, exista o e-mail ou não, esteja a pessoa ativa ou não (a tela
+        diz "Se o e-mail estiver cadastrado, enviaremos um link"). Quando o e-mail pertence a um colaborador
+        ativo com login, o e-mail com o link é colocado na fila; o link vale **1 hora** e é de **uso único**
+        (um pedido novo invalida o anterior). O e-mail tem o botão "Definir nova senha" apontando para
+        `<endereço do front>/definir-senha?token=<token>`. Limite de 5 pedidos por minuto por IP (429). O link de
+        redefinição e a fila de e-mails são **tabelas novas da aplicação** (token de convite e de redefinição, `V033`; fila de
+        e-mails, `V035`).
+      x-perfis: [Publico]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConviteEsqueciSenhaComando' }
+            example: { email: bruno.lima@empresa.com.br }
+      responses:
+        '202': { description: 'Pedido recebido (sempre a mesma resposta).' }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '429': { $ref: '#/components/responses/Erro429MuitasTentativas' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/auth/senha/validar-link:
+    post:
+      tags: [Senha e convite]
+      operationId: validarLinkDeSenha
+      summary: Confere se o link do convite ou da redefinição ainda vale.
+      description: |
+        Tela "Definir senha" (**não existe no Figma**): o front a chama ao abrir `/definir-senha?token=...`, antes
+        de mostrar o formulário. Pública. Não gasta o link. O `tipo` diz qual texto mostrar: `CONVITE` ("Bem-vindo,
+        defina a sua senha") ou `REDEFINICAO` ("Defina uma nova senha"). Link inexistente, já usado ou vencido
+        recebem a **mesma** resposta 422 `LINK_INVALIDO_OU_VENCIDO` (não revela qual). O token do convite vale
+        **7 dias**; o da redefinição, 1 hora. Limite de 5 tentativas por minuto por IP (429). Os dois tokens vivem na
+        **tabela nova da aplicação** de convite e redefinição (script `V033`).
+      x-perfis: [Publico]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConviteLinkValidarComando' }
+            example: { token: 9d3f1c7a4b8e42f1a6c05d2e7b9a3f10c4e8d6b2a1f7035e9c8b4a6d2e1f0a37 }
+      responses:
+        '200':
+          description: O link vale.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConviteLinkInfo' }
+              example:
+                tipo: CONVITE
+                nome: Rafael Torres
+                emailCorporativo: rafael.torres@empresa.com.br
+                expiraEmUtc: '2026-10-12T15:30:00Z'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '422': { $ref: '#/components/responses/Erro422LinkDeSenhaInvalido' }
+        '429': { $ref: '#/components/responses/Erro429MuitasTentativas' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/auth/senha/definir:
+    post:
+      tags: [Senha e convite]
+      operationId: definirSenhaPeloLink
+      summary: Define a senha usando o link do convite ou da redefinição.
+      description: |
+        Tela "Definir senha" (**não existe no Figma**: nova senha, confirmação feita só no front, botão
+        "Salvar senha"). Pública. Consome o link (**uso único**: usar de novo dá 422 `LINK_INVALIDO_OU_VENCIDO`)
+        e grava o hash da nova senha. No convite, o login passa a `SENHA_DEFINIDA`. Na redefinição, as sessões
+        abertas da pessoa são encerradas. Devolve 204; a pessoa então **entra** pela tela de login (não há login
+        automático). Se a pessoa estiver inativa ou o login desativado, o link não vale (422, mesma resposta).
+        Limite de 5 tentativas por minuto por IP (429). O token consumido é o da **tabela nova da aplicação** de convite
+        e redefinição (script `V033`).
+      x-perfis: [Publico]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConviteDefinirSenhaComando' }
+            example:
+              token: 9d3f1c7a4b8e42f1a6c05d2e7b9a3f10c4e8d6b2a1f7035e9c8b4a6d2e1f0a37
+              novaSenha: Aurora#2026Forte
+      responses:
+        '204': { description: 'Senha definida. A pessoa entra pela tela de login.' }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '422': { $ref: '#/components/responses/Erro422LinkDeSenhaInvalido' }
+        '429': { $ref: '#/components/responses/Erro429MuitasTentativas' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/senha:
+    post:
+      tags: [Senha e convite]
+      operationId: trocarMinhaSenha
+      summary: Troca a senha de quem está logado (informando a senha atual).
+      description: |
+        Tela "Trocar senha" (**não existe no Figma**: senha atual, nova senha, confirmação só no front). Qualquer
+        pessoa logada. Senha atual errada: 422 `SENHA_ATUAL_INCORRETA` (o front **não** desloga). Com sucesso
+        devolve 204; as **outras** sessões da pessoa são encerradas (os outros refresh tokens são revogados) e a
+        sessão atual continua. Senhas e hashes nunca aparecem na auditoria. **Limite de tentativas:** 5 tentativas
+        de senha atual errada por minuto por pessoa (429), para um token de acesso roubado não servir para
+        adivinhar a senha.
+      x-perfis: [Funcionario, Gestor, RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SenhaTrocarComando' }
+            example: { senhaAtual: Senha#Forte123, novaSenha: Aurora#2026Forte }
+      responses:
+        '204': { description: 'Senha trocada.' }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '429': { $ref: '#/components/responses/Erro429MuitasTentativas' }
+        '422':
+          description: A senha atual está errada.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: A senha atual está incorreta.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: SENHA_ATUAL_INCORRETA
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+components:
+  parameters:
+    ParamColaboradorId:
+      name: funcionarioId
+      in: path
+      required: true
+      description: Id do colaborador.
+      schema: { type: integer }
+    ParamDocumentoColaboradorId:
+      name: documentoId
+      in: path
+      required: true
+      description: Id do documento do colaborador.
+      schema: { type: integer }
+    ParamCargoId:
+      name: cargoId
+      in: path
+      required: true
+      description: Id do cargo.
+      schema: { type: integer }
+    ParamSetorId:
+      name: setorId
+      in: path
+      required: true
+      description: Id do setor.
+      schema: { type: integer }
+    ParamGestorId:
+      name: gestorId
+      in: path
+      required: true
+      description: Id do gestor (o `gestorId` da lista de gestores, não o do colaborador).
+      schema: { type: integer }
+    ParamBeneficioCatalogoId:
+      name: beneficioId
+      in: path
+      required: true
+      description: Id do benefício no catálogo.
+      schema: { type: integer }
+    ParamAuditoriaEventoId:
+      name: eventoId
+      in: path
+      required: true
+      description: Id do evento de auditoria.
+      schema: { type: integer, format: int64 }
+
+  responses:
+    Erro409ColaboradorDuplicado:
+      description: |
+        CPF ou e-mail corporativo já pertence a outro cadastro. `cadastroExistente` diz qual (e se está ativo). Quando o
+        cadastro existente está **inativo**, o texto manda usar "Readmitir" na ficha dele
+        (`POST /api/rh/funcionarios/{funcionarioId}/readmissao`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ColaboradorDuplicadoProblema' }
+          examples:
+            cpf:
+              summary: CPF repetido (cadastro ativo)
+              value:
+                title: Conflito.
+                status: 409
+                detail: Já existe um colaborador com este CPF.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: CPF_JA_CADASTRADO
+                cadastroExistente: { funcionarioId: 12, nome: Bruno Lima, ativo: true }
+            email:
+              summary: E-mail corporativo repetido (cadastro ativo)
+              value:
+                title: Conflito.
+                status: 409
+                detail: Já existe um colaborador com este e-mail corporativo.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: EMAIL_JA_CADASTRADO
+                cadastroExistente: { funcionarioId: 12, nome: Bruno Lima, ativo: true }
+            cpfInativo:
+              summary: CPF de um cadastro inativo (usar Readmitir)
+              value:
+                title: Conflito.
+                status: 409
+                detail: Este CPF pertence a um cadastro inativo (Henrique Alves). Se a pessoa está voltando à empresa, use "Readmitir" na ficha dela.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: CPF_JA_CADASTRADO
+                cadastroExistente: { funcionarioId: 201, nome: Henrique Alves, ativo: false }
+            emailInativo:
+              summary: E-mail corporativo de um cadastro inativo (usar Readmitir)
+              value:
+                title: Conflito.
+                status: 409
+                detail: Este e-mail corporativo pertence a um cadastro inativo (Henrique Alves). Se a pessoa está voltando à empresa, use "Readmitir" na ficha dela.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: EMAIL_JA_CADASTRADO
+                cadastroExistente: { funcionarioId: 201, nome: Henrique Alves, ativo: false }
+    Erro409CadastroNomeRepetido:
+      description: Já existe um registro com este nome (cargo, setor ou benefício; sem diferenciar maiúsculas).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Conflito.
+            status: 409
+            detail: Já existe um cadastro com este nome.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            codigo: NOME_JA_CADASTRADO
+    Erro409Setor:
+      description: Já existe um setor com este nome, ou o gestor escolhido já responde por outro setor.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          examples:
+            nomeRepetido:
+              summary: Nome de setor repetido (sem diferenciar maiúsculas)
+              value:
+                title: Conflito.
+                status: 409
+                detail: Já existe um cadastro com este nome.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: NOME_JA_CADASTRADO
+            gestorEmOutroSetor:
+              summary: O gestor escolhido já responde por outro setor (um gestor responde por um setor só)
+              value:
+                title: Conflito.
+                status: 409
+                detail: Carlos Ribeiro já é o gestor do setor Comercial. Tire-o de lá antes de escolhê-lo aqui.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: GESTOR_JA_RESPONDE_POR_OUTRO_SETOR
+    Erro422Setor:
+      description: A pessoa escolhida como gestor está inativa (regra do banco) ou não tem o nível `Gestor` (é do RH).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          examples:
+            funcionarioInativo:
+              summary: A pessoa escolhida está inativa
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: A pessoa escolhida está inativa.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FUNCIONARIO_INATIVO
+                regraDoBanco: Nao e possivel cadastrar como gestor um funcionario inativo.
+            gestorPrecisaTerPerfilGestor:
+              summary: A pessoa escolhida é do RH (só quem tem o nível Gestor gerencia um setor)
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: Ana Souza tem o nível RH. Só quem tem o nível Gestor pode gerenciar um setor.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: GESTOR_PRECISA_TER_PERFIL_GESTOR
+    Erro422FuncionarioInativo:
+      description: A pessoa escolhida está inativa (regra do banco).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          example:
+            title: Operação recusada.
+            status: 422
+            detail: A pessoa escolhida está inativa.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            codigo: FUNCIONARIO_INATIVO
+            regraDoBanco: Nao e possivel cadastrar como gestor um funcionario inativo.
+    Erro422LinkDeSenhaInvalido:
+      description: O link não existe, já foi usado ou venceu (a API não diz qual dos três).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          example:
+            title: Link inválido ou vencido.
+            status: 422
+            detail: Este link não vale mais. Peça um novo ao RH ou use "Esqueci minha senha".
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            codigo: LINK_INVALIDO_OU_VENCIDO
+
+  schemas:
+    # ---------------- colaboradores: enums ----------------
+    FuncionarioSituacao:
+      type: string
+      description: |
+        Situação **cadastral** da pessoa, e as abas da lista de colaboradores. `ATIVO`: ativa e com admissão já
+        começada (inclui quem está de férias ou com atestado); `EM_ADMISSAO`: ativa e com admissão no futuro; `INATIVO`.
+        Não confundir com a situação **de hoje** (`SituacaoHoje`, em `00-base.yaml`, `CONVENCOES.md`, seção 10), que
+        diz se a pessoa está trabalhando, de férias, sem registro etc.
+      enum: [ATIVO, EM_ADMISSAO, INATIVO]
+      default: ATIVO
+    FuncionarioTipoContrato:
+      type: string
+      description: Tipo de contrato. `CLT` e `ESTAGIO` (o Figma só mostra estes dois).
+      x-provisorio: >-
+        Quais são os tipos de contrato? O banco guarda texto livre (`TIPO_CONTRATO`, sem CHECK) e o dono ainda não
+        decidiu a lista. Construído com `CLT` e `ESTAGIO`; mais valores = valor novo no enum (versão menor) e um
+        CHECK novo no banco.
+      enum: [CLT, ESTAGIO]
+    FuncionarioDesligamentoSituacao:
+      type: string
+      description: |
+        `AGENDADO`: o último dia de trabalho foi registrado, mas a pessoa ainda está ativa (a data só é gravada no
+        dia seguinte). `EFETIVADO`: já foi gravado e a pessoa está inativa.
+      enum: [AGENDADO, EFETIVADO]
+
+    # ---------------- colaboradores: partes ----------------
+    CargoReferencia:
+      type: object
+      description: Identificação curta de um cargo.
+      required: [id, nome]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+    SetorReferencia:
+      type: object
+      description: Identificação curta de um setor.
+      required: [id, nome]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+    GestorReferencia:
+      type: object
+      description: O gestor de um setor ou de uma pessoa.
+      required: [gestorId, funcionarioId, nome]
+      properties:
+        gestorId: { type: integer, description: 'Id na lista de gestores (Cadastros).' }
+        funcionarioId: { type: integer, description: 'Id do colaborador que é o gestor.' }
+        nome: { type: string }
+    FuncionarioEndereco:
+      type: object
+      description: |
+        Endereço de casa. O próprio colaborador o completa no formulário de admissão (fatia 5); o RH também edita.
+        Todos os campos podem vir `null`.
+      required: [cep, logradouro, numero, complemento, bairro, cidade, uf]
+      properties:
+        cep: { type: [string, 'null'], pattern: '^[0-9]{8}$', description: '8 dígitos, sem hífen.' }
+        logradouro: { type: [string, 'null'], maxLength: 150 }
+        numero: { type: [string, 'null'], maxLength: 10 }
+        complemento: { type: [string, 'null'], maxLength: 100 }
+        bairro: { type: [string, 'null'], maxLength: 100 }
+        cidade: { type: [string, 'null'], maxLength: 100 }
+        uf: { type: [string, 'null'], pattern: '^[A-Z]{2}$', description: 'Sigla do estado, em maiúsculas.' }
+    FuncionarioBeneficioItem:
+      type: object
+      description: Um benefício **ativo** da pessoa (as "pílulas" da ficha, como "Plano de saúde + 1 dependente").
+      required: [beneficioId, nome, quantidadeDependentes]
+      properties:
+        beneficioId: { type: integer }
+        nome: { type: string }
+        quantidadeDependentes: { type: integer, minimum: 0, description: 'Dependentes aprovados ligados a este benefício (vêm da fatia 7; antes dela, 0).' }
+    FuncionarioDesligamento:
+      type: object
+      description: Desligamento registrado.
+      required: [ultimoDiaDeTrabalho, situacao]
+      properties:
+        ultimoDiaDeTrabalho: { type: string, format: date }
+        situacao: { $ref: '#/components/schemas/FuncionarioDesligamentoSituacao' }
+    FuncionarioAcesso:
+      type: object
+      description: 'Situação do login da pessoa (para o menu "..." da ficha: reenviar convite).'
+      required: [situacao, ativo]
+      properties:
+        situacao: { $ref: '#/components/schemas/UsuarioSistemaSituacao' }
+        ativo: { type: boolean, description: 'O login está liberado (`false` quando `SEM_CONVITE` ou desativado).' }
+
+    ColaboradorDuplicadoProblema:
+      description: Erro 409 de CPF ou e-mail corporativo repetido, com o cadastro que já usa o dado.
+      allOf:
+        - $ref: '#/components/schemas/ProblemaDeApi'
+        - type: object
+          required: [cadastroExistente]
+          properties:
+            cadastroExistente:
+              type: object
+              description: O cadastro que já tem o CPF ou o e-mail (o RH vê todos os cadastros). Com `ativo = false`, o caminho é "Readmitir".
+              required: [funcionarioId, nome, ativo]
+              properties:
+                funcionarioId: { type: integer }
+                nome: { type: string }
+                ativo: { type: boolean }
+
+    # ---------------- colaboradores: lista ----------------
+    FuncionarioListaItemRh:
+      type: object
+      description: Uma linha da lista de colaboradores (tela 01).
+      required: [id, nome, emailCorporativo, cargo, setor, dataAdmissao, situacao, situacaoHoje]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        emailCorporativo: { type: [string, 'null'] }
+        cargo: { type: [string, 'null'], description: 'Nome do cargo.' }
+        setor: { type: [string, 'null'], description: 'Nome do setor.' }
+        dataAdmissao: { type: string, format: date }
+        situacao: { $ref: '#/components/schemas/FuncionarioSituacao' }
+        situacaoHoje:
+          description: |
+            Situação de hoje (`SituacaoHoje`, `CONVENCOES.md`, seção 10). `null` quando `situacao` não é `ATIVO`.
+            A etiqueta da tela sai das duas: ver `GET /api/rh/funcionarios`.
+          oneOf:
+            - $ref: '#/components/schemas/SituacaoHoje'
+            - { type: 'null' }
+    FuncionarioListaTotais:
+      type: object
+      description: Totais da empresa inteira por situação (ignoram os filtros da lista).
+      required: [ativos, emAdmissao, inativos]
+      properties:
+        ativos: { type: integer, minimum: 0 }
+        emAdmissao: { type: integer, minimum: 0 }
+        inativos: { type: integer, minimum: 0 }
+    FuncionarioEquipeItem:
+      description: Uma pessoa da equipe do gestor, com a situação de hoje.
+      allOf:
+        - $ref: '#/components/schemas/FuncionarioResumo'
+        - type: object
+          required: [situacaoHoje]
+          properties:
+            situacaoHoje:
+              description: Situação de hoje (`SituacaoHoje`, `CONVENCOES.md`, seção 10).
+              allOf:
+                - $ref: '#/components/schemas/SituacaoHoje'
+    FuncionarioEquipeResposta:
+      type: object
+      description: A equipe do gestor (sem paginação), com as contagens de hoje.
+      required: [setor, total, diaUtil, contagensHoje, itens]
+      properties:
+        setor:
+          description: O setor do gestor; `null` se ele não gerencia nenhum.
+          oneOf:
+            - $ref: '#/components/schemas/SetorReferencia'
+            - { type: 'null' }
+        total: { type: integer, minimum: 0, description: 'Quantas pessoas há na equipe (`itens.length`); a tela 51 diz "8 pessoas".' }
+        diaUtil: { type: boolean, description: 'Hoje tem expediente. `false` em sábado, domingo ou feriado (quem já bateu entrada continua `TRABALHANDO`; os demais ficam `SEM_EXPEDIENTE`).' }
+        contagensHoje:
+          description: Quantas pessoas da equipe estão em cada situação de hoje. A soma dos seis valores é o `total`.
+          allOf:
+            - $ref: '#/components/schemas/PresencaContagens'
+        itens:
+          type: array
+          description: Ordem alfabética do nome.
+          items: { $ref: '#/components/schemas/FuncionarioEquipeItem' }
+    FuncionarioListaRespostaRh:
+      description: Página de colaboradores com os totais por situação.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens, totais]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/FuncionarioListaItemRh' }
+            totais: { $ref: '#/components/schemas/FuncionarioListaTotais' }
+
+    # ---------------- colaboradores: comandos ----------------
+    FuncionarioCriarComando:
+      type: object
+      description: |
+        Cadastro mínimo do colaborador (tela 02). O restante (endereço e outros) a própria pessoa completa no
+        formulário de admissão. **Não há** matrícula, gestor nem unidade no corpo: a matrícula é gerada e o gestor é
+        o do setor escolhido.
+      x-provisorio: >-
+        `FUNCIONARIOS.ID_GESTOR` pode ser diferente do gestor do setor? Construído: sempre o gestor do setor (a
+        tela mostra o gestor como campo informativo). Se puder diferir, entra `gestorId` opcional no comando.
+      required: [nome, cpf, dataNascimento, telefone, emailCorporativo, dataAdmissao, tipoContrato, cargoId, setorId, perfil]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 150, description: 'Nome completo, como está no documento.' }
+        cpf: { type: string, pattern: '^[0-9]{11}$', description: '11 dígitos sem pontuação, com os dígitos verificadores corretos.' }
+        dataNascimento: { type: string, format: date, description: 'Não pode ser no futuro.' }
+        telefone: { type: string, pattern: '^[0-9]{10,11}$', description: 'Só dígitos, com DDD (10 ou 11 dígitos).' }
+        emailCorporativo: { type: string, format: email, maxLength: 150, description: 'Único; é o e-mail de login.' }
+        dataAdmissao: { type: string, format: date, description: 'Pode ser futura ("Em admissão").' }
+        tipoContrato: { $ref: '#/components/schemas/FuncionarioTipoContrato' }
+        cargoId: { type: integer }
+        setorId: { type: integer }
+        perfil:
+          allOf:
+            - $ref: '#/components/schemas/Perfil'
+          description: Nível de acesso (campo "Nível de acesso"; `Funcionario` aparece como "Colaborador").
+        beneficioIds:
+          type: array
+          description: Benefícios do catálogo que a pessoa já recebe (caixas "Benefícios"). Sem repetição. Padrão `[]`.
+          uniqueItems: true
+          default: []
+          items: { type: integer }
+        enviarConvite:
+          type: boolean
+          default: true
+          description: Caixa "Enviar convite de acesso ao portal" (marcada por padrão).
+        incluirNoOnboarding:
+          type: boolean
+          default: false
+          description: |
+            Caixa "Incluir no treinamento Onboarding 2026". `true` inscreve a pessoa em cada treinamento de onboarding em
+            vigor (mesmo efeito de `incluirFuncionarioNoOnboarding`, fatia 6). Sem treinamento em vigor: 422
+            `SEM_TREINAMENTO_DE_ONBOARDING` e ninguém é cadastrado. Sem e-mail.
+        formularioAdmissaoId:
+          type: [integer, 'null']
+          default: null
+          description: |
+            Caixa "Enviar o formulário de admissão": id de um formulário de admissão **publicado** (fatia 5). A pessoa
+            passa a ser destinatária dele (mesmo efeito de `adicionarDestinatariosFormulario`). `null` não envia nada.
+            Sem e-mail (o e-mail que a pessoa recebe é o do convite).
+    FuncionarioEditarComando:
+      type: object
+      description: |
+        Substituição completa dos campos editáveis (botão "Editar dados"). Tudo vem sempre; os campos que podem
+        ser vazios aceitam `null`. A matrícula e a situação não se editam aqui.
+      required: [nome, cpf, dataNascimento, telefone, emailCorporativo, emailPessoal, rg, rgOrgaoEmissor, endereco, dataAdmissao, tipoContrato, cargoId, setorId, perfil, beneficioIds]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 150 }
+        cpf: { type: string, pattern: '^[0-9]{11}$', description: '11 dígitos sem pontuação, com os dígitos verificadores corretos.' }
+        dataNascimento: { type: string, format: date }
+        telefone: { type: string, pattern: '^[0-9]{10,11}$', description: 'Só dígitos, com DDD.' }
+        emailCorporativo: { type: string, format: email, maxLength: 150 }
+        emailPessoal: { type: [string, 'null'], format: email, maxLength: 150 }
+        rg: { type: [string, 'null'], maxLength: 20 }
+        rgOrgaoEmissor: { type: [string, 'null'], maxLength: 20 }
+        endereco: { $ref: '#/components/schemas/FuncionarioEndereco' }
+        dataAdmissao: { type: string, format: date }
+        tipoContrato: { $ref: '#/components/schemas/FuncionarioTipoContrato' }
+        cargoId: { type: integer }
+        setorId: { type: integer }
+        perfil: { $ref: '#/components/schemas/Perfil' }
+        beneficioIds:
+          type: array
+          description: Benefícios **ativos** desejados (os que saem são desativados).
+          uniqueItems: true
+          items: { type: integer }
+    FuncionarioReadmitirComando:
+      type: object
+      description: |
+        Nova admissão de quem está inativo (botão "Readmitir"). O CPF, o e-mail corporativo, a matrícula e os dados
+        pessoais continuam os do cadastro; o que muda é o vínculo novo. O nível de acesso, os benefícios e as férias **não**
+        vêm no corpo (ver `POST /api/rh/funcionarios/{funcionarioId}/readmissao`).
+      required: [dataAdmissao, cargoId, setorId, tipoContrato]
+      properties:
+        dataAdmissao: { type: string, format: date, description: 'Data da nova admissão. Não pode ser anterior ao último dia de trabalho do vínculo anterior; pode ser futura ("Em admissão").' }
+        cargoId: { type: integer }
+        setorId: { type: integer }
+        tipoContrato: { $ref: '#/components/schemas/FuncionarioTipoContrato' }
+        incluirNoOnboarding:
+          type: boolean
+          default: false
+          description: Caixa "Incluir no treinamento Onboarding 2026", com o mesmo efeito do cadastro (`FuncionarioCriarComando`). Sem e-mail.
+        formularioAdmissaoId:
+          type: [integer, 'null']
+          default: null
+          description: Caixa "Enviar o formulário de admissão", com o mesmo efeito do cadastro (`FuncionarioCriarComando`). `null` não envia nada. Sem e-mail.
+        enviarConvite:
+          type: boolean
+          default: false
+          description: |
+            Só para quem **nunca definiu a senha**: libera o login e coloca o convite na fila (o mesmo que "Ativar" mais
+            "Reenviar convite"). Quem já definiu a senha recebe 422 `SENHA_JA_DEFINIDA` com `true`; ela entra com a senha
+            que já tinha depois do "Ativar" de Usuários do sistema.
+    FuncionarioInativarComando:
+      type: object
+      required: [ultimoDiaDeTrabalho]
+      properties:
+        ultimoDiaDeTrabalho:
+          type: string
+          format: date
+          description: Último dia em que a pessoa trabalha. Não pode ser anterior à data de admissão; pode ser hoje, futuro ou passado.
+
+    # ---------------- colaboradores: fichas ----------------
+    FuncionarioFichaRh:
+      type: object
+      description: Ficha completa do colaborador, **só para o RH** (CPF e telefone sem máscara).
+      required: [id, matricula, nome, emailCorporativo, cpf, telefone, dataNascimento, rg, rgOrgaoEmissor, emailPessoal, endereco, cargo, setor, gestor, tipoContrato, jornadaSemanalHoras, dataAdmissao, perfil, ativo, situacao, situacaoHoje, desligamento, beneficios, acesso]
+      properties:
+        id: { type: integer }
+        matricula:
+          type: [string, 'null']
+          description: |
+            Texto (não número, para manter o zero à esquerda). **Gerada pelo sistema e somente leitura** (decidido pelo dono,
+            2026-10-30): sequencial, 5 dígitos (`00482`); não vem no corpo de criar nem de editar.
+        nome: { type: string }
+        emailCorporativo: { type: [string, 'null'] }
+        cpf: { type: [string, 'null'], pattern: '^[0-9]{11}$', description: '11 dígitos, sem máscara. `null` só para quem ainda não tem dados pessoais (administrador do seed).' }
+        telefone: { type: [string, 'null'], pattern: '^[0-9]{10,11}$', description: 'Só dígitos, sem máscara.' }
+        dataNascimento: { type: [string, 'null'], format: date, description: 'O front mostra "Aniversário, 18 de junho".' }
+        rg: { type: [string, 'null'] }
+        rgOrgaoEmissor: { type: [string, 'null'] }
+        emailPessoal: { type: [string, 'null'] }
+        endereco: { $ref: '#/components/schemas/FuncionarioEndereco' }
+        cargo:
+          oneOf:
+            - $ref: '#/components/schemas/CargoReferencia'
+            - { type: 'null' }
+        setor:
+          oneOf:
+            - $ref: '#/components/schemas/SetorReferencia'
+            - { type: 'null' }
+        gestor:
+          description: O gestor da pessoa (o do setor). `null` quando o setor não tem gestor ou a pessoa é o gestor.
+          oneOf:
+            - $ref: '#/components/schemas/GestorReferencia'
+            - { type: 'null' }
+        tipoContrato:
+          oneOf:
+            - $ref: '#/components/schemas/FuncionarioTipoContrato'
+            - { type: 'null' }
+        jornadaSemanalHoras: { type: [number, 'null'], description: 'Carga semanal do cargo ("44 h semanais").' }
+        dataAdmissao: { type: string, format: date }
+        perfil:
+          description: Nível de acesso. `null` quando a pessoa não tem nível configurado (não consegue entrar).
+          oneOf:
+            - $ref: '#/components/schemas/Perfil'
+            - { type: 'null' }
+        ativo: { type: boolean }
+        situacao: { $ref: '#/components/schemas/FuncionarioSituacao' }
+        situacaoHoje:
+          description: |
+            Situação de hoje (`SituacaoHoje`, `CONVENCOES.md`, seção 10). `null` quando `situacao` não é `ATIVO`
+            (em admissão ou inativa). A etiqueta do cabeçalho da ficha sai das duas: ver `GET /api/rh/funcionarios`.
+          oneOf:
+            - $ref: '#/components/schemas/SituacaoHoje'
+            - { type: 'null' }
+        desligamento:
+          description: Desligamento registrado (agendado ou efetivado); `null` se não há.
+          oneOf:
+            - $ref: '#/components/schemas/FuncionarioDesligamento'
+            - { type: 'null' }
+        beneficios:
+          type: array
+          items: { $ref: '#/components/schemas/FuncionarioBeneficioItem' }
+        acesso: { $ref: '#/components/schemas/FuncionarioAcesso' }
+    FuncionarioFichaGestor:
+      type: object
+      description: |
+        Ficha **do gestor** (aba Dados). Sem CPF, RG, endereço, e-mail pessoal, matrícula, benefícios e documentos;
+        telefone mascarado. Só de quem é da equipe (ativo, admissão já começada), por isso a situação de hoje nunca vem vazia.
+      required: [id, nome, cargo, setor, ativo, situacaoHoje, emailCorporativo, telefoneMascarado, dataAdmissao, tipoContrato, jornadaSemanalHoras]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        cargo: { type: [string, 'null'] }
+        setor: { type: [string, 'null'] }
+        ativo: { type: boolean }
+        situacaoHoje: { $ref: '#/components/schemas/SituacaoHoje' }
+        emailCorporativo: { type: [string, 'null'] }
+        telefoneMascarado:
+          type: [string, 'null']
+          description: 'DDD e os 4 últimos dígitos: `(11) 9****-7783` (11 dígitos) ou `(11) ****-7783` (10 dígitos).'
+        dataAdmissao: { type: string, format: date }
+        tipoContrato:
+          oneOf:
+            - $ref: '#/components/schemas/FuncionarioTipoContrato'
+            - { type: 'null' }
+        jornadaSemanalHoras: { type: [number, 'null'] }
+    FuncionarioIndicadoresRh:
+      type: object
+      description: |
+        Os quatro cartões da aba Dados da ficha do RH. Cada valor é calculado por **outra fatia** e vem `null` até ela
+        existir (a tabela com as rotas de origem está em `GET /api/rh/funcionarios/{funcionarioId}/indicadores`).
+      required: [bancoDeHorasMinutos, feriasDisponiveisDias, advertenciasQuantidade, proximoPagamento]
+      properties:
+        bancoDeHorasMinutos: { type: [integer, 'null'], description: 'Saldo do banco de horas, em minutos, com sinal (+380 = "+6h20"). **Fatia 3**: `saldoMinutos` de `GET /api/rh/funcionarios/{funcionarioId}/ponto/banco-de-horas`.' }
+        feriasDisponiveisDias: { type: [integer, 'null'], minimum: 0, description: 'Dias de férias disponíveis. **Fatia 7**: `resumo.diasDisponiveis` de `GET /api/rh/funcionarios/{funcionarioId}/ferias`.' }
+        advertenciasQuantidade: { type: [integer, 'null'], minimum: 0, description: 'Advertências **não canceladas do ano corrente (2026)**. **Fatia 4** (a mesma regra em todas as fatias).' }
+        proximoPagamento: { type: [string, 'null'], format: date, description: 'Data do próximo pagamento (da empresa, igual para todos). **Fatia 7**: `pagamento.data` de `GET /api/eu/pagamento/proximo`.' }
+    FuncionarioIndicadoresGestor:
+      type: object
+      description: |
+        Os quatro cartões da aba Dados da ficha da equipe. Cada valor é calculado por **outra fatia** e vem `null` até ela
+        existir (a tabela com as rotas de origem está em `GET /api/gestor/equipe/{funcionarioId}/indicadores`).
+      required: [bancoDeHorasMinutos, feriasDisponiveisDias, treinamentosPendentes, advertenciasQuantidade]
+      properties:
+        bancoDeHorasMinutos: { type: [integer, 'null'], description: 'Saldo do banco de horas, em minutos, com sinal (-225 = "-3h45"). **Fatia 3**: `resumo.saldoBancoHorasMinutos` de `GET /api/gestor/equipe/{funcionarioId}/ponto`.' }
+        feriasDisponiveisDias: { type: [integer, 'null'], minimum: 0, description: '**Fatia 7**: `resumo.diasDisponiveis` de `GET /api/gestor/equipe/{funcionarioId}/ferias`.' }
+        treinamentosPendentes: { type: [integer, 'null'], minimum: 0, description: 'Obrigatórios não concluídos (treinamento não tem prazo). **Fatia 6**: `resumo.pendentes` de `GET /api/gestor/equipe/{funcionarioId}/treinamentos`.' }
+        advertenciasQuantidade: { type: [integer, 'null'], minimum: 0, description: 'Advertências **não canceladas do ano corrente (2026)**. **Fatia 4** (a mesma regra em todas as fatias).' }
+
+    # ---------------- documentos do colaborador ----------------
+    DocumentoColaboradorTipo:
+      type: string
+      description: |
+        Tipo do documento. Rótulos da tela: `IDENTIDADE` "Documento de identidade (RG ou CNH)", `CPF` "CPF",
+        `CARTEIRA_DE_TRABALHO` "Carteira de trabalho digital", `COMPROVANTE_DE_RESIDENCIA` "Comprovante de
+        residência", `CONTRATO_ASSINADO` "Contrato assinado", `EXAME_ADMISSIONAL` "Exame admissional (ASO)",
+        `OUTRO` "Outro" (a descrição diz o que é).
+      x-provisorio: >-
+        Quais são os tipos de documento? O dono ainda não decidiu a lista (o banco guarda texto livre).
+        Construído com os seis que o Figma mostra mais `OUTRO`; mudar a lista muda este enum (versão menor).
+      enum: [IDENTIDADE, CPF, CARTEIRA_DE_TRABALHO, COMPROVANTE_DE_RESIDENCIA, CONTRATO_ASSINADO, EXAME_ADMISSIONAL, OUTRO]
+    DocumentoColaboradorSituacao:
+      type: string
+      description: '`PENDENTE`: o RH pediu e a pessoa ainda não enviou (sem arquivo). `ENVIADO`: tem arquivo.'
+      enum: [PENDENTE, ENVIADO]
+    DocumentoColaboradorModo:
+      type: string
+      description: '`ANEXAR_AGORA` ("Você já tem o arquivo") ou `PEDIR_PARA_ENVIAR` (a pessoa envia pelo portal; **sem e-mail**, ver `POST /api/rh/funcionarios/{funcionarioId}/documentos`).'
+      enum: [ANEXAR_AGORA, PEDIR_PARA_ENVIAR]
+    DocumentoColaborador:
+      type: object
+      description: Um documento da pessoa. O arquivo em si só se baixa pela rota de download (link temporário).
+      required: [id, tipo, descricao, dataValidade, situacao, nomeArquivoOriginal, pedidoEmUtc, enviadoEmUtc]
+      properties:
+        id: { type: integer }
+        tipo: { $ref: '#/components/schemas/DocumentoColaboradorTipo' }
+        descricao: { type: [string, 'null'], maxLength: 255 }
+        dataValidade: { type: [string, 'null'], format: date, description: 'Validade (opcional); alimenta o aviso de documento vencendo.' }
+        situacao: { $ref: '#/components/schemas/DocumentoColaboradorSituacao' }
+        nomeArquivoOriginal: { type: [string, 'null'], description: 'Nome que a pessoa deu ao arquivo; `null` enquanto pendente.' }
+        pedidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Quando o RH pediu ("Atualização pedida em 01/10"); `null` se foi anexado direto.' }
+        enviadoEmUtc: { type: [string, 'null'], format: date-time, description: 'Coluna "Enviado em"; `null` enquanto pendente.' }
+    DocumentoColaboradorListaResposta:
+      type: object
+      description: Lista curta, sem paginação.
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/DocumentoColaborador' }
+    DocumentoColaboradorNovoForm:
+      type: object
+      description: Formulário `multipart/form-data` do modal "Adicionar documento".
+      required: [modo, tipo]
+      properties:
+        modo: { $ref: '#/components/schemas/DocumentoColaboradorModo' }
+        tipo: { $ref: '#/components/schemas/DocumentoColaboradorTipo' }
+        descricao: { type: string, maxLength: 255, description: 'Opcional. Ex.: comprovante de residência atualizado.' }
+        dataValidade: { type: string, format: date, description: 'Opcional.' }
+        arquivo:
+          type: string
+          format: binary
+          description: PDF, JPG ou PNG, até 10 MB. **Obrigatório** com `ANEXAR_AGORA`; **proibido** com `PEDIR_PARA_ENVIAR`.
+    DocumentoColaboradorEnvioForm:
+      type: object
+      description: Formulário `multipart/form-data` de "Meus documentos".
+      required: [arquivo]
+      properties:
+        arquivo: { type: string, format: binary, description: 'PDF, JPG ou PNG, até 10 MB.' }
+
+    # ---------------- cargos, setores, gestores, benefícios ----------------
+    CargoItem:
+      type: object
+      required: [id, nome, descricao, cargaSemanalHoras, quantidadePessoas]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        descricao: { type: [string, 'null'] }
+        cargaSemanalHoras: { type: number, description: 'Carga horária semanal (ex.: 44).' }
+        quantidadePessoas: { type: integer, minimum: 0, description: 'Pessoas ativas com este cargo.' }
+    CargoListaResposta:
+      description: Página de cargos.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/CargoItem' }
+    CargoComando:
+      type: object
+      required: [nome, descricao, cargaSemanalHoras]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 100, description: 'Único (sem diferenciar maiúsculas).' }
+        descricao: { type: [string, 'null'], maxLength: 255, description: 'O que a pessoa faz no dia a dia.' }
+        cargaSemanalHoras: { type: number, exclusiveMinimum: 0, maximum: 168, description: 'Horas por semana (até 2 casas decimais), ex.: 44.' }
+    SetorItem:
+      type: object
+      required: [id, nome, descricao, gestor, quantidadePessoas]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        descricao: { type: [string, 'null'] }
+        gestor:
+          oneOf:
+            - $ref: '#/components/schemas/GestorReferencia'
+            - { type: 'null' }
+        quantidadePessoas: { type: integer, minimum: 0, description: 'Pessoas ativas do setor com a admissão já começada, inclusive o gestor.' }
+    SetorListaResposta:
+      description: Página de setores.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/SetorItem' }
+    SetorComando:
+      type: object
+      required: [nome, descricao, gestorFuncionarioId]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 100, description: 'Único (sem diferenciar maiúsculas).' }
+        descricao: { type: [string, 'null'], maxLength: 255 }
+        gestorFuncionarioId: { type: [integer, 'null'], description: 'Id do **colaborador** que gerencia o setor (não o `gestorId`); `null` = sem gestor.' }
+    GestorItem:
+      type: object
+      description: |
+        Um gestor (quem tem linha em Gestores): ou **gestor de um setor** (nível `Gestor`, responde por **um** setor), ou
+        a pessoa do RH cadastrada **só para decidir pedidos de gestores** (`soDecidePedidosDeGestores = true`, sem setor).
+      required: [gestorId, funcionario, setor, soDecidePedidosDeGestores, quantidadeEquipe, ausente, ausenteAte, ausenteHoje]
+      properties:
+        gestorId: { type: integer }
+        funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+        setor:
+          description: O setor que ele gerencia; `null` para a pessoa do RH que só decide pedidos de gestores.
+          oneOf:
+            - $ref: '#/components/schemas/SetorReferencia'
+            - { type: 'null' }
+        soDecidePedidosDeGestores:
+          type: boolean
+          description: |
+            `true`: a pessoa é do RH e tem linha em Gestores **só** para poder decidir os pedidos de gestores (o trigger do
+            banco exige essa linha); não gerencia setor, não tem equipe e não usa `/api/gestor/...`. `false`: gerencia um setor.
+        quantidadeEquipe: { type: integer, minimum: 0, description: 'A equipe dele (`GET /api/gestor/equipe`): pessoas ativas do setor com a admissão já começada, sem ele. 0 sem setor.' }
+        ausente: { type: boolean, description: 'O RH marcou o gestor como ausente (a etapa dele é aprovada sozinha nos pedidos novos).' }
+        ausenteAte: { type: [string, 'null'], format: date, description: 'Data de volta do gestor (opcional); a marcação vale até o dia anterior.' }
+        ausenteHoje: { type: boolean, description: 'A marcação vale hoje: `ausente` e, se há data de volta, hoje antes dela. É o que a tela mostra como "Ausente".' }
+    GestorListaResposta:
+      type: object
+      description: Lista curta, sem paginação.
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/GestorItem' }
+    GestorCadastrarComando:
+      type: object
+      required: [funcionarioId]
+      properties:
+        funcionarioId: { type: integer, description: 'Id do colaborador (ativo e com o nível `RH`) a cadastrar como gestor sem setor, só para decidir pedidos de gestores.' }
+    GestorAusenciaComando:
+      type: object
+      required: [ausente, ausenteAte]
+      properties:
+        ausente: { type: boolean, description: '`true` marca o gestor como ausente; `false` desmarca.' }
+        ausenteAte:
+          type: [string, 'null']
+          format: date
+          description: Data de volta do gestor, **depois de hoje**. Só com `ausente = true`; `null` = sem data de volta (vale até o RH desmarcar). Com `ausente = false` precisa vir `null`.
+    GestorAusenciaResposta:
+      description: O gestor com a marcação nova, mais quantos pedidos pararam de esperar por ele agora.
+      allOf:
+        - $ref: '#/components/schemas/GestorItem'
+        - type: object
+          required: [pedidosAprovadosAgora]
+          properties:
+            pedidosAprovadosAgora:
+              type: object
+              description: |
+                Pedidos que já estavam esperando o gestor e tiveram a etapa dele aprovada **nesta chamada** (só ao marcar; ao
+                desmarcar vêm 0). Não inclui férias com sugestão de data em andamento nem pedidos novos.
+              required: [ajustesDePonto, ferias]
+              properties:
+                ajustesDePonto: { type: integer, minimum: 0, description: 'Pedidos de ajuste de ponto (fatia 3).' }
+                ferias: { type: integer, minimum: 0, description: 'Pedidos de férias (fatia 7).' }
+    BeneficioCatalogoItem:
+      type: object
+      required: [id, nome, descricao, opcional, aceitaDependentes, aceitaTrajeto, quantidadePessoas]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        descricao: { type: [string, 'null'] }
+        opcional:
+          type: boolean
+          description: |
+            A própria pessoa pode pedir este benefício (aparece em "Disponíveis para você", tela 44). `false`: só o RH o dá.
+            **Exige o script SQL `V031`**: coluna `OPCIONAL` em `BENEFICIOS`.
+        aceitaDependentes:
+          type: boolean
+          description: |
+            O pedido deixa incluir dependentes (como o plano de saúde). **Exige o script SQL `V031`**: coluna `ACEITA_DEPENDENTES`
+            em `BENEFICIOS`.
+        aceitaTrajeto:
+          type: boolean
+          description: |
+            O pedido pede o trajeto (como o vale-transporte). **Exige o script SQL `V031`**: coluna `ACEITA_TRAJETO` em `BENEFICIOS`.
+        quantidadePessoas: { type: integer, minimum: 0, description: 'Pessoas com o benefício ativo.' }
+    BeneficioCatalogoListaResposta:
+      description: Página de benefícios do catálogo.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/BeneficioCatalogoItem' }
+    BeneficioCatalogoComando:
+      type: object
+      required: [nome, descricao, opcional, aceitaDependentes, aceitaTrajeto]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 100, description: 'Único (sem diferenciar maiúsculas).' }
+        descricao: { type: [string, 'null'], maxLength: 255 }
+        opcional: { type: boolean, description: 'A própria pessoa pode pedir o benefício (ver `BeneficioCatalogoItem`). **Exige o script SQL `V031`**.' }
+        aceitaDependentes: { type: boolean, description: 'O pedido deixa incluir dependentes. **Exige o script SQL `V031`**.' }
+        aceitaTrajeto: { type: boolean, description: 'O pedido pede o trajeto. **Exige o script SQL `V031`**.' }
+
+    # ---------------- empresa ----------------
+    EmpresaUf:
+      type: string
+      description: Sigla da UF. O banco só confere o formato; a API confere que a sigla existe.
+      enum: [AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO]
+    EmpresaConfiguracao:
+      type: object
+      description: Configuração da empresa (uma só linha no banco).
+      required: [nomeEmpresa, uf, municipio, horarioEntrada, horarioSaida, toleranciaAtrasoMinutos, diaPagamento]
+      properties:
+        nomeEmpresa: { type: string, minLength: 1, maxLength: 150 }
+        uf: { $ref: '#/components/schemas/EmpresaUf' }
+        municipio: { type: string, minLength: 1, maxLength: 100 }
+        horarioEntrada: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'Horário padrão de entrada, `HH:mm`, sem fuso.' }
+        horarioSaida: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'Horário padrão de saída, `HH:mm`, sem fuso.' }
+        toleranciaAtrasoMinutos: { type: integer, minimum: 0, maximum: 120 }
+        diaPagamento: { type: integer, minimum: 1, maximum: 31, description: 'Dia do mês da regra padrão de pagamento.' }
+
+    # ---------------- usuários do sistema ----------------
+    UsuarioSistemaSituacao:
+      type: string
+      description: |
+        `SEM_CONVITE`: ainda não tem login. `CONVITE_ENVIADO`: convite válido, senha ainda não definida.
+        `CONVITE_EXPIRADO`: o convite venceu (reenviar). `SENHA_DEFINIDA`: já definiu a senha.
+      enum: [SEM_CONVITE, CONVITE_ENVIADO, CONVITE_EXPIRADO, SENHA_DEFINIDA]
+    UsuarioSistemaItem:
+      type: object
+      description: Uma linha de "Usuários do sistema". A linha é o colaborador; o login pode ainda não existir.
+      required: [funcionarioId, nome, emailCorporativo, perfil, situacao, ativo, ultimoLoginEmUtc, conviteEnviadoEmUtc]
+      properties:
+        funcionarioId: { type: integer }
+        nome: { type: string }
+        emailCorporativo: { type: [string, 'null'] }
+        perfil:
+          oneOf:
+            - $ref: '#/components/schemas/Perfil'
+            - { type: 'null' }
+        situacao: { $ref: '#/components/schemas/UsuarioSistemaSituacao' }
+        ativo: { type: boolean, description: 'O login está liberado (`false` em `SEM_CONVITE`).' }
+        ultimoLoginEmUtc: { type: [string, 'null'], format: date-time }
+        conviteEnviadoEmUtc: { type: [string, 'null'], format: date-time, description: 'Quando o último convite foi enviado.' }
+    UsuarioSistemaListaResposta:
+      description: Página de logins.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/UsuarioSistemaItem' }
+
+    # ---------------- auditoria ----------------
+    AuditoriaArea:
+      type: string
+      description: |
+        Área do evento (filtro "Todas as áreas"). Rótulos: `ACESSO` "Acesso", `COLABORADORES` "Colaboradores",
+        `DOCUMENTOS` "Documentos", `CADASTROS` "Cadastros" (cargos, setores, gestores, benefícios do catálogo e
+        empresa), `IMPORTACAO` "Importação", `PONTO` "Ponto", `FERIADOS` "Feriados", `FERIAS` "Férias",
+        `HOLERITES` "Holerites", `ADVERTENCIAS` "Advertências", `AVISOS` "Avisos", `FORMULARIOS` "Formulários",
+        `TREINAMENTOS` "Treinamentos", `BENEFICIOS` "Benefícios" (adesões, fatia 7) e `ATESTADOS` "Atestados" (fatia 3: o
+        download do arquivo do atestado, `BAIXOU`, e a validação ou a recusa dele; é uma área própria, **não**
+        `DOCUMENTOS`, que é a dos documentos do colaborador, nem `PONTO`; a fatia 3 não cita outra área para o atestado).
+        Todas as fatias usam esta lista.
+      enum: [ACESSO, COLABORADORES, DOCUMENTOS, CADASTROS, IMPORTACAO, PONTO, FERIADOS, FERIAS, HOLERITES, ADVERTENCIAS, AVISOS, FORMULARIOS, TREINAMENTOS, BENEFICIOS, ATESTADOS]
+    AuditoriaAcao:
+      type: string
+      description: |
+        Ação (filtro "Todas as ações"). Rótulos: `ENTROU` "Entrou", `ACESSO_NEGADO` "Acesso negado", `CRIOU` "Criou",
+        `ALTEROU` "Alterou", `EXCLUIU` "Excluiu", `INATIVOU` "Inativou", `REGISTROU` "Registrou", `PEDIU_AJUSTE`
+        "Pediu ajuste", `APROVOU` "Aprovou", `RECUSOU` "Recusou", `PUBLICOU` "Publicou", `ENVIOU_EMAIL` "Enviou
+        e-mail" (só os da lista fechada de e-mails; o lembrete de formulário anônimo entra sem destinatário e sem contagem),
+        `IMPORTOU` "Importou", `BAIXOU` "Baixou" (download de arquivo, como holerite e documento).
+        `EXCLUIU`, `ACESSO_NEGADO` e `INATIVOU` aparecem em vermelho na tela. O filtro `apenasAlteracoes` de
+        `GET /api/rh/auditoria` deixa de fora `ENTROU`, `ACESSO_NEGADO`, `BAIXOU` e `REGISTROU` da área `PONTO`.
+      enum: [ENTROU, ACESSO_NEGADO, CRIOU, ALTEROU, EXCLUIU, INATIVOU, REGISTROU, PEDIU_AJUSTE, APROVOU, RECUSOU, PUBLICOU, ENVIOU_EMAIL, IMPORTOU, BAIXOU]
+    AuditoriaAtor:
+      type: object
+      description: Quem fez. O rótulo sob o nome é "Automático" (`SISTEMA`), "Desligado" (`desligado = true`) ou o perfil (`Funcionario` aparece como "Colaborador").
+      required: [funcionarioId, nome, tipo, perfil, desligado]
+      properties:
+        funcionarioId: { type: [integer, 'null'], description: '`null` quando foi o sistema (tarefa automática).' }
+        nome: { type: string, description: 'Nome da pessoa, ou "Sistema".' }
+        tipo: { type: string, enum: [PESSOA, SISTEMA] }
+        perfil:
+          description: 'O **perfil que a pessoa tinha na hora do evento** (o log guarda uma cópia gravada com o evento: se o perfil mudar depois, o evento antigo continua mostrando o de então). `null` para o sistema ou para quem não tinha nível.'
+          oneOf:
+            - $ref: '#/components/schemas/Perfil'
+            - { type: 'null' }
+        desligado: { type: boolean, description: 'A pessoa está inativa hoje.' }
+    AuditoriaEvento:
+      type: object
+      description: Uma linha do log.
+      required: [id, quandoUtc, ator, area, acao, descricao]
+      properties:
+        id: { type: integer, format: int64 }
+        quandoUtc: { type: string, format: date-time }
+        ator: { $ref: '#/components/schemas/AuditoriaAtor' }
+        area: { $ref: '#/components/schemas/AuditoriaArea' }
+        acao: { $ref: '#/components/schemas/AuditoriaAcao' }
+        descricao: { type: string, description: 'Coluna "O que aconteceu", em texto simples. Nunca traz quem recebeu lembrete de formulário anônimo, nem quantos receberam, nem quem participou dele.' }
+    AuditoriaListaResposta:
+      description: Página de eventos de auditoria.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/AuditoriaEvento' }
+    AuditoriaOrigem:
+      type: object
+      description: De onde veio a ação ("Portal no navegador, IP 10.0.4.23").
+      required: [canal, ip]
+      properties:
+        canal: { type: string, enum: [PORTAL, SISTEMA], description: '`PORTAL`: navegador. `SISTEMA`: tarefa automática.' }
+        ip: { type: [string, 'null'], description: 'Endereço IP; `null` para tarefas do sistema.' }
+    AuditoriaMudanca:
+      type: object
+      description: Uma linha da tabela "O que mudou".
+      required: [campo, antes, depois, valorOculto]
+      properties:
+        campo: { type: string, description: 'Nome do campo em português ("Cargo").' }
+        antes: { type: [string, 'null'] }
+        depois: { type: [string, 'null'] }
+        valorOculto: { type: boolean, description: 'Coluna sensível: o valor **não** é gravado; `antes` e `depois` vêm `null` e a tela mostra "valor não registrado".' }
+    AuditoriaEventoDetalhe:
+      description: Um evento com os detalhes que a linha expandida mostra.
+      allOf:
+        - $ref: '#/components/schemas/AuditoriaEvento'
+        - type: object
+          required: [registroAfetado, origem, mudancas]
+          properties:
+            registroAfetado: { type: string, description: 'Texto do campo "Registro afetado" (ex.: "Colaborador Bruno Lima, matrícula 00482").' }
+            origem: { $ref: '#/components/schemas/AuditoriaOrigem' }
+            mudancas:
+              type: array
+              description: Vazia quando o evento não altera dados.
+              items: { $ref: '#/components/schemas/AuditoriaMudanca' }
+
+    # ---------------- senha e convite ----------------
+    ConviteLinkTipo:
+      type: string
+      description: '`CONVITE`: primeiro acesso. `REDEFINICAO`: "esqueci minha senha".'
+      enum: [CONVITE, REDEFINICAO]
+    ConviteEsqueciSenhaComando:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 150 }
+    ConviteLinkValidarComando:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, minLength: 1, maxLength: 200, description: 'O valor de `token` do endereço do e-mail.' }
+    ConviteLinkInfo:
+      type: object
+      required: [tipo, nome, emailCorporativo, expiraEmUtc]
+      properties:
+        tipo: { $ref: '#/components/schemas/ConviteLinkTipo' }
+        nome: { type: string }
+        emailCorporativo: { type: string }
+        expiraEmUtc: { type: string, format: date-time }
+    ConviteDefinirSenhaComando:
+      type: object
+      required: [token, novaSenha]
+      properties:
+        token: { type: string, minLength: 1, maxLength: 200 }
+        novaSenha:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: |
+            De 8 a 128 caracteres, **sem exigir** letra maiúscula, número ou símbolo (decidido pelo dono, 2026-10-30).
+            A confirmação ("repita a senha") é conferida só no front.
+    SenhaTrocarComando:
+      type: object
+      required: [senhaAtual, novaSenha]
+      properties:
+        senhaAtual: { type: string, minLength: 1, maxLength: 128 }
+        novaSenha:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Mesma regra da definição de senha (de 8 a 128 caracteres, sem exigir maiúscula, número ou símbolo); precisa ser diferente da atual.

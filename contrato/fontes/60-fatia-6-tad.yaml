@@ -1,0 +1,2298 @@
+# Fatia 6: TAD (treinamentos). Roadmap, linhas 225 a 248; telas 22 a 26 (RH), 41 e 42 (funcionário), 58 (gestor).
+# Banco: TREINAMENTOS, TREINAMENTOS_FUNCIONARIOS, TREINAMENTOS_CERTIFICADOS (Criacao_Tabelas:403-464),
+# V026 (módulos e progresso) e V029 (rascunho, público, certificado e as três caixas da publicação).
+tags:
+  - name: Treinamentos
+    description: |
+      Treinamentos com módulos (TAD): o RH cria, publica e acompanha; a pessoa avança módulo a módulo e, ao
+      concluir o último, o treinamento fica `CONCLUIDO` e sai o certificado em PDF (se o RH deixou marcado).
+
+      **Treinamento não tem prazo** (decisão do dono, 2026-10-30; `CONVENCOES.md`, seção 13): fica disponível para quem
+      entrar na empresa. Não existe data final, "atrasada", "Prazos até" nem lembrete antes do fim. Existe publicar, a data
+      de início (só libera o acesso, quando ela é no futuro) e o RH poder **encerrar** a qualquer momento ou **excluir**
+      enquanto nenhum certificado foi emitido, com a confirmação `CONFIRMACAO_NECESSARIA` quando há gente que ainda não
+      concluiu (ver "Encerrar e excluir", abaixo).
+
+      **O que o Figma mostra e NÃO existe** (decisões do dono, 2026-10-29 e 2026-10-30): quiz, "Terminar com um quiz", nota,
+      "Nota mínima para concluir", a coluna Nota e o texto "Concluído com nota 9,0"; prova final; turma presencial,
+      módulo "Aula presencial", "Híbrido" e "Presencial"; o campo "Tipo" do passo Detalhes e o filtro "Todos os tipos"
+      (todo treinamento é online, não há campo de modalidade); o cartão "Em breve / Abre em 15/10" (o treinamento só
+      aparece para a pessoa quando a data de início chega); tudo que é prazo (o "Período 01/01 a 31/12/2026" da lista, o
+      "Prazos até 31/10", o "Até 15/11" e o "De 20/10 a 20/11" dos cartões, o "O prazo é 15/11" da faixa "Sua parte" e o
+      "faltam 24 dias" da tela 58, e as caixas "Termina em", "Avisar por e-mail ao publicar" e "Lembrar quem não começou 7
+      dias antes do fim"); os botões "Lembrar quem não terminou" (tela 22) e "Lembrar quem falta por e-mail" (tela 58),
+      porque esta fatia não envia e-mail nenhum. Onde o Figma diz "quiz final e certificado", leia só
+      "certificado" (e só quando `emiteCertificado` é verdadeiro). O passo "Avaliação" do assistente sobra só com a caixa
+      "Emitir certificado" (o front pode chamá-lo de "Certificado"); o aviso "O quiz ainda não foi criado" some.
+
+      **Situação do treinamento** (`TreinamentoSituacao`, calculada pela API com a data de hoje no fuso -03:00; não existe
+      coluna): `RASCUNHO` (não publicado), `AGENDADO` (publicado, ainda não chegou `comecaEm`), `EM_ANDAMENTO`
+      (publicado, `comecaEm` já chegou e o RH não encerrou) e `ENCERRADO` (o RH encerrou; `encerradoEmUtc` diz quando).
+      Não há mais situação por data final. `ENCERRADO` e `encerradoEmUtc` dependem da coluna nova
+      `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver "Banco: o que é novo", abaixo).
+
+      **Situação da pessoa no treinamento** (`TreinamentoParticipanteSituacao`): `INSCRITO` (tem linha em
+      `TREINAMENTOS_FUNCIONARIOS` e ainda não começou; o Figma chama de "Não iniciado"), `EM_ANDAMENTO` e `CONCLUIDO`.
+      Os valores `REPROVADO` e `CANCELADO` existem no banco, mas a API nunca os grava nem os devolve.
+
+      **Quem tem linha:** treinamento **obrigatório** cria uma linha (`INSCRITO`) para cada pessoa do público no momento
+      da publicação (só pessoas ativas cuja admissão já ocorreu; o trigger do banco recusa inativo). Treinamento
+      **opcional** só tem linha de quem se inscreveu (`POST /api/eu/treinamentos/{treinamentoId}/inscricao`).
+
+      **A tela de execução do treinamento não existe no Figma** (o que abre em "Começar", "Continuar" e "Rever conteúdo").
+      O contrato supõe uma tela simples: lista de módulos com o andamento, o conteúdo do módulo escolhido e o botão
+      "Concluir módulo". A política de segurança do site (`default-src 'self'`) impede incorporar vídeo ou página
+      externa: vídeo e link abrem em nova aba.
+
+      **Pendente** (uma definição só, usada nos indicadores da tela 22, nas fichas, na faixa "Sua parte" e no painel
+      inicial): treinamento **obrigatório** `EM_ANDAMENTO` em que a pessoa tem linha `INSCRITO` ou `EM_ANDAMENTO`. Não é
+      pendência: treinamento opcional, agendado (ninguém o vê ainda) ou encerrado (o RH o fechou).
+
+      **Encerrar e excluir** (só o RH; o menu "..." da linha na tela 22 tem **Editar**, **Encerrar** e **Excluir**).
+      **Encerrar** (`encerrarTreinamento`) fecha as entradas: quem já começou continua e termina, quem não começou perde o
+      treinamento da lista e não pode mais começar, ninguém novo entra (decisão do dono, 2026-10-30). Os certificados já
+      emitidos continuam valendo. **Excluir** (`excluirTreinamento`) apaga o treinamento e todo o andamento, **mas só
+      quando nenhum certificado foi emitido** (decisão do dono, 2026-10-30): "certificado emitido" é a conclusão de uma
+      pessoa num treinamento com `emiteCertificado` verdadeiro (o certificado que a conferência pública aceita). Havendo
+      um, a exclusão é recusada com 422 `TREINAMENTO_COM_CERTIFICADOS` (o RH só pode **encerrar**), mesmo com
+      `confirmar=true`. Um certificado emitido nunca some. Sem certificado emitido, as duas operações, quando há pessoas
+      com linha ainda não concluída, respondem 409 `CONFIRMACAO_NECESSARIA` com `pendentes` (e `emAndamento` e
+      `naoIniciaram`) e só executam quando a chamada é repetida com `confirmar=true`.
+
+      **Banco: o que é novo** (scripts já escritos em `Banco de Dados/Scripts`): a coluna `TREINAMENTOS.ENCERRADO_EM` (`V042`;
+      instante do encerramento; dela dependem a situação `ENCERRADO` e `encerradoEmUtc`); a coluna
+      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V044`; alimenta `nomeArquivo` do módulo de PDF); a mudança do padrão de
+      `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` para `FALSE` (`V043`); e a **auditoria**, que é tabela nova da aplicação (`V037`) e
+      recebe os eventos de publicar (criação das linhas em lote), encerrar e excluir. A `description` de cada operação que
+      depende de uma delas diz isso.
+
+      **Códigos de erro desta fatia** (cada um com um sentido só):
+      - 422 `TREINAMENTO_JA_PUBLICADO`: só em `publicarTreinamento`, quando o treinamento já está publicado (inclusive o
+        encerrado).
+      - 422 `TREINAMENTO_CAMPO_TRAVADO`: um campo que não muda depois de publicado: em `atualizarTreinamento`, o público, a
+        obrigatoriedade, o onboarding e o certificado (e a data de início quando já não está agendado); em
+        `atualizarModuloDeTreinamento`, o `tipo` do módulo.
+      - 422 `TREINAMENTO_MODULOS_TRAVADOS`: a lista de módulos não muda depois de publicado (acrescentar, reordenar ou
+        excluir módulo; vale também para o encerrado).
+      - 422 `TREINAMENTO_ENCERRADO`: o treinamento está encerrado e a operação não vale mais (editar os dados, encerrar de
+        novo; e, nas rotas `/api/eu`, inscrever-se, começar ou concluir módulo quem ainda não tinha começado).
+      - 422 `TREINAMENTO_NAO_ESTA_EM_ANDAMENTO`: encerrar um rascunho ou um agendado (esses se excluem).
+      - 422 `TREINAMENTO_COM_CERTIFICADOS`: excluir um treinamento com certificado emitido (só se encerra).
+      - 422 `TREINAMENTO_NAO_E_OPCIONAL`, `INSCRICAO_PENDENTE`, `SEM_TREINAMENTO_DE_ONBOARDING` e `FUNCIONARIO_INATIVO`:
+        descritos na operação que os devolve.
+      - 409 `CONFIRMACAO_NECESSARIA`: encerrar ou excluir com pessoas que ainda não concluíram (nunca com certificado
+        emitido na exclusão: esse caso é o 422).
+
+      **E-mails:** esta fatia não envia nenhum (`CONVENCOES.md`, seção 12): sem aviso de treinamento publicado, sem
+      lembrete (do RH, do gestor ou automático) e sem e-mail de encerramento. Quem quiser avisar as pessoas usa um Aviso
+      (fatia 4), à mão.
+  - name: Certificados
+    description: |
+      Certificado de conclusão de treinamento. O código de validação é um **UUID versão 4** (aleatório, não enumerável)
+      **gerado pela aplicação** ao criar o certificado: quando o treinamento vira `CONCLUIDO`, o trigger do banco cria a
+      linha com um UUID versão 1 (`UUID()`), e a aplicação o troca por um versão 4 antes de o código aparecer em qualquer
+      resposta ou PDF. O contrato **não promete** "o UUID que o banco gerou". O número amigável (`numero`) aparece à parte.
+      A conferência pública mostra o mínimo de dados.
+      Um certificado emitido nunca é apagado: o treinamento que o emitiu só se encerra, não se exclui (422
+      `TREINAMENTO_COM_CERTIFICADOS`).
+
+paths:
+  # ---------------------------------------------------------------- RH: lista, indicadores e apoio do assistente
+  /api/rh/treinamentos:
+    get:
+      tags: [Treinamentos]
+      operationId: listarTreinamentos
+      summary: Lista os treinamentos com o andamento de cada um, em abas por situação.
+      description: |
+        Tela 22, tabela de cima. `busca` procura no título. `situacao` é a aba (sem ela, "Todos", que inclui os
+        rascunhos). `ordenarPor` aceita `TITULO` e `COMECA_EM` (padrão); `direcao` padrão `DESC`.
+        `contagens` traz o número de cada aba, ignora `situacao` e respeita `busca`.
+        Em cada linha: obrigatório mostra "`concluidos` de `totalParticipantes` concluíram" com a barra;
+        opcional mostra "`totalParticipantes` inscritos". Rascunho tem `totalParticipantes` e `concluidos` zerados.
+        A coluna "Período" do Figma (início e fim) vira só a data de início (`comecaEm`, "Começa em"; vazia em rascunho
+        sem data) e, no encerrado, a data de `encerradoEmUtc`: treinamento não tem fim (seção 13 das convenções).
+        `ENCERRADO`, `encerradoEmUtc` e a aba "Encerrados" dependem da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script
+        `V042`; ver `encerrarTreinamento`).
+        O Figma não desenha a aba "Rascunhos", mas ela é necessária para o RH retomar o que salvou: acrescente-a.
+        O menu "..." da linha tem **Editar** (`obterTreinamento` e `atualizarTreinamento`), **Encerrar**
+        (`encerrarTreinamento`, só em `EM_ANDAMENTO`) e **Excluir** (`excluirTreinamento`). Com `certificadosEmitidos`
+        maior que zero, o front deixa "Excluir" desabilitado e explica "Treinamento com certificado emitido só pode ser
+        encerrado" (a API recusaria com 422 `TREINAMENTO_COM_CERTIFICADOS`); nos demais casos "Excluir" abre a confirmação.
+        Não há "Duplicar" nem "Lembrar".
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+        - { $ref: '#/components/parameters/Busca' }
+        - { $ref: '#/components/parameters/Direcao' }
+        - name: situacao
+          in: query
+          description: Aba da lista. Sem o parâmetro, todos.
+          schema: { $ref: '#/components/schemas/TreinamentoSituacao' }
+        - name: ordenarPor
+          in: query
+          schema: { type: string, enum: [TITULO, COMECA_EM], default: COMECA_EM }
+      responses:
+        '200':
+          description: Página de treinamentos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRhLista' }
+              example:
+                itens:
+                  - { id: 1, titulo: Onboarding 2026, obrigatorio: true, onboarding: true, emiteCertificado: true, situacao: EM_ANDAMENTO, comecaEm: '2026-01-01', encerradoEmUtc: null, publico: PESSOAS, totalModulos: 6, totalParticipantes: 24, concluidos: 18, certificadosEmitidos: 18 }
+                  - { id: 2, titulo: LGPD na prática, obrigatorio: true, onboarding: false, emiteCertificado: true, situacao: EM_ANDAMENTO, comecaEm: '2026-08-01', encerradoEmUtc: null, publico: TODOS, totalModulos: 4, totalParticipantes: 101, concluidos: 63, certificadosEmitidos: 63 }
+                  - { id: 3, titulo: Segurança da informação, obrigatorio: true, onboarding: false, emiteCertificado: true, situacao: EM_ANDAMENTO, comecaEm: '2026-09-15', encerradoEmUtc: null, publico: TODOS, totalModulos: 5, totalParticipantes: 101, concluidos: 41, certificadosEmitidos: 41 }
+                  - { id: 4, titulo: Atendimento ao cliente, obrigatorio: false, onboarding: false, emiteCertificado: true, situacao: AGENDADO, comecaEm: '2026-11-03', encerradoEmUtc: null, publico: SETORES, totalModulos: 3, totalParticipantes: 0, concluidos: 0, certificadosEmitidos: 0 }
+                  - { id: 5, titulo: Armazenagem segura (NR-11), obrigatorio: true, onboarding: false, emiteCertificado: true, situacao: ENCERRADO, comecaEm: '2026-03-10', encerradoEmUtc: '2026-03-14T20:00:00Z', publico: SETORES, totalModulos: 2, totalParticipantes: 12, concluidos: 12, certificadosEmitidos: 12 }
+                  - { id: 6, titulo: Prevenção de assédio no trabalho, obrigatorio: true, onboarding: false, emiteCertificado: true, situacao: RASCUNHO, comecaEm: '2026-11-16', encerradoEmUtc: null, publico: TODOS, totalModulos: 3, totalParticipantes: 0, concluidos: 0, certificadosEmitidos: 0 }
+                pagina: 1
+                tamanhoPagina: 20
+                total: 6
+                totalPaginas: 1
+                contagens: { todos: 6, rascunhos: 1, agendados: 1, emAndamento: 3, encerrados: 1 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Treinamentos]
+      operationId: criarTreinamento
+      summary: Cria um treinamento como rascunho.
+      description: |
+        Assistente "Novo treinamento", passo Detalhes ("Próximo" ou "Salvar rascunho e sair"). Só o `titulo` é
+        obrigatório: o treinamento nasce **rascunho** (`PUBLICADO` falso) e o RH completa os outros passos depois com
+        `PUT /api/rh/treinamentos/{treinamentoId}`. O `id` devolvido é usado para cadastrar os módulos. Quem está no
+        assistente chama este `POST` na primeira vez que sai do passo 1 e o `PUT` nas seguintes.
+        Ninguém vê o treinamento antes de `publicar`. `incluiAdmitidos` e `emiteCertificado` têm padrão verdadeiro no
+        banco; a API sempre grava o valor recebido (não declare o padrão no mapeamento do EF; ver `Scripts\LEIA-ME.md`).
+        **Sem prazo** (seção 13 das convenções): não há `terminaEm`. As colunas `DATA_FIM`, `AVISA_POR_EMAIL` e
+        `LEMBRA_ANTES_DO_FIM` (V029) deixam de ter uso: a API deixa `DATA_FIM` `NULL`; nas outras duas **o banco nasce com
+        `FALSE`** (o `V043` trocou o padrão para `FALSE` e zerou as linhas antigas) **e a API não manda e-mail** (nem aviso
+        de publicação nem lembrete); nenhum agendador as lê.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TreinamentoComando' }
+            example:
+              titulo: Prevenção de assédio no trabalho
+              descricao: Como reconhecer, prevenir e denunciar situações de assédio moral e sexual, e quais canais a empresa oferece.
+              comecaEm: '2026-11-16'
+              obrigatorio: true
+              onboarding: false
+              emiteCertificado: true
+              publico: TODOS
+              setorIds: []
+              funcionarioIds: []
+              incluiAdmitidos: true
+      responses:
+        '201':
+          description: Rascunho criado, ainda sem módulos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRh' }
+              example:
+                id: 6
+                titulo: Prevenção de assédio no trabalho
+                descricao: Como reconhecer, prevenir e denunciar situações de assédio moral e sexual, e quais canais a empresa oferece.
+                comecaEm: '2026-11-16'
+                encerradoEmUtc: null
+                obrigatorio: true
+                onboarding: false
+                emiteCertificado: true
+                publicado: false
+                situacao: RASCUNHO
+                publico: TODOS
+                setores: []
+                pessoas: []
+                incluiAdmitidos: true
+                modulos: []
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/resumo:
+    get:
+      tags: [Treinamentos]
+      operationId: obterIndicadoresDeTreinamentos
+      summary: Mostra os quatro números do topo da tela de treinamentos.
+      description: |
+        Tela 22, faixa de indicadores. `emAndamento`: treinamentos `EM_ANDAMENTO` (publicados, já liberados, não
+        encerrados). `obrigatorios`: treinamentos obrigatórios publicados, em qualquer situação (agendado e encerrado
+        entram; o Figma conta o encerrado também). `certificadosEmitidosNoAno`: certificados com `DATA_EMISSAO` no ano
+        corrente, só de treinamentos com `emiteCertificado` verdadeiro. `pessoasComObrigatorioPendente`: pessoas
+        distintas com **pendência** (definição única, na descrição da tag Treinamentos: treinamento obrigatório
+        `EM_ANDAMENTO` em que a pessoa tem linha `INSCRITO` ou `EM_ANDAMENTO`). O "Prazos até 31/10" que o Figma mostra
+        sob esse número **não existe** (treinamento não tem prazo): o cartão mostra só o número. Separar o encerrado do
+        em andamento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`).
+      x-perfis: [RH]
+      responses:
+        '200':
+          description: Indicadores.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRhIndicadores' }
+              example:
+                emAndamento: 3
+                obrigatorios: 4
+                certificadosEmitidosNoAno: 134
+                ano: 2026
+                pessoasComObrigatorioPendente: 72
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/onboarding:
+    get:
+      tags: [Treinamentos]
+      operationId: listarTreinamentosDeOnboarding
+      summary: Lista os treinamentos de onboarding em vigor, para a caixa "Incluir no treinamento" do cadastro.
+      description: |
+        Tela 02 (adicionar colaborador, "Depois de salvar"): o texto da caixa é "Incluir no treinamento
+        {`titulo`}". Em vigor = publicado, marcado como `onboarding` e **não encerrado** (pode ser agendado; um
+        treinamento de onboarding encerrado deixa de receber gente nova; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        Normalmente vem um só item. Lista vazia: o front deixa a caixa desligada, com a dica "Nenhum treinamento de
+        onboarding publicado". Mais de um item: o texto vira "Incluir nos treinamentos de onboarding" e o cadastro
+        inclui a pessoa em todos. Marcada a caixa, o front manda `incluirNoOnboarding: true` no cadastro (fatia 1); ver
+        `incluirFuncionarioNoOnboarding` para o efeito.
+      x-provisorio: >-
+        Como o RH marca qual treinamento é o de onboarding. O Figma só mostra a caixa "Incluir no treinamento Onboarding 2026" e o selo "Onboarding" no cartão (tela 42), sem dizer como se escolhe. Hoje o contrato supõe a caixa `onboarding` no passo Detalhes, guardada em `TREINAMENTOS.TIPO_TREINAMENTO` (valor `ONBOARDING`, coluna livre que já existe), sem script novo. Se o dono quiser outra regra (por exemplo, um só treinamento por ano), muda `TreinamentoComando.onboarding` e esta rota.
+      x-perfis: [RH]
+      responses:
+        '200':
+          description: Treinamentos de onboarding em vigor (sem paginação; lista curta).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoOnboardingLista' }
+              example:
+                itens:
+                  - { id: 1, titulo: Onboarding 2026, comecaEm: '2026-01-01' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/publico/contagem:
+    get:
+      tags: [Treinamentos]
+      operationId: contarPublicoDeTreinamento
+      summary: Conta quantas pessoas o público escolhido alcança.
+      description: |
+        Passo Publicação ("Todos: 101 pessoas") e a nota "Aparece em Meus treinamentos de 101 pessoas a partir de
+        15/10". Conta só pessoas **ativas cuja admissão já ocorreu** (as "Em admissão" entram depois, pela caixa
+        `incluiAdmitidos`). `publico=TODOS` ignora as listas; `SETORES` usa `setorIds`; `PESSOAS` usa `funcionarioIds`.
+        Para escolher setores o front usa `GET /api/rh/setores` e para marcar pessoas, `GET /api/rh/funcionarios`
+        (fatia 1); esta rota só devolve o número.
+      x-perfis: [RH]
+      parameters:
+        - name: publico
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/TreinamentoPublico' }
+        - name: setorIds
+          in: query
+          description: Ids dos setores (repita o parâmetro).
+          schema: { type: array, items: { type: integer }, maxItems: 100 }
+        - name: funcionarioIds
+          in: query
+          description: Ids das pessoas (repita o parâmetro).
+          schema: { type: array, items: { type: integer }, maxItems: 500 }
+      responses:
+        '200':
+          description: Número de pessoas.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoPublicoContagem' }
+              example: { total: 101 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- RH: um treinamento
+  /api/rh/treinamentos/{treinamentoId}:
+    get:
+      tags: [Treinamentos]
+      operationId: obterTreinamento
+      summary: Mostra um treinamento completo, com os módulos, para editar.
+      description: |
+        Abre o assistente em edição ("Editar" no menu "..." da tela 22) e retoma um rascunho. Devolve os módulos com o
+        conteúdo de texto e o link (o arquivo PDF vem só como nome).
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: O treinamento.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRh' }
+              example:
+                id: 6
+                titulo: Prevenção de assédio no trabalho
+                descricao: Como reconhecer, prevenir e denunciar situações de assédio moral e sexual, e quais canais a empresa oferece.
+                comecaEm: '2026-11-16'
+                encerradoEmUtc: null
+                obrigatorio: true
+                onboarding: false
+                emiteCertificado: true
+                publicado: false
+                situacao: RASCUNHO
+                publico: TODOS
+                setores: []
+                pessoas: []
+                incluiAdmitidos: true
+                modulos:
+                  - { id: 21, ordem: 1, titulo: O que é assédio moral e sexual, tipo: VIDEO, duracaoMinutos: 15, urlExterna: 'https://videos.exemplo.com.br/assedio-introducao', conteudoTexto: null, nomeArquivo: null }
+                  - { id: 22, ordem: 2, titulo: Situações do dia a dia e como agir, tipo: TEXTO, duracaoMinutos: 10, urlExterna: null, conteudoTexto: "Exemplos de situações em reunião, mensagens e eventos da empresa, e o que fazer em cada uma.", nomeArquivo: null }
+                  - { id: 23, ordem: 3, titulo: Canais de denúncia da empresa, tipo: PDF, duracaoMinutos: 5, urlExterna: null, conteudoTexto: null, nomeArquivo: canais-de-denuncia.pdf }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    put:
+      tags: [Treinamentos]
+      operationId: atualizarTreinamento
+      summary: Salva os dados do treinamento (detalhes, certificado e publicação).
+      description: |
+        Substitui **todos** os campos do `TreinamentoComando` (campo omitido volta ao padrão). Serve para os botões
+        "Próximo" e "Salvar rascunho e sair" de qualquer passo e para "Editar" depois de publicado. Os módulos têm
+        rotas próprias.
+
+        **Rascunho:** tudo pode mudar. `setorIds` só vale com `publico = SETORES` e `funcionarioIds` só com `PESSOAS`
+        (a lista do outro público é recusada com 400).
+
+        **Depois de publicado** só mudam `titulo`, `descricao`, `incluiAdmitidos` e, enquanto o treinamento está
+        `AGENDADO`, `comecaEm`. Os demais campos precisam vir com o valor atual; se vierem diferentes, 422
+        `TREINAMENTO_CAMPO_TRAVADO`. Em especial `emiteCertificado` não muda depois de publicado: desligar depois de
+        emitir faria certificados já entregues responderem "não encontrado" na validação, e ligar exporia conclusões
+        antigas (V029). **Treinamento `ENCERRADO`** não muda mais nada: 422 `TREINAMENTO_ENCERRADO` (a situação
+        `ENCERRADO` depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`; ver
+        `encerrarTreinamento`). Os dois 422 têm sentidos distintos (ver "Códigos de erro desta fatia", na tag
+        Treinamentos): `TREINAMENTO_CAMPO_TRAVADO` é campo que não muda depois de publicado e
+        `TREINAMENTO_ENCERRADO` é treinamento que o RH encerrou.
+      x-provisorio: >-
+        O que o RH pode mudar depois de publicar. Os documentos não decidem; o contrato trava o público, a obrigatoriedade e o certificado (já há linhas criadas) e deixa livres só título, descrição e a caixa de incluir quem for admitido (e a data de início, enquanto agendado). Se o dono quiser mais liberdade (por exemplo, acrescentar pessoas), muda a lista de campos travados e pode exigir rota nova.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TreinamentoComando' }
+            example:
+              titulo: Prevenção de assédio no trabalho
+              descricao: Como reconhecer, prevenir e denunciar situações de assédio moral e sexual, e quais canais a empresa oferece.
+              comecaEm: '2026-11-16'
+              obrigatorio: true
+              onboarding: false
+              emiteCertificado: true
+              publico: SETORES
+              setorIds: [1, 2]
+              funcionarioIds: []
+              incluiAdmitidos: true
+      responses:
+        '200':
+          description: Treinamento salvo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRh' }
+              example:
+                id: 6
+                titulo: Prevenção de assédio no trabalho
+                descricao: Como reconhecer, prevenir e denunciar situações de assédio moral e sexual, e quais canais a empresa oferece.
+                comecaEm: '2026-11-16'
+                encerradoEmUtc: null
+                obrigatorio: true
+                onboarding: false
+                emiteCertificado: true
+                publicado: false
+                situacao: RASCUNHO
+                publico: SETORES
+                setores:
+                  - { id: 1, nome: Comercial }
+                  - { id: 2, nome: Financeiro }
+                pessoas: []
+                incluiAdmitidos: true
+                modulos:
+                  - { id: 21, ordem: 1, titulo: O que é assédio moral e sexual, tipo: VIDEO, duracaoMinutos: 15, urlExterna: 'https://videos.exemplo.com.br/assedio-introducao', conteudoTexto: null, nomeArquivo: null }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Campo travado depois de publicado, ou treinamento encerrado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                travado:
+                  summary: Campo travado depois de publicado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: TREINAMENTO_CAMPO_TRAVADO
+                    detail: Depois de publicado, só dá para mudar o título, a descrição e a opção de incluir quem for admitido.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                encerrado:
+                  summary: Treinamento encerrado
+                  value:
+                    title: Treinamento encerrado.
+                    status: 422
+                    codigo: TREINAMENTO_ENCERRADO
+                    detail: Este treinamento foi encerrado e não pode mais ser alterado.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    delete:
+      tags: [Treinamentos]
+      operationId: excluirTreinamento
+      summary: Exclui um treinamento que ainda não emitiu certificado, com confirmação quando há gente que não terminou.
+      description: |
+        Item "Excluir" do menu "..." da tela 22. A exclusão é **física** (não há ocultação) e apaga tudo, e **só vale
+        enquanto nenhum certificado foi emitido** (decisão do dono, 2026-10-30; `CONVENCOES.md`, seção 13):
+
+        - **Com certificado emitido** (o treinamento tem `emiteCertificado` verdadeiro e pelo menos uma pessoa o
+          concluiu; é o número `certificadosEmitidos` da linha em `listarTreinamentos`): 422
+          `TREINAMENTO_COM_CERTIFICADOS`, sem apagar nada, **mesmo com `confirmar=true`**. O RH só pode **encerrar**
+          (`encerrarTreinamento`). Por isso um certificado emitido nunca some e a conferência pública
+          (`validarCertificado`) não tem o caso "certificado apagado". Esta conferência vem **antes** da confirmação
+          abaixo.
+        - **Rascunho e agendado:** ninguém chegou a ver o treinamento (nem pode ter concluído); apaga direto (204), sem
+          confirmação.
+        - **Em andamento ou encerrado, sem certificado emitido:** se há pessoas com linha ainda não concluída
+          (`INSCRITO` ou `EM_ANDAMENTO`; `pendentes`), a primeira chamada devolve 409 `CONFIRMACAO_NECESSARIA`, sem apagar
+          nada. O front mostra o aviso ("9 pessoas ainda não concluíram este treinamento") e repete a chamada com
+          `confirmar=true`, que executa. Sem pendentes, apaga direto.
+        - **Treinamento que não emite certificado** (`emiteCertificado` falso) pode ser excluído mesmo que alguém já o tenha
+          concluído: o andamento e as conclusões somem junto, e a confirmação só conta quem **não** concluiu (não há
+          certificado emitido a proteger).
+
+        **O que a exclusão faz:** numa única transação (a API trava o treinamento para escrita, para que uma conclusão no
+        mesmo instante não seja apagada sem ter sido conferida), apaga o progresso dos módulos, os módulos, as linhas de
+        certificado (que o trigger cria a cada conclusão, mesmo sem `emiteCertificado`; nenhuma é de certificado emitido
+        quando se chega aqui), as linhas dos participantes, o público escolhido e o treinamento; depois apaga do
+        armazenamento de arquivos os PDFs dos módulos. Quem tinha o treinamento deixa de vê-lo e perde o andamento. O evento
+        entra na auditoria (`TREINAMENTOS`, `EXCLUIU`) com o título e o número de `pendentes` (a auditoria é tabela nova da
+        aplicação, script `V037`).
+
+        **O que li no banco:** `TREINAMENTOS_FUNCIONARIOS`, `TREINAMENTOS_CERTIFICADOS`, `TREINAMENTOS_MODULOS` e
+        `TREINAMENTOS_PUBLICO` têm chave estrangeira para `TREINAMENTOS` sem `ON DELETE` (no MySQL/InnoDB isso é
+        `RESTRICT`: o banco recusa apagar o treinamento enquanto houver linha filha, por isso a API apaga os filhos
+        antes, na ordem acima), e `TREINAMENTOS_MODULOS_PROGRESSO` aponta para `TREINAMENTOS_MODULOS` do mesmo jeito
+        (`Criacao_Tabelas`:403-464, V026, V029). Não há trigger de `DELETE` em nenhuma dessas tabelas (os de `DELETE`
+        do banco são só os de `FUNCIONARIOS`, `HOLERITES`, `ADVERTENCIAS` e `FORMULARIOS_PERGUNTAS`). Logo o banco aceita
+        a exclusão física. Li também que os triggers `TRG_TREINAMENTOS_FUNCIONARIOS_AFTER_INSERT` e `_AFTER_UPDATE`
+        (`Criacao_Triggers`:768-791) criam a linha em `TREINAMENTOS_CERTIFICADOS` sempre que a pessoa vira `CONCLUIDO`,
+        inclusive com `emiteCertificado` falso (V029, "SOBRE EMITE_CERTIFICADO = FALSO"): por isso, para a API, "certificado
+        emitido" é a conclusão em treinamento que emite certificado, e não a mera existência da linha. Não existe coluna
+        para ocultar ou arquivar treinamento.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoConfirmar' }
+      responses:
+        '204': { description: Treinamento excluído. }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409': { $ref: '#/components/responses/TreinamentoErro409ConfirmacaoExcluir' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422ComCertificados' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/{treinamentoId}/publicar:
+    post:
+      tags: [Treinamentos]
+      operationId: publicarTreinamento
+      summary: Publica o treinamento (acesso liberado na data de início).
+      description: |
+        Último passo do assistente, "Publicar treinamento" (a opção "Salvar como rascunho" não chama esta rota: o
+        `PUT` já guardou tudo). Sem corpo: publica o que está salvo.
+
+        **Exige** (400 com `errors` por campo): `titulo`; `comecaEm` preenchido (pode ser hoje ou uma data passada, que
+        libera na hora, ou uma data futura, que deixa o treinamento `AGENDADO`); `publico` escolhido (`SETORES` com pelo
+        menos um setor em `setorIds`, `PESSOAS` com pelo menos uma pessoa em `funcionarioIds`); pelo menos um módulo
+        (`errors.modulos`). Não há data final.
+
+        **Efeitos:** marca `PUBLICADO` verdadeiro (a pessoa só passa a ver o treinamento quando `comecaEm` chega, sem
+        agendador para isso). Treinamento **obrigatório** cria uma linha `INSCRITO` em `TREINAMENTOS_FUNCIONARIOS` para
+        cada pessoa ativa do público (setor resolvido em pessoas na hora; o trigger do banco recusa inativo, por isso a API
+        os pula); `TODOS` não guarda linhas em `TREINAMENTOS_PUBLICO`. Opcional não cria linhas. Com `incluiAdmitidos`, o
+        agendador inclui depois, enquanto o treinamento não for encerrado, quem for admitido e estiver no público (só
+        obrigatório). **Nenhum e-mail sai** (seção 12 das convenções): publicar não avisa ninguém; o RH usa um Aviso, se
+        quiser.
+        A criação em lote das linhas entra na auditoria como evento explícito (roadmap, decisão 5; a auditoria é tabela
+        nova da aplicação, script `V037`).
+        Publicar de novo, inclusive um treinamento já encerrado: 422 `TREINAMENTO_JA_PUBLICADO` (código só desta rota; o
+        `PUT` e as rotas de módulo usam outros). Não existe "despublicar": publicado não volta a rascunho (depois só se
+        encerra e, sem certificado emitido, se exclui).
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: Treinamento publicado (`AGENDADO` ou `EM_ANDAMENTO`, conforme `comecaEm`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRh' }
+              example:
+                id: 6
+                titulo: Prevenção de assédio no trabalho
+                descricao: Como reconhecer, prevenir e denunciar situações de assédio moral e sexual, e quais canais a empresa oferece.
+                comecaEm: '2026-11-16'
+                encerradoEmUtc: null
+                obrigatorio: true
+                onboarding: false
+                emiteCertificado: true
+                publicado: true
+                situacao: AGENDADO
+                publico: TODOS
+                setores: []
+                pessoas: []
+                incluiAdmitidos: true
+                modulos:
+                  - { id: 21, ordem: 1, titulo: O que é assédio moral e sexual, tipo: VIDEO, duracaoMinutos: 15, urlExterna: 'https://videos.exemplo.com.br/assedio-introducao', conteudoTexto: null, nomeArquivo: null }
+                  - { id: 22, ordem: 2, titulo: Situações do dia a dia e como agir, tipo: TEXTO, duracaoMinutos: 10, urlExterna: null, conteudoTexto: "Exemplos de situações em reunião, mensagens e eventos da empresa, e o que fazer em cada uma.", nomeArquivo: null }
+                  - { id: 23, ordem: 3, titulo: Canais de denúncia da empresa, tipo: PDF, duracaoMinutos: 5, urlExterna: null, conteudoTexto: null, nomeArquivo: canais-de-denuncia.pdf }
+        '400':
+          description: Falta preencher algo antes de publicar.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeValidacao' }
+              example:
+                title: Dados inválidos.
+                status: 400
+                detail: Confira os campos indicados.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                errors:
+                  modulos: [Inclua pelo menos um módulo.]
+                  comecaEm: [Informe a data em que o acesso é liberado.]
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O treinamento já foi publicado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                codigo: TREINAMENTO_JA_PUBLICADO
+                detail: Este treinamento já foi publicado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/{treinamentoId}/encerrar:
+    post:
+      tags: [Treinamentos]
+      operationId: encerrarTreinamento
+      summary: Encerra o treinamento (ninguém novo entra; quem já começou pode terminar).
+      description: |
+        Item "Encerrar" do menu "..." da tela 22. Só vale para treinamento `EM_ANDAMENTO` (publicado, já liberado, não
+        encerrado): rascunho e agendado se excluem (`excluirTreinamento`), e não se encerra de novo (422
+        `TREINAMENTO_NAO_ESTA_EM_ANDAMENTO` e `TREINAMENTO_ENCERRADO`). Sem corpo. Grava `encerradoEmUtc` (agora) e a
+        situação passa a `ENCERRADO`, na hora, sem agendador. **Não há rota para reabrir.**
+
+        **Confirmação** (seção 13 das convenções): se há pessoas com linha `INSCRITO` ou `EM_ANDAMENTO` (`pendentes`), a
+        primeira chamada devolve 409 `CONFIRMACAO_NECESSARIA` com `pendentes`, `emAndamento` e `naoIniciaram`, sem
+        encerrar. O front mostra o aviso e repete a chamada com `confirmar=true`, que executa. Sem pendentes, encerra
+        direto.
+
+        **O que acontece depois** (decidido pelo dono, 2026-10-30):
+        - **Quem já começou (`EM_ANDAMENTO`) continua e termina:** conclui os módulos e, ao concluir o último, recebe o
+          certificado (se `emiteCertificado`) e aparece em "Quem fez" como `CONCLUIDO`. O cartão dele em "Meus
+          treinamentos" passa a vir com `encerrado: true`.
+        - **Quem estava `INSCRITO` e não começou deixa de poder começar:** o treinamento some de "Meus treinamentos" dele
+          e `iniciarMeuTreinamento` e `concluirModuloDeTreinamento` respondem 422 `TREINAMENTO_ENCERRADO`. A linha fica
+          no banco e em "Quem fez" como "Não iniciado".
+        - **Ninguém novo entra:** o treinamento opcional não aceita inscrição (422 `TREINAMENTO_ENCERRADO`), a caixa
+          `incluiAdmitidos` deixa de incluir quem for admitido e ele sai de `listarTreinamentosDeOnboarding` (o
+          cadastro e a importação não o incluem mais).
+        - **Deixa de ser pendência:** ninguém aparece como pendente por causa dele (indicadores, fichas, painel).
+        - Os certificados já emitidos continuam valendo e o conteúdo continua aberto a quem tem acesso ("Rever
+          conteúdo"). Como um certificado emitido impede a exclusão (`excluirTreinamento`), **encerrar é a única saída**
+          de um treinamento que já emitiu certificado. O evento entra na auditoria (`TREINAMENTOS`, `ALTEROU`; a
+          auditoria é tabela nova da aplicação, script `V037`).
+
+        **Depende do script `V042`**: `TREINAMENTOS.ENCERRADO_EM DATETIME NULL` (o banco guarda o horário em -03:00; a
+        conversão para `encerradoEmUtc` é do back-end; um `CHECK` só deixa encerrar o que foi publicado). A coluna
+        `DATA_FIM` ("prazo", V029) fica sem uso e nula.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoConfirmar' }
+      responses:
+        '200':
+          description: Treinamento encerrado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoRh' }
+              example:
+                id: 5
+                titulo: Armazenagem segura (NR-11)
+                descricao: Regras de circulação, carga e uso seguro de empilhadeira no armazém.
+                comecaEm: '2026-03-10'
+                encerradoEmUtc: '2026-03-14T20:00:00Z'
+                obrigatorio: true
+                onboarding: false
+                emiteCertificado: true
+                publicado: true
+                situacao: ENCERRADO
+                publico: SETORES
+                setores:
+                  - { id: 6, nome: Logística }
+                pessoas: []
+                incluiAdmitidos: false
+                modulos:
+                  - { id: 51, ordem: 1, titulo: Regras de circulação no armazém, tipo: TEXTO, duracaoMinutos: 20, urlExterna: null, conteudoTexto: "Sentido das vias, velocidade máxima e prioridade de quem está carregado.", nomeArquivo: null }
+                  - { id: 52, ordem: 2, titulo: Checklist de inspeção da empilhadeira, tipo: PDF, duracaoMinutos: 10, urlExterna: null, conteudoTexto: null, nomeArquivo: checklist-empilhadeira.pdf }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409': { $ref: '#/components/responses/TreinamentoErro409ConfirmacaoEncerrar' }
+        '422':
+          description: O treinamento não está em andamento (é rascunho ou agendado) ou já foi encerrado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                naoEstaEmAndamento:
+                  summary: Rascunho ou agendado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: TREINAMENTO_NAO_ESTA_EM_ANDAMENTO
+                    detail: Só dá para encerrar um treinamento em andamento. Rascunho e agendado se excluem.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                jaEncerrado:
+                  summary: Já encerrado
+                  value:
+                    title: Treinamento encerrado.
+                    status: 422
+                    codigo: TREINAMENTO_ENCERRADO
+                    detail: Este treinamento já foi encerrado.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- RH: módulos
+  /api/rh/treinamentos/{treinamentoId}/modulos:
+    post:
+      tags: [Treinamentos]
+      operationId: adicionarModuloDeTreinamento
+      summary: Acrescenta um módulo (vídeo, texto, link ou PDF) ao treinamento.
+      description: |
+        Passo Conteúdo, botões "Vídeo", "Arquivo PDF", "Texto" e "Link" (o botão "Aula presencial" não existe). Envio em
+        `multipart/form-data`. O módulo entra no fim (`ordem` = último + 1). O que cada `tipo` exige (o banco confere, V026,
+        `CHK_TREINAMENTOS_MODULOS_CONTEUDO`) e o que recusa com 400 em `errors`:
+        `VIDEO`: `urlExterna`; `TEXTO`: `conteudoTexto` (texto ou markdown, nunca HTML);
+        `LINK`: `urlExterna`; `PDF`: `arquivo` (PDF de até 10 MB, conferido pelo conteúdo e não só pela extensão).
+        Campo que não pertence ao tipo é recusado. `urlExterna` precisa começar com `http://` ou `https://`.
+        Só em **rascunho**: depois de publicado (inclusive o encerrado), 422 `TREINAMENTO_MODULOS_TRAVADOS` (a conclusão é
+        por módulo e `CONCLUIDO` é definitivo; um módulo novo não reabriria quem já concluiu). O arquivo só é gravado no
+        Blob depois de o banco aceitar o módulo. No módulo `PDF`, a API grava `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
+        juntos (o nome que a pessoa deu ao arquivo, `V044`) e devolve só o nome, em `nomeArquivo`.
+      x-provisorio: >-
+        Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (roadmap, fatia 6): o contrato supõe a hipótese mais simples, só link externo; se o dono escolher o Blob, `VIDEO` passa a aceitar `arquivo` (a coluna `CAMINHO_ARQUIVO` já existe em V026). (2) Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/TreinamentoModuloComando' }
+            encoding:
+              arquivo: { contentType: application/pdf }
+            example:
+              titulo: Canais de denúncia da empresa
+              tipo: PDF
+              duracaoMinutos: 5
+              arquivo: canais-de-denuncia.pdf
+      responses:
+        '201':
+          description: Módulo criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoModuloRh' }
+              example: { id: 23, ordem: 3, titulo: Canais de denúncia da empresa, tipo: PDF, duracaoMinutos: 5, urlExterna: null, conteudoTexto: null, nomeArquivo: canais-de-denuncia.pdf }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422ModulosTravados' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/{treinamentoId}/modulos/ordem:
+    put:
+      tags: [Treinamentos]
+      operationId: reordenarModulosDeTreinamento
+      summary: Muda a ordem dos módulos.
+      description: |
+        Recebe **todos** os ids dos módulos do treinamento, na nova ordem (1, 2, 3...). Lista com id faltando, repetido ou
+        de outro treinamento: 400. Só em rascunho (depois de publicado, 422 `TREINAMENTO_MODULOS_TRAVADOS`). `(ID_TREINAMENTO, ORDEM)` é chave única no
+        banco: a troca precisa de duas fases dentro de uma transação.
+      x-provisorio: >-
+        Mesma decisão da criação de módulo (mexer na estrutura do treinamento depois de publicado). Hoje só em rascunho.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TreinamentoModulosOrdemComando' }
+            example: { moduloIds: [22, 21, 23] }
+      responses:
+        '200':
+          description: Módulos na nova ordem.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoModulosRh' }
+              example:
+                itens:
+                  - { id: 22, ordem: 1, titulo: Situações do dia a dia e como agir, tipo: TEXTO, duracaoMinutos: 10, urlExterna: null, conteudoTexto: "Exemplos de situações em reunião, mensagens e eventos da empresa, e o que fazer em cada uma.", nomeArquivo: null }
+                  - { id: 21, ordem: 2, titulo: O que é assédio moral e sexual, tipo: VIDEO, duracaoMinutos: 15, urlExterna: 'https://videos.exemplo.com.br/assedio-introducao', conteudoTexto: null, nomeArquivo: null }
+                  - { id: 23, ordem: 3, titulo: Canais de denúncia da empresa, tipo: PDF, duracaoMinutos: 5, urlExterna: null, conteudoTexto: null, nomeArquivo: canais-de-denuncia.pdf }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422ModulosTravados' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/{treinamentoId}/modulos/{moduloId}:
+    put:
+      tags: [Treinamentos]
+      operationId: atualizarModuloDeTreinamento
+      summary: Edita um módulo (botão "Editar" do passo Conteúdo).
+      description: |
+        Mesmo formato e mesmas regras de `adicionarModuloDeTreinamento`; substitui o módulo todo, sem mudar a `ordem`.
+        Sem `arquivo` num módulo `PDF`, o arquivo atual fica. Em rascunho, o `tipo` pode mudar (o arquivo que deixa de
+        valer é apagado). **Depois de publicado** só se corrige o conteúdo (`titulo`, `duracaoMinutos`, `urlExterna`,
+        `conteudoTexto`, `arquivo`): o `tipo` não muda (422 `TREINAMENTO_CAMPO_TRAVADO`, o mesmo código de
+        `atualizarTreinamento`: é um campo que não muda depois de publicado).
+      x-provisorio: >-
+        Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (hoje, só link externo). (2) O que se pode mexer nos módulos depois de publicado (hoje, só corrigir o conteúdo).
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoModuloId' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/TreinamentoModuloComando' }
+            encoding:
+              arquivo: { contentType: application/pdf }
+            example:
+              titulo: O que é assédio moral e sexual
+              tipo: VIDEO
+              duracaoMinutos: 18
+              urlExterna: 'https://videos.exemplo.com.br/assedio-introducao'
+      responses:
+        '200':
+          description: Módulo salvo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoModuloRh' }
+              example: { id: 21, ordem: 1, titulo: O que é assédio moral e sexual, tipo: VIDEO, duracaoMinutos: 18, urlExterna: 'https://videos.exemplo.com.br/assedio-introducao', conteudoTexto: null, nomeArquivo: null }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422ModuloCampoTravado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    delete:
+      tags: [Treinamentos]
+      operationId: excluirModuloDeTreinamento
+      summary: Remove um módulo do rascunho.
+      description: |
+        Só em rascunho (depois de publicado, 422 `TREINAMENTO_MODULOS_TRAVADOS`). Os módulos que sobram são renumerados
+        (1, 2, 3...) e o arquivo é apagado do Blob.
+      x-provisorio: >-
+        Mesma decisão da criação de módulo (mexer na estrutura depois de publicado). Hoje só em rascunho.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoModuloId' }
+      responses:
+        '204': { description: Módulo removido. }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422ModulosTravados' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- RH: quem fez
+  /api/rh/treinamentos/{treinamentoId}/participantes:
+    get:
+      tags: [Treinamentos]
+      operationId: listarParticipantesDeTreinamento
+      summary: Lista quem fez, quem está fazendo e quem não começou um treinamento.
+      description: |
+        Tela 22, seção "Quem fez" (botão "Ver quem fez"). Lista só quem tem linha no treinamento (obrigatório: o
+        público inteiro; opcional: quem se inscreveu). `situacao` é a aba (`CONCLUIDO` = "Concluíram",
+        `EM_ANDAMENTO`, `INSCRITO` = "Não iniciaram"); `setorId` é o filtro "Todos os setores" (a lista de setores vem de
+        `GET /api/rh/setores`); `busca` procura no nome. `contagens` ignora `situacao` e respeita `setorId` e `busca`.
+        `ordenarPor` aceita `NOME` (padrão), `SETOR`, `SITUACAO`, `INICIO` e `CONCLUSAO`; `direcao` padrão `ASC`.
+        Não há coluna Nota. O botão "Baixar" do certificado só aparece quando `certificadoDisponivel` é verdadeiro.
+        Rascunho não tem participantes (lista vazia). O resultado de pessoas inativas continua na lista (`funcionario.ativo`).
+        Treinamento encerrado continua consultável: quem não começou aparece como "Não iniciado" e quem terminou depois do
+        encerramento aparece como `CONCLUIDO` (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). A linha de resumo sob o título (o Figma: "Obrigatório para todos, com
+        certificado. 01/08 a 31/10/2026") perde o fim: use `comecaEm` ("desde 01/08") e, se houver, `encerradoEmUtc`.
+        `concluidoEmUtc` é o instante em que a pessoa concluiu (o front mostra só o dia, em `America/Sao_Paulo`).
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+        - { $ref: '#/components/parameters/Busca' }
+        - { $ref: '#/components/parameters/Direcao' }
+        - name: situacao
+          in: query
+          description: Aba da lista. Sem o parâmetro, todos.
+          schema: { $ref: '#/components/schemas/TreinamentoParticipanteSituacao' }
+        - name: setorId
+          in: query
+          description: Só as pessoas deste setor.
+          schema: { type: integer }
+        - name: ordenarPor
+          in: query
+          schema: { type: string, enum: [NOME, SETOR, SITUACAO, INICIO, CONCLUSAO], default: NOME }
+      responses:
+        '200':
+          description: Página de participantes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoParticipantesLista' }
+              example:
+                treinamento: { id: 2, titulo: LGPD na prática, obrigatorio: true, onboarding: false, emiteCertificado: true, situacao: EM_ANDAMENTO, comecaEm: '2026-08-01', encerradoEmUtc: null, publico: TODOS, totalModulos: 4 }
+                contagens: { total: 101, concluidos: 63, emAndamento: 21, naoIniciados: 17 }
+                itens:
+                  - { funcionario: { id: 12, nome: Bruno Lima, cargo: Analista pleno, setor: Financeiro, ativo: true }, situacao: CONCLUIDO, iniciadoEm: '2026-08-02', concluidoEmUtc: '2026-09-15T14:05:00Z', modulosConcluidos: 4, certificadoDisponivel: true }
+                  - { funcionario: { id: 4, nome: Carla Mendes, cargo: Assistente administrativa, setor: Administrativo, ativo: true }, situacao: CONCLUIDO, iniciadoEm: '2026-08-05', concluidoEmUtc: '2026-08-20T12:00:00Z', modulosConcluidos: 4, certificadoDisponivel: true }
+                  - { funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }, situacao: INSCRITO, iniciadoEm: null, concluidoEmUtc: null, modulosConcluidos: 0, certificadoDisponivel: false }
+                  - { funcionario: { id: 40, nome: João Pedro Alves, cargo: Desenvolvedor, setor: Tecnologia, ativo: true }, situacao: EM_ANDAMENTO, iniciadoEm: '2026-09-12', concluidoEmUtc: null, modulosConcluidos: 2, certificadoDisponivel: false }
+                pagina: 1
+                tamanhoPagina: 20
+                total: 101
+                totalPaginas: 6
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/{treinamentoId}/participantes/exportacao:
+    get:
+      tags: [Treinamentos]
+      operationId: exportarParticipantesDeTreinamento
+      summary: Baixa a lista de quem fez o treinamento em CSV.
+      description: |
+        Botão "Baixar lista" da tela 22. Aceita os mesmos filtros da lista (`situacao`, `setorId`, `busca`) e devolve **todas**
+        as linhas, sem paginação, com `Content-Disposition: attachment`. CSV em UTF-8 com BOM, separador `;`, colunas
+        `Pessoa;Setor;Situação;Início;Conclusão` (datas `dd/MM/aaaa`; situação em português: Concluído, Em andamento,
+        Não iniciado). Célula que começa com `=`, `+`, `-` ou `@` é neutralizada (roadmap, decisão 9).
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/Busca' }
+        - name: situacao
+          in: query
+          schema: { $ref: '#/components/schemas/TreinamentoParticipanteSituacao' }
+        - name: setorId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Arquivo CSV.
+          headers:
+            Content-Disposition:
+              description: Sempre `attachment; filename="treinamento-lgpd-na-pratica.csv"` (nome com o título).
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string }
+              example: "Pessoa;Setor;Situação;Início;Conclusão\r\nBruno Lima;Financeiro;Concluído;02/08/2026;15/09/2026\r\nDiego Farias;Comercial;Não iniciado;;\r\n"
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/treinamentos/{treinamentoId}/participantes/{funcionarioId}/certificado/download:
+    get:
+      tags: [Certificados]
+      operationId: baixarCertificadoDeParticipante
+      summary: Dá um link temporário para baixar o certificado em PDF de uma pessoa.
+      description: |
+        Botão "Baixar" da coluna Certificado (tela 22) e do histórico na ficha. Devolve `LinkTemporario`; o PDF baixa como
+        anexo (o `url` é uma URL assinada genérica, sem caminho interno de armazenamento). 404 se a pessoa não concluiu, ou
+        se o treinamento tem `emiteCertificado` falso (o trigger do banco cria a linha do certificado de qualquer jeito, mas
+        a API a trata como inexistente).
+        O PDF é gerado quando o treinamento vira `CONCLUIDO`, atualizando a linha que o trigger criou (a API nunca insere
+        outro certificado); se a linha ainda estiver sem arquivo, este download gera o PDF na hora, uma vez.
+      x-provisorio: >-
+        Modelo visual do certificado e formato do número (roadmap, fatia 6). O PDF segue o modelo simples que o back-end escolher; o dono pode trocar o layout e o formato de `numero` sem mudar este contrato.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoFuncionarioId' }
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: 'https://arquivos.exemplo.com.br/download/5b8e2c91d7a04f36?assinatura=exemplo'
+                expiraEmUtc: '2026-10-07T12:57:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- RH: ficha da pessoa
+  /api/rh/funcionarios/{funcionarioId}/treinamentos:
+    get:
+      tags: [Treinamentos]
+      operationId: listarTreinamentosDeFuncionario
+      summary: Mostra os treinamentos de uma pessoa, para a aba Treinamentos da ficha.
+      description: |
+        Aba da ficha da pessoa (RH). O Figma não desenha esta aba para o RH (só para o gestor, tela 52); o contrato a
+        oferece no mesmo formato, com o botão de certificado. Lista as linhas da pessoa em treinamentos publicados cuja data
+        de início já chegou (a mesma visibilidade que ela tem: treinamento encerrado só aparece se ela começou ou
+        concluiu), obrigatórios primeiro e depois por `comecaEm` (o mais antigo primeiro).
+        `resumo.pendentes`: pendências pela definição única da tag Treinamentos (obrigatório `EM_ANDAMENTO` em que ela
+        está `INSCRITO` ou `EM_ANDAMENTO`); opcional nunca é pendência. Treinamento não tem prazo, então não há "prazo
+        vencido" nem data final nos itens. `concluidoEmUtc` é o instante em que concluiu (o front mostra só o dia).
+        O certificado de cada item se baixa com `baixarCertificadoDeParticipante`.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoFuncionarioId' }
+      responses:
+        '200':
+          description: Treinamentos da pessoa (sem paginação; lista curta).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoFichaRhResposta' }
+              example:
+                resumo: { pendentes: 1, emAndamento: 1, concluidos: 1 }
+                itens:
+                  - { treinamentoId: 2, titulo: LGPD na prática, obrigatorio: true, onboarding: false, situacao: CONCLUIDO, iniciadoEm: '2026-08-02', concluidoEmUtc: '2026-09-15T14:05:00Z', modulosConcluidos: 4, totalModulos: 4, certificadoDisponivel: true }
+                  - { treinamentoId: 3, titulo: Segurança da informação, obrigatorio: true, onboarding: false, situacao: EM_ANDAMENTO, iniciadoEm: '2026-10-05', concluidoEmUtc: null, modulosConcluidos: 3, totalModulos: 5, certificadoDisponivel: false }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}/treinamentos/onboarding:
+    post:
+      tags: [Treinamentos]
+      operationId: incluirFuncionarioNoOnboarding
+      summary: Inclui uma pessoa no treinamento de onboarding (liga a caixa "Incluir no treinamento" do cadastro).
+      description: |
+        **É esta a regra por trás da caixa "Incluir no treinamento Onboarding 2026"** do cadastro. O cadastro
+        (`POST /api/rh/funcionarios`) e a confirmação da importação (`POST /api/rh/importacoes/{importacaoId}/confirmar`)
+        aceitam `incluirNoOnboarding` e aplicam **esta mesma regra por dentro**, depois de gravar a pessoa (a importação
+        usa a tabela nova da aplicação `IMPORTACOES`, script `V038`, descrita na fatia 2); nesses dois fluxos o front não
+        chama esta rota. Ela existe para incluir depois uma pessoa já cadastrada (por exemplo, a partir da
+        ficha) e é a referência do efeito e dos erros.
+        Cria uma linha `INSCRITO` em `TREINAMENTOS_FUNCIONARIOS` para a pessoa em cada treinamento de onboarding em vigor
+        (publicado e **não encerrado**; ver `listarTreinamentosDeOnboarding`; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)), qualquer que seja o público; assim o
+        treinamento aparece para ela quando `comecaEm` chegar. Quem já tem linha não muda e vem com
+        `jaEstavaIncluida: true` (a chamada é repetível). Sem treinamento de onboarding em vigor: 422
+        `SEM_TREINAMENTO_DE_ONBOARDING` (no cadastro, que grava tudo ou nada como diz a fatia 1, o mesmo 422 recusa o
+        cadastro inteiro). Pessoa inativa: 422 `FUNCIONARIO_INATIVO` (o trigger do banco também recusa: "Nao e possivel
+        inscrever funcionario inativo em treinamento.").
+      x-provisorio: >-
+        Como o RH marca qual treinamento é o de onboarding (ver `listarTreinamentosDeOnboarding`). Se a regra mudar, muda quem é incluído, não a forma de chamar.
+      x-perfis: [RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoFuncionarioId' }
+      responses:
+        '200':
+          description: Pessoa incluída (ou já estava).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoOnboardingInclusaoResposta' }
+              example:
+                funcionarioId: 104
+                treinamentos:
+                  - { treinamentoId: 1, titulo: Onboarding 2026, jaEstavaIncluida: false }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Não há treinamento de onboarding em vigor, ou a pessoa está inativa.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                semOnboarding:
+                  summary: Nenhum treinamento de onboarding publicado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: SEM_TREINAMENTO_DE_ONBOARDING
+                    detail: Não há treinamento de onboarding publicado.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                inativo:
+                  summary: Pessoa inativa
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: FUNCIONARIO_INATIVO
+                    detail: Não é possível incluir uma pessoa inativa em treinamento.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    regraDoBanco: Nao e possivel inscrever funcionario inativo em treinamento.
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- EU: meus treinamentos (telas 41 e 42)
+  /api/eu/treinamentos:
+    get:
+      tags: [Treinamentos]
+      operationId: listarMeusTreinamentos
+      summary: Lista os meus treinamentos, em cartões, por aba.
+      description: |
+        Telas 41 e 42 ("Meus treinamentos"), para qualquer perfil (gestor e RH também fazem os treinamentos deles). Só
+        aparecem treinamentos **publicados cuja data de início já chegou**; rascunho e agendado não vêm (o cartão "Em breve"
+        do Figma não existe). Entram os treinamentos em que a pessoa tem linha e os **opcionais do público dela** que ela
+        ainda não escolheu (`situacao = DISPONIVEL`). Treinamento **encerrado** só aparece para quem já começou (continua
+        e termina) ou concluiu; para quem estava `INSCRITO` e não começou, e para o opcional ainda não escolhido, ele some (o
+        encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        `aba`: `TODOS` (padrão; tudo que ainda **não** foi concluído, como diz a nota "Os treinamentos que você já concluiu ficam
+        na aba Concluídos"), `DISPONIVEIS` (`DISPONIVEL` e `NAO_INICIADO`), `EM_ANDAMENTO` e `CONCLUIDOS`. `obrigatorio`
+        é o filtro "Obrigatórios e opcionais" (sem ele, os dois). `busca` procura no título e na descrição. O filtro "Todos
+        os tipos" não existe. `contagens` traz o número de cada aba, ignora `aba` e respeita `busca` e `obrigatorio`.
+        Ordem fixa: obrigatórios primeiro, depois `comecaEm` mais antigo (o que espera há mais tempo), depois título.
+        **Sem prazo:** o cartão não tem "Até 15/11" nem "De 20/10 a 20/11"; o selo é só "Obrigatório", "Opcional" ou
+        "Onboarding".
+        A faixa "Sua parte" do gestor (tela 58) é o primeiro item obrigatório, com `encerrado` falso e `situacao`
+        `NAO_INICIADO` ou `EM_ANDAMENTO`, desta lista ("Você está no módulo `moduloAtual` de `totalModulos`"; o "O prazo é
+        15/11" do Figma não existe). Se não há item assim, a faixa não aparece. `encerrado` verdadeiro só vem em cartão
+        `EM_ANDAMENTO` ou `CONCLUIDO` (o RH encerrou o treinamento; quem já começou continua e termina).
+        O desenho do cartão (ícone e cor) é decorativo e não vem da API.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+        - { $ref: '#/components/parameters/Busca' }
+        - name: aba
+          in: query
+          schema: { $ref: '#/components/schemas/TreinamentoAbaMeus' }
+        - name: obrigatorio
+          in: query
+          description: "`true` só os obrigatórios, `false` só os opcionais."
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Página de cartões.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoMeuLista' }
+              example:
+                itens:
+                  - { id: 3, titulo: Segurança da informação, descricao: 'Senhas, golpes por e-mail e cuidado com dados.', obrigatorio: true, onboarding: false, situacao: EM_ANDAMENTO, comecaEm: '2026-09-15', encerrado: false, totalModulos: 5, duracaoTotalMinutos: 100, modulosConcluidos: 3, progressoPercentual: 60, moduloAtual: 4, iniciadoEm: '2026-10-05', concluidoEmUtc: null, certificado: null }
+                  - { id: 7, titulo: Excel para relatórios financeiros, descricao: 'Tabelas dinâmicas, PROCV e gráficos para o fechamento do mês.', obrigatorio: false, onboarding: false, situacao: DISPONIVEL, comecaEm: '2026-10-01', encerrado: false, totalModulos: 8, duracaoTotalMinutos: 180, modulosConcluidos: 0, progressoPercentual: 0, moduloAtual: 1, iniciadoEm: null, concluidoEmUtc: null, certificado: null }
+                pagina: 1
+                tamanhoPagina: 20
+                total: 2
+                totalPaginas: 1
+                contagens: { todos: 2, disponiveis: 1, emAndamento: 1, concluidos: 3 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}:
+    get:
+      tags: [Treinamentos]
+      operationId: obterMeuTreinamento
+      summary: Mostra um treinamento meu, com os módulos e o andamento em cada um.
+      description: |
+        Tela de execução (não existe no Figma): lista dos módulos com `concluido`, mais o cartão do treinamento. O
+        conteúdo de cada módulo vem de `obterConteudoDeModulo`. Pessoa que não tem linha e não é do público, treinamento
+        não publicado ou que ainda não começou: 404; treinamento encerrado em que ela não começou nem concluiu: 404
+        também (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Opcional do público que ela ainda não escolheu é devolvido com `situacao = DISPONIVEL`. Concluído: traz o
+        `certificado` (quando o RH deixou `emiteCertificado` ligado).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: O treinamento e os módulos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoMeuDetalhe' }
+              example:
+                id: 2
+                titulo: LGPD na prática
+                descricao: 'Como a empresa trata dados pessoais e o que cada pessoa deve fazer.'
+                obrigatorio: true
+                onboarding: false
+                situacao: CONCLUIDO
+                encerrado: false
+                comecaEm: '2026-08-01'
+                totalModulos: 4
+                duracaoTotalMinutos: 70
+                modulosConcluidos: 4
+                progressoPercentual: 100
+                moduloAtual: null
+                iniciadoEm: '2026-08-02'
+                concluidoEmUtc: '2026-09-15T14:05:00Z'
+                certificado: { numero: CERT-2026-00482, codigoValidacao: a7f3c1d2-5e9b-4c68-b2d1-8f04e6a93b57, emitidoEm: '2026-09-15' }
+                modulos:
+                  - { id: 11, ordem: 1, titulo: O que é a LGPD, tipo: VIDEO, duracaoMinutos: 15, concluido: true, concluidoEmUtc: '2026-08-02T13:10:00Z' }
+                  - { id: 12, ordem: 2, titulo: Dados pessoais no dia a dia, tipo: TEXTO, duracaoMinutos: 20, concluido: true, concluidoEmUtc: '2026-08-02T13:35:00Z' }
+                  - { id: 13, ordem: 3, titulo: Quando pedir consentimento, tipo: LINK, duracaoMinutos: 15, concluido: true, concluidoEmUtc: '2026-08-20T12:00:00Z' }
+                  - { id: 14, ordem: 4, titulo: Canais para falar do assunto, tipo: PDF, duracaoMinutos: 20, concluido: true, concluidoEmUtc: '2026-09-15T14:05:00Z' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}/inscricao:
+    post:
+      tags: [Treinamentos]
+      operationId: inscreverMeEmTreinamento
+      summary: Inscreve a pessoa em um treinamento opcional ("Quero me inscrever").
+      description: |
+        Só treinamento **opcional**, do público da pessoa, publicado e que já começou. Cria a linha `INSCRITO`. Repetir é
+        inofensivo: já inscrita, devolve o treinamento sem mudar nada. Obrigatório: 422 `TREINAMENTO_NAO_E_OPCIONAL` (quem é do
+        público já tem linha). Fora do público ou não visível: 404. Treinamento que o RH encerrou: 422
+        `TREINAMENTO_ENCERRADO` (ninguém novo entra; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Treinamento não tem prazo, então a
+        inscrição vale a qualquer momento enquanto ele não for encerrado.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: Inscrição feita (ou já existia).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoMeuDetalhe' }
+              example:
+                id: 7
+                titulo: Excel para relatórios financeiros
+                descricao: 'Tabelas dinâmicas, PROCV e gráficos para o fechamento do mês.'
+                obrigatorio: false
+                onboarding: false
+                situacao: NAO_INICIADO
+                encerrado: false
+                comecaEm: '2026-10-01'
+                totalModulos: 8
+                duracaoTotalMinutos: 180
+                modulosConcluidos: 0
+                progressoPercentual: 0
+                moduloAtual: 1
+                iniciadoEm: null
+                concluidoEmUtc: null
+                certificado: null
+                modulos:
+                  - { id: 41, ordem: 1, titulo: Tabelas dinâmicas na prática, tipo: VIDEO, duracaoMinutos: 40, concluido: false, concluidoEmUtc: null }
+                  - { id: 42, ordem: 2, titulo: PROCV sem erro, tipo: TEXTO, duracaoMinutos: 20, concluido: false, concluidoEmUtc: null }
+                  - { id: 43, ordem: 3, titulo: Gráficos para o fechamento, tipo: VIDEO, duracaoMinutos: 25, concluido: false, concluidoEmUtc: null }
+                  - { id: 44, ordem: 4, titulo: Formatação condicional, tipo: TEXTO, duracaoMinutos: 20, concluido: false, concluidoEmUtc: null }
+                  - { id: 45, ordem: 5, titulo: Funções de data e texto, tipo: TEXTO, duracaoMinutos: 20, concluido: false, concluidoEmUtc: null }
+                  - { id: 46, ordem: 6, titulo: Validação de dados, tipo: TEXTO, duracaoMinutos: 15, concluido: false, concluidoEmUtc: null }
+                  - { id: 47, ordem: 7, titulo: Atalhos que economizam tempo, tipo: LINK, duracaoMinutos: 15, concluido: false, concluidoEmUtc: null }
+                  - { id: 48, ordem: 8, titulo: Exercício final com o fechamento do mês, tipo: PDF, duracaoMinutos: 25, concluido: false, concluidoEmUtc: null }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Treinamento obrigatório (não tem inscrição) ou já encerrado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                obrigatorio:
+                  summary: Treinamento obrigatório
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: TREINAMENTO_NAO_E_OPCIONAL
+                    detail: Este treinamento é obrigatório e não precisa de inscrição.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                encerrado:
+                  summary: Treinamento encerrado pelo RH
+                  value:
+                    title: Treinamento encerrado.
+                    status: 422
+                    codigo: TREINAMENTO_ENCERRADO
+                    detail: O RH encerrou este treinamento. Fale com o RH se precisar dele.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}/iniciar:
+    post:
+      tags: [Treinamentos]
+      operationId: iniciarMeuTreinamento
+      summary: Marca que a pessoa começou o treinamento ("Começar").
+      description: |
+        Passa a linha de `INSCRITO` para `EM_ANDAMENTO` e grava `DATA_INICIO` com a data de hoje. Repetir é inofensivo
+        (já em andamento ou concluído: devolve o estado atual, sem `UPDATE`; o banco recusa mudar um treinamento
+        concluído). Não é obrigatório chamar: `concluirModuloDeTreinamento` também inicia quem ainda estava `INSCRITO`.
+        Opcional sem inscrição: 422 `INSCRICAO_PENDENTE`. Treinamento que o RH encerrou e que a pessoa ainda não tinha
+        começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` continua; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: Treinamento em andamento.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoMeuDetalhe' }
+              example:
+                id: 3
+                titulo: Segurança da informação
+                descricao: 'Senhas, golpes por e-mail e cuidado com dados.'
+                obrigatorio: true
+                onboarding: false
+                situacao: EM_ANDAMENTO
+                encerrado: false
+                comecaEm: '2026-09-15'
+                totalModulos: 5
+                duracaoTotalMinutos: 100
+                modulosConcluidos: 0
+                progressoPercentual: 0
+                moduloAtual: 1
+                iniciadoEm: '2026-10-07'
+                concluidoEmUtc: null
+                certificado: null
+                modulos:
+                  - { id: 31, ordem: 1, titulo: Senhas e autenticação em dois passos, tipo: VIDEO, duracaoMinutos: 25, concluido: false, concluidoEmUtc: null }
+                  - { id: 32, ordem: 2, titulo: Golpes por e-mail, tipo: TEXTO, duracaoMinutos: 20, concluido: false, concluidoEmUtc: null }
+                  - { id: 33, ordem: 3, titulo: Dispositivos e redes, tipo: TEXTO, duracaoMinutos: 20, concluido: false, concluidoEmUtc: null }
+                  - { id: 34, ordem: 4, titulo: Dados no trabalho remoto, tipo: VIDEO, duracaoMinutos: 20, concluido: false, concluidoEmUtc: null }
+                  - { id: 35, ordem: 5, titulo: Como avisar sobre um incidente, tipo: PDF, duracaoMinutos: 15, concluido: false, concluidoEmUtc: null }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Falta a inscrição (opcional) ou o treinamento já encerrou.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                inscricao:
+                  summary: Opcional sem inscrição
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: INSCRICAO_PENDENTE
+                    detail: Inscreva-se no treinamento antes de começar.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                encerrado:
+                  summary: Treinamento encerrado pelo RH
+                  value:
+                    title: Treinamento encerrado.
+                    status: 422
+                    codigo: TREINAMENTO_ENCERRADO
+                    detail: O RH encerrou este treinamento. Fale com o RH se precisar dele.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}:
+    get:
+      tags: [Treinamentos]
+      operationId: obterConteudoDeModulo
+      summary: Mostra o conteúdo de um módulo.
+      description: |
+        `TEXTO`: o `conteudoTexto` (texto ou markdown, nunca HTML) é mostrado na tela. `VIDEO` e `LINK`: o front mostra um
+        botão que abre `urlExterna` em nova aba, com `rel="noopener noreferrer"` (a política de segurança do site não deixa
+        incorporar). `PDF`: o front chama
+        `baixarArquivoDeModulo` e abre o link. Os módulos podem ser feitos **em qualquer ordem**. Vale também para "Rever
+        conteúdo" depois de concluído e com o treinamento encerrado (para quem começou ou concluiu). Pessoa sem linha no
+        treinamento: 404; opcional sem inscrição: 422 `INSCRICAO_PENDENTE`.
+      x-provisorio: >-
+        Onde ficam os vídeos, arquivo no Blob ou link externo (hoje, só link externo; se for Blob, o vídeo passa a vir por `baixarArquivoDeModulo`).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoModuloId' }
+      responses:
+        '200':
+          description: O módulo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoModuloConteudo' }
+              example:
+                id: 12
+                ordem: 2
+                titulo: Dados pessoais no dia a dia
+                tipo: TEXTO
+                duracaoMinutos: 20
+                conteudoTexto: "Nome, CPF e e-mail são dados pessoais. Antes de pedir um dado, pergunte a si mesmo para que ele serve."
+                urlExterna: null
+                temArquivo: false
+                concluido: true
+                concluidoEmUtc: '2026-08-02T13:35:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422InscricaoPendente' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/download:
+    get:
+      tags: [Treinamentos]
+      operationId: baixarArquivoDeModulo
+      summary: Dá um link temporário para abrir o arquivo PDF de um módulo.
+      description: |
+        Só módulo com arquivo (`temArquivo` verdadeiro); outro módulo: 404. Mesmas regras de acesso de
+        `obterConteudoDeModulo`. O arquivo vem pelo link temporário, como anexo, nunca por endereço público.
+      x-provisorio: >-
+        Onde ficam os vídeos, arquivo no Blob ou link externo (hoje, só o PDF tem arquivo).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoModuloId' }
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: 'https://arquivos.exemplo.com.br/download/c40a97e1b2d85f63?assinatura=exemplo'
+                expiraEmUtc: '2026-10-07T12:57:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422': { $ref: '#/components/responses/TreinamentoErro422InscricaoPendente' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/concluir:
+    post:
+      tags: [Treinamentos]
+      operationId: concluirModuloDeTreinamento
+      summary: Marca um módulo como concluído; ao concluir o último, conclui o treinamento.
+      description: |
+        Grava uma linha em `TREINAMENTOS_MODULOS_PROGRESSO` (só existe linha de módulo concluído). **Não há rota
+        "concluir treinamento"**: quando o módulo concluído era o último que faltava, a própria API atualiza a linha de
+        `TREINAMENTOS_FUNCIONARIOS` para `CONCLUIDO`, sem nota (a API nunca grava nota; o trigger só recusa nota abaixo de
+        70, e nota vazia passa). O trigger do banco então preenche `DATA_CONCLUSAO` e **cria a linha do certificado** com
+        `CODIGO_VALIDACAO = UUID()` (versão 1): a API **não insere** certificado (colidiria com a chave única); ela
+        **troca esse código por um UUID versão 4** (aleatório, não enumerável; ver `validarCertificado`) e, se
+        `emiteCertificado` for verdadeiro, gera o PDF e grava o caminho nessa linha; se for falso, deixa a linha sem uso.
+        `treinamentoConcluido` diz se foi este módulo que fechou o treinamento (o front então mostra o certificado).
+        A primeira conclusão em `INSCRITO` também inicia o treinamento (`EM_ANDAMENTO`, `DATA_INICIO` = hoje).
+        Repetir é inofensivo: módulo já concluído devolve o estado atual, sem erro e sem tocar no banco (o banco recusa mudar um
+        `CONCLUIDO`: "Treinamento concluido nao pode mudar de status."). Duas conclusões simultâneas dos últimos módulos
+        resultam em um só `CONCLUIDO` e um só certificado.
+        Opcional sem inscrição: 422 `INSCRICAO_PENDENTE`. Treinamento que o RH encerrou e que a pessoa ainda não tinha
+        começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` conclui normalmente e recebe o certificado; o encerramento
+        depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Módulo de outro treinamento: 404. `concluidoEmUtc` do treinamento é o instante em que o
+        último módulo foi concluído.
+      x-provisorio: >-
+        Formato do `numero` do certificado e modelo do PDF (roadmap, fatia 6).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+        - { $ref: '#/components/parameters/TreinamentoModuloId' }
+      responses:
+        '200':
+          description: Módulo concluído.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoModuloConclusaoResposta' }
+              example:
+                moduloId: 14
+                treinamentoConcluido: true
+                treinamento:
+                  id: 2
+                  titulo: LGPD na prática
+                  descricao: 'Como a empresa trata dados pessoais e o que cada pessoa deve fazer.'
+                  obrigatorio: true
+                  onboarding: false
+                  situacao: CONCLUIDO
+                  encerrado: false
+                  comecaEm: '2026-08-01'
+                  totalModulos: 4
+                  duracaoTotalMinutos: 70
+                  modulosConcluidos: 4
+                  progressoPercentual: 100
+                  moduloAtual: null
+                  iniciadoEm: '2026-08-02'
+                  concluidoEmUtc: '2026-09-15T14:05:00Z'
+                  certificado: { numero: CERT-2026-00482, codigoValidacao: a7f3c1d2-5e9b-4c68-b2d1-8f04e6a93b57, emitidoEm: '2026-09-15' }
+                  modulos:
+                    - { id: 11, ordem: 1, titulo: O que é a LGPD, tipo: VIDEO, duracaoMinutos: 15, concluido: true, concluidoEmUtc: '2026-08-02T13:10:00Z' }
+                    - { id: 12, ordem: 2, titulo: Dados pessoais no dia a dia, tipo: TEXTO, duracaoMinutos: 20, concluido: true, concluidoEmUtc: '2026-08-02T13:35:00Z' }
+                    - { id: 13, ordem: 3, titulo: Quando pedir consentimento, tipo: LINK, duracaoMinutos: 15, concluido: true, concluidoEmUtc: '2026-08-20T12:00:00Z' }
+                    - { id: 14, ordem: 4, titulo: Canais para falar do assunto, tipo: PDF, duracaoMinutos: 20, concluido: true, concluidoEmUtc: '2026-09-15T14:05:00Z' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Falta a inscrição (opcional) ou o treinamento já encerrou.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                inscricao:
+                  summary: Opcional sem inscrição
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    codigo: INSCRICAO_PENDENTE
+                    detail: Inscreva-se no treinamento antes de começar.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                encerrado:
+                  summary: Treinamento encerrado pelo RH
+                  value:
+                    title: Treinamento encerrado.
+                    status: 422
+                    codigo: TREINAMENTO_ENCERRADO
+                    detail: O RH encerrou este treinamento. Fale com o RH se precisar dele.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/treinamentos/{treinamentoId}/certificado/download:
+    get:
+      tags: [Certificados]
+      operationId: baixarMeuCertificado
+      summary: Dá um link temporário para baixar o meu certificado em PDF ("Ver certificado").
+      description: |
+        Botão "Ver certificado" da tela 42. Devolve `LinkTemporario`; o PDF baixa como anexo e traz o código de validação
+        (`certificado.codigoValidacao`). 404 se a pessoa não concluiu, se o certificado é de outra pessoa ou se o treinamento
+        tem `emiteCertificado` falso. O PDF é gerado na conclusão; se a linha ainda estiver sem arquivo, este download o gera
+        na hora, uma vez (nunca cria outra linha de certificado).
+      x-provisorio: >-
+        Modelo visual do certificado e formato do número (roadmap, fatia 6). O front mostra `certificado.numero` como vier.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: 'https://arquivos.exemplo.com.br/download/5b8e2c91d7a04f36?assinatura=exemplo'
+                expiraEmUtc: '2026-10-07T12:57:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- GESTOR: equipe (tela 58 e aba da ficha, tela 52)
+  /api/gestor/treinamentos:
+    get:
+      tags: [Treinamentos]
+      operationId: listarTreinamentosDaEquipe
+      summary: Lista os treinamentos que valem para o meu setor, com o andamento da equipe.
+      description: |
+        Tela 58, lista da esquerda ("Treinamentos do setor"). Treinamentos **publicados** (agendados, em andamento e
+        encerrados; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)) que alcançam pelo menos uma pessoa do setor do gestor; rascunho não aparece. A equipe **não inclui o
+        próprio gestor** (o Figma mostra 8 pessoas, sem ele): o que é dele vem de `GET /api/eu/treinamentos`. Obrigatórios
+        primeiro, depois `comecaEm` (o mais antigo primeiro). Sem paginação (lista curta). Obrigatório: "`concluiram` de
+        `totalNaEquipe` concluíram" (equipe = pessoas com linha); opcional: "`inscritos` de `totalNaEquipe` inscritos" (equipe
+        = pessoas do setor que estão no público). **Sem prazo:** o "Até 31/10" do Figma não existe; o agendado mostra
+        "Começa em" com `comecaEm`.
+      x-perfis: [Gestor]
+      responses:
+        '200':
+          description: Treinamentos do setor.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoGestorLista' }
+              example:
+                itens:
+                  - { id: 2, titulo: LGPD na prática, obrigatorio: true, onboarding: false, situacao: EM_ANDAMENTO, comecaEm: '2026-08-01', totalNaEquipe: 8, concluiram: 6, inscritos: 8 }
+                  - { id: 3, titulo: Segurança da informação, obrigatorio: true, onboarding: false, situacao: EM_ANDAMENTO, comecaEm: '2026-09-15', totalNaEquipe: 8, concluiram: 3, inscritos: 8 }
+                  - { id: 4, titulo: Atendimento ao cliente, obrigatorio: false, onboarding: false, situacao: AGENDADO, comecaEm: '2026-11-03', totalNaEquipe: 8, concluiram: 0, inscritos: 0 }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/treinamentos/{treinamentoId}/equipe:
+    get:
+      tags: [Treinamentos]
+      operationId: listarPessoasDaEquipeNoTreinamento
+      summary: Mostra quem da minha equipe fez um treinamento.
+      description: |
+        Tela 58, painel da direita ("Quem fez"). Só pessoas do setor do gestor que **têm linha** no treinamento (não
+        inclui o gestor). Sem paginação. Ordem: nome. Não há nota nem certificado para o gestor; ele vê a situação e a data.
+        `concluiram` e `faltamConcluir` são os dois números do topo (`faltamConcluir` = com linha e ainda não concluíram).
+        Linha `INSCRITO` mostra só "Não iniciado" (o "faltam 24 dias" do Figma não existe: sem prazo); `EM_ANDAMENTO`
+        mostra "módulo `moduloAtual` de `totalModulos`"; `CONCLUIDO` mostra "em" e o dia de `concluidoEmUtc` (o front
+        converte para `America/Sao_Paulo`); `emFeriasAte` preenche o complemento "de férias até 17/10" (lido de `FERIAS`).
+        **Não há botão "Lembrar quem falta por e-mail"** (esta fatia não envia e-mail). Treinamento rascunho ou que não
+        alcança o setor: 404.
+      x-perfis: [Gestor]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoId' }
+      responses:
+        '200':
+          description: Pessoas da equipe neste treinamento.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoGestorEquipeResposta' }
+              example:
+                treinamento: { id: 2, titulo: LGPD na prática, obrigatorio: true, onboarding: false, situacao: EM_ANDAMENTO, comecaEm: '2026-08-01', totalNaEquipe: 8, concluiram: 6, inscritos: 8 }
+                concluiram: 6
+                faltamConcluir: 2
+                itens:
+                  - { funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }, situacao: INSCRITO, concluidoEmUtc: null, modulosConcluidos: 0, totalModulos: 4, moduloAtual: 1, emFeriasAte: null }
+                  - { funcionario: { id: 25, nome: Fernanda Lopes, cargo: Executiva de contas, setor: Comercial, ativo: true }, situacao: CONCLUIDO, concluidoEmUtc: '2026-08-28T14:20:00Z', modulosConcluidos: 4, totalModulos: 4, moduloAtual: null, emFeriasAte: null }
+                  - { funcionario: { id: 26, nome: Gustavo Reis, cargo: Vendedor, setor: Comercial, ativo: true }, situacao: CONCLUIDO, concluidoEmUtc: '2026-09-01T13:05:00Z', modulosConcluidos: 4, totalModulos: 4, moduloAtual: null, emFeriasAte: null }
+                  - { funcionario: { id: 27, nome: Helena Prates, cargo: Assistente comercial, setor: Comercial, ativo: true }, situacao: CONCLUIDO, concluidoEmUtc: '2026-09-10T17:40:00Z', modulosConcluidos: 4, totalModulos: 4, moduloAtual: null, emFeriasAte: null }
+                  - { funcionario: { id: 28, nome: Igor Batista, cargo: Estagiário, setor: Comercial, ativo: true }, situacao: EM_ANDAMENTO, concluidoEmUtc: null, modulosConcluidos: 2, totalModulos: 4, moduloAtual: 3, emFeriasAte: null }
+                  - { funcionario: { id: 22, nome: Júlia Nunes, cargo: Vendedora, setor: Comercial, ativo: true }, situacao: CONCLUIDO, concluidoEmUtc: '2026-08-20T15:10:00Z', modulosConcluidos: 4, totalModulos: 4, moduloAtual: null, emFeriasAte: null }
+                  - { funcionario: { id: 23, nome: Larissa Moura, cargo: Vendedora, setor: Comercial, ativo: true }, situacao: CONCLUIDO, concluidoEmUtc: '2026-08-25T12:30:00Z', modulosConcluidos: 4, totalModulos: 4, moduloAtual: null, emFeriasAte: '2026-10-17' }
+                  - { funcionario: { id: 24, nome: Pedro Santos, cargo: Vendedor, setor: Comercial, ativo: true }, situacao: CONCLUIDO, concluidoEmUtc: '2026-08-22T16:00:00Z', modulosConcluidos: 4, totalModulos: 4, moduloAtual: null, emFeriasAte: null }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/equipe/{funcionarioId}/treinamentos:
+    get:
+      tags: [Treinamentos]
+      operationId: listarTreinamentosDePessoaDaEquipe
+      summary: Mostra os treinamentos de uma pessoa da minha equipe, para a aba Treinamentos da ficha.
+      description: |
+        Tela 52, aba Treinamentos, e o indicador "Treinamentos pendentes" da aba Dados (`resumo.pendentes`: a pendência pela
+        definição única da tag Treinamentos, obrigatório `EM_ANDAMENTO` em que a pessoa está `INSCRITO` ou `EM_ANDAMENTO`;
+        opcional nunca é pendência; **é desta rota que a fatia 1 tira `treinamentosPendentes`**). Mesma lista de
+        `listarTreinamentosDeFuncionario` (mesma visibilidade e mesma ordem), **sem** certificado (o gestor não baixa
+        certificado) e sem data final. Pessoa de outro setor, ou o próprio gestor: 404.
+      x-perfis: [Gestor]
+      parameters:
+        - { $ref: '#/components/parameters/TreinamentoFuncionarioId' }
+      responses:
+        '200':
+          description: Treinamentos da pessoa (sem paginação; lista curta).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TreinamentoFichaGestorResposta' }
+              example:
+                resumo: { pendentes: 2, emAndamento: 0, concluidos: 1 }
+                itens:
+                  - { treinamentoId: 1, titulo: Onboarding 2026, obrigatorio: true, onboarding: true, situacao: CONCLUIDO, iniciadoEm: '2026-08-10', concluidoEmUtc: '2026-08-21T18:15:00Z', modulosConcluidos: 6, totalModulos: 6 }
+                  - { treinamentoId: 2, titulo: LGPD na prática, obrigatorio: true, onboarding: false, situacao: INSCRITO, iniciadoEm: null, concluidoEmUtc: null, modulosConcluidos: 0, totalModulos: 4 }
+                  - { treinamentoId: 3, titulo: Segurança da informação, obrigatorio: true, onboarding: false, situacao: INSCRITO, iniciadoEm: null, concluidoEmUtc: null, modulosConcluidos: 0, totalModulos: 5 }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- PÚBLICO: validar certificado
+  /api/publico/certificados/{codigoValidacao}:
+    get:
+      tags: [Certificados]
+      operationId: validarCertificado
+      summary: Confere um certificado pelo código, sem precisar de login.
+      description: |
+        Pública. O código (`CODIGO_VALIDACAO`) é um **UUID versão 4** (aleatório, não enumerável) **gerado pela aplicação** ao
+        criar o certificado, nunca o número sequencial do certificado. O trigger do banco cria a linha com `UUID()`, que é
+        **versão 1** e **quase sequencial** (a parte de tempo cresce a cada código emitido e o resto é igual no mesmo
+        servidor, então daria para adivinhar o vizinho de um código); por isso a aplicação **troca** esse código por um
+        versão 4 antes de ele aparecer em qualquer resposta ou PDF. **O contrato não promete "o UUID que o banco gerou"**: o
+        que vale é o código que a aplicação gravou. Além disso há o limite de consultas (10 por minuto por IP, 429), e a
+        resposta mostra só o mínimo: quem recebeu, o treinamento e a data.
+        Código que não existe, de treinamento com `emiteCertificado` falso ou de uma conclusão sem certificado: a mesma
+        resposta 404 ("Certificado não encontrado"). **Certificado emitido nunca é apagado**: o treinamento que o emitiu
+        não pode ser excluído (`excluirTreinamento`, 422 `TREINAMENTO_COM_CERTIFICADOS`; só se encerra), e encerrar não
+        afeta o certificado. Por isso o caso "certificado apagado" não existe aqui e um código válido continua válido.
+        Não existe tela para isso no Figma; sugere-se uma página pública simples com um campo de código e o resultado.
+      x-provisorio: >-
+        Modelo visual do certificado e formato do número (roadmap, fatia 6). O PDF deve trazer o código e o endereço da página de conferência; o texto exato é do back-end.
+      x-perfis: [Publico]
+      security: []
+      parameters:
+        - name: codigoValidacao
+          in: path
+          required: true
+          description: Código de validação impresso no certificado (UUID versão 4, gerado pela aplicação).
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Certificado válido.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CertificadoValidacaoResposta' }
+              example:
+                codigoValidacao: a7f3c1d2-5e9b-4c68-b2d1-8f04e6a93b57
+                titularNome: Bruno Lima
+                treinamentoTitulo: LGPD na prática
+                emitidoEm: '2026-09-15'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '404':
+          description: Certificado não encontrado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Certificado não encontrado.
+                status: 404
+                detail: Não encontramos um certificado com este código.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '429': { $ref: '#/components/responses/Erro429MuitasTentativas' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+components:
+  parameters:
+    TreinamentoId:
+      name: treinamentoId
+      in: path
+      required: true
+      schema: { type: integer }
+    TreinamentoModuloId:
+      name: moduloId
+      in: path
+      required: true
+      schema: { type: integer }
+    TreinamentoFuncionarioId:
+      name: funcionarioId
+      in: path
+      required: true
+      description: Id da pessoa.
+      schema: { type: integer }
+    TreinamentoConfirmar:
+      name: confirmar
+      in: query
+      description: |
+        Confirmação do RH (seção 13 das convenções). Sem ele (ou `false`), a operação só executa quando não há nada a
+        perder; havendo gente que ainda não concluiu, responde 409 `CONFIRMACAO_NECESSARIA`. Com `true`, executa.
+        Não contorna a exclusão de treinamento com certificado emitido (422 `TREINAMENTO_COM_CERTIFICADOS`, que vale com
+        ou sem este parâmetro).
+      schema: { type: boolean, default: false }
+
+  responses:
+    TreinamentoErro422ModulosTravados:
+      description: O treinamento já foi publicado e a lista de módulos não muda mais (acrescentar, reordenar ou excluir módulo); vale também para o encerrado.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          example:
+            title: Operação recusada.
+            status: 422
+            codigo: TREINAMENTO_MODULOS_TRAVADOS
+            detail: Este treinamento já foi publicado. Não dá mais para acrescentar, reordenar nem excluir módulos; só corrigir o conteúdo deles.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    TreinamentoErro422ModuloCampoTravado:
+      description: O treinamento já foi publicado e o tipo do módulo não muda mais (os outros campos do módulo ainda se corrigem).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          example:
+            title: Operação recusada.
+            status: 422
+            codigo: TREINAMENTO_CAMPO_TRAVADO
+            detail: Depois de publicado, o tipo do módulo não muda. Dá para corrigir o título, a duração e o conteúdo.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    TreinamentoErro422InscricaoPendente:
+      description: Treinamento opcional em que a pessoa ainda não se inscreveu.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          example:
+            title: Operação recusada.
+            status: 422
+            codigo: INSCRICAO_PENDENTE
+            detail: Inscreva-se no treinamento antes de começar.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    TreinamentoErro409ConfirmacaoEncerrar:
+      description: Há pessoas que ainda não concluíram; nada foi encerrado. Repita a chamada com `confirmar=true` para encerrar.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/TreinamentoProblemaConfirmacao' }
+          example:
+            title: Confirmação necessária.
+            status: 409
+            codigo: CONFIRMACAO_NECESSARIA
+            detail: 38 pessoas ainda não concluíram este treinamento. Confirme para encerrar.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            pendentes: 38
+            emAndamento: 21
+            naoIniciaram: 17
+    TreinamentoErro409ConfirmacaoExcluir:
+      description: O treinamento não emitiu certificado, mas há pessoas que ainda não concluíram; nada foi excluído. Repita a chamada com `confirmar=true` para excluir.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/TreinamentoProblemaConfirmacao' }
+          example:
+            title: Confirmação necessária.
+            status: 409
+            codigo: CONFIRMACAO_NECESSARIA
+            detail: 9 pessoas ainda não concluíram este treinamento. Confirme para excluir.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            pendentes: 9
+            emAndamento: 4
+            naoIniciaram: 5
+    TreinamentoErro422ComCertificados:
+      description: O treinamento já emitiu certificado e não pode ser excluído (só encerrado); nada foi excluído, com ou sem `confirmar=true`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/TreinamentoProblemaComCertificados' }
+          example:
+            title: Operação recusada.
+            status: 422
+            codigo: TREINAMENTO_COM_CERTIFICADOS
+            detail: Este treinamento já emitiu 63 certificados e não pode ser excluído. Encerre o treinamento para que ninguém novo entre.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            certificadosEmitidos: 63
+
+  schemas:
+    # ------------------------------------------------------------ enums
+    TreinamentoSituacao:
+      type: string
+      description: Situação do treinamento, calculada com a data de hoje (-03:00). `RASCUNHO` não está publicado; `AGENDADO` está publicado e `comecaEm` ainda não chegou; `EM_ANDAMENTO` está publicado, `comecaEm` já chegou e o RH não encerrou; `ENCERRADO` o RH encerrou (`encerradoEmUtc`; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`). Não há situação por data final (treinamento não tem prazo).
+      enum: [RASCUNHO, AGENDADO, EM_ANDAMENTO, ENCERRADO]
+    TreinamentoPublico:
+      type: string
+      description: Para quem vale o treinamento (`TREINAMENTOS.PUBLICO`, V029). Não existe "por cargo".
+      enum: [TODOS, SETORES, PESSOAS]
+    TreinamentoModuloTipo:
+      type: string
+      description: Tipo do módulo (V026). `Aula presencial` do Figma não existe.
+      enum: [VIDEO, TEXTO, LINK, PDF]
+    TreinamentoParticipanteSituacao:
+      type: string
+      description: Situação da pessoa num treinamento, igual a `STATUS_TREINAMENTO`. `INSCRITO` é "Não iniciado" no Figma. `REPROVADO` e `CANCELADO` existem no banco e a API não os usa.
+      enum: [INSCRITO, EM_ANDAMENTO, CONCLUIDO]
+    TreinamentoMinhaSituacao:
+      type: string
+      description: |
+        Situação para a pessoa logada. `DISPONIVEL`: opcional do público dela em que ainda não se inscreveu (botão "Quero me
+        inscrever"). `NAO_INICIADO`: tem linha `INSCRITO` ("Começar"). `EM_ANDAMENTO` ("Continuar"; vale também para quem
+        estava em andamento quando o RH encerrou o treinamento). `CONCLUIDO`. Não há valor "encerrado": o treinamento
+        encerrado some para quem não o começou (ver `encerrarTreinamento`).
+      enum: [DISPONIVEL, NAO_INICIADO, EM_ANDAMENTO, CONCLUIDO]
+    TreinamentoAbaMeus:
+      type: string
+      description: Abas da tela "Meus treinamentos". `TODOS` não inclui os concluídos.
+      enum: [TODOS, DISPONIVEIS, EM_ANDAMENTO, CONCLUIDOS]
+
+    # ------------------------------------------------------------ RH: criar e editar
+    TreinamentoComando:
+      type: object
+      description: |
+        Dados do treinamento (passos Detalhes, Avaliação e certificado e Publicação do assistente). Só `titulo` é
+        obrigatório para guardar como rascunho; para publicar, ver `publicarTreinamento`.
+      required: [titulo]
+      properties:
+        titulo: { type: string, minLength: 3, maxLength: 200 }
+        descricao: { type: [string, 'null'], maxLength: 2000, description: Texto ou markdown (nunca HTML). }
+        comecaEm: { type: [string, 'null'], format: date, description: 'Data em que o acesso é liberado ("Começa em"; `DATA_INICIO`). Data futura deixa o treinamento `AGENDADO` até lá. Não é prazo: treinamento não tem data final (o campo "Termina em" do Figma não existe).' }
+        obrigatorio:
+          type: boolean
+          default: false
+          description: Obrigatório. Quem não concluir aparece como pendente para o RH e para o gestor enquanto o treinamento está em andamento (o "até o fim" do texto do Figma não existe).
+        onboarding:
+          type: boolean
+          default: false
+          description: É o treinamento de onboarding (alvo da caixa "Incluir no treinamento" do cadastro).
+          x-provisorio: >-
+            Como o RH marca o treinamento de onboarding; o Figma não desenha esta caixa. Guardada em `TREINAMENTOS.TIPO_TREINAMENTO` (valor `ONBOARDING`), sem script novo.
+        emiteCertificado:
+          type: boolean
+          default: true
+          description: Caixa "Emitir certificado com código de validação ao concluir". Não muda depois de publicado.
+        publico:
+          oneOf:
+            - { $ref: '#/components/schemas/TreinamentoPublico' }
+            - { type: 'null' }
+          description: Para quem vale ("Quem deve fazer"). `null` enquanto o RH não escolheu (só em rascunho).
+        setorIds:
+          type: array
+          description: Só com `publico = SETORES`. Um ou mais setores.
+          items: { type: integer }
+          uniqueItems: true
+          maxItems: 100
+          default: []
+        funcionarioIds:
+          type: array
+          description: Só com `publico = PESSOAS`. As pessoas escolhidas.
+          items: { type: integer }
+          uniqueItems: true
+          maxItems: 500
+          default: []
+        incluiAdmitidos: { type: boolean, default: true, description: 'Caixa "Incluir quem for admitido depois" (o Figma diz "até o fim"; sem prazo, vale enquanto o treinamento não for encerrado). Só tem efeito em obrigatório.' }
+
+    TreinamentoSetorResumo:
+      type: object
+      required: [id, nome]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+
+    TreinamentoModuloRh:
+      type: object
+      description: Módulo, como o RH o vê (com o conteúdo, para editar).
+      required: [id, ordem, titulo, tipo, duracaoMinutos, urlExterna, conteudoTexto, nomeArquivo]
+      properties:
+        id: { type: integer }
+        ordem: { type: integer, minimum: 1, description: "Posição, a partir de 1, sem buracos." }
+        titulo: { type: string }
+        tipo: { $ref: '#/components/schemas/TreinamentoModuloTipo' }
+        duracaoMinutos: { type: [integer, 'null'], minimum: 1, description: 'Duração estimada ("15 minutos").' }
+        urlExterna: { type: [string, 'null'], description: Endereço do vídeo ou do link. }
+        conteudoTexto: { type: [string, 'null'], description: "Texto do módulo (texto ou markdown, nunca HTML)." }
+        nomeArquivo: { type: [string, 'null'], description: 'Nome que a pessoa deu ao PDF enviado, guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V044`); `null` em módulo sem arquivo (vídeo, texto e link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.' }
+
+    TreinamentoModulosRh:
+      type: object
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoModuloRh' }
+
+    TreinamentoModuloComando:
+      type: object
+      description: |
+        Corpo `multipart/form-data` de um módulo. O que cada `tipo` pede: `VIDEO` e `LINK` pedem `urlExterna`; `TEXTO`
+        pede `conteudoTexto`; `PDF` pede `arquivo` (PDF de até 10 MB). Campo de outro tipo é recusado com 400.
+      required: [titulo, tipo]
+      properties:
+        titulo: { type: string, minLength: 1, maxLength: 200 }
+        tipo: { $ref: '#/components/schemas/TreinamentoModuloTipo' }
+        duracaoMinutos: { type: [integer, 'null'], minimum: 1, maximum: 32767 }
+        urlExterna: { type: [string, 'null'], maxLength: 500, pattern: '^https?://', description: "Começa com http:// ou https://." }
+        conteudoTexto: { type: [string, 'null'], maxLength: 50000, description: Texto ou markdown (nunca HTML). }
+        arquivo: { type: string, format: binary, description: PDF de até 10 MB. }
+
+    TreinamentoModulosOrdemComando:
+      type: object
+      required: [moduloIds]
+      properties:
+        moduloIds:
+          type: array
+          description: Todos os ids dos módulos, na nova ordem.
+          items: { type: integer }
+          minItems: 1
+          uniqueItems: true
+
+    TreinamentoRh:
+      type: object
+      description: Treinamento completo, como o RH o vê.
+      required: [id, titulo, obrigatorio, onboarding, emiteCertificado, publicado, situacao, encerradoEmUtc, setores, pessoas, incluiAdmitidos, modulos]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        descricao: { type: [string, 'null'] }
+        comecaEm: { type: [string, 'null'], format: date }
+        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que o RH encerrou o treinamento (`encerrarTreinamento`); `null` enquanto não encerrado. Depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`).' }
+        obrigatorio: { type: boolean }
+        onboarding: { type: boolean }
+        emiteCertificado: { type: boolean }
+        publicado: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoSituacao' }
+        publico:
+          oneOf:
+            - { $ref: '#/components/schemas/TreinamentoPublico' }
+            - { type: 'null' }
+        setores:
+          type: array
+          description: Setores escolhidos (com `publico = SETORES`); senão, vazio.
+          items: { $ref: '#/components/schemas/TreinamentoSetorResumo' }
+        pessoas:
+          type: array
+          description: Pessoas escolhidas (com `publico = PESSOAS`); senão, vazio.
+          items: { $ref: '#/components/schemas/FuncionarioResumo' }
+        incluiAdmitidos: { type: boolean }
+        modulos:
+          type: array
+          description: Módulos em ordem.
+          items: { $ref: '#/components/schemas/TreinamentoModuloRh' }
+
+    # ------------------------------------------------------------ RH: lista, indicadores, quem fez
+    TreinamentoRhResumo:
+      type: object
+      description: Uma linha da lista de treinamentos (tela 22).
+      required: [id, titulo, obrigatorio, onboarding, emiteCertificado, situacao, comecaEm, encerradoEmUtc, publico, totalModulos, totalParticipantes, concluidos, certificadosEmitidos]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        obrigatorio: { type: boolean }
+        onboarding: { type: boolean }
+        emiteCertificado: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoSituacao' }
+        comecaEm: { type: [string, 'null'], format: date }
+        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Quando o RH encerrou; `null` enquanto não encerrado (coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`).' }
+        publico:
+          oneOf:
+            - { $ref: '#/components/schemas/TreinamentoPublico' }
+            - { type: 'null' }
+        totalModulos: { type: integer, minimum: 0 }
+        totalParticipantes: { type: integer, minimum: 0, description: Pessoas com linha no treinamento. }
+        concluidos: { type: integer, minimum: 0, description: Pessoas com `CONCLUIDO`. }
+        certificadosEmitidos: { type: integer, minimum: 0, description: 'Certificados já emitidos: igual a `concluidos` quando `emiteCertificado` é verdadeiro e **0** quando é falso (o trigger do banco cria a linha do certificado em toda conclusão, mas a API a trata como inexistente quando o treinamento não emite). Maior que zero: "Excluir" fica desabilitado no menu "..." ("Treinamento com certificado emitido só pode ser encerrado"), porque `excluirTreinamento` responderia 422 `TREINAMENTO_COM_CERTIFICADOS`.' }
+
+    TreinamentoRhContagens:
+      type: object
+      description: Número de cada aba da lista.
+      required: [todos, rascunhos, agendados, emAndamento, encerrados]
+      properties:
+        todos: { type: integer, minimum: 0 }
+        rascunhos: { type: integer, minimum: 0 }
+        agendados: { type: integer, minimum: 0 }
+        emAndamento: { type: integer, minimum: 0 }
+        encerrados: { type: integer, minimum: 0 }
+
+    TreinamentoRhLista:
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens, contagens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/TreinamentoRhResumo' }
+            contagens: { $ref: '#/components/schemas/TreinamentoRhContagens' }
+
+    TreinamentoRhIndicadores:
+      type: object
+      required: [emAndamento, obrigatorios, certificadosEmitidosNoAno, ano, pessoasComObrigatorioPendente]
+      properties:
+        emAndamento: { type: integer, minimum: 0 }
+        obrigatorios: { type: integer, minimum: 0 }
+        certificadosEmitidosNoAno: { type: integer, minimum: 0 }
+        ano: { type: integer, description: 'Ano de `certificadosEmitidosNoAno` (o "em 2026" do rótulo).' }
+        pessoasComObrigatorioPendente: { type: integer, minimum: 0, description: 'Pessoas distintas com pendência (definição única na tag Treinamentos). Sem prazo, o cartão não tem o "Prazos até".' }
+
+    TreinamentoPublicoContagem:
+      type: object
+      required: [total]
+      properties:
+        total: { type: integer, minimum: 0 }
+
+    TreinamentoParticipantesCabecalho:
+      type: object
+      description: O treinamento aberto em "Quem fez" (título e a linha "Obrigatório para todos, com certificado, desde 01/08"; o fim do período do Figma não existe).
+      required: [id, titulo, obrigatorio, onboarding, emiteCertificado, situacao, comecaEm, encerradoEmUtc, publico, totalModulos]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        obrigatorio: { type: boolean }
+        onboarding: { type: boolean }
+        emiteCertificado: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoSituacao' }
+        comecaEm: { type: [string, 'null'], format: date }
+        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Quando o RH encerrou; `null` enquanto não encerrado.' }
+        publico:
+          oneOf:
+            - { $ref: '#/components/schemas/TreinamentoPublico' }
+            - { type: 'null' }
+        totalModulos: { type: integer, minimum: 0 }
+
+    TreinamentoParticipantesContagens:
+      type: object
+      description: Os três números do topo de "Quem fez" e o total.
+      required: [total, concluidos, emAndamento, naoIniciados]
+      properties:
+        total: { type: integer, minimum: 0 }
+        concluidos: { type: integer, minimum: 0, description: '"Concluíram".' }
+        emAndamento: { type: integer, minimum: 0, description: '"Em andamento".' }
+        naoIniciados: { type: integer, minimum: 0, description: '"Não iniciaram" (`INSCRITO`).' }
+
+    TreinamentoParticipante:
+      type: object
+      description: Uma linha de "Quem fez" (RH).
+      required: [funcionario, situacao, iniciadoEm, concluidoEmUtc, modulosConcluidos, certificadoDisponivel]
+      properties:
+        funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+        situacao: { $ref: '#/components/schemas/TreinamentoParticipanteSituacao' }
+        iniciadoEm: { type: [string, 'null'], format: date, description: '`DATA_INICIO` da linha (o banco guarda só o dia).' }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que a pessoa concluiu (a hora em que concluiu o último módulo, `TREINAMENTOS_MODULOS_PROGRESSO.DATA_CONCLUSAO`). Conclusão anterior aos módulos (sem linha de progresso): o dia de `DATA_CONCLUSAO` à 00:00 no fuso -03:00. O front mostra só o dia, em `America/Sao_Paulo`.' }
+        modulosConcluidos: { type: integer, minimum: 0 }
+        certificadoDisponivel: { type: boolean, description: Verdadeiro só quando concluiu e o treinamento emite certificado (mostra "Baixar"). }
+
+    TreinamentoParticipantesLista:
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [treinamento, contagens, itens]
+          properties:
+            treinamento: { $ref: '#/components/schemas/TreinamentoParticipantesCabecalho' }
+            contagens: { $ref: '#/components/schemas/TreinamentoParticipantesContagens' }
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/TreinamentoParticipante' }
+
+    TreinamentoProblemaConfirmacao:
+      description: |
+        Corpo do 409 `CONFIRMACAO_NECESSARIA` ao encerrar ou excluir um treinamento (seção 13 das convenções). Nada foi
+        feito: o front mostra os números e, se o RH confirmar, repete a chamada com `confirmar=true`. A forma é a mesma
+        nas duas operações: ao excluir, o caso de certificado emitido **não** é 409, é o 422
+        `TREINAMENTO_COM_CERTIFICADOS` (`TreinamentoProblemaComCertificados`).
+      allOf:
+        - $ref: '#/components/schemas/ProblemaDeApi'
+        - type: object
+          required: [pendentes, emAndamento, naoIniciaram]
+          properties:
+            codigo: { type: string, enum: [CONFIRMACAO_NECESSARIA] }
+            pendentes: { type: integer, minimum: 0, description: 'Pessoas com linha `INSCRITO` ou `EM_ANDAMENTO` num treinamento já liberado (é `emAndamento` + `naoIniciaram`). Treinamento ainda agendado tem 0: ninguém o viu.' }
+            emAndamento: { type: integer, minimum: 0, description: 'Pessoas que já começaram e não terminaram. Ao encerrar, continuam e terminam; ao excluir, perdem o andamento.' }
+            naoIniciaram: { type: integer, minimum: 0, description: 'Pessoas inscritas que não começaram. Ao encerrar, deixam de poder começar; ao excluir, a linha some.' }
+
+    TreinamentoProblemaComCertificados:
+      description: |
+        Corpo do 422 `TREINAMENTO_COM_CERTIFICADOS` ao excluir um treinamento que já emitiu certificado (só se encerra).
+        Nada foi apagado e o `confirmar=true` não contorna.
+      allOf:
+        - $ref: '#/components/schemas/ProblemaDeRegraDeNegocio'
+        - type: object
+          required: [certificadosEmitidos]
+          properties:
+            codigo: { type: string, enum: [TREINAMENTO_COM_CERTIFICADOS] }
+            certificadosEmitidos: { type: integer, minimum: 1, description: 'Certificados já emitidos (conclusões num treinamento que emite certificado): o mesmo número de `certificadosEmitidos` da linha em `listarTreinamentos`.' }
+
+    # ------------------------------------------------------------ RH: ficha, onboarding
+    TreinamentoFichaResumo:
+      type: object
+      required: [pendentes, emAndamento, concluidos]
+      properties:
+        pendentes: { type: integer, minimum: 0, description: "Pendências pela definição única da tag Treinamentos: obrigatório `EM_ANDAMENTO` em que a pessoa está `INSCRITO` ou `EM_ANDAMENTO`. Treinamento não tem prazo." }
+        emAndamento: { type: integer, minimum: 0 }
+        concluidos: { type: integer, minimum: 0 }
+
+    TreinamentoFichaRhItem:
+      type: object
+      description: Um treinamento na aba da ficha, para o RH.
+      required: [treinamentoId, titulo, obrigatorio, onboarding, situacao, iniciadoEm, concluidoEmUtc, modulosConcluidos, totalModulos, certificadoDisponivel]
+      properties:
+        treinamentoId: { type: integer }
+        titulo: { type: string }
+        obrigatorio: { type: boolean }
+        onboarding: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoParticipanteSituacao' }
+        iniciadoEm: { type: [string, 'null'], format: date }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que a pessoa concluiu (mesma regra de `TreinamentoParticipante.concluidoEmUtc`).' }
+        modulosConcluidos: { type: integer, minimum: 0 }
+        totalModulos: { type: integer, minimum: 0 }
+        certificadoDisponivel: { type: boolean }
+
+    TreinamentoFichaRhResposta:
+      type: object
+      required: [resumo, itens]
+      properties:
+        resumo: { $ref: '#/components/schemas/TreinamentoFichaResumo' }
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoFichaRhItem' }
+
+    TreinamentoOnboardingItem:
+      type: object
+      required: [id, titulo, comecaEm]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        comecaEm: { type: [string, 'null'], format: date }
+
+    TreinamentoOnboardingLista:
+      type: object
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoOnboardingItem' }
+
+    TreinamentoOnboardingInclusaoItem:
+      type: object
+      required: [treinamentoId, titulo, jaEstavaIncluida]
+      properties:
+        treinamentoId: { type: integer }
+        titulo: { type: string }
+        jaEstavaIncluida: { type: boolean }
+
+    TreinamentoOnboardingInclusaoResposta:
+      type: object
+      required: [funcionarioId, treinamentos]
+      properties:
+        funcionarioId: { type: integer }
+        treinamentos:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoOnboardingInclusaoItem' }
+
+    # ------------------------------------------------------------ EU: cartões, módulos, certificado
+    CertificadoResumo:
+      type: object
+      description: O certificado da pessoa neste treinamento (só existe quando concluiu e o treinamento emite certificado).
+      required: [numero, codigoValidacao, emitidoEm]
+      properties:
+        numero:
+          type: string
+          description: >-
+            Número amigável mostrado na tela e no PDF: `CERT-{ano de emissão}-{id do certificado com 5 dígitos}`, calculado sem coluna nova.
+            Decisão do dono (2026-11-02): fica este formato, sem sigla por treinamento (o Figma mostra `LGPD-2026-00482`, que exigiria uma sigla que o banco não guarda).
+        codigoValidacao: { type: string, format: uuid, description: 'UUID versão 4 gerado pela aplicação ao criar o certificado (`CODIGO_VALIDACAO`); é o que a conferência pública aceita. Não é o UUID versão 1 que o trigger do banco gera: a aplicação o troca (ver `validarCertificado`).' }
+        emitidoEm: { type: string, format: date, description: '`DATA_EMISSAO`.' }
+
+    TreinamentoMeuCartao:
+      type: object
+      description: Cartão de "Meus treinamentos".
+      required: [id, titulo, descricao, obrigatorio, onboarding, situacao, encerrado, comecaEm, totalModulos, duracaoTotalMinutos, modulosConcluidos, progressoPercentual, moduloAtual, iniciadoEm, concluidoEmUtc, certificado]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        descricao: { type: [string, 'null'] }
+        obrigatorio: { type: boolean, description: O selo é "Obrigatório" ou "Opcional"; com `onboarding` verdadeiro o selo é "Onboarding". }
+        onboarding: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoMinhaSituacao' }
+        encerrado: { type: boolean, description: 'Verdadeiro quando o RH encerrou o treinamento (`encerrarTreinamento`). Só vem verdadeiro em cartão `EM_ANDAMENTO` (a pessoa continua e termina) ou `CONCLUIDO`. O front pode avisar "Encerrado pelo RH; você ainda pode terminar". A pendência e a faixa "Sua parte" ignoram cartão encerrado.' }
+        comecaEm: { type: [string, 'null'], format: date, description: 'Dia em que o acesso foi liberado. Não é prazo: o cartão não tem "Até 15/11" nem "De 20/10 a 20/11".' }
+        totalModulos: { type: integer, minimum: 0, description: '"5 módulos" (o Figma às vezes diz "aulas": use "módulos").' }
+        duracaoTotalMinutos: { type: [integer, 'null'], minimum: 0, description: 'Soma das durações dos módulos que têm duração ("1h40"); `null` se nenhum tem.' }
+        modulosConcluidos: { type: integer, minimum: 0 }
+        progressoPercentual: { type: integer, minimum: 0, maximum: 100, description: '`modulosConcluidos` / `totalModulos`, arredondado para baixo.' }
+        moduloAtual: { type: [integer, 'null'], minimum: 1, description: '`ordem` do primeiro módulo ainda não concluído; `null` quando todos foram.' }
+        iniciadoEm: { type: [string, 'null'], format: date }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que a pessoa concluiu o treinamento (mesma regra de `TreinamentoParticipante.concluidoEmUtc`); `null` se não concluiu. O front mostra só o dia.' }
+        certificado:
+          oneOf:
+            - { $ref: '#/components/schemas/CertificadoResumo' }
+            - { type: 'null' }
+
+    TreinamentoMeusContagens:
+      type: object
+      description: Número de cada aba de "Meus treinamentos".
+      required: [todos, disponiveis, emAndamento, concluidos]
+      properties:
+        todos: { type: integer, minimum: 0, description: Tudo que ainda não foi concluído. }
+        disponiveis: { type: integer, minimum: 0 }
+        emAndamento: { type: integer, minimum: 0 }
+        concluidos: { type: integer, minimum: 0 }
+
+    TreinamentoMeuLista:
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens, contagens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/TreinamentoMeuCartao' }
+            contagens: { $ref: '#/components/schemas/TreinamentoMeusContagens' }
+
+    TreinamentoModuloEu:
+      type: object
+      description: Um módulo na lista da tela de execução (sem o conteúdo).
+      required: [id, ordem, titulo, tipo, duracaoMinutos, concluido, concluidoEmUtc]
+      properties:
+        id: { type: integer }
+        ordem: { type: integer, minimum: 1 }
+        titulo: { type: string }
+        tipo: { $ref: '#/components/schemas/TreinamentoModuloTipo' }
+        duracaoMinutos: { type: [integer, 'null'], minimum: 1 }
+        concluido: { type: boolean }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: '`DATA_CONCLUSAO` do progresso do módulo (instante; o banco guarda em -03:00 e a API converte para UTC).' }
+
+    TreinamentoMeuDetalhe:
+      allOf:
+        - $ref: '#/components/schemas/TreinamentoMeuCartao'
+        - type: object
+          required: [modulos]
+          properties:
+            modulos:
+              type: array
+              items: { $ref: '#/components/schemas/TreinamentoModuloEu' }
+
+    TreinamentoModuloConteudo:
+      type: object
+      description: O módulo aberto na tela de execução.
+      required: [id, ordem, titulo, tipo, duracaoMinutos, conteudoTexto, urlExterna, temArquivo, concluido, concluidoEmUtc]
+      properties:
+        id: { type: integer }
+        ordem: { type: integer, minimum: 1 }
+        titulo: { type: string }
+        tipo: { $ref: '#/components/schemas/TreinamentoModuloTipo' }
+        duracaoMinutos: { type: [integer, 'null'], minimum: 1 }
+        conteudoTexto: { type: [string, 'null'], description: "Só em `TEXTO` (texto ou markdown, nunca HTML)." }
+        urlExterna: { type: [string, 'null'], description: Só em `VIDEO` e `LINK`; abre em nova aba. }
+        temArquivo: { type: boolean, description: Verdadeiro em `PDF`; o arquivo vem por `baixarArquivoDeModulo`. }
+        concluido: { type: boolean }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que a pessoa concluiu este módulo; `null` se ainda não concluiu.' }
+
+    TreinamentoModuloConclusaoResposta:
+      type: object
+      required: [moduloId, treinamentoConcluido, treinamento]
+      properties:
+        moduloId: { type: integer }
+        treinamentoConcluido: { type: boolean, description: Verdadeiro quando este módulo era o último que faltava e o treinamento passou a `CONCLUIDO`. }
+        treinamento: { $ref: '#/components/schemas/TreinamentoMeuDetalhe' }
+
+    # ------------------------------------------------------------ GESTOR
+    TreinamentoGestorResumo:
+      type: object
+      description: Um treinamento na lista da equipe (tela 58).
+      required: [id, titulo, obrigatorio, onboarding, situacao, comecaEm, totalNaEquipe, concluiram, inscritos]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        obrigatorio: { type: boolean }
+        onboarding: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoSituacao' }
+        comecaEm: { type: [string, 'null'], format: date, description: 'Dia da liberação ("Começa em 03/11" no agendado). Não há data final.' }
+        totalNaEquipe: { type: integer, minimum: 0, description: 'Obrigatório: pessoas da equipe com linha. Opcional: pessoas do setor que estão no público.' }
+        concluiram: { type: integer, minimum: 0 }
+        inscritos: { type: integer, minimum: 0, description: Pessoas da equipe com linha (em obrigatório é igual a `totalNaEquipe`). }
+
+    TreinamentoGestorLista:
+      type: object
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoGestorResumo' }
+
+    TreinamentoGestorPessoa:
+      type: object
+      description: Uma pessoa da equipe em "Quem fez" (sem nota e sem certificado).
+      required: [funcionario, situacao, concluidoEmUtc, modulosConcluidos, totalModulos, moduloAtual, emFeriasAte]
+      properties:
+        funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+        situacao: { $ref: '#/components/schemas/TreinamentoParticipanteSituacao' }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que a pessoa concluiu (mesma regra de `TreinamentoParticipante.concluidoEmUtc`); o front mostra "em 20/08".' }
+        modulosConcluidos: { type: integer, minimum: 0 }
+        totalModulos: { type: integer, minimum: 0 }
+        moduloAtual: { type: [integer, 'null'], minimum: 1, description: '`ordem` do primeiro módulo ainda não concluído; `null` quando concluiu.' }
+        emFeriasAte: { type: [string, 'null'], format: date, description: "Último dia das férias, se a pessoa está de férias hoje (lido de `FERIAS`)." }
+
+    TreinamentoGestorEquipeResposta:
+      type: object
+      required: [treinamento, concluiram, faltamConcluir, itens]
+      properties:
+        treinamento: { $ref: '#/components/schemas/TreinamentoGestorResumo' }
+        concluiram: { type: integer, minimum: 0 }
+        faltamConcluir: { type: integer, minimum: 0 }
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoGestorPessoa' }
+
+    TreinamentoFichaGestorItem:
+      type: object
+      description: Um treinamento na aba da ficha, para o gestor (sem certificado).
+      required: [treinamentoId, titulo, obrigatorio, onboarding, situacao, iniciadoEm, concluidoEmUtc, modulosConcluidos, totalModulos]
+      properties:
+        treinamentoId: { type: integer }
+        titulo: { type: string }
+        obrigatorio: { type: boolean }
+        onboarding: { type: boolean }
+        situacao: { $ref: '#/components/schemas/TreinamentoParticipanteSituacao' }
+        iniciadoEm: { type: [string, 'null'], format: date }
+        concluidoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que a pessoa concluiu (mesma regra de `TreinamentoParticipante.concluidoEmUtc`).' }
+        modulosConcluidos: { type: integer, minimum: 0 }
+        totalModulos: { type: integer, minimum: 0 }
+
+    TreinamentoFichaGestorResposta:
+      type: object
+      required: [resumo, itens]
+      properties:
+        resumo: { $ref: '#/components/schemas/TreinamentoFichaResumo' }
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/TreinamentoFichaGestorItem' }
+
+    # ------------------------------------------------------------ PÚBLICO
+    CertificadoValidacaoResposta:
+      type: object
+      description: O mínimo que a conferência pública mostra.
+      required: [codigoValidacao, titularNome, treinamentoTitulo, emitidoEm]
+      properties:
+        codigoValidacao: { type: string, format: uuid }
+        titularNome: { type: string, description: Nome de quem concluiu. }
+        treinamentoTitulo: { type: string }
+        emitidoEm: { type: string, format: date }

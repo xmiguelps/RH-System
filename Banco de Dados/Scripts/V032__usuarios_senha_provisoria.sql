@@ -1,0 +1,55 @@
+-- ============================================================
+-- V032 - Usuarios: marca de senha provisoria (convite ainda nao aceito)
+-- Fatia 1 (contrato: UsuarioSistemaSituacao e FuncionarioAcesso)
+-- ============================================================
+-- POR QUE
+--   Em "Usuarios do sistema" cada login tem uma situacao: SEM_CONVITE,
+--   CONVITE_ENVIADO, CONVITE_EXPIRADO ou SENHA_DEFINIDA. E o convite
+--   so se reenvia a quem NUNCA definiu a senha (readmissao e convite).
+--   O trigger TRG_USUARIOS_BEFORE_INSERT exige SENHA com pelo menos 40
+--   caracteres, entao o login criado no convite nasce com um hash
+--   provisorio aleatorio e inutilizavel (decisao do roadmap, fatia 1).
+--   Nada no banco diz se o hash que esta em USUARIOS.SENHA e esse
+--   provisorio ou uma senha de verdade.
+--
+-- DUAS HIPOTESES QUE O RESULTADO ADMITE (por isso a coluna)
+--   a) Deduzir "senha definida" dos tokens de V033: existe token usado.
+--      Falha com o administrador do seed (login com senha de verdade e
+--      nenhum token) e com a limpeza de tokens antigos (apagar um convite
+--      vencido faria a pessoa parecer "senha definida").
+--   b) Uma coluna explicita. E o que este script faz.
+--
+-- O QUE ESTE SCRIPT FAZ
+--   Acrescenta USUARIOS.SENHA_PROVISORIA, BOOLEAN NOT NULL, padrao FALSO.
+--   - VERDADEIRO: o login foi criado por um convite que ainda nao foi
+--     aceito, e SENHA guarda o hash provisorio que nunca confere com
+--     nenhuma senha digitada.
+--   - FALSO: SENHA e uma senha escolhida pela pessoa.
+--
+-- POR QUE O PADRAO E FALSO
+--   Quem ja existe (o administrador do seed da fatia 0, criado com senha
+--   de verdade) fica certo sem nenhum UPDATE e sem a fatia 0 precisar
+--   saber desta coluna. Quem cria o login por convite grava VERDADEIRO
+--   de proposito. O padrao e igual ao valor que a aplicacao grava nos
+--   casos comuns, entao o EF Core nao tem como omitir um valor "errado".
+--
+-- COMO A SITUACAO SE CALCULA (nada disto e gravado)
+--   - sem linha em USUARIOS ............ SEM_CONVITE
+--   - SENHA_PROVISORIA = FALSO .......... SENHA_DEFINIDA
+--   - SENHA_PROVISORIA = VERDADEIRO e existe token de CONVITE em aberto
+--     e ainda nao vencido (V033) ........ CONVITE_ENVIADO
+--   - SENHA_PROVISORIA = VERDADEIRO sem token em aberto valido .... CONVITE_EXPIRADO
+--
+-- REGRAS QUE FICAM COM A APLICACAO
+--   - Gravar VERDADEIRO ao criar o login por convite e FALSO ao aceitar o
+--     convite (definir a senha). A redefinicao ("esqueci minha senha") de
+--     quem ja tem senha nao mexe na marca.
+--   - Login com SENHA_PROVISORIA = VERDADEIRO nunca entra, mesmo que o hash
+--     "confira" (nao confere, mas a aplicacao nao deve nem tentar).
+--
+-- FUSO: nao ha coluna de data neste script.
+-- NENHUM TRIGGER E ALTERADO POR ESTE SCRIPT.
+-- ============================================================
+
+ALTER TABLE USUARIOS
+    ADD COLUMN SENHA_PROVISORIA BOOLEAN NOT NULL DEFAULT FALSE;

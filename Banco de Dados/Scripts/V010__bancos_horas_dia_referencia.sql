@@ -1,0 +1,44 @@
+-- ============================================================
+-- V010 - Dia de referencia em BANCOS_HORAS
+-- Item 7 de docs/pedidos-para-o-kauan.md
+-- ============================================================
+-- POR QUE
+--   O dono decidiu (2026-10-28) que o banco de horas e SO
+--   AUTOMATICO: um servico da aplicacao consolida o dia e grava o
+--   lancamento (o botao de lancamento manual do Figma fica
+--   escondido). Esse servico precisa:
+--   a) nunca lancar o mesmo dia duas vezes para a mesma pessoa
+--      (se rodar duas vezes, ou depois de ficar parado),
+--   b) recalcular um dia depois que um ajuste de ponto e aprovado.
+--   Hoje so existe DATA_LANCAMENTO, que e a data em que o lancamento
+--   foi GRAVADO (o trigger preenche com CURDATE() e recusa data
+--   futura). Isso nao diz a QUAL DIA o lancamento se refere: se a
+--   consolidacao rodar com 3 dias de atraso, os 3 dias teriam a mesma
+--   DATA_LANCAMENTO.
+--
+-- O QUE ESTE SCRIPT FAZ
+--   Acrescenta DIA_REFERENCIA (o dia trabalhado a que o lancamento se
+--   refere) e a chave unica (ID_FUNCIONARIO, DIA_REFERENCIA): uma
+--   linha por pessoa e por dia. Recalcular um dia = atualizar essa
+--   linha (BANCOS_HORAS so tem trigger de INSERT, entao o UPDATE nao
+--   e bloqueado).
+--
+-- DECISOES QUE VOCE PODE REVER
+--   1) DIA_REFERENCIA aceita NULL. Linhas antigas (de teste) nao tem
+--      dia de referencia, e NOT NULL faria este script falhar se
+--      houvesse dados. A aplicacao sempre preenche. A chave unica
+--      nao protege linhas com NULL (MySQL aceita varios NULL numa
+--      chave unica), mas, como o lancamento e so automatico, nao
+--      deve haver linha sem o dia.
+--   2) NAO ha coluna de "origem" (automatico/manual): so ha
+--      lancamento automatico.
+--   3) QUANTIDADE continua >= 0 e o sinal vem de TIPO_LANCAMENTO
+--      (CREDITO/DEBITO), como o grupo ja definiu. Gravar ou nao uma
+--      linha zerada num dia sem saldo e escolha da consolidacao.
+--
+-- NENHUM TRIGGER E ALTERADO POR ESTE SCRIPT.
+-- ============================================================
+
+ALTER TABLE BANCOS_HORAS
+    ADD COLUMN DIA_REFERENCIA DATE NULL,
+    ADD CONSTRAINT UQ_BANCOS_HORAS_FUNCIONARIO_DIA UNIQUE (ID_FUNCIONARIO, DIA_REFERENCIA);

@@ -1,0 +1,43 @@
+-- ============================================================
+-- V045 - Formularios: lembrete automatico ligado ou desligado
+-- Fatia 5 (formularios). Item declarado no contrato.
+-- ============================================================
+-- POR QUE
+--   A etapa Publicacao tem a caixa "Lembrar quem nao respondeu 7 dias antes do
+--   prazo", ligada por padrao (decisao do dono, 2026-10-30). Ligada, o agendador
+--   manda um e-mail de lembrete 7 dias antes de DATA_PRAZO, so a quem ainda nao
+--   respondeu (contrato/fontes/50-fatia-5-formularios.yaml,
+--   FormularioPublicacaoComando.lembreteAutomatico). O contrato diz que a caixa
+--   e uma coluna nova em FORMULARIOS, e que o estado "lembrete enviado hoje" mora
+--   na tabela de tarefas agendadas da aplicacao, nunca no formulario.
+--
+-- O QUE ESTE SCRIPT FAZ
+--   Acrescenta LEMBRETE_AUTOMATICO em FORMULARIOS.
+--
+-- POR QUE O PADRAO NO BANCO E FALSE (e o contrato diz "ligada por padrao")
+--   O padrao ligado e da API: ao criar o formulario ela grava VERDADEIRO. No
+--   banco o padrao e FALSE porque so ele e seguro com o EF Core. Se o padrao do
+--   banco fosse VERDADEIRO e o RH desligasse a caixa, o EF poderia omitir o valor
+--   FALSE e o banco gravar VERDADEIRO sem erro (roadmap, decisao 12 (a)): o lembrete
+--   sairia mesmo desligado, e o e-mail e o efeito que nao se desfaz. Com FALSE,
+--   omitir ou gravar FALSE da o mesmo resultado. O pior caso passa a ser um
+--   lembrete que nao sai, que e visivel e inofensivo. Os formularios que ja
+--   existiam ficam sem lembrete automatico (nao havia nenhum).
+--
+-- POR QUE NAO HA CHECK AMARRANDO A COLUNA AO PRAZO OU AO PUBLICO
+--   O contrato guarda a caixa mesmo quando ela nao tem efeito (sem prazo, ou
+--   formulario por link, onde nao ha a quem lembrar) e a tela a esconde. Um
+--   CHECK recusaria a gravacao de um rascunho que a tela ainda vai completar.
+--
+-- O QUE FICA COM A APLICACAO
+--   - So agir com prazo e com PUBLICO igual a SETORES ou PESSOAS.
+--   - Formulario anonimo: o lembrete vai so a quem ainda nao participou e NUNCA
+--     guarda o destinatario nem devolve numero (contrato, regra 6 de
+--     "Formularios"). Isto e regra da fila de e-mails, nao desta coluna.
+--
+-- FUSO: nao ha coluna de data neste script.
+-- NENHUM TRIGGER E ALTERADO POR ESTE SCRIPT.
+-- ============================================================
+
+ALTER TABLE FORMULARIOS
+    ADD COLUMN LEMBRETE_AUTOMATICO BOOLEAN NOT NULL DEFAULT FALSE;

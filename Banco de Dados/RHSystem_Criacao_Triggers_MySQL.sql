@@ -367,8 +367,65 @@ BEGIN
 END$$
 
 -- ============================================================
--- PONTOS: valida datas e calcula horas trabalhadas
--- Jornadas que atravessam a meia-noite não são suportadas.
+-- PONTOS: valida datas e copia a carga horaria diaria do cargo
+-- ============================================================
+--
+-- ALTERADO em 2026-10-29, a pedido do dono, PARA O KAUAN CONFERIR
+-- (itens 1 e 2 de docs/pedidos-para-o-kauan.md). Os dois triggers
+-- abaixo (INSERT e UPDATE) receberam as MESMAS duas mudancas.
+-- Para ver so o que mudou neste arquivo: git diff.
+--
+-- MUDANCA 1: removido o bloco que usava NEW.HORA_ENTRADA e
+-- NEW.HORA_SAIDA.
+--   POR QUE: essas colunas sairam de PONTOS no commit e3eb1be. As
+--   batidas agora ficam em PONTOS_MARCACOES, com data e hora
+--   completas. O MySQL confere os nomes de coluna quando o trigger
+--   e criado, entao o CREATE TRIGGER falhava com o erro Unknown
+--   column HORA_ENTRADA in NEW (testado no MySQL 8.4.13) e este
+--   script parava aqui: criava so 13 dos 36 triggers do arquivo.
+--   O QUE O BLOCO FAZIA: (a) recusava saida menor ou igual a
+--   entrada e (b) preenchia PONTOS.HORAS_TRABALHADAS.
+--   O QUE ACONTECE AGORA COM (a): a ordem entrada e saida deixa de
+--   ser conferida por trigger. Quem confere sao as funcoes:
+--   FN_VERIFICAR_CONSISTENCIA_PONTO marca o dia como inconsistente
+--   e FN_CALCULAR_HORAS_PONTO devolve NULL nesse caso. Como a
+--   marcacao tem data e hora, a restricao de virada do dia deste
+--   trigger tambem deixa de existir.
+--   O QUE ACONTECE AGORA COM (b): o trigger NAO preenche mais
+--   PONTOS.HORAS_TRABALHADAS. A coluna e o CHECK de 0 a 24
+--   continuam, mas o valor so existe se a aplicacao gravar. As
+--   horas do dia saem de FN_CALCULAR_HORAS_PONTO. Nenhum script SQL
+--   da pasta Banco de Dados le essa coluna (conferido por busca).
+--   PARA VOCE DECIDIR: se quiser a coluna sempre preenchida, o
+--   caminho seria um trigger nas marcacoes. Nao fiz isso aqui.
+--
+-- MUDANCA 2: a carga horaria copiada do cargo agora e dividida por 5.
+--   POR QUE: CARGOS.CARGA_HORARIA passou a ser SEMANAL (por exemplo
+--   44) e PONTOS.CARGA_HORARIA e POR DIA. Antes o trigger copiava o
+--   valor sem dividir, e o ponto ficava com 44 horas de carga do dia.
+--   COMO: ROUND(v_carga / 5, 2). Exemplo: 44 / 5 = 8.80. Se o cargo
+--   nao tem carga (NULL), o resultado continua NULL.
+--   O 5 SIGNIFICA cinco dias de trabalho por semana (segunda a
+--   sexta). PARA VOCE DECIDIR: se algum cargo trabalhar seis dias, o
+--   5 nao serve e a carga do dia teria que vir de outro lugar.
+--   A copia so acontece quando NEW.CARGA_HORARIA vem NULL (como ja
+--   era). Se a aplicacao informar a carga do dia, o trigger respeita.
+--   LINHAS ANTIGAS: este trigger nao corrige pontos ja gravados com
+--   a carga semanal. Se existirem, precisam de um UPDATE a parte.
+--
+-- O QUE NAO MUDOU: recusar ponto de funcionario inativo, ponto
+-- antes da admissao e ponto depois do desligamento.
+--
+-- COMO CONFERIR (banco de teste):
+--   1) o script inteiro de triggers aplica ate o fim, sem erro
+--   2) cargo com CARGA_HORARIA 44 e um funcionario nele: INSERT em
+--      PONTOS sem informar CARGA_HORARIA grava 8.80
+--   3) INSERT em PONTOS com data antes da admissao: recusa
+--   4) INSERT em PONTOS informando CARGA_HORARIA 6: fica 6
+--
+-- Se voce ja tem a sua propria correcao destes triggers, compare:
+-- o resultado esperado e o mesmo (sem NEW.HORA_ENTRADA e
+-- NEW.HORA_SAIDA, e a carga do cargo dividida por 5).
 -- ============================================================
 
 CREATE TRIGGER TRG_PONTOS_BEFORE_INSERT
@@ -401,19 +458,12 @@ BEGIN
             SET MESSAGE_TEXT = 'A data do ponto e posterior ao desligamento.';
     END IF;
 
-    IF NEW.HORA_ENTRADA IS NOT NULL AND NEW.HORA_SAIDA IS NOT NULL THEN
-        IF NEW.HORA_SAIDA <= NEW.HORA_ENTRADA THEN
-            SIGNAL SQLSTATE '45000'
-                SET MESSAGE_TEXT = 'A saida deve ser posterior a entrada; virada do dia nao suportada.';
-        END IF;
-        SET NEW.HORAS_TRABALHADAS =
-            ROUND(TIME_TO_SEC(TIMEDIFF(NEW.HORA_SAIDA, NEW.HORA_ENTRADA)) / 3600, 2);
-    ELSE
-        SET NEW.HORAS_TRABALHADAS = NULL;
-    END IF;
+    -- Removido em 2026-10-29: o bloco de HORA_ENTRADA e HORA_SAIDA
+    -- (colunas que nao existem mais em PONTOS). Ver cabecalho da secao.
 
+    -- Carga do dia = carga semanal do cargo dividida por 5 dias.
     IF NEW.CARGA_HORARIA IS NULL THEN
-        SET NEW.CARGA_HORARIA = v_carga;
+        SET NEW.CARGA_HORARIA = ROUND(v_carga / 5, 2);
     END IF;
 END$$
 
@@ -447,19 +497,12 @@ BEGIN
             SET MESSAGE_TEXT = 'A data do ponto e posterior ao desligamento.';
     END IF;
 
-    IF NEW.HORA_ENTRADA IS NOT NULL AND NEW.HORA_SAIDA IS NOT NULL THEN
-        IF NEW.HORA_SAIDA <= NEW.HORA_ENTRADA THEN
-            SIGNAL SQLSTATE '45000'
-                SET MESSAGE_TEXT = 'A saida deve ser posterior a entrada; virada do dia nao suportada.';
-        END IF;
-        SET NEW.HORAS_TRABALHADAS =
-            ROUND(TIME_TO_SEC(TIMEDIFF(NEW.HORA_SAIDA, NEW.HORA_ENTRADA)) / 3600, 2);
-    ELSE
-        SET NEW.HORAS_TRABALHADAS = NULL;
-    END IF;
+    -- Removido em 2026-10-29: o bloco de HORA_ENTRADA e HORA_SAIDA
+    -- (colunas que nao existem mais em PONTOS). Ver cabecalho da secao.
 
+    -- Carga do dia = carga semanal do cargo dividida por 5 dias.
     IF NEW.CARGA_HORARIA IS NULL THEN
-        SET NEW.CARGA_HORARIA = v_carga;
+        SET NEW.CARGA_HORARIA = ROUND(v_carga / 5, 2);
     END IF;
 END$$
 
