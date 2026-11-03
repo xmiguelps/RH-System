@@ -127,11 +127,11 @@ paths:
         Grava o colaborador, os dados pessoais (CPF e telefone), os benefícios escolhidos e, com
         `enviarConvite = true`, cria o login e coloca o e-mail de convite na fila (ver "Senha e convite").
         Tudo na mesma transação. **Ninguém recebe senha:** o login nasce sem senha utilizável.
-        O convite depende das **tabelas novas da aplicação** de convite (`V033`, com a marca de senha provisória `V032`) e de
-        fila de e-mails (`V035`).
+        O convite depende das **tabelas novas da aplicação** de convite (`V001`, com a marca de senha provisória `V001`) e de
+        fila de e-mails (`V001`).
 
         **Regras**
-        - A **matrícula** é **gerada pelo sistema** (contador `SEQUENCIAS`, script `V030`) e é somente leitura (não vem no corpo).
+        - A **matrícula** é **gerada pelo sistema** (contador `SEQUENCIAS`, script `V001`) e é somente leitura (não vem no corpo).
         - O **gestor** é o gestor do setor escolhido (a tela mostra o nome, que vem de `GET /api/rh/setores`).
           Setor sem gestor deixa o colaborador sem gestor (os pedidos de ponto e de férias dele vão direto ao RH,
           `CONVENCOES.md`, seção 9).
@@ -515,7 +515,7 @@ paths:
         (a partir da fatia 3, depois de o banco de horas daquele dia fechar; se esse momento já passou, grava na
         hora). Resposta: a ficha com `desligamento.situacao = AGENDADO` ou, se já foi gravado, `EFETIVADO`.
         O desligamento agendado e a tarefa que o efetiva no dia seguinte são **tabelas novas da aplicação** (desligamento
-        agendado, script `V034`; tarefas agendadas, script `V036`).
+        agendado, script `V001`; tarefas agendadas, script `V001`).
 
         Ao efetivar, o banco faz sozinho o que o grupo definiu: desativa o login, desativa os benefícios e cancela
         as férias futuras (`SOLICITADA` ou `APROVADA`), **sem aviso à pessoa e sem registro próprio dessas
@@ -660,8 +660,8 @@ paths:
         `enviarConvite = true` faz de uma vez o "Ativar" e o "Reenviar convite" (o link do convite não valeria com o login
         desativado), com o e-mail de convite na fila. Quem já definiu a senha entra com ela depois do "Ativar", e
         `enviarConvite = true` para ela dá 422 `SENHA_JA_DEFINIDA` (o front só mostra a caixa quando faz sentido). Padrão
-        `false`. O convite depende das **tabelas novas da aplicação** de convite (`V033`, com a marca de senha provisória `V032`) e de
-        fila de e-mails (`V035`).
+        `false`. O convite depende das **tabelas novas da aplicação** de convite (`V001`, com a marca de senha provisória `V001`) e de
+        fila de e-mails (`V001`).
 
         **Erros:** a nova `dataAdmissao` não pode ser anterior ao último dia de trabalho do vínculo anterior (400 em
         `dataAdmissao`); cadastro que **já está ativo** (inclusive com desligamento só agendado: cancele-o antes): 409
@@ -1636,7 +1636,7 @@ paths:
         (`soDecidePedidosDeGestores = true`) não há etapa do gestor para aprovar sozinha: a marcação é recusada com 422
         `GESTOR_SEM_EQUIPE`. Marcar, desmarcar e a data de volta valem para qualquer motivo de ausência.
 
-        No banco, a marcação é `GESTORES.APROVACAO_AUTOMATICA` e `GESTORES.APROVACAO_AUTOMATICA_ATE` (script V011; o
+        No banco, a marcação é `GESTORES.APROVACAO_AUTOMATICA` e `GESTORES.APROVACAO_AUTOMATICA_ATE` (script V001; o
         nome das colunas não mudou).
       x-perfis: [RH]
       parameters:
@@ -1703,7 +1703,7 @@ paths:
         saúde) e `aceitaTrajeto` (o pedido pede o trajeto, como no vale-transporte). No catálogo de demonstração só os
         benefícios 3 (Plano odontológico) e 6 (Auxílio-creche) são `opcional`: são os dois "Disponíveis para você" que a
         tela 44 mostra ao Bruno, que já tem o 1, o 2, o 4 e o 5 (os "Seus benefícios" das telas 44 e 46).
-        **Depende do script SQL `V031`**: três colunas booleanas em `BENEFICIOS`, `OPCIONAL`, `ACEITA_DEPENDENTES` e
+        **Depende do script SQL `V001`**: três colunas booleanas em `BENEFICIOS`, `OPCIONAL`, `ACEITA_DEPENDENTES` e
         `ACEITA_TRAJETO` (a tabela tinha só nome e descrição, `Criacao_Tabelas:536-542`). Nascem `FALSE`: o benefício que já existia
         fica "só o RH concede, sem dependentes e sem trajeto", e a API grava o valor que o RH marcou.
       x-perfis: [RH]
@@ -1741,7 +1741,7 @@ paths:
       description: |
         Tela 29, cadastro "Benefícios". Só o perfil `RH`. Nome único (409 `NOME_JA_CADASTRADO`). O corpo traz as três marcas
         do catálogo (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`), que **dependem do
-        script SQL `V031`** (colunas `OPCIONAL`, `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` em `BENEFICIOS`).
+        script SQL `V001`** (colunas `OPCIONAL`, `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` em `BENEFICIOS`).
       x-perfis: [RH]
       requestBody:
         required: true
@@ -1769,7 +1769,7 @@ paths:
       summary: Altera um benefício do catálogo.
       description: |
         Tela 29, cadastro "Benefícios". Só o perfil `RH`. Substitui nome, descrição e as três marcas do catálogo
-        (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`; dependem do script SQL `V031`).
+        (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`; dependem do script SQL `V001`).
       x-perfis: [RH]
       parameters:
         - $ref: '#/components/parameters/ParamBeneficioCatalogoId'
@@ -2000,8 +2000,8 @@ paths:
       description: |
         Tela 29 ("Reenviar convite") e menu "..." da ficha. Só o perfil `RH`. Cria o login se ainda não existe
         (sem senha utilizável), invalida o convite anterior e coloca o e-mail na fila. O link vale 7 dias. Depende das
-        **tabelas novas da aplicação** de convite (token, `V033`) e de fila de e-mails (`V035`), e da marca de senha provisória
-        em `USUARIOS` (`V032`), que a API liga ao criar o login por convite e desliga quando a pessoa define a senha.
+        **tabelas novas da aplicação** de convite (token, `V001`) e de fila de e-mails (`V001`), e da marca de senha provisória
+        em `USUARIOS` (`V001`), que a API liga ao criar o login por convite e desliga quando a pessoa define a senha.
         A pessoa precisa estar **ativa** (422 `FUNCIONARIO_INATIVO`) e ter **e-mail corporativo** (sem ele, 422
         `FUNCIONARIO_SEM_EMAIL_CORPORATIVO`: o RH completa o cadastro antes).
         Quem já definiu a senha **não** recebe convite: 422 `SENHA_JA_DEFINIDA` (a pessoa usa "Esqueci minha
@@ -2179,7 +2179,7 @@ paths:
         e-mail (da lista fechada de e-mails, `CONVENCOES.md`, seção 12), importação e download de arquivos, de **todas as
         fatias** (cada fatia registra os seus eventos). Os cancelamentos automáticos da inativação **não** têm registro
         próprio (decisão do dono). **Nunca** aparecem senha, hash nem token; valores de colunas sensíveis não são
-        gravados (ver `AuditoriaMudanca.valorOculto`). O log é uma **tabela nova da aplicação** (auditoria; script `V037`).
+        gravados (ver `AuditoriaMudanca.valorOculto`). O log é uma **tabela nova da aplicação** (auditoria; script `V001`).
 
         **Formulário anônimo (privacidade, decisão do dono, 2026-10-30):** a auditoria **não pode permitir descobrir quem
         respondeu nem quem ainda não participou**. Por isso:
@@ -2361,8 +2361,8 @@ paths:
         ativo com login, o e-mail com o link é colocado na fila; o link vale **1 hora** e é de **uso único**
         (um pedido novo invalida o anterior). O e-mail tem o botão "Definir nova senha" apontando para
         `<endereço do front>/definir-senha?token=<token>`. Limite de 5 pedidos por minuto por IP (429). O link de
-        redefinição e a fila de e-mails são **tabelas novas da aplicação** (token de convite e de redefinição, `V033`; fila de
-        e-mails, `V035`).
+        redefinição e a fila de e-mails são **tabelas novas da aplicação** (token de convite e de redefinição, `V001`; fila de
+        e-mails, `V001`).
       x-perfis: [Publico]
       security: []
       requestBody:
@@ -2388,7 +2388,7 @@ paths:
         defina a sua senha") ou `REDEFINICAO` ("Defina uma nova senha"). Link inexistente, já usado ou vencido
         recebem a **mesma** resposta 422 `LINK_INVALIDO_OU_VENCIDO` (não revela qual). O token do convite vale
         **7 dias**; o da redefinição, 1 hora. Limite de 5 tentativas por minuto por IP (429). Os dois tokens vivem na
-        **tabela nova da aplicação** de convite e redefinição (script `V033`).
+        **tabela nova da aplicação** de convite e redefinição (script `V001`).
       x-perfis: [Publico]
       security: []
       requestBody:
@@ -2425,7 +2425,7 @@ paths:
         abertas da pessoa são encerradas. Devolve 204; a pessoa então **entra** pela tela de login (não há login
         automático). Se a pessoa estiver inativa ou o login desativado, o link não vale (422, mesma resposta).
         Limite de 5 tentativas por minuto por IP (429). O token consumido é o da **tabela nova da aplicação** de convite
-        e redefinição (script `V033`).
+        e redefinição (script `V001`).
       x-perfis: [Publico]
       security: []
       requestBody:
@@ -3233,16 +3233,16 @@ components:
           type: boolean
           description: |
             A própria pessoa pode pedir este benefício (aparece em "Disponíveis para você", tela 44). `false`: só o RH o dá.
-            **Exige o script SQL `V031`**: coluna `OPCIONAL` em `BENEFICIOS`.
+            **Exige o script SQL `V001`**: coluna `OPCIONAL` em `BENEFICIOS`.
         aceitaDependentes:
           type: boolean
           description: |
-            O pedido deixa incluir dependentes (como o plano de saúde). **Exige o script SQL `V031`**: coluna `ACEITA_DEPENDENTES`
+            O pedido deixa incluir dependentes (como o plano de saúde). **Exige o script SQL `V001`**: coluna `ACEITA_DEPENDENTES`
             em `BENEFICIOS`.
         aceitaTrajeto:
           type: boolean
           description: |
-            O pedido pede o trajeto (como o vale-transporte). **Exige o script SQL `V031`**: coluna `ACEITA_TRAJETO` em `BENEFICIOS`.
+            O pedido pede o trajeto (como o vale-transporte). **Exige o script SQL `V001`**: coluna `ACEITA_TRAJETO` em `BENEFICIOS`.
         quantidadePessoas: { type: integer, minimum: 0, description: 'Pessoas com o benefício ativo.' }
     BeneficioCatalogoListaResposta:
       description: Página de benefícios do catálogo.
@@ -3260,9 +3260,9 @@ components:
       properties:
         nome: { type: string, minLength: 1, maxLength: 100, description: 'Único (sem diferenciar maiúsculas).' }
         descricao: { type: [string, 'null'], maxLength: 255 }
-        opcional: { type: boolean, description: 'A própria pessoa pode pedir o benefício (ver `BeneficioCatalogoItem`). **Exige o script SQL `V031`**.' }
-        aceitaDependentes: { type: boolean, description: 'O pedido deixa incluir dependentes. **Exige o script SQL `V031`**.' }
-        aceitaTrajeto: { type: boolean, description: 'O pedido pede o trajeto. **Exige o script SQL `V031`**.' }
+        opcional: { type: boolean, description: 'A própria pessoa pode pedir o benefício (ver `BeneficioCatalogoItem`). **Exige o script SQL `V001`**.' }
+        aceitaDependentes: { type: boolean, description: 'O pedido deixa incluir dependentes. **Exige o script SQL `V001`**.' }
+        aceitaTrajeto: { type: boolean, description: 'O pedido pede o trajeto. **Exige o script SQL `V001`**.' }
 
     # ---------------- empresa ----------------
     EmpresaUf:

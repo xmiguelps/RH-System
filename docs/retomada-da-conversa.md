@@ -1,5 +1,7 @@
 # Retomada da conversa (planejamento do RH-System)
 
+> **Nota de 2026-11-03:** este arquivo é um registro datado. Os scripts de banco `V006` a `V047` que ele cita foram **incorporados ao `V001` e ao `V002`** em 2026-11-03 (ver `docs/superpowers/plans/2026-11-03-base-do-esquema.md` e `Banco de Dados/Scripts/LEIA-ME.md`, que tem o mapa de qual pedido veio cada um). A pasta tem hoje `V001` a `V005`, e o próximo script é o `V006`. O texto abaixo não foi reescrito.
+
 Escrito em 2026-10-28 e atualizado em 2026-10-29 (respostas das Partes 3 e 4) para continuar o trabalho em outro PC, numa sessão nova do Claude Code. A sessão antiga não passa para o outro PC; este arquivo e os documentos do repositório passam.
 
 ## ATUALIZAÇÃO DE 2026-11-02: o planejamento dos dois planos está escrito (nada commitado ainda)

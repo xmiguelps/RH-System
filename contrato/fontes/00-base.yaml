@@ -3,7 +3,7 @@
 openapi: 3.1.0
 info:
   title: API do RH-System
-  version: 0.2.1
+  version: 0.2.2
   description: |
     Contrato escrito antes do back-end. Quem implementa a API segue este documento; quem faz o
     front-end gera tipos e dados simulados dele. Só o dono muda o contrato.

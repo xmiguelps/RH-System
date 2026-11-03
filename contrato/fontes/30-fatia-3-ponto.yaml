@@ -1,6 +1,6 @@
 # Fatia 3: ponto (bater ponto, espelho, ajustes em duas etapas, feriados, banco de horas e atestado).
 # Fontes: roadmap (fatia 3, linhas 145 a 175, e "Antes do congelamento"), spec 13.3/13.6, design seção 7,
-# telas 04, 12, 13, 32 (cartão), 33, 47, 54, 55, 56 e os scripts V007 a V011, V023 e V028.
+# telas 04, 12, 13, 32 (cartão), 33, 47, 54, 55, 56 e os scripts V001.
 # Convenção de tempo (CONVENCOES.md, seção 3): instante = UTC terminando em Z; dia de calendário = date no fuso -03:00;
 # horário do dia = HH:mm sem fuso; duração = minutos inteiros.
 # Aprovação em duas etapas: CONVENCOES.md, seção 9 (um só modelo para o ponto e para as férias). Situação de hoje: seção 10.
@@ -26,11 +26,11 @@ tags:
         e antes do horário de entrada mais a tolerância, o espelho diz `SEM_REGISTRO` (ainda não há batida) e
         `SituacaoHoje` diz `AINDA_NAO_COMECOU`: o espelho não faz essa distinção.
 
-      **Tabelas novas da aplicação** (scripts já escritos em `Banco de Dados/Scripts`): a **auditoria** (`V037`; a batida, a
-      correção do RH e o acesso ao arquivo do atestado vão para ela), a **fila de e-mails** (`V035`; e-mail de resultado do
-      pedido de ajuste) e as **tarefas agendadas** (`V036`; consolidação diária do banco de horas, importação e repetição
-      anual de feriados). **Colunas novas** de tabelas do grupo: `PONTOS_MARCACOES.DATA_CORRECAO` (`V039`; o "quando" da
-      correção do RH em `corrigidaEmUtc`) e `PONTOS_MANUTENCOES.CHAVE_PENDENTE` (`V040`; um só pedido pendente por dia e
+      **Tabelas novas da aplicação** (scripts já escritos em `Banco de Dados/Scripts`): a **auditoria** (`V001`; a batida, a
+      correção do RH e o acesso ao arquivo do atestado vão para ela), a **fila de e-mails** (`V001`; e-mail de resultado do
+      pedido de ajuste) e as **tarefas agendadas** (`V001`; consolidação diária do banco de horas, importação e repetição
+      anual de feriados). **Colunas novas** de tabelas do grupo: `PONTOS_MARCACOES.DATA_CORRECAO` (`V001`; o "quando" da
+      correção do RH em `corrigidaEmUtc`) e `PONTOS_MANUTENCOES.CHAVE_PENDENTE` (`V001`; um só pedido pendente por dia e
       por pessoa).
   - name: Pedidos de ajuste de ponto
     description: |
@@ -49,7 +49,7 @@ tags:
       já ter passado) e decidido depois de criado.
 
       **Quem é gestor** (usado nas regras abaixo): quem tem uma linha em `GESTORES` (a lista de
-      `GET /api/rh/gestores`, fatia 1). Li `Criacao_Tabelas:129-138` e o `V011`: `GESTORES` não tem coluna de situação; a
+      `GET /api/rh/gestores`, fatia 1). Li `Criacao_Tabelas:129-138` e o `V001`: `GESTORES` não tem coluna de situação; a
       linha vale enquanto a pessoa está ativa (`FUNCIONARIOS.ATIVO`), porque o banco recusa cadastrar gestor inativo
       (`Criacao_Triggers:154-168`). **O gestor de uma pessoa** é o gestor do setor dela (`SETORES.ID_GESTOR`, fatia 1;
       um gestor responde por **um** setor). **Só quem tem perfil `Gestor` é gestor de setor** (422
@@ -61,7 +61,7 @@ tags:
       Sofia Ramos); (2) a pessoa está num setor sem gestor (Recursos Humanos, Administrativo, Tecnologia e Compras:
       Carla Mendes, João Pedro Alves, Vanessa Lima...); (3) o gestor do setor está desligado (inativo). Só o RH decide, e
       quem do RH decide precisa estar **também em `GESTORES`**: o trigger do banco exige um `ID_GESTOR` na decisão final
-      e recusa quando ele é a própria pessoa do pedido (`Criacao_Triggers:547-561`; `V011`, linhas 27-30 e 46-52). Nos
+      e recusa quando ele é a própria pessoa do pedido (`Criacao_Triggers:547-561`; nota «(antigo V011)» do `V001`). Nos
       demais casos o pedido nasce com `etapa: GESTOR`.
 
       **Gestor ausente** (a ausência que antes se chamava "chave de aprovação automática"): é ligada pelo RH em
@@ -96,15 +96,15 @@ tags:
       de outra equipe são 404** (fora do escopo, nunca 422). Decisão do dono (2026-10-30): **o RH pode recusar o que o
       gestor aprovou**. O atestado tem o código próprio `ATESTADO_JA_DECIDIDO` (ver a tag "Atestados").
 
-      **O RH e o próprio pedido** (conferi `Criacao_Triggers:535-567`, `V011` e `Scripts\LEIA-ME.md:98`; as duas
+      **O RH e o próprio pedido** (conferi `Criacao_Triggers:535-567`, `V001` e `Scripts\LEIA-ME.md`, seção «O que eu gostaria que você questionasse»; as duas
       coisas valem). O trigger só compara o **`ID_GESTOR`** com a pessoa do pedido
       (`O gestor nao pode analisar a propria solicitacao.`); nenhuma regra do banco compara `ID_FUNCIONARIO_RH`
-      (quem do RH confirmou) com ela, e o `LEIA-ME.md:98` diz que o dono aceitou "o RH pode confirmar o próprio
+      (quem do RH confirmou) com ela, e o `LEIA-ME.md` (seção «O que eu gostaria que você questionasse») diz que o dono aceitou "o RH pode confirmar o próprio
       pedido" e que por isso nenhum `CHECK` foi criado. Efeito, **inferido** dessas leituras (não rodei o banco):
       se o pedido **passou pelo gestor**, o `ID_GESTOR` é o do gestor e o RH, mesmo sendo a pessoa do pedido, confirma;
       se o pedido **não passou pelo gestor**, o `ID_GESTOR` vira o de quem do RH decide, e quem é a pessoa do pedido
       não pode decidi-lo (422 `PEDIDO_PROPRIO`). Se a **única** pessoa do RH cadastrada em `GESTORES` é também quem
-      pediu, ninguém consegue decidir o pedido dela (aviso do `V011`, linhas 50-52).
+      pediu, ninguém consegue decidir o pedido dela (aviso da nota «(antigo V011)» do `V001`).
 
       **Textos de `motivoNaoPodeDecidir`:** são **cinco textos fixos**, definidos no schema `PontoPedidoAjuste`; a
       fatia 7 os copia, palavra por palavra, para as férias.
@@ -120,7 +120,7 @@ tags:
       e-mail. A etapa do gestor aprovada sozinha pelo "gestor ausente" não é decisão de ninguém e **não** manda e-mail
       (escolha minha, a avisar o dono): a pessoa só recebe quando o RH decide. A correção direta do RH
       (`PUT .../ponto/dias/{dia}`) também **não** manda. O e-mail leva o resultado, quem decidiu e a observação, se houver;
-      o envio passa pela **fila de e-mails** (tabela nova da aplicação, script `V035`) e uma falha de envio
+      o envio passa pela **fila de e-mails** (tabela nova da aplicação, script `V001`) e uma falha de envio
       não desfaz a decisão. A pessoa vê o resultado também em "Meus pedidos de ajuste".
   - name: Banco de horas
     description: Saldo e extrato do banco de horas. Só lançamentos automáticos (Crédito e Débito); não há lançamento manual, folga nem compensação.
@@ -130,7 +130,7 @@ tags:
     description: |
       O funcionário envia o atestado (dado de saúde); o gestor da equipe vê o arquivo; só o RH valida ou recusa.
       Validado vira "Falta compensada". O acesso ao arquivo fica registrado na auditoria (tabela nova da aplicação,
-      script `V037`), na área `ATESTADOS` (`AuditoriaArea`, fatia 1; ação `BAIXOU`). **Só o atestado validado, de dia inteiro, faz a pessoa aparecer como `ATESTADO` em
+      script `V001`), na área `ATESTADOS` (`AuditoriaArea`, fatia 1; ação `BAIXOU`). **Só o atestado validado, de dia inteiro, faz a pessoa aparecer como `ATESTADO` em
       `SituacaoHoje`**: enquanto está `ENVIADO` (esperando o RH) ela não aparece (hoje, Carla Mendes e João Pedro Alves,
       atestados 43 e 44).
 
@@ -165,7 +165,7 @@ paths:
           `GET /api/eu/ponto/banco-de-horas`.
         - `bancoHoras.atualizadoAte` é o **último dia consolidado**, **global** (o mesmo para todas as pessoas; não é
           por pessoa), e vem da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script
-          `V036`). Ver `GET /api/eu/ponto/banco-de-horas`. É o "Atualizado até ontem".
+          `V001`). Ver `GET /api/eu/ponto/banco-de-horas`. É o "Atualizado até ontem".
       x-perfis: [Funcionario, Gestor, RH]
       responses:
         '200':
@@ -201,7 +201,7 @@ paths:
         - O dia do ponto é criado junto, vazio, se ainda não existir. A carga do dia vem do cargo (semanal ÷ 5).
         - Bater em feriado, folga ou férias é aceito (a batida entra como qualquer outra e vira hora extra).
           **Escolha minha:** os documentos não proíbem e um teste do roadmap cobre "ponto em feriado".
-        - A batida é registrada na auditoria (com IP e origem; tabela nova da aplicação, script `V037`).
+        - A batida é registrada na auditoria (com IP e origem; tabela nova da aplicação, script `V001`).
         - A primeira entrada do dia faz a pessoa passar a `TRABALHANDO` em `SituacaoHoje` (e continua assim mesmo
           depois da saída).
         - Recusas do banco (422, mensagem original em `regraDoBanco`): `Nao e possivel registrar ponto de
@@ -528,7 +528,7 @@ paths:
         - o dia, **depois de aplicar os itens**, precisa fechar em pares `ENTRADA` e `SAIDA` alternados e em ordem
           (a validação da sequência fica com a aplicação): `PONTO_SEQUENCIA_INVALIDA`;
         - só um pedido em análise por dia: 409 `PONTO_PEDIDO_JA_EM_ANALISE`. A regra vale **também no banco** (script
-          `V040`): só pode haver **um** pedido `PENDENTE` por dia e por pessoa (a chave é o registro de ponto da pessoa
+          `V001`): só pode haver **um** pedido `PENDENTE` por dia e por pessoa (a chave é o registro de ponto da pessoa
           naquele dia). Por isso a **segunda tentativa simultânea** (duplo clique, duas abas) cai **no mesmo 409
           `PONTO_PEDIDO_JA_EM_ANALISE`**: a API continua conferindo antes de gravar e, se o banco recusar por essa chave,
           devolve o mesmo erro, nunca um 500;
@@ -852,7 +852,7 @@ paths:
 
         O extrato tem **só `CREDITO` e `DEBITO`** (decisão do dono, design seção 7: sem folga nem compensação; o
         "Compensação, folga de meio período" do Figma é só um Débito). Não existe lançamento manual: os lançamentos
-        vêm da **consolidação diária** do agendador (tarefas agendadas: tabela nova da aplicação, script `V036`), que:
+        vêm da **consolidação diária** do agendador (tarefas agendadas: tabela nova da aplicação, script `V001`), que:
         - grava no máximo **uma linha por pessoa e por dia** (`diaReferencia`); rodar duas vezes não duplica;
         - ao subir depois de uma parada, recupera todos os dias que ficaram para trás;
         - recalcula o dia quando um ajuste de ponto é aprovado ou o RH corrige o dia;
@@ -871,7 +871,7 @@ paths:
         no fim erra até alguns minutos (`Scripts\LEIA-ME.md`, "Armadilhas novas"); e `FN_CALCULAR_SALDO_BANCO_HORAS`,
         a função do banco, soma horas, então **não** deve ser usada para este campo.
         `atualizadoAte` é o **último dia consolidado**: o dia de referência da consolidação diária mais recente que
-        terminou (tarefa agendada de consolidação do banco de horas, `TAREFAS_AGENDADAS`, script `V036`). É um valor
+        terminou (tarefa agendada de consolidação do banco de horas, `TAREFAS_AGENDADAS`, script `V001`). É um valor
         **global** (o mesmo para todas as pessoas, não é por pessoa) e normalmente é ontem. **Dia com saldo zero não
         tem linha** no banco: `atualizadoAte` não depende de a pessoa ter lançamento naquele dia. Só é `null` se a
         consolidação nunca rodou.
@@ -1380,7 +1380,7 @@ paths:
         (outra equipe, pedido de outro gestor ou pedido do próprio gestor: 404). Grava `decisaoGestor` com `decisao:
         APROVADA`; o pedido continua `PENDENTE` e passa para a `etapa: RH`. Nenhuma batida é alterada ainda. **A pessoa
         recebe e-mail com o resultado** (a decisão do gestor, `CONVENCOES.md`, seção 12; o envio passa pela fila de
-        e-mails, tabela nova da aplicação, script `V035`) e vê o resultado em "Meus pedidos de ajuste".
+        e-mails, tabela nova da aplicação, script `V001`) e vê o resultado em "Meus pedidos de ajuste".
         `observacao` é opcional, vai em `decisaoGestor.observacao` e aparece para a pessoa.
 
         Erros, os mesmos das férias (`CONVENCOES.md`, seção 9):
@@ -1444,7 +1444,7 @@ paths:
         gestor: 404). Se o gestor recusa, o pedido **acaba na hora**: `status: REJEITADA`, `etapa: CONCLUIDA`,
         `decisaoGestor` com `decisao: REJEITADA` e `decisaoRh: null`, e o RH não confirma. Nenhuma batida é alterada.
         **A pessoa recebe e-mail com o resultado** (`CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação,
-        script `V035`). `observacao` é opcional, vai em `decisaoGestor.observacao` e aparece para a pessoa. Mesmos
+        script `V001`). `observacao` é opcional, vai em `decisaoGestor.observacao` e aparece para a pessoa. Mesmos
         erros da aprovação: 409 `PEDIDO_JA_DECIDIDO` e 409 `PEDIDO_ETAPA_INCORRETA`.
       x-perfis: [Gestor]
       parameters:
@@ -1544,7 +1544,7 @@ paths:
       summary: Devolve o link temporário do arquivo de um atestado da equipe.
       description: |
         **Só o gestor**, só atestado da equipe dele (outro: **404**). O arquivo é dado de saúde: o acesso fica
-        **registrado na auditoria** (quem, quando, qual atestado, IP e origem; tabela nova da aplicação, script `V037`;
+        **registrado na auditoria** (quem, quando, qual atestado, IP e origem; tabela nova da aplicação, script `V001`;
         área `ATESTADOS`, ação `BAIXOU`) a cada link gerado. Nunca há link público; o link vale pouco tempo e baixa
         como anexo.
       x-perfis: [Gestor]
@@ -1711,8 +1711,8 @@ paths:
           impede apagar essa batida).
 
         Depois de gravar, o banco de horas do dia é recalculado e o fato vai para a auditoria (tabela nova da aplicação,
-        script `V037`; a batida antiga fica no log). As batidas corrigidas ou incluídas levam `origem: CORRIGIDA_RH` e a
-        data da correção na coluna `DATA_CORRECAO` (`V039`), gravadas juntas. Devolve o dia já corrigido. O banco ainda recusa dia anterior à admissão e
+        script `V001`; a batida antiga fica no log). As batidas corrigidas ou incluídas levam `origem: CORRIGIDA_RH` e a
+        data da correção na coluna `DATA_CORRECAO` (`V001`), gravadas juntas. Devolve o dia já corrigido. O banco ainda recusa dia anterior à admissão e
         funcionário inativo (422, `regraDoBanco`; o de pessoa inativa traz `codigo: FUNCIONARIO_INATIVO`).
       x-perfis: [RH]
       parameters:
@@ -2157,9 +2157,9 @@ paths:
         linha nova; item com `marcacaoId` altera a batida existente), todas com `origem: CORRIGIDA_RH`; grava
         `status: APROVADA`, `etapa: CONCLUIDA` e `decisaoRh` (`decisao: APROVADA`, quem do RH confirmou, quando e a
         `observacao`, que substitui a do gestor); recalcula o banco de horas do dia; registra na auditoria (tabela nova da
-        aplicação, script `V037`; a batida antiga fica no log). **A pessoa recebe e-mail com o resultado**
-        (a decisão do RH, `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V035`). As
-        batidas aplicadas levam também a data da correção em `DATA_CORRECAO` (`V039`).
+        aplicação, script `V001`; a batida antiga fica no log). **A pessoa recebe e-mail com o resultado**
+        (a decisão do RH, `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V001`). As
+        batidas aplicadas levam também a data da correção em `DATA_CORRECAO` (`V001`).
 
         Recusas (os mesmos códigos das férias, `CONVENCOES.md`, seções 9 e 11):
         - 409 `PEDIDO_ETAPA_INCORRETA`: o pedido ainda está na etapa do gestor (`podeDecidir` é `false`);
@@ -2295,7 +2295,7 @@ paths:
         `PEDIDO_RH_FORA_DE_GESTORES` e 422 `PEDIDO_PROPRIO` como na aprovação (o trigger também roda quando o
         status vira `REJEITADA`). Grava `status: REJEITADA`, `etapa: CONCLUIDA` e `decisaoRh` (`decisao: REJEITADA`, quem
         do RH e quando); nenhuma batida é alterada. **A pessoa recebe e-mail com o resultado** (a decisão do RH,
-        `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V035`). `observacao` é
+        `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V001`). `observacao` é
         opcional, vai em `decisaoRh.observacao` (e substitui a do gestor) e aparece para a pessoa.
       x-perfis: [RH]
       parameters:
@@ -2362,7 +2362,7 @@ paths:
         os do tipo `EMPRESA` se existirem. Lista curta, **sem paginação**, por data. `mes` vazio devolve o ano
         todo. Só `ativo: true`, a menos que `incluirInativos=true`. Nacionais e estaduais "entram sozinhos"
         (importados automaticamente pelo agendador, que depende da tabela nova de tarefas agendadas da aplicação, script
-        `V036`) e não se editam (`podeEditar: false`). A tabela do banco já
+        `V001`) e não se editam (`podeEditar: false`). A tabela do banco já
         traz os nacionais de 2026 sem acento nos nomes; a API devolve os nomes como estão guardados. Se a empresa
         ainda não tem UF e município configurados (Cadastros > Empresa, fatia 1), esta lista **não dá erro**: vêm só
         os nacionais e os do tipo `EMPRESA` (**escolha minha**, para a tela abrir numa instalação nova). O erro
@@ -2664,7 +2664,7 @@ paths:
       summary: Devolve o link temporário do arquivo de um atestado.
       description: |
         **Só o RH.** O arquivo é dado de saúde: cada link gerado fica **registrado na auditoria** (quem, quando,
-        qual atestado, IP e origem; tabela nova da aplicação, script `V037`; área `ATESTADOS`, ação `BAIXOU`). Nunca há
+        qual atestado, IP e origem; tabela nova da aplicação, script `V001`; área `ATESTADOS`, ação `BAIXOU`). Nunca há
         link público; o link vale pouco tempo e baixa como anexo.
       x-perfis: [RH]
       parameters:
@@ -2693,7 +2693,7 @@ paths:
         consolidação do banco de horas recalcula os dias do atestado. O atestado de dias inteiros validado que cobre
         hoje faz a pessoa aparecer como `ATESTADO` em `SituacaoHoje` (só depois de validado: enquanto `ENVIADO`, como o 43
         da Carla Mendes e o 44 do João Pedro Alves hoje, a pessoa não aparece como `ATESTADO`). O RH pode validar o
-        próprio atestado (o dono aceitou que o RH confirme o próprio pedido, `Scripts\LEIA-ME.md:98`). Não há e-mail
+        próprio atestado (o dono aceitou que o RH confirme o próprio pedido, `Scripts\LEIA-ME.md`, seção «O que eu gostaria que você questionasse»). Não há e-mail
         para o atestado (lista fechada, `CONVENCOES.md`, seção 12).
         409 `ATESTADO_JA_DECIDIDO` se já foi validado ou recusado (código do atestado, que tem uma só decisão; não é o
         `PEDIDO_JA_DECIDIDO` dos pedidos em duas etapas).
@@ -2920,7 +2920,7 @@ components:
           format: date-time
           description: |
             Quando o RH corrigiu ou incluiu a batida; `null` se `origem` é `SISTEMA`. A fonte é a **coluna**
-            `PONTOS_MARCACOES.DATA_CORRECAO` (script `V039`), não o log de auditoria: a coluna `ORIGEM` diz quem e
+            `PONTOS_MARCACOES.DATA_CORRECAO` (script `V001`), não o log de auditoria: a coluna `ORIGEM` diz quem e
             `DATA_CORRECAO` diz quando, e um `CHECK` do banco as amarra (`CORRIGIDA_RH` tem a data, `SISTEMA` não tem).
             A aplicação grava as duas juntas, no mesmo `INSERT` ou `UPDATE`, tanto na correção direta do RH
             (`PUT .../ponto/dias/{dia}`) quanto na aprovação de um pedido de ajuste. O banco guarda a coluna em -03:00 e a
@@ -2974,7 +2974,7 @@ components:
       required: [saldoMinutos, atualizadoAte]
       properties:
         saldoMinutos: { type: integer, description: 'Soma dos minutos de cada linha do banco de horas (cada linha convertida de horas para minutos e depois somada; créditos menos débitos). Negativo é devedor. Ver `GET /api/eu/ponto/banco-de-horas`.' }
-        atualizadoAte: { type: [string, 'null'], format: date, description: 'Último dia consolidado ("Atualizado até ontem"): valor global (o mesmo para todas as pessoas), tirado da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V036`). `null` só se a consolidação nunca rodou.' }
+        atualizadoAte: { type: [string, 'null'], format: date, description: 'Último dia consolidado ("Atualizado até ontem"): valor global (o mesmo para todas as pessoas), tirado da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V001`). `null` só se a consolidação nunca rodou.' }
 
     PontoHoje:
       type: object
@@ -3381,7 +3381,7 @@ components:
           required: [saldoMinutos, atualizadoAte, itens]
           properties:
             saldoMinutos: { type: integer, description: 'Soma dos minutos de cada linha do banco de horas, de todos os lançamentos (não só os filtrados): cada linha é convertida de horas para minutos e depois somada; créditos menos débitos.' }
-            atualizadoAte: { type: [string, 'null'], format: date, description: 'Último dia consolidado: valor global (o mesmo para todas as pessoas), da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V036`). `null` só se a consolidação nunca rodou.' }
+            atualizadoAte: { type: [string, 'null'], format: date, description: 'Último dia consolidado: valor global (o mesmo para todas as pessoas), da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V001`). `null` só se a consolidação nunca rodou.' }
             itens: { type: array, items: { $ref: '#/components/schemas/BancoHorasLancamento' } }
 
     # ---------------------------------------------------------------- feriados
