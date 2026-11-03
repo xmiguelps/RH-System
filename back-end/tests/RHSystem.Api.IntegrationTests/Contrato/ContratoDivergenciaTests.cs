@@ -25,16 +25,13 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "verificarSaude",
     ];
 
-    private async Task<JsonNode> DocumentoGeradoAsync()
-    {
-        var api = await ApiCompartilhada.ObterAsync(mysql);
-        return JsonNode.Parse(await api.CreateClient().GetStringAsync("/openapi/v1.json"))!;
-    }
+    private async Task<JsonNode> DocumentoGeradoAsync() =>
+        await CarregadorDeContrato.GeradoAsync((await ApiCompartilhada.ObterAsync(mysql)).CreateClient());
 
     [Fact]
     public async Task Operacoes_da_API_no_escopo_batem_com_o_contrato()
     {
-        var divergencias = ComparadorDeContrato.Comparar(LocalizadorDoContrato.CarregarContrato(), await DocumentoGeradoAsync(), OperationIdsNoEscopo);
+        var divergencias = ComparadorDeContrato.Comparar(CarregadorDeContrato.Contrato(), await DocumentoGeradoAsync(), OperationIdsNoEscopo);
 
         Assert.True(divergencias.Count == 0, "A API diverge do contrato:\n- " + string.Join("\n- ", divergencias));
     }

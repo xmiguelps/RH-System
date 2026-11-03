@@ -14,3 +14,15 @@ Colunas: `fatia` (0 a 8) e `situação`: `planejada` (só no contrato), `em anda
 | 5 | Formulários | planejada |
 | 6 | TAD (treinamentos) | planejada |
 | 7 | Gestão | planejada |
+
+## Rotas implementadas
+
+Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementada e testada na branch; o dono passa a `pronta` quando publicar no ambiente da demo. Quem entrega a rota acrescenta a linha dela no mesmo passo em que a implementa (o teste `STATUS_md_lista_toda_rota_implementada_e_toda_rota_listada_existe_na_API` confere nos dois sentidos).
+
+| Rota | operationId | Situação | Observação |
+|---|---|---|---|
+| `POST /api/auth/entrar` | entrar | em andamento | |
+| `POST /api/auth/renovar` | renovarSessao | em andamento | |
+| `POST /api/auth/sair` | sair | em andamento | |
+| `GET /api/auth/eu` | obterUsuarioLogado | em andamento | |
+| `GET /health` | verificarSaude | em andamento | |

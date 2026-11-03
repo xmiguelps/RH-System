@@ -57,6 +57,13 @@ internal static class RotasDeTeste
         rotas.GrupoPublico().MapGet("/__teste/ator", (IAtorAtual ator) => Results.Ok(Descrever(ator))).ExcludeFromDescription();
         rotas.MapGet("/__teste/sem-familia", () => Results.Ok()).ExcludeFromDescription();
 
+        // Só a fábrica de teste da matriz de perfis liga isto: uma rota REAL (/api/rh, sem segmento __teste) que o contrato não tem, para provar que
+        // a matriz acusa "rota fora do contrato".
+        if (rotas.ServiceProvider.GetRequiredService<IConfiguration>().GetValue<bool>("Testes:RotaFalsaDaMatriz"))
+        {
+            rotas.GrupoRh().MapGet("/rota-falsa-fora-do-contrato", () => Results.Ok()).ExcludeFromDescription();
+        }
+
         // O padrão de escopo que as fatias seguintes copiam: a consulta parte de DaEquipe e termina em OuNaoEncontrado, então "não existe" e
         // "é de outro setor" dão a mesma resposta. Sem equipe (gestor sem setor): lista vazia, e 404 ao pedir uma pessoa.
         rotas.GrupoGestor().MapGet(
