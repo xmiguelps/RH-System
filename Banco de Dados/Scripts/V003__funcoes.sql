@@ -12,7 +12,7 @@
 -- 5) Horas de pontos inconsistentes não entram no total do período.
 -- ============================================================
 
-USE rh_system;
+-- (a linha USE foi removida: o executor de scripts ja conecta no banco certo)
 
 DROP FUNCTION IF EXISTS FN_CALCULAR_SALDO_BANCO_HORAS;
 DROP FUNCTION IF EXISTS FN_CALCULAR_TEMPO_EMPRESA_DIAS;

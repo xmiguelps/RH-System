@@ -8,7 +8,7 @@
 -- Ele não apaga dados das tabelas.
 -- ============================================================
 
-USE rh_system;
+-- (a linha USE foi removida: o executor de scripts ja conecta no banco certo)
 
 -- Remover versões anteriores dos triggers deste script
 DROP TRIGGER IF EXISTS TRG_FUNCIONARIOS_BEFORE_INSERT;
