@@ -24,17 +24,16 @@ public sealed record ResultadoDeEntrada(SessaoResposta? Sessao, FalhaDeEntrada? 
 
 internal static class Mapeamento
 {
-    public static SessaoResposta Sessao(Usuario usuario, Perfil perfil, AcessoEmitido acesso, RefreshGerado refresh) =>
+    public static UsuarioResposta Usuario(Usuario usuario, Perfil perfil) =>
         new(
-            acesso.Token,
-            acesso.ExpiraEmUtc,
-            refresh.Token,
-            new UsuarioResposta(
-                usuario.Id,
-                usuario.FuncionarioId,
-                usuario.Funcionario.Nome,
-                usuario.Funcionario.EmailCorporativo ?? string.Empty,
-                perfil,
-                usuario.Funcionario.Cargo?.Nome,
-                usuario.Funcionario.Setor?.Nome));
+            usuario.Id,
+            usuario.FuncionarioId,
+            usuario.Funcionario.Nome,
+            usuario.Funcionario.EmailCorporativo ?? string.Empty,
+            perfil,
+            usuario.Funcionario.Cargo?.Nome,
+            usuario.Funcionario.Setor?.Nome);
+
+    public static SessaoResposta Sessao(Usuario usuario, Perfil perfil, AcessoEmitido acesso, RefreshGerado refresh) =>
+        new(acesso.Token, acesso.ExpiraEmUtc, refresh.Token, Usuario(usuario, perfil));
 }
