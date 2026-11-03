@@ -5,7 +5,7 @@
 -- POR QUE
 --   O login devolve um token de acesso de vida curta (15 minutos) e um
 --   refresh token (7 dias) para renova-lo. O refresh token precisa ser
---   revogavel (sair, uso repetido) e girar a cada uso. Por regra de
+--   revogavel (sair, pessoa inativada) e girar a cada uso. Por regra de
 --   privacidade do projeto, o token em si nunca fica no banco: so o hash.
 --
 -- O QUE ESTE SCRIPT FAZ
@@ -13,14 +13,17 @@
 --   - TOKEN_HASH: SO O HASH (SHA-256, 64 caracteres hexadecimais) do token.
 --     A chave unica impede dois tokens com o mesmo hash.
 --   - CRIADO_EM, EXPIRA_EM, REVOGADO_EM: todos em UTC. REVOGADO_EM so e
---     preenchido quando o token e usado na renovacao (rotacao) ou no sair.
+--     preenchido quando o token e usado na renovacao (rotacao), no sair, ou
+--     quando a pessoa e inativada (todos os tokens dela sao revogados).
 --
 -- COMO A APLICACAO USA
---   - Renovar: UPDATE ... SET REVOGADO_EM = agora WHERE TOKEN_HASH = ? AND
---     REVOGADO_EM IS NULL AND EXPIRA_EM > agora, e conferir que UMA linha
---     mudou; so entao emite o token novo. Duas renovacoes simultaneas com o
---     mesmo token: so uma conta 1 e a outra recebe 401, sem revogar os
---     demais tokens da pessoa.
+--   - Renovar: a aplicacao le o token pelo hash e confere que ele existe,
+--     nao foi revogado e nao expirou (EXPIRA_EM > agora, feito no codigo, nao
+--     no UPDATE). Depois faz UPDATE ... SET REVOGADO_EM = agora WHERE
+--     TOKEN_HASH = ? AND REVOGADO_EM IS NULL e confere que UMA linha mudou;
+--     so entao emite o token novo. Duas renovacoes simultaneas com o mesmo
+--     token: so uma conta 1 e a outra recebe 401, sem revogar os demais
+--     tokens da pessoa.
 --
 -- O QUE O BANCO GARANTE
 --   Hash no formato, validade posterior a emissao, um hash so por token.
