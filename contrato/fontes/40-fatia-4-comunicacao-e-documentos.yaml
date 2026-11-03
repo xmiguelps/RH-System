@@ -1,0 +1,2555 @@
+# Fatia 4: comunicação e documentos (avisos, holerites, advertências e aniversariantes).
+# Roadmap: docs/superpowers/plans/2026-10-28-roadmap-completo.md, fatia 4 (linhas 176 a 199).
+# Telas (16): RH 07, 08 (holerites), 11, 14, 15 (advertências), 27, 28 (avisos); funcionário 36 (holerites),
+# 37, 38 (avisos), 43 (advertências); gestor 49 (holerites), 50 (avisos), 53, 59, 60 (advertências).
+# As telas 49 e 50 do gestor reutilizam as do funcionário (rotas /api/eu/...), como manda o roadmap (decisão 14).
+# Aniversariantes: só a API; a tela é da fatia 7d.
+tags:
+  - name: Avisos
+    description: O RH publica avisos (simples ou detalhados) e acompanha quem leu; todos leem os seus avisos.
+  - name: Holerites
+    description: O RH publica o PDF do holerite de cada pessoa (um a um ou em lote); cada pessoa vê e baixa só os seus.
+  - name: Advertências
+    description: Advertências verbais e escritas, com ciência, contestação e resposta do RH.
+  - name: Aniversariantes
+    description: Quem faz aniversário nos próximos dias (a tela é da fatia 7d).
+
+paths:
+  # ---------------------------------------------------------------- AVISOS (RH)
+  /api/rh/avisos:
+    get:
+      tags: [Avisos]
+      operationId: listarAvisos
+      summary: Lista os avisos do RH por situação (ativos, agendados, expirados e rascunhos).
+      description: |
+        Só o RH (tela 27). Cada aba da tela é um valor de `situacao`; sem `situacao`, devolve os ativos.
+        `busca` procura no título e no conteúdo. `tipo` filtra "Todos os tipos".
+
+        **Ordem fixa:** ativos e expirados, da publicação mais recente para a mais antiga; agendados, do que publica
+        primeiro; rascunhos, do criado mais recentemente para o mais antigo.
+
+        `leitura` só vem preenchida nos avisos `ATIVO` e `EXPIRADO`; em rascunho e agendado é `null`.
+        Todo aviso é para todos os funcionários ativos: não há público por setor nem anexo PDF (decisão do dono, 2026-10-28).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+        - name: situacao
+          in: query
+          description: Aba da tela. Padrão `ATIVO`.
+          schema: { $ref: '#/components/schemas/AvisoSituacao' }
+        - name: tipo
+          in: query
+          description: Só avisos deste tipo. Sem o parâmetro, todos.
+          schema: { $ref: '#/components/schemas/AvisoTipo' }
+      responses:
+        '200':
+          description: Página de avisos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoListaRh' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 4
+                totalPaginas: 1
+                itens:
+                  - id: 412
+                    tipo: SIMPLES
+                    titulo: Cantina com novo horário
+                    previa: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde continua às 15:30.
+                    situacao: ATIVO
+                    fixado: false
+                    publicacaoEmUtc: '2026-10-07T11:00:00Z'
+                    expiraEmUtc: '2026-10-21T02:59:59Z'
+                    autorNome: Ana Souza
+                    leitura: { viram: 41, total: 101 }
+                  - id: 409
+                    tipo: DETALHADO
+                    titulo: Política de trabalho remoto atualizada
+                    previa: Quem trabalha nos setores administrativos pode pedir até 2 dias de trabalho remoto por semana, combinados com o gestor.
+                    situacao: ATIVO
+                    fixado: true
+                    publicacaoEmUtc: '2026-10-06T12:00:00Z'
+                    expiraEmUtc: '2026-11-07T02:59:59Z'
+                    autorNome: Ana Souza
+                    leitura: { viram: 73, total: 101 }
+                  - id: 405
+                    tipo: SIMPLES
+                    titulo: Expediente no feriado de 12/10
+                    previa: Segunda-feira, 12/10, é feriado. Não haverá expediente e o ponto não precisa ser registrado.
+                    situacao: ATIVO
+                    fixado: false
+                    publicacaoEmUtc: '2026-10-01T11:00:00Z'
+                    expiraEmUtc: '2026-10-13T02:59:59Z'
+                    autorNome: Ana Souza
+                    leitura: { viram: 97, total: 101 }
+                  - id: 377
+                    tipo: SIMPLES
+                    titulo: Novo convênio com academia
+                    previa: Colaboradores têm desconto na mensalidade da academia parceira. Peça o código ao RH.
+                    situacao: ATIVO
+                    fixado: false
+                    publicacaoEmUtc: '2026-09-22T11:00:00Z'
+                    expiraEmUtc: null
+                    autorNome: Ana Souza
+                    leitura: { viram: 88, total: 101 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Avisos]
+      operationId: criarAviso
+      summary: Cria um aviso, salvando como rascunho ou publicando (agora ou numa data futura).
+      description: |
+        Só o RH (tela 28). `publicar: false` é o botão "Salvar rascunho"; `publicar: true` é "Publicar aviso".
+
+        - **Simples:** texto puro de até 280 caracteres. **Detalhado:** texto longo em **markdown** (`format: markdown`), com seções
+          feitas por títulos (`## Como pedir`). **HTML nunca é interpretado**: se for escrito, aparece como texto
+          (roadmap, decisão 6). Não há anexo.
+        - Publicando: `publicarEmUtc` vazio (ou no passado) publica agora; no futuro, o aviso fica `AGENDADO` e a API o publica na hora.
+          **O e-mail para todos os funcionários ativos sai sempre na publicação** (agora ou na data agendada; não existe a opção
+          "enviar por e-mail também"). O aviso é sempre para todos os funcionários ativos.
+        - Rascunho: não sai e-mail e ninguém vê. `publicarEmUtc`, se vier, é só a data prevista.
+        - `expiraEm` é o último dia em que o aviso vale (fim desse dia, fuso -03:00); vazio = não expira. Não pode ser anterior ao dia da publicação (400; o trigger
+          do banco também recusa, com `A expiracao do aviso nao pode ser anterior a publicacao.`, mas a API valida antes).
+        - `fixado`: o aviso fica no topo da tela inicial até expirar.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AvisoCriacaoComando' }
+            examples:
+              publicarAgora:
+                summary: Aviso simples publicado agora
+                value:
+                  tipo: SIMPLES
+                  titulo: Inventário de estoque no sábado, 17/10
+                  conteudo: O inventário começa às 07:00 e vai até 13:00. As horas entram no banco de horas.
+                  expiraEm: '2026-10-18'
+                  fixado: false
+                  publicar: true
+              rascunhoDetalhado:
+                summary: Aviso detalhado salvo como rascunho
+                value:
+                  tipo: DETALHADO
+                  titulo: Campanha de vacinação contra a gripe
+                  conteudo: "## Quando\nDias 13 e 14/10, das 09:00 às 16:00, na sala de treinamento.\n\n## Quem pode\nTodos os colaboradores. Dependentes podem se inscrever com o RH até 10/10."
+                  publicarEmUtc: '2026-10-09T11:00:00Z'
+                  expiraEm: '2026-10-15'
+                  fixado: true
+                  publicar: false
+      responses:
+        '201':
+          description: Aviso criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoDetalheRh' }
+              example:
+                id: 413
+                tipo: SIMPLES
+                titulo: Inventário de estoque no sábado, 17/10
+                previa: O inventário começa às 07:00 e vai até 13:00. As horas entram no banco de horas.
+                situacao: ATIVO
+                fixado: false
+                publicacaoEmUtc: '2026-10-07T12:42:00Z'
+                expiraEmUtc: '2026-10-19T02:59:59Z'
+                autorNome: Ana Souza
+                leitura: { viram: 0, total: 101 }
+                conteudo: O inventário começa às 07:00 e vai até 13:00. As horas entram no banco de horas.
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/avisos/resumo:
+    get:
+      tags: [Avisos]
+      operationId: obterResumoDosAvisos
+      summary: Mostra os números do topo da tela de avisos e a contagem de cada aba.
+      description: |
+        Só o RH (tela 27). Os números não dependem de busca nem de filtro.
+
+        - `contagens`: quantos avisos há em cada aba (`Ativos 4`, `Agendados 1`, `Expirados 12`, `Rascunhos 1`).
+        - `leituraMediaDosAtivosPercentual`: média, entre os avisos ativos, de `viram ÷ total`, arredondada para inteiro (0 a 100);
+          `null` quando não há aviso ativo.
+        - `expiramNosProximos7Dias` e `proximoAExpirar`: avisos ativos que expiram nos próximos 7 dias (o card "Expiram nesta semana") e o que expira primeiro.
+      x-perfis: [RH]
+      responses:
+        '200':
+          description: Números dos avisos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoPainelRh' }
+              example:
+                contagens: { ativos: 4, agendados: 1, expirados: 12, rascunhos: 1 }
+                leituraMediaDosAtivosPercentual: 74
+                expiramNosProximos7Dias: 1
+                proximoAExpirar: { avisoId: 405, titulo: Expediente no feriado de 12/10, expiraEmUtc: '2026-10-13T02:59:59Z' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/avisos/{avisoId}:
+    parameters:
+      - $ref: '#/components/parameters/AvisoIdCaminho'
+    get:
+      tags: [Avisos]
+      operationId: obterAviso
+      summary: Mostra um aviso inteiro, com o conteúdo, para o painel de detalhes do RH.
+      description: Só o RH (tela 27). Vale para qualquer situação, inclusive rascunho. 404 se o aviso não existe.
+      x-perfis: [RH]
+      responses:
+        '200':
+          description: O aviso.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoDetalheRh' }
+              example:
+                id: 409
+                tipo: DETALHADO
+                titulo: Política de trabalho remoto atualizada
+                previa: Quem trabalha nos setores administrativos pode pedir até 2 dias de trabalho remoto por semana, combinados com o gestor.
+                situacao: ATIVO
+                fixado: true
+                publicacaoEmUtc: '2026-10-06T12:00:00Z'
+                expiraEmUtc: '2026-11-07T02:59:59Z'
+                autorNome: Ana Souza
+                leitura: { viram: 73, total: 101 }
+                conteudo: |
+                  ## O que mudou
+                  Quem trabalha nos setores administrativos pode pedir até 2 dias de trabalho remoto por semana, combinados com o gestor.
+
+                  ## Como pedir
+                  Pelo portal, com pelo menos 2 dias úteis de antecedência. O gestor aprova ou recusa em até 1 dia útil.
+
+                  ## Quem continua presencial
+                  Loja, logística e recepção, por causa do atendimento ao público.
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    put:
+      tags: [Avisos]
+      operationId: editarAviso
+      summary: Edita o título, o conteúdo, a data de publicação, a expiração e o "fixar" de um aviso.
+      description: |
+        Só o RH (botão "Editar" da tela 27). O **tipo não muda** depois de criado. Vale em qualquer situação; editar **não reenvia o e-mail**.
+        A regra de conteúdo é a da criação (simples: até 280 caracteres, sem markdown; detalhado: markdown).
+
+        - `publicarEmUtc` só pode mudar enquanto o aviso é `RASCUNHO` ou `AGENDADO`; nos demais, vazio ou igual ao valor atual
+          (qualquer outro valor devolve 422 `AVISO_PUBLICACAO_NAO_EDITAVEL`).
+        - Editar um aviso `EXPIRADO` com nova data de expiração futura volta a deixá-lo `ATIVO`.
+        - `expiraEm` vazio tira a expiração.
+        - Para publicar um rascunho, depois de salvar, use `POST /api/rh/avisos/{avisoId}/publicar`.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AvisoEdicaoComando' }
+            example:
+              titulo: Cantina com novo horário (atualizado)
+              conteudo: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde passa para as 15:45.
+              expiraEm: '2026-10-20'
+              fixado: false
+      responses:
+        '200':
+          description: Aviso atualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoDetalheRh' }
+              example:
+                id: 412
+                tipo: SIMPLES
+                titulo: Cantina com novo horário (atualizado)
+                previa: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde passa para as 15:45.
+                situacao: ATIVO
+                fixado: false
+                publicacaoEmUtc: '2026-10-07T11:00:00Z'
+                expiraEmUtc: '2026-10-21T02:59:59Z'
+                autorNome: Ana Souza
+                leitura: { viram: 41, total: 101 }
+                conteudo: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde passa para as 15:45.
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A data de publicação não pode mudar nesta situação do aviso.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Este aviso já foi publicado; a data de publicação não pode mudar.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: AVISO_PUBLICACAO_NAO_EDITAVEL
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    delete:
+      tags: [Avisos]
+      operationId: excluirAviso
+      summary: Exclui um aviso que ainda não foi publicado (rascunho ou agendado).
+      description: |
+        Só o RH (tela 27). Sem corpo. Só vale para aviso `RASCUNHO` ou `AGENDADO`: ninguém o viu e o e-mail dele ainda não saiu.
+        Aviso já publicado (`ATIVO` ou `EXPIRADO`) **não se exclui**: devolve 422 `AVISO_NAO_PODE_SER_EXCLUIDO`; para tirá-lo do ar
+        use `POST /api/rh/avisos/{avisoId}/encerrar`. Resposta 204. A exclusão é **física** (o aviso e as linhas de leitura dele somem) e entra
+        na auditoria (área `AVISOS`, ação `EXCLUIU`). O Figma não desenha o botão "Excluir": a tela do RH precisa dele nos avisos
+        rascunho e agendado.
+
+        **O que se leu no banco** (`Criacao_Tabelas`, `Criacao_Triggers` e `V013`): `AVISOS` só tem triggers de `INSERT`, nada trava o `DELETE`;
+        `AVISOS_VISUALIZACOES` tem chave estrangeira para `AVISOS` sem `ON DELETE CASCADE`, e o trigger `TRG_AVISOS_AFTER_INSERT` cria uma linha
+        dessas por funcionário ativo já na criação do aviso (inclusive do rascunho). Por isso a API apaga primeiro essas linhas (todas "não lidas",
+        porque aviso não publicado não pode ser aberto) e depois o aviso, na mesma transação. Nenhuma outra tabela aponta para `AVISOS`.
+      x-perfis: [RH]
+      responses:
+        '204': { description: Aviso excluído. }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O aviso já foi publicado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Só é possível excluir um aviso que ainda não foi publicado. Para tirar um aviso do ar, encerre-o.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: AVISO_NAO_PODE_SER_EXCLUIDO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/avisos/{avisoId}/publicar:
+    post:
+      tags: [Avisos]
+      operationId: publicarAviso
+      summary: Publica um rascunho (agora ou na data prevista, se for futura).
+      description: |
+        Só o RH. Sem corpo. Usa a `publicarEmUtc` guardada no rascunho: vazia ou no passado publica agora; futura deixa o aviso `AGENDADO`.
+        Ao publicar, o e-mail sai para todos os funcionários ativos (agora ou na data agendada) e a data de publicação gravada é a efetiva, não a
+        do momento em que o rascunho foi criado. Se `expiraEm` ficou anterior à publicação, devolve 400.
+
+        Só vale para rascunho: aviso já publicado devolve 422 `AVISO_JA_PUBLICADO`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/AvisoIdCaminho'
+      responses:
+        '200':
+          description: Aviso publicado ou agendado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoDetalheRh' }
+              example:
+                id: 398
+                tipo: DETALHADO
+                titulo: Campanha de vacinação contra a gripe
+                previa: Dias 13 e 14/10, das 09:00 às 16:00, na sala de treinamento. Todos os colaboradores. Dependentes podem se inscrever com o RH até 10/10.
+                situacao: AGENDADO
+                fixado: true
+                publicacaoEmUtc: '2026-10-09T11:00:00Z'
+                expiraEmUtc: '2026-10-16T02:59:59Z'
+                autorNome: Ana Souza
+                leitura: null
+                conteudo: "## Quando\nDias 13 e 14/10, das 09:00 às 16:00, na sala de treinamento.\n\n## Quem pode\nTodos os colaboradores. Dependentes podem se inscrever com o RH até 10/10."
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O aviso já foi publicado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Este aviso já foi publicado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: AVISO_JA_PUBLICADO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/avisos/{avisoId}/encerrar:
+    post:
+      tags: [Avisos]
+      operationId: encerrarAviso
+      summary: Encerra um aviso ativo agora ("Encerrar agora").
+      description: |
+        Só o RH (tela 27). Sem corpo. Grava a expiração como o momento atual e o aviso passa a `EXPIRADO`; as leituras já feitas continuam na contagem.
+        Só vale para aviso `ATIVO`: rascunho, agendado ou já expirado devolve 422 `AVISO_NAO_ESTA_ATIVO`.
+        O aviso já publicado só se encerra, nunca se exclui; o que ainda não foi publicado (rascunho ou agendado) se exclui com
+        `DELETE /api/rh/avisos/{avisoId}`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/AvisoIdCaminho'
+      responses:
+        '200':
+          description: Aviso encerrado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoDetalheRh' }
+              example:
+                id: 412
+                tipo: SIMPLES
+                titulo: Cantina com novo horário
+                previa: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde continua às 15:30.
+                situacao: EXPIRADO
+                fixado: false
+                publicacaoEmUtc: '2026-10-07T11:00:00Z'
+                expiraEmUtc: '2026-10-07T12:42:00Z'
+                autorNome: Ana Souza
+                leitura: { viram: 52, total: 101 }
+                conteudo: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde continua às 15:30.
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O aviso não está ativo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Só um aviso ativo pode ser encerrado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: AVISO_NAO_ESTA_ATIVO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/avisos/{avisoId}/leituras:
+    get:
+      tags: [Avisos]
+      operationId: listarLeiturasDoAviso
+      summary: Mostra quem viu e quem ainda não viu um aviso ("Quem viu").
+      description: |
+        Só o RH (tela 27). `viram` e `aindaNaoViram` são os totais do aviso e **não** mudam com `situacao`; `itens` é a lista pedida
+        (a tela mostra os que ainda não viram: use `situacao=NAO_LIDO` e `tamanhoPagina=5`; "E mais 23 pessoas" = `total` − 5).
+        Sem `situacao`, devolve todos. Ordem: nome.
+
+        Quem **abre** o aviso conta como "viu" (ver `POST /api/eu/avisos/{avisoId}/leitura`). A contagem considera os funcionários ativos
+        no momento em que o aviso foi criado, mais quem foi admitido depois e abriu o aviso.
+
+        Só vale para aviso já publicado (`ATIVO`, `EXPIRADO`) e para `AGENDADO`/`RASCUNHO` devolve 422 `AVISO_AINDA_NAO_PUBLICADO`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/AvisoIdCaminho'
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - name: situacao
+          in: query
+          description: '`LIDO` (já viram), `NAO_LIDO` (ainda não viram). Sem o parâmetro, todos.'
+          schema: { type: string, enum: [LIDO, NAO_LIDO] }
+      responses:
+        '200':
+          description: Totais e página da lista.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoLeituras' }
+              example:
+                pagina: 1
+                tamanhoPagina: 5
+                total: 28
+                totalPaginas: 6
+                viram: 73
+                aindaNaoViram: 28
+                itens:
+                  - funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                    lido: false
+                    lidoEmUtc: null
+                  - funcionario: { id: 28, nome: Igor Batista, cargo: Estagiário, setor: Comercial, ativo: true }
+                    lido: false
+                    lidoEmUtc: null
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O aviso ainda não foi publicado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Este aviso ainda não foi publicado.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: AVISO_AINDA_NAO_PUBLICADO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/avisos/{avisoId}/lembretes:
+    post:
+      tags: [Avisos]
+      operationId: lembrarQuemNaoViuAviso
+      summary: Manda um e-mail de lembrete a quem ainda não viu o aviso ("Lembrar quem não viu").
+      description: |
+        Só o RH (botão da tela 27). Sem corpo. Enfileira um e-mail para cada funcionário **ativo** que ainda não abriu o aviso e devolve quantos
+        e-mails foram enfileirados (0 quando todos já viram). Resposta 202: o envio acontece em segundo plano.
+        Só vale para aviso `ATIVO`; os demais devolvem 422 `AVISO_NAO_ESTA_ATIVO`.
+        Decisão do dono (2026-11-02): o botão fica, e este e-mail entra na lista fechada de `CONVENCOES.md`, seção 12. Não há limite de
+        lembretes por aviso (escolha de engenharia: se virar abuso, o contrato ganha um limite por dia e um 422).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/AvisoIdCaminho'
+      responses:
+        '202':
+          description: Lembretes enfileirados.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoLembreteResultado' }
+              example: { quantidadeDeEmails: 28 }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: O aviso não está ativo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Só é possível lembrar sobre um aviso ativo.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: AVISO_NAO_ESTA_ATIVO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- AVISOS (leitura, qualquer perfil)
+  /api/eu/avisos:
+    get:
+      tags: [Avisos]
+      operationId: listarMeusAvisos
+      summary: Lista os avisos vigentes para quem está logado (telas 37 e 50 e o cartão da tela inicial).
+      description: |
+        Qualquer perfil (funcionário, gestor e RH, cada um vê os mesmos avisos: sempre para todos).
+        Só aparecem avisos **vigentes**: publicados, com data de publicação já passada e que não expiraram. Rascunho, agendado e expirado nunca aparecem.
+        Quem foi admitido depois da publicação também vê o aviso vigente.
+
+        `apenasNaoLidos=true` é a aba "Não lidos". `busca` procura no título e no conteúdo. Ordem: publicação mais recente primeiro;
+        com `fixadosPrimeiro=true` (o cartão de avisos da tela inicial), os fixados vêm antes, também do mais recente para o mais antigo.
+        A tela inicial pede `tamanhoPagina=2`.
+
+        `contagens` (`Não lidos 2`, `Todos 5`, e o número do menu "Avisos") não depende de `busca` nem de `apenasNaoLidos`.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+        - name: apenasNaoLidos
+          in: query
+          description: '`true` devolve só os avisos que a pessoa ainda não abriu. Padrão `false`.'
+          schema: { type: boolean }
+        - name: fixadosPrimeiro
+          in: query
+          description: '`true` põe os avisos fixados antes dos demais. Padrão `false`.'
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Página de avisos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoListaEu' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 4
+                totalPaginas: 1
+                contagens: { naoLidos: 2, total: 4 }
+                itens:
+                  - id: 412
+                    tipo: SIMPLES
+                    titulo: Cantina com novo horário
+                    previa: A partir de 13/10, o almoço é servido das 11:30 às 14:00. O café da tarde continua às 15:30.
+                    fixado: false
+                    publicadoEmUtc: '2026-10-07T11:00:00Z'
+                    expiraEmUtc: '2026-10-21T02:59:59Z'
+                    autorNome: Ana Souza
+                    lido: false
+                  - id: 409
+                    tipo: DETALHADO
+                    titulo: Política de trabalho remoto atualizada
+                    previa: Quem trabalha nos setores administrativos pode pedir até 2 dias de trabalho remoto por semana, combinados com o gestor.
+                    fixado: true
+                    publicadoEmUtc: '2026-10-06T12:00:00Z'
+                    expiraEmUtc: '2026-11-07T02:59:59Z'
+                    autorNome: Ana Souza
+                    lido: false
+                  - id: 405
+                    tipo: SIMPLES
+                    titulo: Expediente no feriado de 12/10
+                    previa: Segunda-feira, 12/10, é feriado. Não haverá expediente e o ponto não precisa ser registrado.
+                    fixado: false
+                    publicadoEmUtc: '2026-10-01T11:00:00Z'
+                    expiraEmUtc: '2026-10-13T02:59:59Z'
+                    autorNome: Ana Souza
+                    lido: true
+                  - id: 377
+                    tipo: SIMPLES
+                    titulo: Novo convênio com academia
+                    previa: Colaboradores têm desconto na mensalidade da academia parceira. Peça o código ao RH.
+                    fixado: false
+                    publicadoEmUtc: '2026-09-22T11:00:00Z'
+                    expiraEmUtc: null
+                    autorNome: Ana Souza
+                    lido: true
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/avisos/{avisoId}:
+    get:
+      tags: [Avisos]
+      operationId: obterMeuAviso
+      summary: Mostra um aviso vigente inteiro, com o conteúdo (tela 38).
+      description: |
+        Qualquer perfil. **Não marca como lido**: quem abre o aviso chama também `POST /api/eu/avisos/{avisoId}/leitura`.
+        404 se o aviso não existe ou **não está vigente** (rascunho, agendado ou expirado).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/AvisoIdCaminho'
+      responses:
+        '200':
+          description: O aviso.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvisoDetalheEu' }
+              example:
+                id: 409
+                tipo: DETALHADO
+                titulo: Política de trabalho remoto atualizada
+                previa: Quem trabalha nos setores administrativos pode pedir até 2 dias de trabalho remoto por semana, combinados com o gestor.
+                fixado: true
+                publicadoEmUtc: '2026-10-06T12:00:00Z'
+                expiraEmUtc: '2026-11-07T02:59:59Z'
+                autorNome: Ana Souza
+                lido: false
+                lidoEmUtc: null
+                conteudo: |
+                  ## O que mudou
+                  Quem trabalha nos setores administrativos pode pedir até 2 dias de trabalho remoto por semana, combinados com o gestor.
+
+                  ## Como pedir
+                  Pelo portal, com pelo menos 2 dias úteis de antecedência. O gestor aprova ou recusa em até 1 dia útil.
+
+                  ## Quem continua presencial
+                  Loja, logística e recepção, por causa do atendimento ao público.
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/avisos/{avisoId}/leitura:
+    post:
+      tags: [Avisos]
+      operationId: marcarAvisoComoLido
+      summary: Marca o aviso como lido para quem está logado (ao abrir o aviso).
+      description: |
+        Qualquer perfil. Sem corpo. **Idempotente**: se já estava lido, nada muda e a data da primeira leitura é mantida.
+        Se a pessoa não tinha linha de leitura (foi admitida depois da publicação), ela é criada.
+        404 se o aviso não existe ou não está vigente.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/AvisoIdCaminho'
+      responses:
+        '204': { description: Aviso marcado como lido. }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- HOLERITES (RH)
+  /api/rh/funcionarios/{funcionarioId}/holerites:
+    parameters:
+      - name: funcionarioId
+        in: path
+        required: true
+        description: Identificador da pessoa.
+        schema: { type: integer }
+    get:
+      tags: [Holerites]
+      operationId: listarHoleritesDoFuncionario
+      summary: Lista os holerites de uma pessoa, para a aba Holerites da ficha (tela 07).
+      description: |
+        Só o RH. Sem `todasAsVersoes`, devolve só a **versão atual** de cada (ano, mês, tipo); com `todasAsVersoes=true`, devolve também as versões
+        antigas (o histórico do holerite substituído). Inclui os holerites `AGENDADO` (ainda não visíveis para a pessoa).
+        Ordem: competência mais recente primeiro (ano, mês), depois a versão mais nova, depois o mais recente cadastrado.
+
+        `ultimoPublicado` é o holerite **já publicado** mais recentemente (por data de publicação), sem considerar os filtros: é a linha
+        "Último holerite enviado: Setembro de 2026, publicado em 05/10/2026" do modal de envio (tela 08). `null` se nenhum foi publicado.
+        Funciona para pessoa inativa (o RH guarda os holerites de quem saiu).
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - name: ano
+          in: query
+          description: Só holerites deste ano de competência.
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - name: tipo
+          in: query
+          description: Só holerites deste tipo.
+          schema: { $ref: '#/components/schemas/HoleriteTipo' }
+        - name: todasAsVersoes
+          in: query
+          description: '`true` inclui as versões substituídas. Padrão `false`.'
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Página de holerites.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HoleriteListaRh' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 2
+                totalPaginas: 1
+                ultimoPublicado:
+                  id: 5121
+                  funcionarioId: 12
+                  tipo: MENSAL
+                  mes: 9
+                  ano: 2026
+                  versao: 1
+                  versaoAtual: true
+                  situacao: PUBLICADO
+                  publicacaoEmUtc: '2026-10-05T14:30:00Z'
+                itens:
+                  - id: 5121
+                    funcionarioId: 12
+                    tipo: MENSAL
+                    mes: 9
+                    ano: 2026
+                    versao: 1
+                    versaoAtual: true
+                    situacao: PUBLICADO
+                    publicacaoEmUtc: '2026-10-05T14:30:00Z'
+                  - id: 4987
+                    funcionarioId: 12
+                    tipo: MENSAL
+                    mes: 8
+                    ano: 2026
+                    versao: 1
+                    versaoAtual: true
+                    situacao: PUBLICADO
+                    publicacaoEmUtc: '2026-09-04T13:10:00Z'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Holerites]
+      operationId: enviarHolerite
+      summary: Publica ou agenda o PDF do holerite de uma pessoa (modal "Enviar holerite", tela 08).
+      description: |
+        Só o RH. `multipart/form-data`. Campos: `mes` (1 a 12), `ano`, `tipo` (`MENSAL`, `DECIMO_TERCEIRO` ou `FERIAS`), `arquivo` e, para escolher
+        quando publicar, **um** destes dois: `publicarEm` (uma data) **ou** `noDiaDoPagamento: true`. Os dois juntos: 400.
+
+        - **Arquivo:** só PDF (a API confere o conteúdo, não só a extensão), **até 5 MB (5 × 1024 × 1024 bytes)**; senão, 400 com o erro em `arquivo`.
+          O arquivo só é guardado depois de a regra do banco aprovar.
+        - **Quando publicar** ("Quando publicar" da tela 08):
+          - **Agora:** nenhum dos dois campos, ou `publicarEm` com o dia de hoje.
+          - **Numa data:** `publicarEm` é um dia futuro; o holerite fica `AGENDADO` e a pessoa só o vê, e só recebe o e-mail, a partir do início
+            desse dia (00:00, fuso -03:00). Dia no passado: 400.
+          - **No dia do pagamento** ("Agendar para o dia do pagamento"): `noDiaDoPagamento: true`. **O sistema calcula a data**: é a do próximo
+            pagamento da empresa, a mesma que `GET /api/eu/pagamento/proximo` (fatia 7) devolve em `pagamento.data` (de hoje em diante; se hoje é o
+            dia do pagamento, publica agora). A resposta traz o resultado em `publicacaoEmUtc` e `situacao`, para a tela mostrar a data que o sistema
+            escolheu. Empresa sem dia de pagamento configurado: 422 `EMPRESA_NAO_CONFIGURADA` (o RH configura em Cadastros > Empresa, fatia 1).
+        - **E-mail:** a pessoa recebe um e-mail **sempre** que um holerite é publicado (na hora, ou no dia agendado); não existe opção para não avisar
+          (CONVENCOES, seção 12). A caixa "Avisar por e-mail quando publicar" que o Figma mostra na tela 08 fica escondida.
+        - **Competência futura** só é aceita no tipo `FERIAS` (o holerite de férias é pago antes das férias). Competência anterior à admissão
+          ou posterior ao desligamento é recusada.
+        - **Já existe holerite dessa pessoa, nesse mês e tipo:** 409 `HOLERITE_JA_EXISTE`. Para corrigir um holerite errado use
+          `POST /api/rh/holerites/{holeriteId}/versoes` (o banco não deixa apagar holerite).
+        - A ação entra na auditoria. O retorno é o holerite criado (versão 1).
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/HoleriteEnvioComando' }
+            examples:
+              publicarAgora:
+                summary: Publicar agora
+                value: { mes: 10, ano: 2026, tipo: MENSAL, arquivo: holerite-bruno-lima-2026-10.pdf }
+              agendar:
+                summary: Agendar para uma data
+                value: { mes: 10, ano: 2026, tipo: MENSAL, arquivo: holerite-bruno-lima-2026-10.pdf, publicarEm: '2026-11-06' }
+              noDiaDoPagamento:
+                summary: Publicar no dia do pagamento (o sistema calcula a data)
+                value: { mes: 10, ano: 2026, tipo: MENSAL, arquivo: holerite-bruno-lima-2026-10.pdf, noDiaDoPagamento: true }
+      responses:
+        '201':
+          description: Holerite guardado (publicado ou agendado).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HoleriteItemRh' }
+              example:
+                id: 5230
+                funcionarioId: 12
+                tipo: MENSAL
+                mes: 10
+                ano: 2026
+                versao: 1
+                versaoAtual: true
+                situacao: AGENDADO
+                publicacaoEmUtc: '2026-11-06T03:00:00Z'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409':
+          description: Já existe holerite dessa pessoa nesse mês e tipo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Já existe um holerite mensal de outubro de 2026 para esta pessoa. Para corrigir, envie uma nova versão.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: HOLERITE_JA_EXISTE
+        '422':
+          description: |
+            Recusado por regra do banco. Mensagens do trigger de holerite (`regraDoBanco`) e o `codigo` de cada uma:
+            `Nao e possivel cadastrar holerite de competencia futura.` (`HOLERITE_COMPETENCIA_FUTURA`);
+            `A competencia do holerite e anterior a admissao.` (`HOLERITE_COMPETENCIA_ANTERIOR_A_ADMISSAO`);
+            `A competencia do holerite e posterior ao desligamento.` (`HOLERITE_COMPETENCIA_POSTERIOR_AO_DESLIGAMENTO`).
+            Com `noDiaDoPagamento: true` e a empresa sem dia de pagamento configurado: `EMPRESA_NAO_CONFIGURADA` (regra da API, sem `regraDoBanco`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                empresaSemDiaDePagamento:
+                  summary: Publicar no dia do pagamento sem dia de pagamento configurado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: A empresa ainda não tem o dia do pagamento configurado. Configure em Cadastros > Empresa ou escolha uma data.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: EMPRESA_NAO_CONFIGURADA
+                competenciaFutura:
+                  summary: Competência futura em holerite que não é de férias
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Só o holerite de férias pode ter competência futura.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: HOLERITE_COMPETENCIA_FUTURA
+                    regraDoBanco: Nao e possivel cadastrar holerite de competencia futura.
+                anteriorAAdmissao:
+                  summary: Competência anterior à admissão
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: A competência do holerite é anterior à admissão da pessoa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: HOLERITE_COMPETENCIA_ANTERIOR_A_ADMISSAO
+                    regraDoBanco: A competencia do holerite e anterior a admissao.
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/holerites/lote:
+    post:
+      tags: [Holerites]
+      operationId: enviarHoleritesEmLote
+      summary: Publica ou agenda vários holerites de uma vez, um PDF por pessoa.
+      description: |
+        Só o RH. O envio em lote **entra** (decisão do dono, 2026-10-30): um envio com vários PDFs, um por pessoa. `multipart/form-data`.
+        Os campos `mes`, `ano`, `tipo` e `publicarEm` **ou** `noDiaDoPagamento` valem para **todos** os holerites do envio e seguem as regras
+        de `POST /api/rh/funcionarios/{funcionarioId}/holerites` (PDF até 5 MB cada, competência futura só em férias, agendamento, o sistema calcula a data
+        de `noDiaDoPagamento`, e o e-mail sai sempre ao publicar).
+
+        **Como cada PDF é ligado a uma pessoa:** `itens` (uma lista em JSON) traz uma linha por arquivo, com `nomeDoArquivo` (o nome do arquivo enviado
+        em `arquivos`) e `funcionarioId` (a pessoa dona do holerite). Quem escolhe a pessoa de cada arquivo é o RH, na tela do lote (que o Figma não desenha;
+        a lista de pessoas vem da fatia 1); a API **não** adivinha a pessoa pelo conteúdo nem pelo nome do arquivo.
+
+        **Cada item é independente:** um item inválido não impede os outros. A resposta é sempre 200 com o resultado de cada item (publicado, agendado ou o erro dele).
+        Se a pessoa já tem holerite do mesmo mês e tipo, o item volta com `HOLERITE_JA_EXISTE` (o lote não cria versões).
+        Limites: até 200 PDFs por envio e 100 MB no total; acima disso, 400. Nome de arquivo repetido em `itens`, ou arquivo sem item (e item sem arquivo), é 400.
+        Erro que vale para o lote todo (e não para um item) recusa o envio inteiro: `publicarEm` e `noDiaDoPagamento` juntos, ou `publicarEm` no passado, é 400;
+        `noDiaDoPagamento` sem dia de pagamento configurado na empresa é 422 `EMPRESA_NAO_CONFIGURADA`. O lote inteiro entra na auditoria.
+      x-perfis: [RH]
+      x-provisorio: >-
+        Só o **formato** do lote está em aberto (a decisão de ter lote está tomada). Hipótese: um envio com vários PDFs e a lista `itens` que liga cada
+        arquivo a uma pessoa (`nomeDoArquivo` e `funcionarioId`), cada item validado sozinho (sem tudo ou nada). Se o dono quiser outro formato (por exemplo
+        "tudo ou nada", ou o nome do arquivo trazendo a matrícula da pessoa), o corpo e a resposta mudam. Não há tela desenhada para o lote.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/HoleriteLoteComando' }
+            encoding:
+              itens: { contentType: application/json }
+              arquivos: { contentType: application/pdf }
+            example:
+              mes: 10
+              ano: 2026
+              tipo: MENSAL
+              noDiaDoPagamento: true
+              itens:
+                - { funcionarioId: 12, nomeDoArquivo: bruno-lima.pdf }
+                - { funcionarioId: 21, nomeDoArquivo: diego-farias.pdf }
+                - { funcionarioId: 24, nomeDoArquivo: pedro-santos.pdf }
+              arquivos: [bruno-lima.pdf, diego-farias.pdf, pedro-santos.pdf]
+      responses:
+        '200':
+          description: Resultado de cada item do lote.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HoleriteLoteResultado' }
+              example:
+                total: 3
+                enviados: 2
+                comErro: 1
+                itens:
+                  - funcionarioId: 12
+                    nomeDoArquivo: bruno-lima.pdf
+                    sucesso: true
+                    holerite: { id: 5230, funcionarioId: 12, tipo: MENSAL, mes: 10, ano: 2026, versao: 1, versaoAtual: true, situacao: AGENDADO, publicacaoEmUtc: '2026-11-06T03:00:00Z' }
+                    codigoDoErro: null
+                    mensagemDoErro: null
+                  - funcionarioId: 21
+                    nomeDoArquivo: diego-farias.pdf
+                    sucesso: true
+                    holerite: { id: 5231, funcionarioId: 21, tipo: MENSAL, mes: 10, ano: 2026, versao: 1, versaoAtual: true, situacao: AGENDADO, publicacaoEmUtc: '2026-11-06T03:00:00Z' }
+                    codigoDoErro: null
+                    mensagemDoErro: null
+                  - funcionarioId: 24
+                    nomeDoArquivo: pedro-santos.pdf
+                    sucesso: false
+                    holerite: null
+                    codigoDoErro: HOLERITE_JA_EXISTE
+                    mensagemDoErro: Já existe um holerite mensal de outubro de 2026 para esta pessoa.
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '422':
+          description: '`noDiaDoPagamento` com a empresa sem dia de pagamento configurado: o lote inteiro é recusado e nenhum item é processado.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: A empresa ainda não tem o dia do pagamento configurado. Configure em Cadastros > Empresa ou escolha uma data.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: EMPRESA_NAO_CONFIGURADA
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/holerites/{holeriteId}/versoes:
+    post:
+      tags: [Holerites]
+      operationId: substituirHolerite
+      summary: Corrige um holerite enviado errado, guardando uma nova versão no lugar dele.
+      description: |
+        Só o RH. `multipart/form-data`: `arquivo` (PDF até 5 MB) e, para escolher quando publicar, `publicarEm` **ou** `noDiaDoPagamento: true`
+        (mesmas regras do envio individual, inclusive o 422 `EMPRESA_NAO_CONFIGURADA`; sem nenhum dos dois, publica agora).
+        O holerite não se apaga (o banco proíbe): cria a **versão seguinte** (maior versão + 1) da mesma pessoa, competência e tipo. A pessoa passa a ver só a
+        maior versão **já publicada** de cada (ano, mês, tipo); a versão antiga continua no histórico do RH. Se a nova for agendada, a antiga segue valendo até o dia.
+        A pessoa recebe um novo e-mail **sempre** que a nova versão é publicada (na hora ou no dia agendado).
+
+        `{holeriteId}` precisa ser a **versão atual**; se já existe versão mais nova, 409 `HOLERITE_VERSAO_DESATUALIZADA`.
+        Esta ação **não existe no Figma**: a tela do RH precisa de um botão "Substituir" na lista da aba Holerites.
+      x-perfis: [RH]
+      x-provisorio: >-
+        A correção por nova versão (em vez de apagar e reenviar) é decisão da sessão por delegação do dono (2026-10-29) e o dono pode discordar.
+      parameters:
+        - $ref: '#/components/parameters/HoleriteIdCaminho'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/HoleriteNovaVersaoComando' }
+            example: { arquivo: holerite-bruno-lima-2026-09-corrigido.pdf }
+      responses:
+        '201':
+          description: Nova versão guardada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HoleriteItemRh' }
+              example:
+                id: 5240
+                funcionarioId: 12
+                tipo: MENSAL
+                mes: 9
+                ano: 2026
+                versao: 2
+                versaoAtual: true
+                situacao: PUBLICADO
+                publicacaoEmUtc: '2026-10-07T12:42:00Z'
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409':
+          description: Já existe uma versão mais nova deste holerite.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Este holerite já foi substituído por uma versão mais nova. Atualize a lista.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: HOLERITE_VERSAO_DESATUALIZADA
+        '422':
+          description: |
+            Recusada por regra do banco (as mesmas mensagens do envio individual, por exemplo se a pessoa foi desligada com data anterior à competência):
+            `HOLERITE_COMPETENCIA_ANTERIOR_A_ADMISSAO`, `HOLERITE_COMPETENCIA_POSTERIOR_AO_DESLIGAMENTO`; e, com `noDiaDoPagamento: true` e a empresa
+            sem dia de pagamento configurado, `EMPRESA_NAO_CONFIGURADA`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: A competência do holerite é posterior ao desligamento da pessoa.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: HOLERITE_COMPETENCIA_POSTERIOR_AO_DESLIGAMENTO
+                regraDoBanco: A competencia do holerite e posterior ao desligamento.
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/holerites/{holeriteId}/download:
+    get:
+      tags: [Holerites]
+      operationId: obterLinkDeDownloadDoHolerite
+      summary: Devolve um link temporário para baixar o PDF de um holerite (RH).
+      description: |
+        Só o RH ("Baixar PDF" da tela 07). Vale para qualquer versão, publicada ou agendada. Devolve o `LinkTemporario`; o arquivo
+        vem pelo link, como anexo, e nunca por link público. A `url` é uma URL assinada e opaca (o front só a abre; nunca a monta nem lê o
+        caminho do arquivo, que não sai da API). O acesso entra na auditoria.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/HoleriteIdCaminho'
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: https://arquivos.exemplo.com.br/download/7f3a9c1e-5d24-4b7a-9c0e-2a6d8b1f4e53?expira=2026-10-07T12%3A52%3A00Z&assinatura=assinatura-de-exemplo
+                expiraEmUtc: '2026-10-07T12:52:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- HOLERITES (a própria pessoa)
+  /api/eu/holerites:
+    get:
+      tags: [Holerites]
+      operationId: listarMeusHolerites
+      summary: Lista os holerites da pessoa logada (telas 36 e 49).
+      description: |
+        Qualquer perfil, sempre os **da própria pessoa** (o gestor vê os dele aqui; **não existe** rota para o gestor ver os holerites da equipe).
+        Só aparecem holerites **já publicados** e só a **versão atual** de cada (ano, mês, tipo). Os agendados e as versões substituídas não aparecem.
+        Não há marca de "novo" nem de "visto" (decisão do dono, 2026-10-28; o "Novo" que o Figma mostra na tela 36 fica escondido).
+
+        `ano` (padrão: o ano atual) é o seletor "2026" e filtra a lista **e** as contagens; `tipo` é a aba escolhida.
+        `contagens` (`Todos 10`, `Mensais 9`, `Férias 1`, `13º salário 0`) vale para o `ano` pedido e não depende de `tipo`;
+        `anosDisponiveis` são os anos com algum holerite, do mais recente para o mais antigo (opções do seletor). `total` é "10 holerites em 2026".
+        Ordem: mais recente primeiro (ano, mês e, no mesmo mês, publicação mais recente).
+
+        **Cartão "Próximo pagamento"** (telas 36 e 49, "até 6 de novembro"): o dado **não vem desta rota**. A tela chama `GET /api/eu/pagamento/proximo`
+        (fatia 7, qualquer perfil), que devolve `pagamento` (a data do próximo pagamento: `data` no formato `2026-11-06`, mais `ano`, `mes`, `origem`
+        `REGRA` ou `EXCECAO` e `ajustes`) e `competencia` (`ano` e `mes` do holerite a que o pagamento se refere, "Holerite de outubro").
+        Se a empresa ainda não configurou o dia do pagamento, os dois vêm `null` (regra da rota, fatia 7) e o cartão não aparece.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - name: ano
+          in: query
+          description: Ano de competência. Padrão o ano atual.
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - name: tipo
+          in: query
+          description: Só holerites deste tipo (as abas Mensais, Férias e 13º salário). Sem o parâmetro, todos.
+          schema: { $ref: '#/components/schemas/HoleriteTipo' }
+      responses:
+        '200':
+          description: Página de holerites.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HoleriteListaEu' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 10
+                totalPaginas: 1
+                ano: 2026
+                anosDisponiveis: [2026, 2025]
+                contagens: { todos: 10, mensais: 9, ferias: 1, decimoTerceiro: 0 }
+                itens:
+                  - { id: 5121, tipo: MENSAL, mes: 9, ano: 2026, publicadoEmUtc: '2026-10-05T14:30:00Z' }
+                  - { id: 4987, tipo: MENSAL, mes: 8, ano: 2026, publicadoEmUtc: '2026-09-04T13:10:00Z' }
+                  - { id: 4410, tipo: FERIAS, mes: 1, ano: 2026, publicadoEmUtc: '2026-01-02T12:00:00Z' }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/holerites/{holeriteId}/download:
+    get:
+      tags: [Holerites]
+      operationId: obterLinkDeDownloadDoMeuHolerite
+      summary: Devolve um link temporário para baixar o PDF de um holerite da própria pessoa.
+      description: |
+        Qualquer perfil, só para holerite **da própria pessoa**, já **publicado** e na **versão atual**. Outro holerite, agendado ou versão substituída:
+        404 (a API não revela se existe), inclusive para o gestor. Devolve o `LinkTemporario`; o arquivo vem como anexo, nunca por link público,
+        e o link vence em poucos minutos. A `url` é uma URL assinada e opaca (o front só a abre; o caminho do arquivo não sai da API).
+        O acesso entra na auditoria.
+      x-perfis: [Funcionario, Gestor, RH]
+      x-provisorio: >-
+        A tela 36 tem dois botões, "Ver" e "Baixar PDF". Pela regra de arquivos (roadmap, decisão 7) o PDF sempre baixa como anexo, então o contrato tem uma
+        só rota e os dois botões usariam o mesmo link. Se o dono quiser que "Ver" abra o PDF na tela do navegador, esta rota ganha um parâmetro
+        (por exemplo `abrirNoNavegador=true`) para o link vir sem forçar o download.
+      parameters:
+        - $ref: '#/components/parameters/HoleriteIdCaminho'
+      responses:
+        '200':
+          description: Link temporário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LinkTemporario' }
+              example:
+                url: https://arquivos.exemplo.com.br/download/c41e08b2-91d7-4f6a-8b35-0e7f2a9d6c14?expira=2026-10-07T12%3A52%3A00Z&assinatura=assinatura-de-exemplo
+                expiraEmUtc: '2026-10-07T12:52:00Z'
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- ADVERTÊNCIAS (RH)
+  /api/rh/advertencias:
+    get:
+      tags: [Advertências]
+      operationId: listarAdvertencias
+      summary: Lista as advertências de todos os setores, com filtros (tela 14).
+      description: |
+        Só o RH. A lista é **de um ano** (`ano`, padrão o ano atual; "Mostrando 6 de 9 em 2026") pela **data do ocorrido**. As abas são valores de `situacao`
+        (Todas = sem o parâmetro; Aguardando ciência = `PENDENTE`; Ciente = `APLICADA`; Contestada = `CONTESTADA`; `CANCELADA` existe mas não tem aba no Figma).
+        `busca` procura no **nome do colaborador** e no **motivo**; `setorId` é "Todos os setores"; `tipo` é "Todos os tipos".
+        Ordem: data do ocorrido mais recente primeiro, depois o mais recente registrado. O botão "Abrir" usa `GET /api/rh/advertencias/{advertenciaId}`.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - $ref: '#/components/parameters/Busca'
+        - name: ano
+          in: query
+          description: Ano da data do ocorrido. Padrão o ano atual.
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - name: situacao
+          in: query
+          description: Só advertências nesta situação.
+          schema: { $ref: '#/components/schemas/AdvertenciaSituacao' }
+        - name: setorId
+          in: query
+          description: Só advertências de pessoas deste setor (o setor atual da pessoa).
+          schema: { type: integer }
+        - name: tipo
+          in: query
+          description: Só advertências deste tipo.
+          schema: { $ref: '#/components/schemas/AdvertenciaTipo' }
+      responses:
+        '200':
+          description: Página de advertências.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaLista' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 9
+                totalPaginas: 1
+                itens:
+                  - id: 118
+                    data: '2026-10-05'
+                    funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: ESCRITA
+                    motivo: Atrasos repetidos sem justificativa
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: PENDENTE
+                  - id: 112
+                    data: '2026-09-29'
+                    funcionario: { id: 31, nome: Thiago Mello, cargo: Auxiliar de logística, setor: Logística, ativo: true }
+                    tipo: VERBAL
+                    motivo: Uso de celular durante a operação da empilhadeira
+                    aplicadaPor: { tipo: GESTOR, nome: Paulo Vieira }
+                    situacao: APLICADA
+                  - id: 109
+                    data: '2026-09-15'
+                    funcionario: { id: 44, nome: Vanessa Lima, cargo: Assistente administrativa, setor: Administrativo, ativo: true }
+                    tipo: ESCRITA
+                    motivo: Falta sem justificativa em 12/09
+                    aplicadaPor: { tipo: RH, nome: null }
+                    situacao: CONTESTADA
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/advertencias/resumo:
+    get:
+      tags: [Advertências]
+      operationId: obterResumoDasAdvertencias
+      summary: Mostra os números do topo da tela de advertências e a contagem de cada aba.
+      description: |
+        Só o RH (tela 14). Os números são de **um ano** (`ano`, padrão o ano atual) pela data do ocorrido e não dependem de busca nem de filtro.
+        `contagens` são as das abas da lista (e o "Registradas em 2026"): `todas` soma as quatro situações e **inclui as canceladas**, como a lista faz.
+        `setorComMaisRegistros` é o setor atual com mais advertências **não canceladas** do ano (a regra de contagem das advertências, a mesma da
+        tela do gestor; empate: o primeiro em ordem alfabética); `null` quando não há advertência não cancelada no ano.
+      x-perfis: [RH]
+      parameters:
+        - name: ano
+          in: query
+          description: Ano da data do ocorrido. Padrão o ano atual.
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+      responses:
+        '200':
+          description: Números do ano.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaResumoRh' }
+              example:
+                ano: 2026
+                contagens: { todas: 9, pendentes: 2, aplicadas: 6, contestadas: 1, canceladas: 0 }
+                setorComMaisRegistros: { setor: Logística, quantidade: 4 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/advertencias/{advertenciaId}:
+    get:
+      tags: [Advertências]
+      operationId: obterAdvertencia
+      summary: Mostra uma advertência inteira, com a contestação, para o RH ("Abrir").
+      description: Só o RH. Inclui a descrição, a data da ciência e, se houve, o texto e a data da contestação.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/AdvertenciaIdCaminho'
+      responses:
+        '200':
+          description: A advertência.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaDetalheRh' }
+              example:
+                id: 109
+                data: '2026-09-15'
+                funcionario: { id: 44, nome: Vanessa Lima, cargo: Assistente administrativa, setor: Administrativo, ativo: true }
+                tipo: ESCRITA
+                motivo: Falta sem justificativa em 12/09
+                aplicadaPor: { tipo: RH, nome: null }
+                situacao: CONTESTADA
+                descricao: Não houve registro de ponto nem aviso prévio no sábado, 12/09, dia de escala da pessoa.
+                dataCienciaUtc: null
+                textoContestacao: Troquei o plantão de 12/09 com a colega Júlia por mensagem e avisei o gestor na sexta; posso mostrar a conversa.
+                dataContestacaoUtc: '2026-09-17T13:05:00Z'
+                desfechoDaContestacao: null
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/advertencias/{advertenciaId}/resposta:
+    post:
+      tags: [Advertências]
+      operationId: responderContestacaoDeAdvertencia
+      summary: O RH responde à contestação, mantendo a advertência ou acatando a contestação.
+      description: |
+        Só o RH. Só vale para advertência `CONTESTADA`; qualquer outra situação devolve 422 `ADVERTENCIA_NAO_ESTA_CONTESTADA`.
+
+        - `decisao: MANTER`: a advertência volta a `APLICADA` (`desfechoDaContestacao: MANTIDA`).
+        - `decisao: ACATAR`: a advertência passa a `CANCELADA` (`desfechoDaContestacao: ACATADA`); cancelada não muda mais de status (trigger do banco).
+        - `resposta` é o texto que o RH escreve para a pessoa: **vai por e-mail** à pessoa e **não fica guardado** no banco (o Kauan decide se guarda;
+          ver `V014`), só na auditoria. Por isso a pessoa não vê a resposta na tela, só a nova situação.
+        Não há outra forma de cancelar uma advertência.
+      x-perfis: [RH]
+      x-provisorio: >-
+        Decisão do dono (roadmap, fatia 4, "o que acontece depois da contestação"): hipótese mais simples, o RH mantém (volta a `APLICADA`) ou acata
+        (`CANCELADA`) e responde por e-mail, sem guardar a resposta. Se o dono quiser outro desfecho (por exemplo, a resposta aparecer na tela da pessoa,
+        ou um status próprio para "contestação negada"), muda o corpo desta rota e o schema da advertência (`respostaDoRh`).
+      parameters:
+        - $ref: '#/components/parameters/AdvertenciaIdCaminho'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdvertenciaRespostaComando' }
+            example:
+              decisao: ACATAR
+              resposta: Conferimos as mensagens e o registro do gestor. A troca de plantão foi combinada, então cancelamos a advertência.
+      responses:
+        '200':
+          description: Contestação respondida.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaDetalheRh' }
+              example:
+                id: 109
+                data: '2026-09-15'
+                funcionario: { id: 44, nome: Vanessa Lima, cargo: Assistente administrativa, setor: Administrativo, ativo: true }
+                tipo: ESCRITA
+                motivo: Falta sem justificativa em 12/09
+                aplicadaPor: { tipo: RH, nome: null }
+                situacao: CANCELADA
+                descricao: Não houve registro de ponto nem aviso prévio no sábado, 12/09, dia de escala da pessoa.
+                dataCienciaUtc: null
+                textoContestacao: Troquei o plantão de 12/09 com a colega Júlia por mensagem e avisei o gestor na sexta; posso mostrar a conversa.
+                dataContestacaoUtc: '2026-09-17T13:05:00Z'
+                desfechoDaContestacao: ACATADA
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A advertência não está contestada.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Só uma advertência contestada pode receber resposta.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: ADVERTENCIA_NAO_ESTA_CONTESTADA
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/funcionarios/{funcionarioId}/advertencias:
+    parameters:
+      - name: funcionarioId
+        in: path
+        required: true
+        description: Identificador da pessoa.
+        schema: { type: integer }
+    get:
+      tags: [Advertências]
+      operationId: listarAdvertenciasDoFuncionario
+      summary: Lista as advertências de uma pessoa, para a aba Advertências da ficha (tela 11).
+      description: |
+        Só o RH. Todas as advertências da pessoa, de todos os anos e **inclusive as canceladas**, da data do ocorrido mais recente para a mais antiga.
+        O botão "Abrir" usa `GET /api/rh/advertencias/{advertenciaId}`. Funciona também para pessoa inativa. O número "Advertências" do resumo da
+        ficha (`advertenciasQuantidade`, fatia 1) é outra conta: só as **não canceladas do ano corrente**, por isso pode ser menor que o `total` desta lista.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Página de advertências da pessoa.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaLista' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 1
+                totalPaginas: 1
+                itens:
+                  - id: 96
+                    data: '2026-06-02'
+                    funcionario: { id: 24, nome: Pedro Santos, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: VERBAL
+                    motivo: Faltou à escala de sábado sem avisar
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: APLICADA
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Advertências]
+      operationId: registrarAdvertencia
+      summary: O RH registra uma advertência para uma pessoa (telas 11 e 15).
+      description: |
+        Só o RH. Serve ao botão "Registrar advertência" da ficha (tela 11) e ao "Nova advertência" da lista (tela 15, que antes pede à pessoa
+        uma lista de colaboradores: use a lista de funcionários da fatia 1). A advertência nasce `PENDENTE` ("Aguardando ciência").
+
+        - `dataDoOcorrido`: dia do fato, hoje ou antes (futura: 400).
+        - `aplicadaPor`: `GESTOR_DO_COLABORADOR` registra em nome do gestor da pessoa (o gestor ativo dela; se ela não tem gestor, ou o gestor foi
+          desligado, 422 `ADVERTENCIA_SEM_GESTOR`); `RH` registra em nome do RH (a lista mostra "RH").
+        - `motivo`: resumo de uma linha (até 255 caracteres). `descricao`: o que aconteceu, quando e qual regra foi descumprida.
+        - **E-mail:** **só a pessoa** recebe, **sempre**, o e-mail de "advertência registrada" (CONVENCOES, seção 12). O gestor dela **não** recebe
+          cópia quando o RH registra (decisão do dono, 2026-10-30), nem quando `aplicadaPor` é `GESTOR_DO_COLABORADOR`: quem registra é o RH. Não existe
+          opção para não avisar. A caixa "Avisar o colaborador e o gestor por e-mail" que o Figma mostra na tela 15 fica escondida (o contrato não
+          avisa o gestor).
+        - Pessoa inativa não recebe advertência (422 `FUNCIONARIO_INATIVO`).
+        Entra na auditoria. A pessoa vê a advertência em `/api/eu/advertencias` e confirma a ciência ou contesta.
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdvertenciaRegistroRhComando' }
+            example:
+              dataDoOcorrido: '2026-10-05'
+              tipo: ESCRITA
+              aplicadaPor: GESTOR_DO_COLABORADOR
+              motivo: Atrasos repetidos sem justificativa
+              descricao: Nas últimas três semanas houve cinco atrasos na abertura da loja (22/09, 25/09, 29/09, 01/10 e 03/10), sem justificativa e sem pedido de ajuste no ponto. Abrir a loja no horário faz parte da escala do dia.
+      responses:
+        '201':
+          description: Advertência registrada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaDetalheRh' }
+              example:
+                id: 118
+                data: '2026-10-05'
+                funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                tipo: ESCRITA
+                motivo: Atrasos repetidos sem justificativa
+                aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                situacao: PENDENTE
+                descricao: Nas últimas três semanas houve cinco atrasos na abertura da loja (22/09, 25/09, 29/09, 01/10 e 03/10), sem justificativa e sem pedido de ajuste no ponto. Abrir a loja no horário faz parte da escala do dia.
+                dataCienciaUtc: null
+                textoContestacao: null
+                dataContestacaoUtc: null
+                desfechoDaContestacao: null
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: |
+            Recusada por regra de negócio ou do banco. `FUNCIONARIO_INATIVO` (código único em todas as fatias; trigger: `Nao e possivel registrar advertencia para funcionario inativo.`),
+            `ADVERTENCIA_SEM_GESTOR` (a pessoa não tem gestor ativo e `aplicadaPor` é `GESTOR_DO_COLABORADOR`) e `ADVERTENCIA_GESTOR_ADVERTE_A_SI_MESMO`
+            (trigger: `O gestor nao pode advertir a si mesmo.`, quando a pessoa é o próprio gestor).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                inativo:
+                  summary: Pessoa inativa
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não é possível registrar advertência para uma pessoa inativa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FUNCIONARIO_INATIVO
+                    regraDoBanco: Nao e possivel registrar advertencia para funcionario inativo.
+                semGestor:
+                  summary: Pessoa sem gestor ativo
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Esta pessoa não tem gestor ativo. Escolha "RH" em "Aplicada por".
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ADVERTENCIA_SEM_GESTOR
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- ADVERTÊNCIAS (gestor, só a equipe dele)
+  /api/gestor/advertencias:
+    get:
+      tags: [Advertências]
+      operationId: listarAdvertenciasDaEquipe
+      summary: Lista as advertências das pessoas da equipe do gestor (tela 59).
+      description: |
+        Só o gestor, **só a equipe dele**: as pessoas do setor dele (um gestor responde por **um** setor), sem o próprio gestor (a mesma equipe de
+        `GET /api/gestor/equipe`, fatia 1). Mostra as advertências da equipe registradas por qualquer pessoa (o gestor ou o RH). A lista é **de um ano**
+        (`ano`, padrão o ano atual, pela data do ocorrido). Ordem: data do ocorrido mais recente primeiro, depois o mais recente registrado.
+        O botão "Abrir" usa `GET /api/gestor/advertencias/{advertenciaId}`.
+      x-perfis: [Gestor]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - name: ano
+          in: query
+          description: Ano da data do ocorrido. Padrão o ano atual.
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - name: situacao
+          in: query
+          description: Só advertências nesta situação.
+          schema: { $ref: '#/components/schemas/AdvertenciaSituacao' }
+      responses:
+        '200':
+          description: Página de advertências da equipe.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaLista' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 3
+                totalPaginas: 1
+                itens:
+                  - id: 118
+                    data: '2026-10-05'
+                    funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: ESCRITA
+                    motivo: Atrasos repetidos sem justificativa
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: PENDENTE
+                  - id: 103
+                    data: '2026-07-11'
+                    funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: VERBAL
+                    motivo: Atraso na abertura da loja
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: APLICADA
+                  - id: 96
+                    data: '2026-06-02'
+                    funcionario: { id: 24, nome: Pedro Santos, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: VERBAL
+                    motivo: Faltou à escala de sábado sem avisar
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: APLICADA
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/advertencias/resumo:
+    get:
+      tags: [Advertências]
+      operationId: obterResumoDasAdvertenciasDaEquipe
+      summary: Mostra os números do topo da tela de advertências do setor e o quadro "Por pessoa".
+      description: |
+        Só o gestor, só a equipe dele (tela 59). Os números são de **um ano** (`ano`, padrão o ano atual) pela data do ocorrido.
+
+        **Regra da contagem** (a mesma em todas as fatias): conta **advertência não cancelada** (`PENDENTE`, `APLICADA` ou `CONTESTADA`) do ano pedido
+        (padrão o ano corrente). `registradas` é "Registradas em 2026", `pessoasComAdvertencia` é a "2" de "2 de 8" e cada `quantidade` de `porPessoa`
+        usam essa regra; a soma das quantidades de `porPessoa` é `registradas`. A lista `GET /api/gestor/advertencias` mostra também as canceladas
+        (use `situacao=CANCELADA`), por isso o `total` dela pode ser maior que `registradas`.
+        `aguardandoCiencia` traz quantas e **quais pessoas** têm advertência `PENDENTE`; `totalDaEquipe` é o "8" de "2 de 8" (as pessoas ativas do setor,
+        **sem o gestor**: a mesma equipe de `GET /api/gestor/equipe`, fatia 1); `porPessoa` traz **todas** as pessoas da equipe (inclusive com 0), da que
+        tem mais advertências para a que tem menos e, no empate, por nome. O indicador `advertenciasQuantidade` da ficha da pessoa (fatia 1) usa a
+        mesma regra, sempre do ano corrente.
+      x-perfis: [Gestor]
+      parameters:
+        - name: ano
+          in: query
+          description: Ano da data do ocorrido. Padrão o ano atual.
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+      responses:
+        '200':
+          description: Números do ano para a equipe.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaResumoGestor' }
+              example:
+                ano: 2026
+                registradas: 3
+                aguardandoCiencia:
+                  quantidade: 1
+                  pessoas:
+                    - { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                pessoasComAdvertencia: 2
+                totalDaEquipe: 8
+                porPessoa:
+                  - { funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }, quantidade: 2 }
+                  - { funcionario: { id: 24, nome: Pedro Santos, cargo: Vendedor, setor: Comercial, ativo: true }, quantidade: 1 }
+                  - { funcionario: { id: 25, nome: Fernanda Lopes, cargo: Executiva de contas, setor: Comercial, ativo: true }, quantidade: 0 }
+                  - { funcionario: { id: 26, nome: Gustavo Reis, cargo: Vendedor, setor: Comercial, ativo: true }, quantidade: 0 }
+                  - { funcionario: { id: 27, nome: Helena Prates, cargo: Assistente comercial, setor: Comercial, ativo: true }, quantidade: 0 }
+                  - { funcionario: { id: 28, nome: Igor Batista, cargo: Estagiário, setor: Comercial, ativo: true }, quantidade: 0 }
+                  - { funcionario: { id: 22, nome: Júlia Nunes, cargo: Vendedora, setor: Comercial, ativo: true }, quantidade: 0 }
+                  - { funcionario: { id: 23, nome: Larissa Moura, cargo: Vendedora, setor: Comercial, ativo: true }, quantidade: 0 }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/advertencias/{advertenciaId}:
+    get:
+      tags: [Advertências]
+      operationId: obterAdvertenciaDaEquipe
+      summary: Mostra uma advertência inteira de uma pessoa da equipe, para o gestor ("Abrir").
+      description: |
+        Só o gestor. Advertência de pessoa **fora da equipe** dele: 404 (a API não revela que existe). O gestor vê a descrição, a data da ciência
+        e a situação (`CONTESTADA` aparece), mas **não** o texto da contestação nem a resposta do RH.
+      x-perfis: [Gestor]
+      parameters:
+        - $ref: '#/components/parameters/AdvertenciaIdCaminho'
+      responses:
+        '200':
+          description: A advertência.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaDetalheGestor' }
+              example:
+                id: 118
+                data: '2026-10-05'
+                funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                tipo: ESCRITA
+                motivo: Atrasos repetidos sem justificativa
+                aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                situacao: PENDENTE
+                descricao: Nas últimas três semanas houve cinco atrasos na abertura da loja (22/09, 25/09, 29/09, 01/10 e 03/10), sem justificativa e sem pedido de ajuste no ponto. Abrir a loja no horário faz parte da escala do dia.
+                dataCienciaUtc: null
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/gestor/equipe/{funcionarioId}/advertencias:
+    parameters:
+      - name: funcionarioId
+        in: path
+        required: true
+        description: Identificador da pessoa (precisa ser da equipe do gestor).
+        schema: { type: integer }
+    get:
+      tags: [Advertências]
+      operationId: listarAdvertenciasDoFuncionarioDaEquipe
+      summary: Lista as advertências de uma pessoa da equipe, para a aba Advertências da ficha do gestor.
+      description: |
+        Só o gestor. Todas as advertências da pessoa, de todos os anos e **inclusive as canceladas**, da data do ocorrido mais recente para a mais antiga.
+        Pessoa de **outro setor**: 404. O botão "Abrir" usa `GET /api/gestor/advertencias/{advertenciaId}`. O número "Advertências" do resumo da
+        ficha (`advertenciasQuantidade`, fatia 1) conta só as **não canceladas do ano corrente**, por isso pode ser menor que o `total` desta lista.
+      x-perfis: [Gestor]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Página de advertências da pessoa.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaLista' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 2
+                totalPaginas: 1
+                itens:
+                  - id: 118
+                    data: '2026-10-05'
+                    funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: ESCRITA
+                    motivo: Atrasos repetidos sem justificativa
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: PENDENTE
+                  - id: 103
+                    data: '2026-07-11'
+                    funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                    tipo: VERBAL
+                    motivo: Atraso na abertura da loja
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: APLICADA
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+    post:
+      tags: [Advertências]
+      operationId: registrarAdvertenciaDaEquipe
+      summary: O gestor registra uma advertência para uma pessoa da própria equipe (telas 53 e 60).
+      description: |
+        Só o gestor, só para pessoa da equipe dele (outro setor: 404). Serve à ficha da equipe (tela 53, com a pessoa já escolhida) e à tela de
+        advertências do setor (tela 60, em que o gestor escolhe a pessoa na lista `GET /api/gestor/equipe`, fatia 1). A advertência nasce `PENDENTE`
+        e fica **registrada como aplicada por quem registrou** (o gestor logado). O RH vê tudo na lista dele ("O RH recebe uma cópia").
+        As regras de campos são as de `POST /api/rh/funcionarios/{funcionarioId}/advertencias`, sem o campo `aplicadaPor`.
+
+        **E-mail:** a pessoa recebe **sempre** o e-mail de "advertência registrada" e o RH recebe uma cópia dele (CONVENCOES, seção 12); não existe
+        opção para não avisar. A caixa "Avisar o colaborador por e-mail" que o Figma mostra nas telas 53 e 60 fica escondida.
+        Pessoa inativa: 422 `FUNCIONARIO_INATIVO`. O gestor não registra advertência para si mesmo: ele não faz parte da equipe dele (a lista dele não o traz),
+        então pedir o próprio id devolve 404.
+      x-perfis: [Gestor]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdvertenciaRegistroGestorComando' }
+            example:
+              dataDoOcorrido: '2026-10-07'
+              tipo: VERBAL
+              motivo: Atraso na abertura da loja
+              descricao: Abriu a loja às 08:40, com a escala marcada para as 08:00, sem avisar o gestor.
+      responses:
+        '201':
+          description: Advertência registrada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaDetalheGestor' }
+              example:
+                id: 119
+                data: '2026-10-07'
+                funcionario: { id: 21, nome: Diego Farias, cargo: Vendedor, setor: Comercial, ativo: true }
+                tipo: VERBAL
+                motivo: Atraso na abertura da loja
+                aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                situacao: PENDENTE
+                descricao: Abriu a loja às 08:40, com a escala marcada para as 08:00, sem avisar o gestor.
+                dataCienciaUtc: null
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Pessoa inativa (trigger `Nao e possivel registrar advertencia para funcionario inativo.`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Não é possível registrar advertência para uma pessoa inativa.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FUNCIONARIO_INATIVO
+                regraDoBanco: Nao e possivel registrar advertencia para funcionario inativo.
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- ADVERTÊNCIAS (a própria pessoa)
+  /api/eu/advertencias:
+    get:
+      tags: [Advertências]
+      operationId: listarMinhasAdvertencias
+      summary: Lista as advertências da pessoa logada, com o que precisa de ciência em primeiro lugar (tela 43).
+      description: |
+        Qualquer perfil, sempre as **da própria pessoa** (um gestor ou alguém do RH também pode receber advertência).
+        **Ordem:** as `PENDENTE` primeiro (a tela as destaca com "Aguardando sua ciência" e os botões "Confirmar ciência" e "Contestar"), depois as demais da
+        data do ocorrido mais recente para a mais antiga (o "Histórico"). Cada item já traz a descrição e a contestação: "Ver detalhes" não precisa de outra chamada.
+        `situacao` filtra, se a tela precisar.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/TamanhoPagina'
+        - name: situacao
+          in: query
+          description: Só advertências nesta situação.
+          schema: { $ref: '#/components/schemas/AdvertenciaSituacao' }
+      responses:
+        '200':
+          description: Página de advertências da pessoa.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaListaEu' }
+              example:
+                pagina: 1
+                tamanhoPagina: 20
+                total: 2
+                totalPaginas: 1
+                itens:
+                  - id: 118
+                    data: '2026-10-05'
+                    tipo: ESCRITA
+                    motivo: Atrasos repetidos sem justificativa
+                    descricao: Nas últimas três semanas houve cinco atrasos na abertura da loja (22/09, 25/09, 29/09, 01/10 e 03/10), sem justificativa e sem pedido de ajuste no ponto. Abrir a loja no horário faz parte da escala do dia.
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: PENDENTE
+                    dataCienciaUtc: null
+                    textoContestacao: null
+                    dataContestacaoUtc: null
+                    desfechoDaContestacao: null
+                  - id: 103
+                    data: '2026-07-11'
+                    tipo: VERBAL
+                    motivo: Atraso na abertura da loja
+                    descricao: Abriu a loja às 08:40, com a escala marcada para as 08:00, sem avisar o gestor.
+                    aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                    situacao: APLICADA
+                    dataCienciaUtc: '2026-07-11T19:20:00Z'
+                    textoContestacao: null
+                    dataContestacaoUtc: null
+                    desfechoDaContestacao: null
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/advertencias/{advertenciaId}/ciencia:
+    post:
+      tags: [Advertências]
+      operationId: confirmarCienciaDeAdvertencia
+      summary: A pessoa confirma que tomou ciência da advertência ("Confirmar ciência").
+      description: |
+        Qualquer perfil, só para advertência **da própria pessoa** (de outra pessoa: 404). Sem corpo. A advertência passa de `PENDENTE` para `APLICADA`
+        ("Ciente") e grava a data da ciência. Confirmar a ciência **não** quer dizer que a pessoa concorda.
+        Só vale para `PENDENTE`; qualquer outra situação (inclusive repetir o clique) devolve 422 `ADVERTENCIA_NAO_ESTA_PENDENTE`.
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/AdvertenciaIdCaminho'
+      responses:
+        '200':
+          description: Ciência registrada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaEu' }
+              example:
+                id: 118
+                data: '2026-10-05'
+                tipo: ESCRITA
+                motivo: Atrasos repetidos sem justificativa
+                descricao: Nas últimas três semanas houve cinco atrasos na abertura da loja (22/09, 25/09, 29/09, 01/10 e 03/10), sem justificativa e sem pedido de ajuste no ponto. Abrir a loja no horário faz parte da escala do dia.
+                aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                situacao: APLICADA
+                dataCienciaUtc: '2026-10-07T12:41:00Z'
+                textoContestacao: null
+                dataContestacaoUtc: null
+                desfechoDaContestacao: null
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A advertência não está aguardando ciência.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Esta advertência já teve ciência ou contestação.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: ADVERTENCIA_NAO_ESTA_PENDENTE
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/eu/advertencias/{advertenciaId}/contestacao:
+    post:
+      tags: [Advertências]
+      operationId: contestarAdvertencia
+      summary: A pessoa contesta a advertência, explicando o motivo ("Contestar").
+      description: |
+        Qualquer perfil, só para advertência **da própria pessoa** (de outra pessoa: 404). A advertência passa de `PENDENTE` para `CONTESTADA` e grava o texto e a
+        data da contestação. O RH analisa e responde **por e-mail** (`POST /api/rh/advertencias/{advertenciaId}/resposta`); o RH a encontra na aba
+        "Contestada" da lista dele (não há e-mail ao RH no momento da contestação: não está entre os eventos aprovados).
+        Só vale para `PENDENTE`: contestar de novo, ou depois de dar ciência, devolve 422 `ADVERTENCIA_NAO_ESTA_PENDENTE` (a primeira contestação nunca é sobrescrita).
+      x-perfis: [Funcionario, Gestor, RH]
+      parameters:
+        - $ref: '#/components/parameters/AdvertenciaIdCaminho'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdvertenciaContestacaoComando' }
+            example:
+              texto: Em duas dessas datas eu estava com a chave da loja emprestada ao gerente, e avisei por mensagem. Posso mostrar a conversa.
+      responses:
+        '200':
+          description: Contestação registrada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvertenciaEu' }
+              example:
+                id: 118
+                data: '2026-10-05'
+                tipo: ESCRITA
+                motivo: Atrasos repetidos sem justificativa
+                descricao: Nas últimas três semanas houve cinco atrasos na abertura da loja (22/09, 25/09, 29/09, 01/10 e 03/10), sem justificativa e sem pedido de ajuste no ponto. Abrir a loja no horário faz parte da escala do dia.
+                aplicadaPor: { tipo: GESTOR, nome: Carlos Ribeiro }
+                situacao: CONTESTADA
+                dataCienciaUtc: null
+                textoContestacao: Em duas dessas datas eu estava com a chave da loja emprestada ao gerente, e avisei por mensagem. Posso mostrar a conversa.
+                dataContestacaoUtc: '2026-10-07T12:42:00Z'
+                desfechoDaContestacao: null
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: A advertência não está aguardando ciência.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Esta advertência já teve ciência ou contestação.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: ADVERTENCIA_NAO_ESTA_PENDENTE
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  # ---------------------------------------------------------------- ANIVERSARIANTES (só a API; a tela é da fatia 7d)
+  /api/eu/aniversariantes:
+    get:
+      tags: [Aniversariantes]
+      operationId: listarAniversariantes
+      summary: Lista quem faz aniversário hoje e nos próximos 14 dias (cartão da tela inicial, fatia 7d).
+      description: |
+        Qualquer perfil: todos veem os aniversariantes da empresa inteira (não só do setor). Só pessoas **ativas** com data de nascimento.
+        Janela: de **hoje até 14 dias à frente** (`diasAte` de 0 a 14), pela data de hoje no fuso -03:00. Ordem: data do aniversário, depois nome.
+        Quem nasceu em 29/02 comemora em 28/02 nos anos que não são bissextos. A lista é curta e **não é paginada**.
+
+        `aniversarioEm` é a próxima data do aniversário (`diasAte: 0` é hoje: a tela diz "Ninguém faz aniversário hoje" quando nenhum item tem `diasAte: 0`).
+        O **ano de nascimento e a idade não são expostos**. Esta rota é só da API; a tela é da fatia 7d.
+      x-perfis: [Funcionario, Gestor, RH]
+      responses:
+        '200':
+          description: Aniversariantes dos próximos dias.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AniversariantesResposta' }
+              example:
+                dias: 14
+                itens:
+                  - funcionario: { id: 8, nome: Marina Costa, cargo: Gerente financeira, setor: Financeiro, ativo: true }
+                    aniversarioEm: '2026-10-15'
+                    diasAte: 8
+                  - funcionario: { id: 24, nome: Pedro Santos, cargo: Vendedor, setor: Comercial, ativo: true }
+                    aniversarioEm: '2026-10-19'
+                    diasAte: 12
+                  - funcionario: { id: 2, nome: Sofia Ramos, cargo: Analista de RH, setor: Recursos Humanos, ativo: true }
+                    aniversarioEm: '2026-10-21'
+                    diasAte: 14
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+components:
+  parameters:
+    AvisoIdCaminho:
+      name: avisoId
+      in: path
+      required: true
+      description: Identificador do aviso.
+      schema: { type: integer }
+    HoleriteIdCaminho:
+      name: holeriteId
+      in: path
+      required: true
+      description: Identificador do holerite (cada versão tem o seu).
+      schema: { type: integer }
+    AdvertenciaIdCaminho:
+      name: advertenciaId
+      in: path
+      required: true
+      description: Identificador da advertência.
+      schema: { type: integer }
+
+  schemas:
+    # ------------------------------------------------------------ avisos
+    AvisoTipo:
+      type: string
+      description: |
+        `SIMPLES`: título e mensagem curta (texto puro, até 280 caracteres). `DETALHADO`: texto longo em markdown, com seções.
+        (Decisão desta fatia: o banco guarda o tipo em `AVISOS.TIPO_AVISO`, que é texto livre, e usa estes dois valores.)
+      enum: [SIMPLES, DETALHADO]
+
+    AvisoSituacao:
+      type: string
+      description: |
+        Calculada pela API, nunca enviada pelo front. `RASCUNHO`: salvo e não publicado. `AGENDADO`: publicado com data futura (ninguém vê ainda).
+        `ATIVO`: no ar. `EXPIRADO`: passou da expiração ou foi encerrado.
+      enum: [RASCUNHO, AGENDADO, ATIVO, EXPIRADO]
+
+    AvisoLeituraContagem:
+      type: object
+      description: Quantas pessoas já abriram o aviso ("41 de 101 viram").
+      required: [viram, total]
+      properties:
+        viram: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0, description: Quantas pessoas deveriam ver o aviso. }
+
+    AvisoItemRh:
+      type: object
+      description: Um aviso na lista do RH, sem o conteúdo inteiro.
+      required: [id, tipo, titulo, previa, situacao, fixado, publicacaoEmUtc, expiraEmUtc, autorNome, leitura]
+      properties:
+        id: { type: integer }
+        tipo: { $ref: '#/components/schemas/AvisoTipo' }
+        titulo: { type: string, maxLength: 200 }
+        previa:
+          type: string
+          description: |
+            Aviso simples: a mensagem inteira (até 280 caracteres). Aviso detalhado: o início do conteúdo em texto puro (sem markdown), até 200 caracteres.
+            A tela corta com reticências conforme o espaço.
+        situacao: { $ref: '#/components/schemas/AvisoSituacao' }
+        fixado: { type: boolean, description: O aviso fica no topo da tela inicial até expirar. }
+        publicacaoEmUtc:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Quando foi publicado, ou quando será (agendado). No rascunho é a data prevista, se alguém informou; senão `null`.
+        expiraEmUtc:
+          type: [string, 'null']
+          format: date-time
+          description: Quando expira (ou expirou). `null` = não expira.
+        autorNome:
+          type: [string, 'null']
+          description: Quem criou o aviso ("Publicado por Ana Souza").
+        leitura:
+          oneOf:
+            - $ref: '#/components/schemas/AvisoLeituraContagem'
+            - type: 'null'
+          description: Só nos avisos `ATIVO` e `EXPIRADO`; `null` em rascunho e agendado.
+
+    AvisoDetalheRh:
+      description: Um aviso com o conteúdo inteiro, para o painel de detalhes do RH.
+      allOf:
+        - $ref: '#/components/schemas/AvisoItemRh'
+        - type: object
+          required: [conteudo]
+          properties:
+            conteudo:
+              type: string
+              description: 'Simples, texto puro; detalhado, **markdown** (`format: markdown`). HTML nunca é interpretado.'
+
+    AvisoListaRh:
+      description: Página de avisos do RH.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/AvisoItemRh' }
+
+    AvisoPainelRh:
+      type: object
+      description: Números do topo da tela de avisos do RH e contagem de cada aba.
+      required: [contagens, leituraMediaDosAtivosPercentual, expiramNosProximos7Dias, proximoAExpirar]
+      properties:
+        contagens:
+          type: object
+          required: [ativos, agendados, expirados, rascunhos]
+          properties:
+            ativos: { type: integer, minimum: 0 }
+            agendados: { type: integer, minimum: 0 }
+            expirados: { type: integer, minimum: 0 }
+            rascunhos: { type: integer, minimum: 0 }
+        leituraMediaDosAtivosPercentual:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: Média de viram ÷ total entre os avisos ativos, arredondada. `null` sem aviso ativo.
+        expiramNosProximos7Dias: { type: integer, minimum: 0 }
+        proximoAExpirar:
+          type: [object, 'null']
+          description: O aviso ativo que expira primeiro, entre os que expiram nos próximos 7 dias. `null` se nenhum.
+          required: [avisoId, titulo, expiraEmUtc]
+          properties:
+            avisoId: { type: integer }
+            titulo: { type: string }
+            expiraEmUtc: { type: string, format: date-time }
+
+    AvisoCriacaoComando:
+      type: object
+      description: Corpo para criar um aviso (rascunho ou publicado).
+      required: [tipo, titulo, conteudo, fixado, publicar]
+      properties:
+        tipo: { $ref: '#/components/schemas/AvisoTipo' }
+        titulo: { type: string, minLength: 1, maxLength: 200 }
+        conteudo:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: |
+            `format: markdown` no detalhado; texto puro no simples. **Simples: até 280 caracteres** (400 acima disso). Detalhado: até 10.000 caracteres.
+            HTML nunca é interpretado.
+        publicarEmUtc:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Com `publicar: true`: vazio ou no passado publica agora; no futuro agenda. Com `publicar: false`: a data prevista (opcional).
+        expiraEm:
+          type: [string, 'null']
+          format: date
+          description: Último dia em que o aviso vale (até o fim desse dia, fuso -03:00). Vazio = não expira.
+        fixado: { type: boolean, description: Fixa no topo da tela inicial até expirar. }
+        publicar: { type: boolean, description: '`false` salva como rascunho; `true` publica (ou agenda).' }
+
+    AvisoEdicaoComando:
+      type: object
+      description: Corpo para editar um aviso. O tipo não muda.
+      required: [titulo, conteudo, fixado]
+      properties:
+        titulo: { type: string, minLength: 1, maxLength: 200 }
+        conteudo:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: 'Mesma regra da criação (simples: até 280 caracteres; detalhado: markdown, até 10.000).'
+        publicarEmUtc:
+          type: [string, 'null']
+          format: date-time
+          description: Só muda em rascunho e agendado. Nos demais, vazio ou igual ao atual.
+        expiraEm:
+          type: [string, 'null']
+          format: date
+          description: Último dia em que o aviso vale. Vazio tira a expiração.
+        fixado: { type: boolean }
+
+    AvisoLeituraItem:
+      type: object
+      description: Uma pessoa na lista "Quem viu".
+      required: [funcionario, lido, lidoEmUtc]
+      properties:
+        funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+        lido: { type: boolean }
+        lidoEmUtc: { type: [string, 'null'], format: date-time }
+
+    AvisoLeituras:
+      description: Totais de leitura do aviso e uma página da lista de pessoas.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [viram, aindaNaoViram, itens]
+          properties:
+            viram: { type: integer, minimum: 0 }
+            aindaNaoViram: { type: integer, minimum: 0 }
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/AvisoLeituraItem' }
+
+    AvisoLembreteResultado:
+      type: object
+      required: [quantidadeDeEmails]
+      properties:
+        quantidadeDeEmails: { type: integer, minimum: 0, description: Quantos e-mails de lembrete foram enfileirados. }
+
+    AvisoItemEu:
+      type: object
+      description: Um aviso vigente na lista de quem está logado.
+      required: [id, tipo, titulo, previa, fixado, publicadoEmUtc, expiraEmUtc, autorNome, lido]
+      properties:
+        id: { type: integer }
+        tipo: { $ref: '#/components/schemas/AvisoTipo' }
+        titulo: { type: string }
+        previa: { type: string, description: 'Aviso simples: a mensagem inteira (até 280 caracteres). Detalhado: o início do conteúdo em texto puro (sem markdown), até 200 caracteres.' }
+        fixado: { type: boolean }
+        publicadoEmUtc: { type: string, format: date-time }
+        expiraEmUtc: { type: [string, 'null'], format: date-time }
+        autorNome: { type: [string, 'null'] }
+        lido: { type: boolean, description: Se a pessoa já abriu o aviso. }
+
+    AvisoDetalheEu:
+      description: Um aviso vigente com o conteúdo inteiro.
+      allOf:
+        - $ref: '#/components/schemas/AvisoItemEu'
+        - type: object
+          required: [lidoEmUtc, conteudo]
+          properties:
+            lidoEmUtc: { type: [string, 'null'], format: date-time }
+            conteudo:
+              type: string
+              description: 'Simples, texto puro; detalhado, **markdown** (`format: markdown`). O front mostra sem interpretar HTML.'
+
+    AvisoListaEu:
+      description: Página de avisos vigentes e as contagens das abas.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens, contagens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/AvisoItemEu' }
+            contagens:
+              type: object
+              description: Não depende de `busca` nem de `apenasNaoLidos`.
+              required: [naoLidos, total]
+              properties:
+                naoLidos: { type: integer, minimum: 0, description: Avisos vigentes que a pessoa ainda não abriu (também o número do menu). }
+                total: { type: integer, minimum: 0, description: Todos os avisos vigentes. }
+
+    # ------------------------------------------------------------ holerites
+    HoleriteTipo:
+      type: string
+      description: Tipo do holerite (valores de `HOLERITES.TIPO_HOLERITE`, `V012`). Mensal, 13º salário ou férias.
+      enum: [MENSAL, DECIMO_TERCEIRO, FERIAS]
+
+    HoleriteSituacao:
+      type: string
+      description: '`PUBLICADO`: a pessoa já vê. `AGENDADO`: a publicação (e o e-mail) está marcada para um dia futuro.'
+      enum: [PUBLICADO, AGENDADO]
+
+    HoleriteItemRh:
+      type: object
+      description: Um holerite (uma versão) como o RH vê.
+      required: [id, funcionarioId, tipo, mes, ano, versao, versaoAtual, situacao, publicacaoEmUtc]
+      properties:
+        id: { type: integer }
+        funcionarioId: { type: integer }
+        tipo: { $ref: '#/components/schemas/HoleriteTipo' }
+        mes: { type: integer, minimum: 1, maximum: 12, description: Mês de competência. }
+        ano: { type: integer, minimum: 2000, maximum: 2100, description: Ano de competência. }
+        versao: { type: integer, minimum: 1, description: 1 é o envio original; cada correção cria a versão seguinte. }
+        versaoAtual: { type: boolean, description: '`true` na maior versão da competência e tipo (a que a pessoa vê, depois de publicada).' }
+        situacao: { $ref: '#/components/schemas/HoleriteSituacao' }
+        publicacaoEmUtc: { type: string, format: date-time, description: 'Quando foi publicado ou quando será (agendado, sempre o começo do dia agendado).' }
+
+    HoleriteListaRh:
+      description: Página de holerites da pessoa, como o RH vê.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens, ultimoPublicado]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/HoleriteItemRh' }
+            ultimoPublicado:
+              oneOf:
+                - $ref: '#/components/schemas/HoleriteItemRh'
+                - type: 'null'
+              description: O holerite já publicado mais recentemente, ignorando filtros e página. `null` se nenhum.
+
+    HoleriteItemEu:
+      type: object
+      description: Um holerite na lista da própria pessoa (só publicados, só a versão atual).
+      required: [id, tipo, mes, ano, publicadoEmUtc]
+      properties:
+        id: { type: integer }
+        tipo: { $ref: '#/components/schemas/HoleriteTipo' }
+        mes: { type: integer, minimum: 1, maximum: 12 }
+        ano: { type: integer, minimum: 2000, maximum: 2100 }
+        publicadoEmUtc: { type: string, format: date-time }
+
+    HoleriteListaEu:
+      description: Página de holerites da própria pessoa, com as contagens das abas e os anos do seletor.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens, ano, anosDisponiveis, contagens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/HoleriteItemEu' }
+            ano: { type: integer, description: 'O ano de competência usado (o pedido, ou o ano atual).' }
+            anosDisponiveis:
+              type: array
+              description: Anos com algum holerite publicado, do mais recente para o mais antigo.
+              items: { type: integer }
+            contagens:
+              type: object
+              description: Do `ano` pedido; não depende de `tipo`.
+              required: [todos, mensais, ferias, decimoTerceiro]
+              properties:
+                todos: { type: integer, minimum: 0 }
+                mensais: { type: integer, minimum: 0 }
+                ferias: { type: integer, minimum: 0 }
+                decimoTerceiro: { type: integer, minimum: 0 }
+
+    HoleriteEnvioComando:
+      type: object
+      description: Corpo (`multipart/form-data`) do envio de um holerite.
+      required: [mes, ano, tipo, arquivo]
+      properties:
+        mes: { type: integer, minimum: 1, maximum: 12, description: Mês de competência. }
+        ano: { type: integer, minimum: 2000, maximum: 2100, description: Ano de competência. }
+        tipo: { $ref: '#/components/schemas/HoleriteTipo' }
+        arquivo:
+          type: string
+          format: binary
+          description: PDF do holerite. Só `application/pdf`, até 5 MB (5 × 1024 × 1024 bytes).
+        publicarEm:
+          type: string
+          format: date
+          description: |
+            Para agendar numa data: dia da publicação, hoje ou futuro (fuso -03:00); publica no começo desse dia. Vazio ou hoje = publica agora.
+            Dia passado: 400. **Exclusivo com `noDiaDoPagamento`** (os dois juntos: 400).
+        noDiaDoPagamento:
+          type: boolean
+          description: |
+            `true` agenda para o dia do próximo pagamento da empresa: o sistema calcula a data (a de `pagamento.data` em `GET /api/eu/pagamento/proximo`,
+            fatia 7; se hoje é o dia do pagamento, publica agora). **Exclusivo com `publicarEm`** (os dois juntos: 400). Vazio ou `false`: vale `publicarEm`.
+            Empresa sem dia de pagamento configurado: 422 `EMPRESA_NAO_CONFIGURADA`.
+
+    HoleriteNovaVersaoComando:
+      type: object
+      description: Corpo (`multipart/form-data`) da correção de um holerite.
+      required: [arquivo]
+      properties:
+        arquivo:
+          type: string
+          format: binary
+          description: PDF corrigido. Só `application/pdf`, até 5 MB.
+        publicarEm:
+          type: string
+          format: date
+          description: Como no envio individual. Exclusivo com `noDiaDoPagamento`. Vazio (e sem `noDiaDoPagamento`) = publica agora.
+        noDiaDoPagamento:
+          type: boolean
+          description: Como no envio individual (`HoleriteEnvioComando.noDiaDoPagamento`). Exclusivo com `publicarEm`.
+
+    HoleriteLoteItemComando:
+      type: object
+      required: [funcionarioId, nomeDoArquivo]
+      properties:
+        funcionarioId: { type: integer }
+        nomeDoArquivo: { type: string, minLength: 1, description: 'Nome do arquivo, como enviado em `arquivos`. Não pode repetir no lote.' }
+
+    HoleriteLoteComando:
+      type: object
+      description: Corpo (`multipart/form-data`) do envio em lote. `itens` vai como JSON; `arquivos` repete o campo, um PDF por parte.
+      required: [mes, ano, tipo, itens, arquivos]
+      properties:
+        mes: { type: integer, minimum: 1, maximum: 12 }
+        ano: { type: integer, minimum: 2000, maximum: 2100 }
+        tipo: { $ref: '#/components/schemas/HoleriteTipo' }
+        publicarEm:
+          type: string
+          format: date
+          description: Como no envio individual; vale para todos os itens. Exclusivo com `noDiaDoPagamento`.
+        noDiaDoPagamento:
+          type: boolean
+          description: Como no envio individual (`HoleriteEnvioComando.noDiaDoPagamento`); vale para todos os itens. Exclusivo com `publicarEm`.
+        itens:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/HoleriteLoteItemComando' }
+        arquivos:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { type: string, format: binary, description: 'PDF de até 5 MB.' }
+
+    HoleriteLoteItemResultado:
+      type: object
+      required: [funcionarioId, nomeDoArquivo, sucesso, holerite, codigoDoErro, mensagemDoErro]
+      properties:
+        funcionarioId: { type: integer }
+        nomeDoArquivo: { type: string }
+        sucesso: { type: boolean }
+        holerite:
+          oneOf:
+            - $ref: '#/components/schemas/HoleriteItemRh'
+            - type: 'null'
+          description: O holerite criado; `null` se o item falhou.
+        codigoDoErro:
+          type: [string, 'null']
+          description: |
+            Se falhou: o `codigo` que a operação individual daria (`HOLERITE_JA_EXISTE`, `HOLERITE_COMPETENCIA_FUTURA`, `HOLERITE_COMPETENCIA_ANTERIOR_A_ADMISSAO`,
+            `HOLERITE_COMPETENCIA_POSTERIOR_AO_DESLIGAMENTO`) ou `ARQUIVO_INVALIDO` (não é PDF, ou passa de 5 MB) ou `FUNCIONARIO_NAO_ENCONTRADO`.
+        mensagemDoErro: { type: [string, 'null'], description: Texto em português para mostrar ao RH. }
+
+    HoleriteLoteResultado:
+      type: object
+      required: [total, enviados, comErro, itens]
+      properties:
+        total: { type: integer, minimum: 0 }
+        enviados: { type: integer, minimum: 0, description: Publicados mais agendados. }
+        comErro: { type: integer, minimum: 0 }
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/HoleriteLoteItemResultado' }
+
+    # ------------------------------------------------------------ advertências
+    AdvertenciaTipo:
+      type: string
+      description: '`VERBAL` ou `ESCRITA`. O banco guarda em `ADVERTENCIAS.TIPO_ADVERTENCIA`, que é texto livre; estes são os valores usados.'
+      x-provisorio: >-
+        Decisão do dono (roadmap, fatia 4, "tipos de advertência"): o spec e o Figma só têm verbal e escrita. Hipótese: só estes dois. Se houver mais
+        (por exemplo suspensão), este enum cresce.
+      enum: [VERBAL, ESCRITA]
+
+    AdvertenciaSituacao:
+      type: string
+      description: |
+        Valores do banco (`ADVERTENCIAS.STATUS_ADVERTENCIA`, `V014`). `PENDENTE`: "Aguardando ciência". `APLICADA`: "Ciente". `CONTESTADA`: "Contestada",
+        esperando o RH. `CANCELADA`: contestação acatada; não muda mais.
+        Fluxo: `PENDENTE` → `APLICADA` ou `CONTESTADA`; `CONTESTADA` → `APLICADA` (mantida) ou `CANCELADA` (acatada).
+      enum: [PENDENTE, APLICADA, CONTESTADA, CANCELADA]
+
+    AdvertenciaDesfecho:
+      type: string
+      description: 'O que o RH decidiu sobre a contestação. `MANTIDA`: a advertência continua (`APLICADA`). `ACATADA`: foi cancelada (`CANCELADA`).'
+      enum: [MANTIDA, ACATADA]
+
+    AdvertenciaAplicadaPor:
+      type: object
+      description: Quem aplicou a advertência.
+      required: [tipo, nome]
+      x-provisorio: >-
+        O banco só guarda o gestor (`ADVERTENCIAS.ID_GESTOR`); não guarda qual pessoa do RH registrou. Hipótese: quando o RH registra, `tipo` é `RH` e `nome` é
+        `null` (a tela mostra "RH"). Se o dono quiser o nome da pessoa do RH na coluna "Aplicada por", falta uma coluna nova (pedir ao Kauan) e `nome` passa a vir preenchido.
+      properties:
+        tipo: { type: string, enum: [GESTOR, RH] }
+        nome: { type: [string, 'null'], description: Nome do gestor; `null` quando foi o RH. }
+
+    AdvertenciaItem:
+      type: object
+      description: Uma advertência numa lista (RH, gestor ou ficha), sem a descrição.
+      required: [id, data, funcionario, tipo, motivo, aplicadaPor, situacao]
+      properties:
+        id: { type: integer }
+        data: { type: string, format: date, description: Data do ocorrido (`DATA_ADVERTENCIA`). }
+        funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+        tipo: { $ref: '#/components/schemas/AdvertenciaTipo' }
+        motivo: { type: string, maxLength: 255, description: Resumo de uma linha. }
+        aplicadaPor: { $ref: '#/components/schemas/AdvertenciaAplicadaPor' }
+        situacao: { $ref: '#/components/schemas/AdvertenciaSituacao' }
+
+    AdvertenciaLista:
+      description: Página de advertências.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/AdvertenciaItem' }
+
+    AdvertenciaDetalheRh:
+      description: Uma advertência inteira, como o RH vê (com a contestação).
+      allOf:
+        - $ref: '#/components/schemas/AdvertenciaItem'
+        - type: object
+          required: [descricao, dataCienciaUtc, textoContestacao, dataContestacaoUtc, desfechoDaContestacao]
+          properties:
+            descricao: { type: string, description: 'O que aconteceu, quando e qual regra foi descumprida.' }
+            dataCienciaUtc: { type: [string, 'null'], format: date-time }
+            textoContestacao: { type: [string, 'null'], description: O texto que a pessoa escreveu ao contestar. }
+            dataContestacaoUtc: { type: [string, 'null'], format: date-time }
+            desfechoDaContestacao:
+              oneOf:
+                - $ref: '#/components/schemas/AdvertenciaDesfecho'
+                - type: 'null'
+              description: Preenchido depois que o RH responde; `null` antes disso ou se nunca houve contestação.
+
+    AdvertenciaDetalheGestor:
+      description: Uma advertência inteira de pessoa da equipe, como o gestor vê (sem o texto da contestação).
+      x-provisorio: >-
+        Decisão do dono: o gestor vê o texto da contestação e o desfecho? O roadmap só diz que o gestor vê as advertências da equipe. Hipótese: ele vê
+        `situacao` (inclusive `CONTESTADA`), mas não o texto da pessoa nem a resposta do RH. Se vir, acrescentar `textoContestacao`, `dataContestacaoUtc` e
+        `desfechoDaContestacao` a este schema.
+      allOf:
+        - $ref: '#/components/schemas/AdvertenciaItem'
+        - type: object
+          required: [descricao, dataCienciaUtc]
+          properties:
+            descricao: { type: string }
+            dataCienciaUtc: { type: [string, 'null'], format: date-time }
+
+    AdvertenciaEu:
+      type: object
+      description: Uma advertência da própria pessoa, completa (a lista dela já traz tudo).
+      required: [id, data, tipo, motivo, descricao, aplicadaPor, situacao, dataCienciaUtc, textoContestacao, dataContestacaoUtc, desfechoDaContestacao]
+      properties:
+        id: { type: integer }
+        data: { type: string, format: date, description: Data do ocorrido. }
+        tipo: { $ref: '#/components/schemas/AdvertenciaTipo' }
+        motivo: { type: string }
+        descricao: { type: string }
+        aplicadaPor: { $ref: '#/components/schemas/AdvertenciaAplicadaPor' }
+        situacao: { $ref: '#/components/schemas/AdvertenciaSituacao' }
+        dataCienciaUtc: { type: [string, 'null'], format: date-time }
+        textoContestacao: { type: [string, 'null'] }
+        dataContestacaoUtc: { type: [string, 'null'], format: date-time }
+        desfechoDaContestacao:
+          oneOf:
+            - $ref: '#/components/schemas/AdvertenciaDesfecho'
+            - type: 'null'
+          description: Preenchido depois que o RH responde à contestação.
+
+    AdvertenciaListaEu:
+      description: Página de advertências da própria pessoa.
+      allOf:
+        - $ref: '#/components/schemas/Paginacao'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/AdvertenciaEu' }
+
+    AdvertenciaResumoRh:
+      type: object
+      description: |
+        Números do topo da tela de advertências do RH e contagem de cada aba, de um ano. `contagens` são as das abas (incluem as canceladas, como a lista);
+        `setorComMaisRegistros` conta só as advertências não canceladas do ano.
+      required: [ano, contagens, setorComMaisRegistros]
+      properties:
+        ano: { type: integer }
+        contagens:
+          type: object
+          required: [todas, pendentes, aplicadas, contestadas, canceladas]
+          properties:
+            todas: { type: integer, minimum: 0, description: 'Registradas no ano (todas as situações, inclusive as canceladas).' }
+            pendentes: { type: integer, minimum: 0, description: Aguardando ciência. }
+            aplicadas: { type: integer, minimum: 0, description: Ciente. }
+            contestadas: { type: integer, minimum: 0 }
+            canceladas: { type: integer, minimum: 0 }
+        setorComMaisRegistros:
+          type: [object, 'null']
+          description: O setor atual com mais advertências **não canceladas** no ano; `null` se não há nenhuma.
+          required: [setor, quantidade]
+          properties:
+            setor: { type: string }
+            quantidade: { type: integer, minimum: 1 }
+
+    AdvertenciaResumoGestor:
+      type: object
+      description: |
+        Números do topo da tela de advertências do setor e o quadro "Por pessoa", de um ano. Todas as contagens usam a mesma regra: só advertência
+        **não cancelada** (`PENDENTE`, `APLICADA` ou `CONTESTADA`) do ano pedido (padrão o ano corrente).
+      required: [ano, registradas, aguardandoCiencia, pessoasComAdvertencia, totalDaEquipe, porPessoa]
+      properties:
+        ano: { type: integer }
+        registradas: { type: integer, minimum: 0, description: 'Advertências não canceladas do ano para a equipe ("Registradas em 2026"). É a soma das quantidades de `porPessoa`.' }
+        aguardandoCiencia:
+          type: object
+          required: [quantidade, pessoas]
+          properties:
+            quantidade: { type: integer, minimum: 0, description: Advertências `PENDENTE` da equipe. }
+            pessoas:
+              type: array
+              description: Pessoas com advertência `PENDENTE`, sem repetir.
+              items: { $ref: '#/components/schemas/FuncionarioResumo' }
+        pessoasComAdvertencia: { type: integer, minimum: 0, description: Pessoas da equipe com pelo menos uma advertência não cancelada no ano. }
+        totalDaEquipe: { type: integer, minimum: 0, description: 'Pessoas ativas da equipe, sem o gestor (o "8" de "2 de 8"; é o total de `GET /api/gestor/equipe`, fatia 1).' }
+        porPessoa:
+          type: array
+          description: Todas as pessoas da equipe, da que tem mais advertências para a que tem menos e, no empate, por nome.
+          items:
+            type: object
+            required: [funcionario, quantidade]
+            properties:
+              funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+              quantidade: { type: integer, minimum: 0, description: Advertências não canceladas dessa pessoa no ano. }
+
+    AdvertenciaRegistroRhComando:
+      type: object
+      description: Corpo para o RH registrar uma advertência.
+      required: [dataDoOcorrido, tipo, aplicadaPor, motivo, descricao]
+      properties:
+        dataDoOcorrido: { type: string, format: date, description: Dia do fato; hoje ou antes. }
+        tipo: { $ref: '#/components/schemas/AdvertenciaTipo' }
+        aplicadaPor:
+          type: string
+          enum: [GESTOR_DO_COLABORADOR, RH]
+          description: Em nome de quem a advertência é registrada. `GESTOR_DO_COLABORADOR` exige que a pessoa tenha gestor ativo.
+          x-provisorio: >-
+            O print da tela 15 mostra só "Gestor do colaborador" selecionado; as outras opções do campo "Aplicada por" não aparecem. O contrato supõe duas:
+            o gestor da pessoa e o RH (spec 13.3: "aplicadas pelo RH ou pelo gestor"). Se a lista for outra, este enum muda.
+        motivo: { type: string, minLength: 1, maxLength: 255, description: Resumo de uma linha. }
+        descricao: { type: string, minLength: 1, maxLength: 5000, description: 'O que aconteceu, quando e qual regra foi descumprida.' }
+
+    AdvertenciaRegistroGestorComando:
+      type: object
+      description: Corpo para o gestor registrar uma advertência para a equipe dele. Quem aplica é sempre o gestor logado.
+      required: [dataDoOcorrido, tipo, motivo, descricao]
+      properties:
+        dataDoOcorrido: { type: string, format: date, description: Dia do fato; hoje ou antes. }
+        tipo: { $ref: '#/components/schemas/AdvertenciaTipo' }
+        motivo: { type: string, minLength: 1, maxLength: 255, description: Resumo de uma linha. }
+        descricao: { type: string, minLength: 1, maxLength: 5000, description: 'O que aconteceu, quando e qual regra foi descumprida.' }
+
+    AdvertenciaContestacaoComando:
+      type: object
+      required: [texto]
+      properties:
+        texto: { type: string, minLength: 10, maxLength: 2000, description: O que a pessoa quer explicar ("explique o que aconteceu"). }
+
+    AdvertenciaRespostaComando:
+      type: object
+      required: [decisao, resposta]
+      properties:
+        decisao:
+          type: string
+          enum: [MANTER, ACATAR]
+          description: '`MANTER`: a advertência continua (`APLICADA`). `ACATAR`: a contestação é aceita e a advertência é cancelada (`CANCELADA`).'
+        resposta: { type: string, minLength: 1, maxLength: 2000, description: Texto enviado por e-mail à pessoa. Não fica guardado no banco. }
+
+    # ------------------------------------------------------------ aniversariantes
+    AniversarianteItem:
+      type: object
+      required: [funcionario, aniversarioEm, diasAte]
+      properties:
+        funcionario: { $ref: '#/components/schemas/FuncionarioResumo' }
+        aniversarioEm: { type: string, format: date, description: 'Próxima data do aniversário (dia e mês de nascimento, no ano de hoje).' }
+        diasAte: { type: integer, minimum: 0, maximum: 14, description: Dias até o aniversário; 0 é hoje. }
+
+    AniversariantesResposta:
+      type: object
+      required: [dias, itens]
+      properties:
+        dias: { type: integer, description: 'Tamanho da janela, em dias à frente de hoje. Fixo em 14.' }
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/AniversarianteItem' }

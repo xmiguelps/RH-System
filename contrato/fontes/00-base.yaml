@@ -1,0 +1,274 @@
+# Base do contrato: informações gerais, segurança e o que todas as fatias compartilham.
+# Convenções em contrato/CONVENCOES.md.
+openapi: 3.1.0
+info:
+  title: API do RH-System
+  version: 0.2.1
+  description: |
+    Contrato escrito antes do back-end. Quem implementa a API segue este documento; quem faz o
+    front-end gera tipos e dados simulados dele. Só o dono muda o contrato.
+servers:
+  - url: http://localhost:5000
+    description: Desenvolvimento local (valor de exemplo; a URL real vem da configuração)
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acesso devolvido por `POST /api/auth/entrar`, no cabeçalho `Authorization`.
+
+  parameters:
+    Pagina:
+      name: pagina
+      in: query
+      description: Número da página, a partir de 1.
+      schema: { type: integer, minimum: 1, default: 1 }
+    TamanhoPagina:
+      name: tamanhoPagina
+      in: query
+      description: Itens por página.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Busca:
+      name: busca
+      in: query
+      description: Texto livre. Cada rota diz em quais campos procura.
+      schema: { type: string, maxLength: 100 }
+    Direcao:
+      name: direcao
+      in: query
+      description: Direção da ordenação.
+      schema: { $ref: '#/components/schemas/DirecaoOrdenacao' }
+
+  headers:
+    RetryAfter:
+      description: Segundos até poder tentar de novo.
+      schema: { type: integer, minimum: 1 }
+
+  schemas:
+    Perfil:
+      type: string
+      description: Perfil de acesso da pessoa logada.
+      enum: [Funcionario, Gestor, RH]
+
+    DirecaoOrdenacao:
+      type: string
+      enum: [ASC, DESC]
+
+    SituacaoHoje:
+      type: string
+      description: |
+        Situação de uma pessoa hoje (definição única, ver `CONVENCOES.md`, seção 10).
+        `SEM_EXPEDIENTE`: sábado, domingo ou feriado. `FERIAS` e `ATESTADO`: cobrem hoje.
+        `TRABALHANDO`: já registrou entrada hoje. `SEM_REGISTRO`: dia com expediente, sem entrada,
+        depois do horário padrão de entrada mais a tolerância. `AINDA_NAO_COMECOU`: o mesmo, antes desse limite.
+      enum: [SEM_EXPEDIENTE, FERIAS, ATESTADO, TRABALHANDO, SEM_REGISTRO, AINDA_NAO_COMECOU]
+
+    PresencaContagens:
+      type: object
+      description: Quantas pessoas estão em cada `SituacaoHoje` (única forma de contar situações de hoje; `CONVENCOES.md`, seção 10).
+      required: [trabalhando, ferias, atestado, semRegistro, aindaNaoComecou, semExpediente]
+      properties:
+        trabalhando: { type: integer, minimum: 0 }
+        ferias: { type: integer, minimum: 0 }
+        atestado: { type: integer, minimum: 0 }
+        semRegistro: { type: integer, minimum: 0 }
+        aindaNaoComecou: { type: integer, minimum: 0 }
+        semExpediente: { type: integer, minimum: 0 }
+
+    DecisaoDeEtapa:
+      type: object
+      description: |
+        Decisão de uma etapa (gestor ou RH) de um pedido em duas etapas (`CONVENCOES.md`, seção 9).
+        O pedido traz `null` enquanto a etapa não foi decidida. A observação é opcional no ponto e
+        obrigatória ao recusar férias.
+      required: [decisao, decididaEmUtc, automatica]
+      properties:
+        decisao:
+          type: string
+          enum: [APROVADA, REJEITADA]
+        decididaPor:
+          description: Quem decidiu (`null` quando foi aprovada sozinha pelo "Gestor ausente").
+          oneOf:
+            - $ref: '#/components/schemas/FuncionarioResumo'
+            - type: 'null'
+        decididaEmUtc: { type: string, format: date-time }
+        automatica:
+          type: boolean
+          description: Verdadeiro quando a etapa do gestor foi aprovada sozinha por "Gestor ausente".
+        observacao: { type: [string, 'null'], maxLength: 500 }
+
+    EtapaDoPedido:
+      type: string
+      description: Em que etapa está um pedido de aprovação em duas etapas (`CONVENCOES.md`, seção 9).
+      enum: [GESTOR, RH, CONCLUIDA]
+
+    Paginacao:
+      type: object
+      description: Campos de paginação, para combinar com `itens` via `allOf`.
+      required: [pagina, tamanhoPagina, total, totalPaginas]
+      properties:
+        pagina: { type: integer, minimum: 1 }
+        tamanhoPagina: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0, description: Total de itens que atendem aos filtros. }
+        totalPaginas: { type: integer, minimum: 0 }
+
+    FuncionarioResumo:
+      type: object
+      description: Identificação curta de uma pessoa, para listas e cartões.
+      required: [id, nome, ativo]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        cargo: { type: [string, 'null'] }
+        setor: { type: [string, 'null'] }
+        ativo: { type: boolean }
+
+    LinkTemporario:
+      type: object
+      description: Link para baixar um arquivo; vale por pouco tempo e baixa como anexo.
+      required: [url, expiraEmUtc]
+      properties:
+        url: { type: string, format: uri }
+        expiraEmUtc: { type: string, format: date-time }
+
+    ProblemaDeApi:
+      type: object
+      description: Corpo de todo erro da API (`application/problem+json`, RFC 9457), em português, sem stack trace.
+      required: [title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: [string, 'null'] }
+        instance: { type: string }
+        traceId: { type: string }
+        codigo:
+          type: string
+          description: Código estável da regra violada, quando o front precisa decidir algo por ela.
+
+    ProblemaDeValidacao:
+      description: Erro 400, com as mensagens por campo.
+      allOf:
+        - $ref: '#/components/schemas/ProblemaDeApi'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              description: Nome do campo (como no corpo da requisição) e as mensagens dele.
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    ProblemaDeRegraDeNegocio:
+      description: Erro 422, regra de negócio ou erro de trigger do banco.
+      allOf:
+        - $ref: '#/components/schemas/ProblemaDeApi'
+        - type: object
+          properties:
+            regraDoBanco:
+              type: string
+              description: Mensagem original do trigger do banco (técnica, sem acento), quando foi ele que recusou.
+
+  responses:
+    Erro400Validacao:
+      description: Algum campo está inválido ou faltando.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeValidacao' }
+          example:
+            title: Dados inválidos.
+            status: 400
+            detail: Confira os campos indicados.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            errors:
+              email: [O e-mail é obrigatório.]
+    Erro400Login:
+      description: E-mail ou senha em branco. Só a rota `entrar` usa este texto; todo outro 400 usa `Erro400Validacao`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeValidacao' }
+          example:
+            title: Dados inválidos.
+            status: 400
+            detail: Preencha o e-mail e a senha.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            errors:
+              email: [O e-mail é obrigatório.]
+    Erro401NaoAutenticado:
+      description: Sem login, token inválido ou vencido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Não autenticado.
+            status: 401
+            detail: Entre novamente para continuar.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    Erro403SemPermissao:
+      description: O perfil da pessoa não pode usar esta rota.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Sem permissão.
+            status: 403
+            detail: Você não tem permissão para esta ação.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    Erro404NaoEncontrado:
+      description: Não existe, ou está fora do escopo da pessoa (a API não revela qual dos dois).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Não encontrado.
+            status: 404
+            detail: O registro não foi encontrado.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    Erro409Conflito:
+      description: Conflito com o que já existe (por exemplo, CPF repetido ou registro alterado por outra pessoa).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Conflito.
+            status: 409
+            detail: Já existe um registro com estes dados.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    Erro422RegraDeNegocio:
+      description: A operação foi recusada por uma regra de negócio ou por uma regra do banco.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+          example:
+            title: Operação recusada.
+            status: 422
+            detail: A operação foi recusada por uma regra do banco de dados.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+            regraDoBanco: Funcionario inativo nao pode registrar ponto
+    Erro429MuitasTentativas:
+      description: Muitas tentativas em pouco tempo.
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Muitas tentativas.
+            status: 429
+            detail: Muitas tentativas. Aguarde um minuto e tente de novo.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+    Erro500Interno:
+      description: Erro inesperado no servidor.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+          example:
+            title: Erro no servidor.
+            status: 500
+            detail: Erro no servidor. Tente novamente em instantes.
+            traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00

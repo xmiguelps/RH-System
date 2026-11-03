@@ -1,0 +1,218 @@
+# Fatia 0: login e sessão. Fixado pelo plano da fatia 0 (Task 8, linhas 391 a 399) e pela Task 10.
+# É também o exemplo de referência do formato das demais fontes.
+tags:
+  - name: Autenticação
+    description: Entrar, renovar a sessão, sair e ver quem está logado.
+  - name: Operação
+    description: Saúde da API.
+
+paths:
+  /api/auth/entrar:
+    post:
+      tags: [Autenticação]
+      operationId: entrar
+      summary: Entra com e-mail e senha e recebe a sessão.
+      description: |
+        Pública. O e-mail é comparado sem diferença de maiúsculas e sem espaços nas pontas.
+        E-mail inexistente, senha errada e inativo com senha errada recebem **a mesma** resposta 401
+        (mesmo `title` e `detail`). Só o usuário inativo com a **senha certa** recebe o 403 informativo.
+        Limite de 5 tentativas por minuto por IP (429).
+      x-perfis: [Publico]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EntrarComando' }
+            example: { email: ana.souza@empresa.com.br, senha: Senha#Forte123 }
+      responses:
+        '200':
+          description: Sessão criada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessaoResposta' }
+              example:
+                tokenDeAcesso: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.assinatura-de-exemplo
+                acessoExpiraEmUtc: '2026-10-07T12:45:00Z'
+                refreshToken: 7f3c9a1e5b2d4c8aa6e0f1d2c3b4a596
+                usuario:
+                  id: 1
+                  funcionarioId: 1
+                  nome: Ana Souza
+                  email: ana.souza@empresa.com.br
+                  perfil: RH
+                  cargo: Gerente de RH
+                  setor: Recursos Humanos
+        '400': { $ref: '#/components/responses/Erro400Login' }
+        '401':
+          description: E-mail ou senha inválidos.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: E-mail ou senha inválidos.
+                status: 401
+                detail: E-mail ou senha inválidos.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '403':
+          description: Acesso desativado (senha certa, usuário inativo) ou perfil de acesso não configurado.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              examples:
+                inativo:
+                  summary: Usuário inativo com a senha certa
+                  value:
+                    title: Acesso desativado.
+                    status: 403
+                    detail: Seu acesso está desativado. Fale com o RH.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                semPerfil:
+                  summary: Funcionário sem nível de acesso configurado
+                  value:
+                    title: Perfil não configurado.
+                    status: 403
+                    detail: Seu perfil de acesso não está configurado. Fale com o RH.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+        '429': { $ref: '#/components/responses/Erro429MuitasTentativas' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/auth/renovar:
+    post:
+      tags: [Autenticação]
+      operationId: renovarSessao
+      summary: Troca o refresh token por uma sessão nova.
+      description: |
+        Pública. O refresh token é de uso único: o antigo passa a devolver 401. Duas renovações
+        simultâneas com o mesmo token: no máximo uma recebe 200, a outra recebe 401 e **não** revoga
+        os demais tokens do usuário.
+      x-perfis: [Publico]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RenovarComando' }
+            example: { refreshToken: 7f3c9a1e5b2d4c8aa6e0f1d2c3b4a596 }
+      responses:
+        '200':
+          description: Sessão renovada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessaoResposta' }
+              example:
+                tokenDeAcesso: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.outra-assinatura
+                acessoExpiraEmUtc: '2026-10-07T12:57:00Z'
+                refreshToken: 0d8e7c6b5a4f4e3d9c2b1a0f9e8d7c6b
+                usuario:
+                  id: 1
+                  funcionarioId: 1
+                  nome: Ana Souza
+                  email: ana.souza@empresa.com.br
+                  perfil: RH
+                  cargo: Gerente de RH
+                  setor: Recursos Humanos
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/auth/sair:
+    post:
+      tags: [Autenticação]
+      operationId: sair
+      summary: Encerra a sessão e invalida o refresh token.
+      x-perfis: [Publico]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RenovarComando' }
+            example: { refreshToken: 7f3c9a1e5b2d4c8aa6e0f1d2c3b4a596 }
+      responses:
+        '204': { description: Sessão encerrada. }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/auth/eu:
+    get:
+      tags: [Autenticação]
+      operationId: obterUsuarioLogado
+      summary: Mostra quem está logado.
+      x-perfis: [Funcionario, Gestor, RH]
+      responses:
+        '200':
+          description: A pessoa logada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioResposta' }
+              example:
+                id: 1
+                funcionarioId: 1
+                nome: Ana Souza
+                email: ana.souza@empresa.com.br
+                perfil: RH
+                cargo: Gerente de RH
+                setor: Recursos Humanos
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /health:
+    get:
+      tags: [Operação]
+      operationId: verificarSaude
+      summary: Diz se a API e o banco estão no ar.
+      x-perfis: [Publico]
+      security: []
+      responses:
+        '200':
+          description: API e banco acessíveis.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaudeResposta' }
+              example: { status: ok }
+        '503':
+          description: O banco ficou inacessível depois da subida. O plano da fatia 0 não define o corpo desta resposta.
+
+components:
+  schemas:
+    EntrarComando:
+      type: object
+      required: [email, senha]
+      properties:
+        email: { type: string, minLength: 1 }
+        senha: { type: string, minLength: 1, maxLength: 128 }
+    RenovarComando:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 1 }
+    UsuarioResposta:
+      type: object
+      description: |
+        A pessoa logada. `cargo` e `setor` servem ao rodapé do menu ("Analista pleno, Financeiro"; "Perfil gestor,
+        setor Comercial"; telas 32, 46 e 51). **Não estavam no plano da fatia 0** (que define `Usuario` sem eles):
+        foram acrescentados depois (`CONVENCOES.md`, seção 11) e o plano da fatia 0 deve ser ajustado.
+      required: [id, funcionarioId, nome, email, perfil, cargo, setor]
+      properties:
+        id: { type: integer }
+        funcionarioId: { type: integer }
+        nome: { type: string }
+        email: { type: string }
+        perfil: { $ref: '#/components/schemas/Perfil' }
+        cargo: { type: [string, 'null'], description: 'Nome do cargo da pessoa; `null` se ela não tem cargo.' }
+        setor: { type: [string, 'null'], description: 'Nome do setor da pessoa; `null` se ela não tem setor.' }
+    SessaoResposta:
+      type: object
+      description: Token de acesso (15 minutos, só em memória no front) e refresh token (7 dias, `localStorage`).
+      required: [tokenDeAcesso, acessoExpiraEmUtc, refreshToken, usuario]
+      properties:
+        tokenDeAcesso: { type: string }
+        acessoExpiraEmUtc: { type: string, format: date-time }
+        refreshToken: { type: string }
+        usuario: { $ref: '#/components/schemas/UsuarioResposta' }
+    SaudeResposta:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }

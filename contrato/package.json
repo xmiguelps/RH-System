@@ -1,0 +1,16 @@
+{
+  "name": "rh-system-contrato",
+  "private": true,
+  "type": "module",
+  "description": "Ferramentas do contrato da API: junta as fontes em openapi.yaml e valida.",
+  "scripts": {
+    "montar": "node montar.mjs",
+    "validar": "node montar.mjs && redocly lint openapi.yaml && node validar-exemplos.mjs openapi.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.72.1",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.9.1"
+  }
+}

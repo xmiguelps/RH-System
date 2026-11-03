@@ -1,0 +1,473 @@
+# Fatia 2: importação de colaboradores por Excel.
+# NÃO existe tela no Figma: a alternância "Importar planilha" no cadastro (tela 02), a prévia com erros por linha e
+# coluna, a confirmação (tudo ou nada) e o modelo para baixar são desenhados em estilo simples.
+# Fluxo: baixar o modelo -> enviar a planilha (validação, sem gravar colaboradores) -> ver a prévia -> confirmar.
+tags:
+  - name: Importação
+    description: Cadastro de vários colaboradores de uma vez, por planilha Excel (.xlsx), com prévia de erros.
+
+paths:
+  /api/rh/importacoes/modelo:
+    get:
+      tags: [Importação]
+      operationId: baixarModeloDeImportacao
+      summary: Baixa a planilha modelo para importar colaboradores.
+      description: |
+        Botão "Baixar modelo" da alternância "Importar planilha" (tela 02). Só o perfil `RH`. Devolve um arquivo
+        `.xlsx` como anexo (`Content-Disposition: attachment; filename="modelo-importacao-colaboradores.xlsx"`).
+
+        **Aba "Colaboradores"** (a que se preenche): linha 1 com os títulos abaixo, **nesta ordem**; dados a partir
+        da linha 2.
+        | Coluna | Título | Como preencher |
+        |---|---|---|
+        | `NOME` | Nome completo | Obrigatório, até 150 caracteres. |
+        | `CPF` | CPF | Obrigatório. Com ou sem pontos e traço; dígitos verificadores corretos; único no arquivo e no sistema. |
+        | `DATA_NASCIMENTO` | Data de nascimento | Obrigatória. `dd/mm/aaaa` ou célula de data do Excel; não pode ser futura. |
+        | `TELEFONE` | Telefone | Obrigatório. Com DDD (10 ou 11 dígitos); aceita máscara. |
+        | `EMAIL_CORPORATIVO` | E-mail corporativo | Obrigatório, e-mail válido, único no arquivo e no sistema. |
+        | `DATA_ADMISSAO` | Data de admissão | Obrigatória. `dd/mm/aaaa` ou célula de data; pode ser futura. |
+        | `TIPO_CONTRATO` | Tipo de contrato | Obrigatório. `CLT` ou `Estágio`. |
+        | `CARGO` | Cargo | Obrigatório. Nome de um cargo da aba "Valores válidos". |
+        | `SETOR` | Setor | Obrigatório. Nome de um setor da aba "Valores válidos". O gestor vem do setor. |
+        | `NIVEL_DE_ACESSO` | Nível de acesso | Obrigatório. `Colaborador`, `Gestor` ou `RH`. |
+        | `BENEFICIOS` | Benefícios | Opcional. Nomes do catálogo separados por `;` (ex.: `Vale-refeição; Plano de saúde`). |
+
+        **Aba "Valores válidos"** (só leitura): colunas com os cargos, os setores, os tipos de contrato, os níveis de
+        acesso e os benefícios que existem **hoje** (o arquivo é gerado na hora do pedido, com os cadastros atuais).
+        Nomes de cargo, setor e benefício são comparados sem diferenciar maiúsculas e sem espaços nas pontas.
+        O gestor, a matrícula e a unidade **não** são colunas (gestor = o do setor; matrícula gerada; sem unidades).
+      x-provisorio: >-
+        Quais são as colunas do modelo? O dono ainda não decidiu. Construído espelhando o cadastro mínimo (tela 02)
+        sem o gestor, que vem do setor. Mudar colunas muda esta tabela, `ImportacaoColuna` e `ImportacaoLinhaValores`.
+      x-perfis: [RH]
+      responses:
+        '200':
+          description: O arquivo do modelo.
+          headers:
+            Content-Disposition:
+              description: 'Anexo: `attachment; filename="modelo-importacao-colaboradores.xlsx"`.'
+              schema: { type: string }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+              example: (arquivo .xlsx binário)
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/importacoes:
+    post:
+      tags: [Importação]
+      operationId: validarPlanilhaDeImportacao
+      summary: Envia a planilha e recebe a prévia com os erros por linha e coluna (sem cadastrar ninguém).
+      description: |
+        Estados "escolher arquivo" e "prévia" da importação (**sem Figma**). Só o perfil `RH`. Envio em
+        `multipart/form-data`, **uma única requisição**.
+
+        **O que faz:** lê a aba "Colaboradores" e valida **todas** as linhas **sem gravar nenhum colaborador**:
+        campos obrigatórios, formatos, CPF e e-mail repetidos **no arquivo** e **já cadastrados**, e existência de
+        cargo, setor, tipo de contrato, nível de acesso e benefícios (regras do modelo). Linhas totalmente em
+        branco são ignoradas. Guarda o arquivo por até **1 hora** (`expiraEmUtc`) para a confirmação; ele é
+        apagado depois de confirmado ou vencido. A resposta é sempre uma prévia; **o RH corrige a planilha e envia
+        de novo** enquanto houver erro. A importação (o `importacaoId`, a situação e a prévia guardada) vive numa **tabela
+        nova da aplicação** (importações; `V038`), não nas tabelas de colaboradores.
+
+        **CPF ou e-mail de um cadastro inativo:** esta importação só cadastra gente nova. Se o CPF ou o e-mail corporativo
+        de uma linha já pertence a um cadastro **inativo** (alguém que saiu da empresa), a linha recebe um erro em `CPF` ou
+        `EMAIL_CORPORATIVO` cuja mensagem manda usar **Readmitir** na ficha da pessoa
+        (`POST /api/rh/funcionarios/{funcionarioId}/readmissao`, fatia 1); a importação não readmite ninguém.
+
+        **Limites:** só `.xlsx` (não `.xls` nem CSV), até **5 MB**, até **500 linhas de dados**. O servidor também
+        limita o tamanho descompactado, o número de planilhas e o de células (um `.xlsx` é um zip; os valores
+        ficam na implementação). Problema no arquivo **como um todo** (não é Excel, grande demais, colunas
+        diferentes do modelo, vazio, mais de 500 linhas) volta como 422 com `codigo`, sem prévia.
+
+        **Prévia:** `linhas` traz todas as linhas lidas, cada uma com os valores como foram digitados e os erros
+        (`coluna` + `mensagem`). `podeConfirmar` só é `true` com **zero** linhas com erro (**tudo ou nada**).
+        A prévia e o resultado entram na auditoria (área `IMPORTACAO`).
+      x-perfis: [RH]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/ImportacaoEnvioForm' }
+            encoding:
+              arquivo: { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+            example: { arquivo: novos-colaboradores-outubro.xlsx }
+      responses:
+        '201':
+          description: Planilha lida. Devolve a prévia (com ou sem erros).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportacaoPrevia' }
+              examples:
+                comErros:
+                  summary: Duas linhas com erro (não dá para confirmar)
+                  value:
+                    importacaoId: 15
+                    nomeArquivo: novos-colaboradores-outubro.xlsx
+                    situacao: COM_ERROS
+                    totalLinhas: 4
+                    linhasValidas: 2
+                    linhasComErro: 2
+                    podeConfirmar: false
+                    expiraEmUtc: '2026-10-07T13:30:00Z'
+                    linhas:
+                      - numeroLinha: 2
+                        situacao: OK
+                        valores: { nome: Tiago Nogueira, cpf: 402.817.593-32, dataNascimento: 14/03/1989, telefone: (11) 97766-3344, emailCorporativo: tiago.nogueira@empresa.com.br, dataAdmissao: 19/10/2026, tipoContrato: Estágio, cargo: Estagiário, setor: Tecnologia, nivelDeAcesso: Colaborador, beneficios: Vale-transporte }
+                        erros: []
+                      - numeroLinha: 3
+                        situacao: COM_ERRO
+                        valores: { nome: Mariana Teixeira, cpf: 123.456.789-00, dataNascimento: 21/07/1992, telefone: (11) 98877-1020, emailCorporativo: mariana.teixeira@empresa.com.br, dataAdmissao: 03/11/2026, tipoContrato: CLT, cargo: Analista de RH, setor: Recursos Humanos, nivelDeAcesso: Colaborador, beneficios: null }
+                        erros:
+                          - { coluna: CPF, mensagem: CPF inválido. }
+                      - numeroLinha: 4
+                        situacao: OK
+                        valores: { nome: Aline Carvalho, cpf: 713.482.906-50, dataNascimento: 30/05/1991, telefone: (11) 96655-2211, emailCorporativo: aline.carvalho@empresa.com.br, dataAdmissao: 19/10/2026, tipoContrato: CLT, cargo: Analista de RH, setor: Recursos Humanos, nivelDeAcesso: Colaborador, beneficios: 'Vale-refeição; Plano de saúde' }
+                        erros: []
+                      - numeroLinha: 5
+                        situacao: COM_ERRO
+                        valores: { nome: Elisa Prado, cpf: 658.123.470-26, dataNascimento: 02/12/1994, telefone: (11) 95544-8800, emailCorporativo: tiago.nogueira@empresa.com.br, dataAdmissao: 03/11/2026, tipoContrato: CLT, cargo: Analista de compras (novo), setor: Marketing, nivelDeAcesso: Colaborador, beneficios: null }
+                        erros:
+                          - { coluna: EMAIL_CORPORATIVO, mensagem: Este e-mail aparece também na linha 2. }
+                          - { coluna: CARGO, mensagem: 'O cargo "Analista de compras (novo)" não existe. Use um cargo da aba Valores válidos.' }
+                          - { coluna: SETOR, mensagem: 'O setor "Marketing" não existe. Use um setor da aba Valores válidos.' }
+                pronta:
+                  summary: Sem erros (pode confirmar)
+                  value:
+                    importacaoId: 16
+                    nomeArquivo: novos-colaboradores-outubro-corrigido.xlsx
+                    situacao: PRONTA
+                    totalLinhas: 2
+                    linhasValidas: 2
+                    linhasComErro: 0
+                    podeConfirmar: true
+                    expiraEmUtc: '2026-10-07T13:40:00Z'
+                    linhas:
+                      - numeroLinha: 2
+                        situacao: OK
+                        valores: { nome: Tiago Nogueira, cpf: 402.817.593-32, dataNascimento: 14/03/1989, telefone: (11) 97766-3344, emailCorporativo: tiago.nogueira@empresa.com.br, dataAdmissao: 19/10/2026, tipoContrato: Estágio, cargo: Estagiário, setor: Tecnologia, nivelDeAcesso: Colaborador, beneficios: Vale-transporte }
+                        erros: []
+                      - numeroLinha: 3
+                        situacao: OK
+                        valores: { nome: Aline Carvalho, cpf: 713.482.906-50, dataNascimento: 30/05/1991, telefone: (11) 96655-2211, emailCorporativo: aline.carvalho@empresa.com.br, dataAdmissao: 19/10/2026, tipoContrato: CLT, cargo: Analista de RH, setor: Recursos Humanos, nivelDeAcesso: Colaborador, beneficios: 'Vale-refeição; Plano de saúde' }
+                        erros: []
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '422':
+          description: O arquivo, como um todo, não pode ser lido. Os códigos estão em `examples`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                naoEExcel:
+                  summary: Não é um .xlsx válido
+                  value:
+                    title: Arquivo inválido.
+                    status: 422
+                    detail: O arquivo não é uma planilha do Excel (.xlsx). Baixe o modelo e preencha nele.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ARQUIVO_INVALIDO
+                grande:
+                  summary: Passa de 5 MB (ou descompacta demais)
+                  value:
+                    title: Arquivo inválido.
+                    status: 422
+                    detail: O arquivo é grande demais. O limite é de 5 MB.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ARQUIVO_MUITO_GRANDE
+                modeloAlterado:
+                  summary: Colunas diferentes do modelo
+                  value:
+                    title: Arquivo inválido.
+                    status: 422
+                    detail: As colunas da planilha não são as do modelo. Baixe o modelo de novo e copie os dados para ele.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: MODELO_ALTERADO
+                vazia:
+                  summary: Nenhuma linha de dados
+                  value:
+                    title: Arquivo inválido.
+                    status: 422
+                    detail: A planilha não tem nenhuma linha preenchida.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: PLANILHA_VAZIA
+                limite:
+                  summary: Mais de 500 linhas
+                  value:
+                    title: Arquivo inválido.
+                    status: 422
+                    detail: A planilha tem 501 linhas. O limite é de 500 por importação.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: LIMITE_DE_LINHAS_EXCEDIDO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/importacoes/{importacaoId}/confirmar:
+    post:
+      tags: [Importação]
+      operationId: confirmarImportacao
+      summary: Confirma a importação e cadastra todos os colaboradores da planilha (tudo ou nada).
+      description: |
+        Estado "resultado" (**sem Figma**), botão "Cadastrar N colaboradores" da prévia. Só o perfil `RH`.
+        Só confirma uma importação `PRONTA` (sem nenhuma linha com erro).
+
+        **A gravação é uma transação só** (até 500 linhas): se o banco recusar uma linha no meio (por exemplo um
+        trigger), **nada fica gravado** (422 `IMPORTACAO_LINHA_RECUSADA`, com o número da linha). Antes de gravar, a
+        API confere as linhas **de novo** (alguém pode ter cadastrado o mesmo CPF ou e-mail depois da prévia): se
+        houver conflito, também 422 `IMPORTACAO_LINHA_RECUSADA` e nada é gravado; o RH envia a planilha de novo.
+
+        Cada linha vira um colaborador **exatamente como o cadastro da tela 02** (matrícula gerada, gestor do
+        setor, benefícios, dados pessoais). **Ninguém recebe senha:** com `enviarConvite = true` (padrão) cada
+        pessoa recebe o convite de acesso por e-mail (fila, com limite de vazão); com `false`, ninguém recebe agora
+        e o RH envia depois em Cadastros, Usuários do sistema. O convite depende das **tabelas novas da aplicação** de
+        convite (token) e de fila de e-mails (`V033` e `V035`).
+
+        **"Depois de salvar": as mesmas caixas do cadastro** (`POST /api/rh/funcionarios`, tela 02), com o **mesmo efeito**,
+        valendo para **todas** as pessoas da planilha:
+        - `incluirNoOnboarding = true`: cada pessoa é inscrita em cada treinamento de onboarding em vigor (mesmo efeito de
+          `incluirFuncionarioNoOnboarding`, fatia 6; a lista vem de `GET /api/rh/treinamentos/onboarding`). Sem nenhum em
+          vigor: 422 `SEM_TREINAMENTO_DE_ONBOARDING`. Padrão `false`.
+        - `formularioAdmissaoId`: cada pessoa passa a ser destinatária do formulário de admissão **publicado** com esse id
+          (mesmo efeito de `adicionarDestinatariosFormulario`, fatia 5; o front o lista com
+          `GET /api/rh/formularios?tipo=ADMISSAO&situacao=PUBLICADO`). Formulário que não existe, que não é de admissão ou
+          que não está publicado: 400 em `formularioAdmissaoId`; que não é "para pessoas escolhidas" ou já encerrou: 422
+          `FORMULARIO_NAO_E_POR_PESSOAS` ou `FORMULARIO_ENCERRADO`. `null` (padrão) não envia nada.
+        - Estas duas conferências acontecem **antes** de gravar: se falharem, **nada é cadastrado** (a gravação inteira é uma
+          transação só). **Nenhum e-mail sai por estas caixas** (lista fechada de e-mails, `CONVENCOES.md`, seção 12): a
+          pessoa vê o treinamento e o formulário ao entrar no portal; o e-mail que ela recebe é o do convite.
+
+        O arquivo guardado é apagado. O resultado entra na auditoria (`IMPORTOU`).
+
+        **Só cadastra**: atualizar quem já existe por planilha está fora do escopo. Confirmar **duas vezes** a mesma
+        importação: 409 `IMPORTACAO_JA_CONFIRMADA`. Importação vencida (mais de 1 hora): 422 `IMPORTACAO_EXPIRADA`
+        (enviar a planilha de novo).
+      x-provisorio: >-
+        A importação marca as pessoas como "Em admissão"? Construído: não marca nada especial; a situação cadastral
+        (`situacao` em `GET /api/rh/funcionarios`) vem da data de admissão de cada linha (futura = `EM_ADMISSAO`), igual
+        ao cadastro. Se o dono quiser que toda importação nasça "Em admissão", muda a regra de `situacao` para as pessoas
+        desta importação.
+      x-perfis: [RH]
+      parameters:
+        - name: importacaoId
+          in: path
+          required: true
+          description: O `importacaoId` devolvido pela prévia.
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportacaoConfirmarComando' }
+            example: { enviarConvite: true, incluirNoOnboarding: true, formularioAdmissaoId: 11 }
+      responses:
+        '200':
+          description: Colaboradores cadastrados.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportacaoResultado' }
+              example:
+                importacaoId: 16
+                situacao: CONFIRMADA
+                nomeArquivo: novos-colaboradores-outubro-corrigido.xlsx
+                totalCriados: 2
+                convitesEnviados: 2
+                incluidosNoOnboarding: 2
+                incluidosNoFormularioDeAdmissao: 2
+                confirmadaEmUtc: '2026-10-07T12:41:44Z'
+                funcionarios:
+                  - { id: 105, nome: Tiago Nogueira, cargo: Estagiário, setor: Tecnologia, ativo: true }
+                  - { id: 202, nome: Aline Carvalho, cargo: Analista de RH, setor: Recursos Humanos, ativo: true }
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '409':
+          description: Esta importação já foi confirmada.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeApi' }
+              example:
+                title: Conflito.
+                status: 409
+                detail: Esta importação já foi confirmada.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: IMPORTACAO_JA_CONFIRMADA
+        '422':
+          description: Não deu para confirmar. Nada foi gravado. Os códigos estão em `examples`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ImportacaoProblemaDeRegra' }
+              examples:
+                comErros:
+                  summary: A prévia ainda tem linhas com erro
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: A planilha ainda tem linhas com erro. Corrija e envie de novo.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: IMPORTACAO_COM_ERROS
+                expirada:
+                  summary: Passou de 1 hora desde a prévia
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: A prévia venceu. Envie a planilha de novo.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: IMPORTACAO_EXPIRADA
+                linhaRecusada:
+                  summary: O banco ou uma conferência recusou uma linha (nada foi gravado)
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: 'A linha 12 foi recusada: já existe um colaborador com este CPF. Nenhum colaborador foi cadastrado. Envie a planilha de novo.'
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: IMPORTACAO_LINHA_RECUSADA
+                    linha: 12
+                    regraDoBanco: Duplicate entry for key 'UQ_FUNCIONARIOS_DETALHES_CPF'
+                semOnboarding:
+                  summary: A caixa de onboarding está marcada, mas nenhum treinamento de onboarding está publicado (nada foi gravado)
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não há treinamento de onboarding publicado. Desmarque a caixa ou publique o treinamento.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: SEM_TREINAMENTO_DE_ONBOARDING
+                formularioEncerrado:
+                  summary: O formulário de admissão escolhido já encerrou (nada foi gravado)
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O formulário de admissão escolhido já foi encerrado. Escolha outro.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_ENCERRADO
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+components:
+  schemas:
+    ImportacaoSituacao:
+      type: string
+      description: |
+        `COM_ERROS`: tem linha com erro (não confirma). `PRONTA`: sem erros, pode confirmar. `CONFIRMADA`: os
+        colaboradores foram cadastrados.
+      enum: [COM_ERROS, PRONTA, CONFIRMADA]
+    ImportacaoColuna:
+      type: string
+      description: |
+        Coluna da planilha, pelo código. Títulos no modelo: `NOME` "Nome completo", `CPF` "CPF", `DATA_NASCIMENTO`
+        "Data de nascimento", `TELEFONE` "Telefone", `EMAIL_CORPORATIVO` "E-mail corporativo", `DATA_ADMISSAO` "Data
+        de admissão", `TIPO_CONTRATO` "Tipo de contrato", `CARGO` "Cargo", `SETOR` "Setor", `NIVEL_DE_ACESSO` "Nível
+        de acesso", `BENEFICIOS` "Benefícios".
+      enum: [NOME, CPF, DATA_NASCIMENTO, TELEFONE, EMAIL_CORPORATIVO, DATA_ADMISSAO, TIPO_CONTRATO, CARGO, SETOR, NIVEL_DE_ACESSO, BENEFICIOS]
+    ImportacaoEnvioForm:
+      type: object
+      description: Formulário `multipart/form-data`.
+      required: [arquivo]
+      properties:
+        arquivo:
+          type: string
+          format: binary
+          description: Planilha `.xlsx` preenchida no modelo, até 5 MB e 500 linhas de dados.
+    ImportacaoLinhaErro:
+      type: object
+      description: Um problema numa célula da linha.
+      required: [coluna, mensagem]
+      properties:
+        coluna: { $ref: '#/components/schemas/ImportacaoColuna' }
+        mensagem: { type: string, description: 'Texto pronto para mostrar, em português.' }
+    ImportacaoLinhaValores:
+      type: object
+      description: Os valores da linha **como foram digitados** (texto; data de célula do Excel vem como `dd/mm/aaaa`). `null` = célula vazia.
+      required: [nome, cpf, dataNascimento, telefone, emailCorporativo, dataAdmissao, tipoContrato, cargo, setor, nivelDeAcesso, beneficios]
+      properties:
+        nome: { type: [string, 'null'] }
+        cpf: { type: [string, 'null'] }
+        dataNascimento: { type: [string, 'null'] }
+        telefone: { type: [string, 'null'] }
+        emailCorporativo: { type: [string, 'null'] }
+        dataAdmissao: { type: [string, 'null'] }
+        tipoContrato: { type: [string, 'null'] }
+        cargo: { type: [string, 'null'] }
+        setor: { type: [string, 'null'] }
+        nivelDeAcesso: { type: [string, 'null'] }
+        beneficios: { type: [string, 'null'] }
+    ImportacaoLinha:
+      type: object
+      description: Uma linha de dados da planilha, com o resultado da validação.
+      required: [numeroLinha, situacao, valores, erros]
+      properties:
+        numeroLinha: { type: integer, minimum: 2, description: 'Número da linha na planilha (a linha 1 é o cabeçalho); é o que o RH vê no Excel.' }
+        situacao: { type: string, enum: [OK, COM_ERRO] }
+        valores: { $ref: '#/components/schemas/ImportacaoLinhaValores' }
+        erros:
+          type: array
+          description: Vazio quando `situacao = OK`.
+          items: { $ref: '#/components/schemas/ImportacaoLinhaErro' }
+    ImportacaoPrevia:
+      type: object
+      description: A prévia da importação (todas as linhas lidas e os erros por linha e coluna).
+      required: [importacaoId, nomeArquivo, situacao, totalLinhas, linhasValidas, linhasComErro, podeConfirmar, expiraEmUtc, linhas]
+      properties:
+        importacaoId: { type: integer, description: 'Usar em `POST .../{importacaoId}/confirmar`.' }
+        nomeArquivo: { type: string }
+        situacao:
+          description: '`COM_ERROS` ou `PRONTA` (nunca `CONFIRMADA` aqui).'
+          allOf:
+            - $ref: '#/components/schemas/ImportacaoSituacao'
+        totalLinhas: { type: integer, minimum: 1, maximum: 500 }
+        linhasValidas: { type: integer, minimum: 0 }
+        linhasComErro: { type: integer, minimum: 0 }
+        podeConfirmar: { type: boolean, description: '`true` só com `linhasComErro = 0` (tudo ou nada).' }
+        expiraEmUtc: { type: string, format: date-time, description: 'Depois disso a confirmação é recusada (enviar de novo).' }
+        linhas:
+          type: array
+          items: { $ref: '#/components/schemas/ImportacaoLinha' }
+    ImportacaoConfirmarComando:
+      type: object
+      description: As mesmas caixas "Depois de salvar" do cadastro (tela 02), valendo para todas as pessoas da planilha.
+      required: [enviarConvite]
+      properties:
+        enviarConvite:
+          type: boolean
+          default: true
+          description: Envia o convite de acesso por e-mail a todos os cadastrados (caixa marcada por padrão).
+        incluirNoOnboarding:
+          type: boolean
+          default: false
+          description: |
+            Inscreve cada pessoa em cada treinamento de onboarding em vigor (mesmo efeito de `incluirFuncionarioNoOnboarding`,
+            fatia 6). Sem treinamento em vigor: 422 `SEM_TREINAMENTO_DE_ONBOARDING` e nada é cadastrado. Sem e-mail.
+        formularioAdmissaoId:
+          type: [integer, 'null']
+          default: null
+          description: |
+            Id de um formulário de admissão **publicado** (fatia 5); cada pessoa passa a ser destinatária dele (mesmo efeito de
+            `adicionarDestinatariosFormulario`). `null` não envia nada. Sem e-mail.
+    ImportacaoResultado:
+      type: object
+      description: O resultado da importação confirmada.
+      required: [importacaoId, situacao, nomeArquivo, totalCriados, convitesEnviados, incluidosNoOnboarding, incluidosNoFormularioDeAdmissao, confirmadaEmUtc, funcionarios]
+      properties:
+        importacaoId: { type: integer }
+        situacao:
+          description: Sempre `CONFIRMADA`.
+          allOf:
+            - $ref: '#/components/schemas/ImportacaoSituacao'
+        nomeArquivo: { type: string }
+        totalCriados: { type: integer, minimum: 1 }
+        convitesEnviados: { type: integer, minimum: 0, description: 'Convites colocados na fila (0 com `enviarConvite = false`).' }
+        incluidosNoOnboarding: { type: integer, minimum: 0, description: 'Pessoas inscritas no onboarding (`totalCriados` com `incluirNoOnboarding = true`, senão 0).' }
+        incluidosNoFormularioDeAdmissao: { type: integer, minimum: 0, description: 'Pessoas incluídas como destinatárias do formulário de admissão (`totalCriados` com `formularioAdmissaoId`, senão 0).' }
+        confirmadaEmUtc: { type: string, format: date-time }
+        funcionarios:
+          type: array
+          description: Os colaboradores cadastrados, para abrir as fichas.
+          items: { $ref: '#/components/schemas/FuncionarioResumo' }
+    ImportacaoProblemaDeRegra:
+      description: Erro 422 da confirmação. Quando a causa é uma linha, traz o número dela.
+      allOf:
+        - $ref: '#/components/schemas/ProblemaDeRegraDeNegocio'
+        - type: object
+          properties:
+            linha: { type: integer, minimum: 2, description: 'Número da linha na planilha; só em `IMPORTACAO_LINHA_RECUSADA`.' }
