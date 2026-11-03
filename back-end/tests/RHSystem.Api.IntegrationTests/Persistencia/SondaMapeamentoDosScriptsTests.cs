@@ -246,7 +246,7 @@ public class SondaMapeamentoDosScriptsTests(MySqlFixture mysql)
     [Fact]
     public async Task Padroes_FALSE_de_proposito_gravam_true_e_false_como_enviados()
     {
-        // FORMULARIOS.LEMBRETE_AUTOMATICO (V045), TREINAMENTOS.AVISA_POR_EMAIL e LEMBRA_ANTES_DO_FIM (V043): o padrão do banco é FALSE de
+        // FORMULARIOS.LEMBRETE_AUTOMATICO, TREINAMENTOS.AVISA_POR_EMAIL e LEMBRA_ANTES_DO_FIM (V001): o padrão do banco é FALSE de
         // propósito, NÃO é declarado no mapeamento e o EF sempre envia o valor.
         var conexao = await mysql.NovoBancoComScriptsAsync();
         await using (var db = new SondaCorreta(conexao))
@@ -269,7 +269,7 @@ public class SondaMapeamentoDosScriptsTests(MySqlFixture mysql)
     [Fact]
     public async Task Matricula_pela_SEQUENCIAS_devolve_numeros_sem_buraco_na_mesma_transacao_e_o_rollback_devolve_o_numero()
     {
-        // V030: UPDATE SEQUENCIAS SET ULTIMO_VALOR = LAST_INSERT_ID(ULTIMO_VALOR + 1) WHERE NOME = 'MATRICULA' e SELECT LAST_INSERT_ID() na
+        // Tabela SEQUENCIAS (V001): UPDATE SEQUENCIAS SET ULTIMO_VALOR = LAST_INSERT_ID(ULTIMO_VALOR + 1) WHERE NOME = 'MATRICULA' e SELECT LAST_INSERT_ID() na
         // mesma conexão e transação. SQL cru, sem entidade; o formato é LPAD(numero, 5, '0').
         var conexao = await mysql.NovoBancoComScriptsAsync();
 

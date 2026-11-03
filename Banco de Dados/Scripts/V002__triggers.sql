@@ -595,7 +595,9 @@ BEGIN
             SET MESSAGE_TEXT = 'A competencia do holerite e posterior ao desligamento.';
     END IF;
 
-    IF v_competencia > CURDATE() THEN
+    -- O holerite de FERIAS e pago antes das ferias, entao pode ter competencia futura.
+    -- Os outros tipos continuam recusados.
+    IF v_competencia > CURDATE() AND NEW.TIPO_HOLERITE <> 'FERIAS' THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Nao e possivel cadastrar holerite de competencia futura.';
     END IF;

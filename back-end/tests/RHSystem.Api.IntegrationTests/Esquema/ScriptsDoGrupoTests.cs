@@ -30,7 +30,7 @@ public partial class ScriptsDoGrupoTests(MySqlFixture mysql)
     [GeneratedRegex(@"^[ \t]*CREATE[ \t]+FUNCTION[ \t]+(?:IF[ \t]+NOT[ \t]+EXISTS[ \t]+)?`?(?<nome>\w+)`?", RegexOptions.IgnoreCase | RegexOptions.Multiline)]
     private static partial Regex CreateFunction();
 
-    /// <summary>Nomes distintos criados no início de linha (comentário não conta; o V012 recria um trigger do V002, por isso "distintos").</summary>
+    /// <summary>Nomes distintos criados no início de linha (comentário não conta).</summary>
     private static HashSet<string> NomesCriados(Regex padrao, IEnumerable<ScriptSql> scripts) =>
         scripts
             .SelectMany(s => padrao.Matches(s.Conteudo).Select(m => m.Groups["nome"].Value))
@@ -131,20 +131,31 @@ public partial class ScriptsDoGrupoTests(MySqlFixture mysql)
         Assert.Equal(["Funcionario", "Funcionario Gestor", "RH"], await ListarAsync(conexao, consulta));
     }
 
+    /// <summary>
+    /// A exceção de FÉRIAS (o holerite de férias é pago antes das férias, então pode ter competência futura) mora dentro do trigger
+    /// do grupo no V002. Se o grupo trocar o V002 por uma versão sem ela, este teste é quem avisa.
+    /// </summary>
     [Fact]
-    public async Task Scripts_de_negocio_V006_em_diante_aplicam_depois_de_V001_a_V005_pelo_usuario_restrito()
+    public async Task Trigger_de_holerite_aceita_competencia_futura_so_para_ferias()
     {
-        var conexao = await mysql.NovoBancoAsync(); // o V012 usa DELIMITER
-        var executor = new ExecutorDeScripts(conexao, NullLogger<ExecutorDeScripts>.Instance);
-        var todos = Scripts;
+        var conexao = await mysql.NovoBancoComScriptsAsync();
+        await ExecutarAsync(conexao, "INSERT INTO FUNCIONARIOS (NOME, DATA_ADMISSAO, ATIVO, EMAIL_CORPORATIVO) VALUES ('Holerite Teste', '2026-01-02', TRUE, 'holerite.teste@empresa.com.br')");
+        var id = await ContarAsync(conexao, "SELECT ID_FUNCIONARIO FROM FUNCIONARIOS WHERE EMAIL_CORPORATIVO = 'holerite.teste@empresa.com.br'");
+        var futuro = DateTime.UtcNow.Year + 2;
 
-        await executor.AplicarPendentesAsync(todos.Where(s => s.Versao <= 5).ToList(), CancellationToken.None);
-        Assert.Equal(5, await ContarAsync(conexao, "SELECT COUNT(*) FROM SCHEMA_VERSOES"));
+        Task Inserir(string tipo, int mes, int ano) =>
+            ExecutarAsync(conexao, $"INSERT INTO HOLERITES (ID_FUNCIONARIO, MES, ANO, TIPO_HOLERITE) VALUES ({id}, {mes}, {ano}, '{tipo}')");
 
-        await executor.AplicarPendentesAsync(todos, CancellationToken.None);
+        // Controle: o mesmo funcionário recebe um holerite mensal de uma competência passada (a recusa abaixo é por ser futura).
+        await Inserir("MENSAL", 2, 2026);
 
-        Assert.Equal(todos.Count, await ContarAsync(conexao, "SELECT COUNT(*) FROM SCHEMA_VERSOES"));
-        Assert.Equal(1, await ContarAsync(conexao, "SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = 'TRG_HOLERITES_BEFORE_INSERT'"));
+        await Inserir("FERIAS", 6, futuro);
+
+        foreach (var tipo in new[] { "MENSAL", "DECIMO_TERCEIRO" })
+        {
+            var erro = await Assert.ThrowsAsync<MySqlException>(() => Inserir(tipo, 6, futuro));
+            Assert.Contains("Nao e possivel cadastrar holerite de competencia futura.", erro.Message);
+        }
     }
 
     [Fact]
