@@ -5,12 +5,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Os scripts do banco (de "Banco de Dados/Scripts") viajam dentro do assembly. O nome lógico é o que o ScriptsEmbutidos lê. -->
+    <!-- Os scripts do banco (de Banco de Dados/Scripts) viajam dentro do assembly. O nome logico e o que o ScriptsEmbutidos le. -->
     <EmbeddedResource Include="..\..\..\Banco de Dados\Scripts\*.sql" LogicalName="Scripts/%(Filename)%(Extension)" />
   </ItemGroup>
 

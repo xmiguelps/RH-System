@@ -21,6 +21,11 @@ public class MySqlFixture : IAsyncLifetime
         "--collation-server=utf8mb4_unicode_ci",
         "--default-time-zone=-03:00",
         "--log-bin-trust-function-creators=1",
+        // So desempenho (nao mudam o comportamento): cada teste cria um banco aplicando todos os scripts, e o DDL do MySQL e lento por causa
+        // do fsync. Sem durabilidade, num contêiner descartável.
+        "--innodb-flush-log-at-trx-commit=0",
+        "--sync-binlog=0",
+        "--innodb-doublewrite=OFF",
     ];
 
     private readonly MySqlContainer _container;

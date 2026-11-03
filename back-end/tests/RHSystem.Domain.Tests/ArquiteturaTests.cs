@@ -65,6 +65,17 @@ public class ArquiteturaTests
     }
 
     [Fact]
+    public void Assembly_do_Domain_nao_referencia_EntityFrameworkCore_nem_AspNetCore()
+    {
+        var referenciados = typeof(RHSystem.Domain.Autenticacao.Perfil).Assembly.GetReferencedAssemblies()
+            .Select(a => a.Name ?? string.Empty)
+            .ToList();
+
+        Assert.DoesNotContain(referenciados, nome => nome.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
+        Assert.DoesNotContain(referenciados, nome => nome.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Directory_Build_props_e_Directory_Packages_props_nao_tem_ProjectReference()
     {
         foreach (var arquivo in new[] { "Directory.Build.props", "Directory.Packages.props" })
