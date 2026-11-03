@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\RHSystem.Application\RHSystem.Application.csproj" />
+  </ItemGroup>
+</Project>
