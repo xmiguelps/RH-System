@@ -1,12 +1,28 @@
-# Scripts novos do banco (V006 a V047)
+# Esquema do banco: o que a aplicação acrescentou aos arquivos do grupo
+
+**Atualização de 2026-11-03: os antigos scripts `V006` a `V047` foram incorporados ao `V001` e ao `V002`.** A pasta tem hoje `V001` a `V005` e este arquivo. O texto original de cada script antigo continua no histórico do git (commit `10fe79a`; por exemplo `git show 10fe79a:"Banco de Dados/Scripts/V033__usuarios_tokens_senha.sql"`). **Neste arquivo, os números `V006` a `V047` são os dos scripts antigos**; as tabelas abaixo dizem de que pedido veio cada um e onde está hoje.
+
+| Script | O que tem hoje |
+|---|---|
+| `V001` | todas as tabelas (as 25 do grupo, já com as colunas, regras e índices que vieram depois, e as 22 tabelas novas nas seções 26 a 47), os índices, as chaves estrangeiras, os feriados de 2026 e o contador `SEQUENCIAS` |
+| `V002` | os 36 triggers do grupo (com os itens 1 e 2 corrigidos e a exceção de férias no trigger de holerite) |
+| `V003` | as 8 funções do grupo |
+| `V004` | `REFRESH_TOKENS` (login da API) |
+| `V005` | os níveis de acesso iniciais (`RH`, `Funcionario`, `Funcionario Gestor`) |
+
+Dentro do `V001`, cada grupo de colunas ou regras acrescentado depois vem com um comentário que diz de que pedido veio (o título do antigo script), e cada tabela nova tem uma seção numerada com o mesmo título. **Para conferir o que a aplicação mudou**, procure esses comentários ou compare com o `V001` e o `V002` de antes da junção (no histórico, commit `f69db4e`). O banco que sai do `V001` ao `V005` foi conferido contra o que os 47 scripts produziam: veja "Como a base nova foi conferida".
+
+## Como chegamos aqui (histórico)
 
 **Atualização de 2026-10-30:** a pasta ganhou 18 scripts (`V030` a `V047`), escritos pelo lado da aplicação a partir do **contrato da API** (`contrato/`), a pedido do dono, para **todo o esquema ficar pronto antes de o back-end começar**; o Kauan confere depois, como nos `V006` a `V029`. Veja "Scripts V030 a V047" mais abaixo. Os números são provisórios: o dono pode renumerar.
 
 Os 24 scripts `V006` a `V029` fazem o que a lista `docs/pedidos-para-o-kauan.md` pedia ao Kauan (itens 3 a 27). Foram escritos pelo lado da aplicação, a pedido do dono (2026-10-29), **para o Kauan conferir depois**. Cada script começa com um comentário que explica **por que** existe, **o que faz**, quais decisões foram tomadas e o que **fica com a aplicação**. Leia o comentário antes do SQL.
 
-Dos três arquivos do grupo em `Banco de Dados/`, **só o de triggers foi alterado** (itens 1 e 2, com autorização do dono; veja "Itens 1 e 2" abaixo). As tabelas e as funções continuam como estavam.
+Naquele momento, dos três arquivos do grupo em `Banco de Dados/`, **só o de triggers tinha sido alterado** (itens 1 e 2, com autorização do dono; veja "Itens 1 e 2" abaixo). Em 2026-11-03 o `V001` também recebeu as mudanças dos scripts antigos (o dono decidiu juntar tudo antes do primeiro deploy) e o `V002` ganhou a exceção de férias do trigger de holerite.
 
-## Quais itens estão aqui
+## Mapa: de que pedido veio cada script antigo (`V006` a `V029`)
+
+Hoje todos estão dentro do `V001`, exceto a parte de trigger do `V012`, que está no `V002`.
 
 | Script | Item da lista | O que faz |
 |---|---|---|
@@ -37,7 +53,7 @@ Dos três arquivos do grupo em `Banco de Dados/`, **só o de triggers foi altera
 
 ## Scripts V030 a V047 (2026-10-30): colunas e tabelas que o contrato da API exige
 
-Testados em conjunto num MySQL 8.4.13 limpo com `--default-time-zone=-03:00`: os arquivos do grupo e `V006` a `V047` aplicam sem erro e deixam **47 tabelas, 36 triggers, 8 funções e 238 índices**. **Sem triggers novos.** Cada script começa com um comentário que diz por que existe, o que faz e o que fica com a aplicação.
+Hoje tudo isto está no `V001`. Medição de 2026-10-30, com os scripts antigos: testados em conjunto num MySQL 8.4.13 limpo com `--default-time-zone=-03:00`: os arquivos do grupo e `V006` a `V047` aplicam sem erro e deixam **47 tabelas, 36 triggers, 8 funções e 238 índices**. **Sem triggers novos.** Cada script começa com um comentário que diz por que existe, o que faz e o que fica com a aplicação.
 
 | Script | O que faz |
 |---|---|
@@ -76,11 +92,13 @@ Testados em conjunto num MySQL 8.4.13 limpo com `--default-time-zone=-03:00`: os
 - **Banco de horas:** converta **cada linha** para minutos e depois some. Somar horas e converter no fim erra até alguns minutos (medido), e `FN_CALCULAR_SALDO_BANCO_HORAS` soma horas.
 - O trigger de treinamento cria o certificado com **UUID versão 1** e também quando `EMITE_CERTIFICADO` é `FALSE`: a aplicação troca o código por v4 e apaga essas linhas ao excluir.
 - **Excluir formulário e treinamento:** apague os filhos na ordem do contrato (as chaves estrangeiras não têm `ON DELETE`).
-- `V039`, `V040` e `V041` usam um `ALTER` só: se falharem, nada fica pela metade. `V030` faz o `ALTER` antes do `CREATE`: matrícula antiga fora do formato derruba o script sem deixar nada parcial.
+- O DDL do MySQL não desfaz: se o `V001` falhar no meio, o banco fica parcial. O executor avisa, e em desenvolvimento se recria o banco (`docker compose down -v`). (Os scripts antigos `V039` a `V041` e `V030` eram escritos para não deixar nada pela metade; isso não vale mais para o `V001`, que é um arquivo só.)
 
-**O que o Kauan deve conferir:** `V030` (contador no lugar de `AUTO_INCREMENT`), `V031` e `V032` (colunas em tabelas dele), `V040` (chave única sobre coluna calculada em `PONTOS_MANUTENCOES`), `V041` (o terceiro `CHECK` deixa passar recusa antiga sem motivo), `V043` (mexe no padrão do `V029`), `V046` (altera `FORMULARIOS_RESPOSTAS`, do `V017`) e `V047` (só índices). **Decisões do dono:** triggers de imutabilidade na auditoria; as listas `CLT`/`ESTAGIO`, tipos de documento e `VERBAL`/`ESCRITA`; a coluna com o nome de quem do RH aplicou a advertência; o saldo do banco de horas em horas com 2 casas contra minutos no contrato; o trigger de certificado com UUID v1.
+**O que o Kauan deve conferir** (os números abaixo são dos scripts antigos; hoje as mudanças estão no `V001`, marcadas por comentário com o título do pedido): `V030` (contador no lugar de `AUTO_INCREMENT`), `V031` e `V032` (colunas em tabelas dele), `V040` (chave única sobre coluna calculada em `PONTOS_MANUTENCOES`), `V041` (o terceiro `CHECK` deixa passar recusa antiga sem motivo), `V043` (mexe no padrão do `V029`), `V046` (altera `FORMULARIOS_RESPOSTAS`, do `V017`) e `V047` (só índices). **Decisões do dono:** triggers de imutabilidade na auditoria; as listas `CLT`/`ESTAGIO`, tipos de documento e `VERBAL`/`ESCRITA`; a coluna com o nome de quem do RH aplicou a advertência; o saldo do banco de horas em horas com 2 casas contra minutos no contrato; o trigger de certificado com UUID v1.
 
 ## Itens 1 e 2: feitos direto no SEU arquivo de triggers (para você validar)
+
+(Os três arquivos do grupo foram movidos para esta pasta como `V001`, `V002` e `V003`; o arquivo de triggers de que esta seção fala é hoje o `V002`.)
 
 Os itens 1 e 2 são os triggers `TRG_PONTOS_BEFORE_INSERT` e `TRG_PONTOS_BEFORE_UPDATE`, que você já estava corrigindo. **Eles bloqueavam tudo:** o script de triggers do grupo **não aplicava**. Falhava na linha 374 com `Unknown column 'HORA_ENTRADA' in 'NEW'`, porque os triggers ainda usavam `HORA_ENTRADA` e `HORA_SAIDA`, colunas que saíram de `PONTOS` no commit `e3eb1be`. Medi no MySQL 8.4.13: o arquivo original criava **13 dos 36** triggers e parava. Por isso não dava para escrevê-los como script novo (o V002 precisa aplicar antes).
 
@@ -101,33 +119,37 @@ Se você já tiver a sua própria correção, compare: o resultado esperado é o
 
 ## Numeração
 
-Os números começam em `V006` porque o plano da fatia 0 reserva `V001` a `V003` para os três arquivos do grupo (que ainda serão movidos para esta pasta) e `V004` e `V005` para `REFRESH_TOKENS` e os níveis de acesso iniciais. **Quem numera é o dono**; se a ordem mudar, é só renomear (os scripts não citam o número uns dos outros, exceto nos comentários). O nome do arquivo precisa seguir `V{nnn}__{nome}.sql`: o executor recusa outro padrão.
+A pasta tem `V001` a `V005`; o **próximo script é o `V006`**. **Quem numera é o dono**: o grupo envia o conteúdo e o dono dá o número, para não haver dois com o mesmo. O nome do arquivo precisa seguir `V{nnn}__{nome}.sql`: o executor recusa outro padrão.
 
-Regra do projeto: **depois do primeiro deploy no Azure, script aplicado não se edita mais**. Mudança vira script novo (`ALTER`; `DROP` e `CREATE` para trigger). **Antes** do primeiro deploy, o grupo pode, se preferir um esquema "limpo", incorporar estas mudanças direto nos `CREATE TABLE` do V001. É decisão sua e do grupo; por isso os scripts são pequenos e independentes.
+Regra do projeto: **depois do primeiro deploy no Azure, script aplicado não se edita mais**. Mudança vira script novo (`ALTER` para tabela; `DROP` e `CREATE` para trigger e função). **Antes** do primeiro deploy foi possível ter um esquema "limpo", com as mudanças dentro dos `CREATE TABLE`: o dono decidiu fazer isso em 2026-11-03, e é a junção descrita no topo. Quem tiver um banco local criado antes precisa recriá-lo (`docker compose down -v`), porque o executor recusa um banco cujo `V001` ou `V002` aplicado mudou.
 
-**Prazo da sua conferência:** o primeiro deploy (fim da fatia 0) **congela tudo o que estiver nesta pasta**, inclusive estes 24 scripts. O dono disse em 2026-10-29 que "vai demorar para termos um verdadeiro deploy", então **até lá estes scripts podem ser corrigidos no lugar**, sem criar script novo; não há pressa. Se a sua conferência vier depois do deploy, qualquer correção vira script novo. Se o grupo incorporar uma mudança no V001, o script correspondente (V0nn) precisa sair **na mesma mudança**, senão ele falha por coluna repetida. E o DDL do MySQL não desfaz: um script com várias instruções que falhe no meio deixa o banco parcial (o executor avisa); por isso, onde possível, a troca de `CHECK` foi feita numa instrução só.
+**Prazo da sua conferência:** o primeiro deploy (fim da fatia 0) **congela tudo o que estiver nesta pasta**. O dono disse em 2026-10-29 que "vai demorar para termos um verdadeiro deploy", então **até lá o `V001` e o `V002` podem ser corrigidos no lugar**, sem criar script novo; não há pressa. Se a sua conferência vier depois do deploy, qualquer correção vira script novo. Não esqueça que o DDL do MySQL não desfaz: um script com várias instruções que falhe no meio deixa o banco parcial (o executor avisa).
 
-## Como foi testado
+## Como foi testado (os scripts antigos, 2026-10-29)
 
-Num MySQL **8.4.13** descartável (Docker), em ordem: `V001`, `V002` (o **arquivo de triggers do grupo, já com os itens 1 e 2 corrigidos**; as primeiras rodadas de teste usaram uma cópia, e foram repetidas com o arquivo real), `V003` e depois `V006` a `V029`. Os 36 triggers do arquivo são criados, e os 204 testes de comportamento, os 25 com dados antigos e 30 testes dos dois triggers de ponto (carga ÷ 5, `HORAS_TRABALHADAS`, datas, funcionário inativo, funções) passaram com ele.
+Registro do que foi medido **antes** da junção, com os scripts antigos; a conferência da base nova está na próxima seção. Num MySQL **8.4.13** descartável (Docker), em ordem: `V001`, `V002` (o **arquivo de triggers do grupo, já com os itens 1 e 2 corrigidos**; as primeiras rodadas de teste usaram uma cópia, e foram repetidas com o arquivo real), `V003` e depois `V006` a `V029`. Os 36 triggers do arquivo são criados, e os 204 testes de comportamento, os 25 com dados antigos e 30 testes dos dois triggers de ponto (carga ÷ 5, `HORAS_TRABALHADAS`, datas, funcionário inativo, funções) passaram com ele.
 
 - Os 24 scripts aplicam sem erro num banco **vazio** e também sobre um banco com **linhas antigas** (funcionário, ponto, holerite, aviso, treinamento, formulário com resposta, benefício, férias etc.), que é onde um `ALTER` com `CHECK` costuma falhar.
 - 204 testes de comportamento: cada regra que os comentários prometem foi exercitada, nos dois sentidos (aceita o que deve e recusa o que deve), inclusive com os **triggers do grupo ligados**. Por exemplo: resposta de candidato e resposta anônima passam pelo trigger de resposta; o banco recusa gravar nome numa resposta de formulário anônimo e recusa trocar o `ANONIMO` depois da primeira resposta; inativar um funcionário ainda cancela as férias e desliga os benefícios com os `CHECK` novos; o trigger de holerite continua recusando competência futura que não seja de férias. Nos testes de recusa conferi também **o motivo** do erro (um teste de "recusa" passa com qualquer erro).
 - Uma **revisão independente** (agente `revisor-de-plano`, 2026-10-29) leu os 24 scripts. O que ela apontou e eu conferi foi corrigido e testado de novo: `;` dentro de comentário (o executor pode se confundir), data de volta da chave de aprovação, `ID_GESTOR` obrigatório na etapa do gestor, estado "encerrado" do formulário, anonimato garantido pelo banco, participação anônima sem data e com UUID aleatório, padrões `FALSE` em avisos e treinamentos, troca do `CHECK` de advertência numa instrução só, `STATUS_PEDIDO` sem padrão, código do link com `ascii_bin`.
 - Os testes não estão no repositório (são scripts de shell que usam um container). Se quiser, eles podem entrar.
 
-Para repetir à mão:
+(Com os scripts antigos, repetir à mão era aplicar `V001`, `V002`, `V003` e depois `V006` a `V029`, na ordem, num MySQL 8.4 descartável.)
 
-```
-docker run -d --name rh-mysql-teste -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=rh_system mysql:8.4
-# depois, na ordem: V001 (tabelas), V002 (triggers, já corrigido), V003 (funções), V006 ... V029
-docker exec -i rh-mysql-teste mysql -uroot --default-character-set=utf8mb4 < "Banco de Dados/RHSystem_Criacao_Tabelas_MySQL.sql"
-docker exec -i rh-mysql-teste mysql -uroot --default-character-set=utf8mb4 rh_system < "Banco de Dados/Scripts/V006__funcionarios_matricula_contrato.sql"
-```
+## Como a base nova foi conferida (2026-11-03)
+
+Os 47 scripts antigos (os da pasta `Banco de Dados/Scripts` no commit `f69db4e`) foram aplicados num banco `cmp_ref` e a base nova (`V001` a `V005`) em outro, `cmp_novo`, num MySQL 8.4 com `--default-time-zone=-03:00` e `--log-bin-trust-function-creators=1`. Depois se comparou o **retrato** de cada um: colunas na ordem (tipo, padrão, coluna gerada, charset, comentário), índices, restrições (`CHECK`, chaves únicas, chaves estrangeiras com as colunas e as regras), triggers, funções e parâmetros, opções das tabelas e os dados. Resultado: **48 tabelas, 426 colunas, 36 triggers e as 8 funções, iguais.** As únicas diferenças:
+
+- o **comentário** dentro do trigger de holerite (o texto do antigo `V012` contava "antes era..."; hoje são duas linhas). Sem os comentários, o corpo do trigger é idêntico, e os outros 35 triggers são idênticos no texto exato;
+- a **ordem** de três linhas `KEY` no `SHOW CREATE TABLE` (`IDX_FERIAS_FUNCIONARIO_INICIO`, as duas chaves de FK de `FORMULARIOS_RESPOSTAS` e `IDX_PONTOS_FUNCIONARIO_DATA`): o conjunto de índices é o mesmo.
+
+"Igual" vale no sentido lógico: no banco antigo as colunas acrescentadas por `ALTER` entram como `INSTANT` (versões de linha do InnoDB), e no novo nascem no `CREATE`; isso não muda nenhum resultado. Um achado que vale guardar: os `CREATE INDEX` dos antigos `V035` a `V038` **ficaram soltos, logo depois da tabela**, porque dentro do `CREATE TABLE` o MySQL guarda a constante de três `CHECK` (`FILA_EMAILS` e `TAREFAS_AGENDADAS`) como `_utf8mb4':'` e não como `_ascii':'`. É só a forma do texto guardado, mas assim a comparação ficou exata.
+
+A comparação foi validada com defeitos de propósito (tipo de coluna, ordem de colunas, `CHECK` apagado, índice a mais, ordem das colunas dentro de um índice, coluna de origem de uma FK, valor de `SEQUENCIAS`, `DEFAULT`, comentário de tabela, função e trigger apagados): cada um foi acusado no arquivo certo. E duas aplicações independentes dos 47 scripts antigos deram retratos iguais.
 
 ## O que eu gostaria que você questionasse (decisões minhas)
 
-Estas não vieram da lista; foram escolhas de desenho, todas explicadas no comentário do script:
+(Os números abaixo são dos scripts antigos.) Estas não vieram da lista; foram escolhas de desenho, todas explicadas no comentário do script:
 
 - **V011** não cria o `CHECK` opcional "status `APROVADA` exige a etapa do gestor", porque travaria o pedido de quem é gestor (que só o RH decide).
 - **V021** coloca o estado do pedido dentro de `BENEFICIOS_FUNCIONARIOS` (e **não** numa tabela de pedidos), para manter os dependentes ligados à adesão, como o dono decidiu. O custo: refazer um pedido recusado é um `UPDATE` da mesma linha. Dependentes (`V024`) e trajeto (`V025`) têm as mesmas colunas de situação, porque o Figma lista os três em "Seus pedidos".
@@ -135,7 +157,7 @@ Estas não vieram da lista; foram escolhas de desenho, todas explicadas no comen
 - **V017** guarda candidato, resposta anônima e resposta comum **na mesma tabela** (`FORMULARIOS_RESPOSTAS`), porque os triggers de pergunta só contam respostas ali.
 - **V018 e V029** usam uma **coluna gerada** (`CHAVE_DESTINO`) só para a chave única funcionar com `NULL`; **V019** usa outra (`CHAVE_AVALIADO`) na chave primária.
 - **V019** não tem `ID` automático nem hora, de propósito: assim não dá para cruzar a ordem de quem participou com a ordem das respostas.
-- **V012** é o único que altera um trigger do grupo. Se alguém rodar de novo o script original de triggers, ele desfaz a mudança; a ordem dos scripts evita isso.
+- **V012** era o único que alterava um trigger do grupo (a exceção de férias no trigger de holerite). Hoje essa exceção está no próprio `V002`. Se o grupo trocar o `V002` por uma versão sem ela, a exceção some em silêncio: o teste `Trigger_de_holerite_aceita_competencia_futura_so_para_ferias` (em `ScriptsDoGrupoTests`) é quem avisa.
 - Os `CHECK` usam `COALESCE` em alguns pontos de propósito: no MySQL um `CHECK` que dá `NULL` **passa**.
 - **V015/V017:** o anonimato é garantido pelo banco com uma chave estrangeira composta `(ID_FORMULARIO, ANONIMO)` entre a resposta e o formulário. É uma cópia de uma coluna de propósito: com ela o MySQL recusa trocar o `ANONIMO` do formulário depois da primeira resposta, sem trigger. Se preferir trigger, é só trocar.
 - **V015:** `DATA_ENCERRAMENTO` existe para "agendado com a data vencida" não ser igual a "encerrado".

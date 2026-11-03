@@ -301,7 +301,7 @@ paths:
         na auditoria (área `AVISOS`, ação `EXCLUIU`). O Figma não desenha o botão "Excluir": a tela do RH precisa dele nos avisos
         rascunho e agendado.
 
-        **O que se leu no banco** (`Criacao_Tabelas`, `Criacao_Triggers` e `V013`): `AVISOS` só tem triggers de `INSERT`, nada trava o `DELETE`;
+        **O que se leu no banco** (`Criacao_Tabelas`, `Criacao_Triggers` e `V001`): `AVISOS` só tem triggers de `INSERT`, nada trava o `DELETE`;
         `AVISOS_VISUALIZACOES` tem chave estrangeira para `AVISOS` sem `ON DELETE CASCADE`, e o trigger `TRG_AVISOS_AFTER_INSERT` cria uma linha
         dessas por funcionário ativo já na criação do aviso (inclusive do rascunho). Por isso a API apaga primeiro essas linhas (todas "não lidas",
         porque aviso não publicado não pode ser aberto) e depois o aviso, na mesma transação. Nenhuma outra tabela aponta para `AVISOS`.
@@ -1266,7 +1266,7 @@ paths:
         - `decisao: MANTER`: a advertência volta a `APLICADA` (`desfechoDaContestacao: MANTIDA`).
         - `decisao: ACATAR`: a advertência passa a `CANCELADA` (`desfechoDaContestacao: ACATADA`); cancelada não muda mais de status (trigger do banco).
         - `resposta` é o texto que o RH escreve para a pessoa: **vai por e-mail** à pessoa e **não fica guardado** no banco (o Kauan decide se guarda;
-          ver `V014`), só na auditoria. Por isso a pessoa não vê a resposta na tela, só a nova situação.
+          ver `V001`), só na auditoria. Por isso a pessoa não vê a resposta na tela, só a nova situação.
         Não há outra forma de cancelar uma advertência.
       x-perfis: [RH]
       x-provisorio: >-
@@ -2138,7 +2138,7 @@ components:
     # ------------------------------------------------------------ holerites
     HoleriteTipo:
       type: string
-      description: Tipo do holerite (valores de `HOLERITES.TIPO_HOLERITE`, `V012`). Mensal, 13º salário ou férias.
+      description: Tipo do holerite (valores de `HOLERITES.TIPO_HOLERITE`, `V001`). Mensal, 13º salário ou férias.
       enum: [MENSAL, DECIMO_TERCEIRO, FERIAS]
 
     HoleriteSituacao:
@@ -2330,7 +2330,7 @@ components:
     AdvertenciaSituacao:
       type: string
       description: |
-        Valores do banco (`ADVERTENCIAS.STATUS_ADVERTENCIA`, `V014`). `PENDENTE`: "Aguardando ciência". `APLICADA`: "Ciente". `CONTESTADA`: "Contestada",
+        Valores do banco (`ADVERTENCIAS.STATUS_ADVERTENCIA`, `V001`). `PENDENTE`: "Aguardando ciência". `APLICADA`: "Ciente". `CONTESTADA`: "Contestada",
         esperando o RH. `CANCELADA`: contestação acatada; não muda mais.
         Fluxo: `PENDENTE` → `APLICADA` ou `CONTESTADA`; `CONTESTADA` → `APLICADA` (mantida) ou `CANCELADA` (acatada).
       enum: [PENDENTE, APLICADA, CONTESTADA, CANCELADA]

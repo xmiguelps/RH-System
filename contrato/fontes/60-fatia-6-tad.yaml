@@ -1,6 +1,6 @@
 # Fatia 6: TAD (treinamentos). Roadmap, linhas 225 a 248; telas 22 a 26 (RH), 41 e 42 (funcionário), 58 (gestor).
 # Banco: TREINAMENTOS, TREINAMENTOS_FUNCIONARIOS, TREINAMENTOS_CERTIFICADOS (Criacao_Tabelas:403-464),
-# V026 (módulos e progresso) e V029 (rascunho, público, certificado e as três caixas da publicação).
+# módulos e progresso, rascunho, público, certificado e as três caixas da publicação (tudo no V001).
 tags:
   - name: Treinamentos
     description: |
@@ -29,7 +29,7 @@ tags:
       coluna): `RASCUNHO` (não publicado), `AGENDADO` (publicado, ainda não chegou `comecaEm`), `EM_ANDAMENTO`
       (publicado, `comecaEm` já chegou e o RH não encerrou) e `ENCERRADO` (o RH encerrou; `encerradoEmUtc` diz quando).
       Não há mais situação por data final. `ENCERRADO` e `encerradoEmUtc` dependem da coluna nova
-      `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver "Banco: o que é novo", abaixo).
+      `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver "Banco: o que é novo", abaixo).
 
       **Situação da pessoa no treinamento** (`TreinamentoParticipanteSituacao`): `INSCRITO` (tem linha em
       `TREINAMENTOS_FUNCIONARIOS` e ainda não começou; o Figma chama de "Não iniciado"), `EM_ANDAMENTO` e `CONCLUIDO`.
@@ -59,10 +59,10 @@ tags:
       com linha ainda não concluída, respondem 409 `CONFIRMACAO_NECESSARIA` com `pendentes` (e `emAndamento` e
       `naoIniciaram`) e só executam quando a chamada é repetida com `confirmar=true`.
 
-      **Banco: o que é novo** (scripts já escritos em `Banco de Dados/Scripts`): a coluna `TREINAMENTOS.ENCERRADO_EM` (`V042`;
+      **Banco: o que é novo** (scripts já escritos em `Banco de Dados/Scripts`): a coluna `TREINAMENTOS.ENCERRADO_EM` (`V001`;
       instante do encerramento; dela dependem a situação `ENCERRADO` e `encerradoEmUtc`); a coluna
-      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V044`; alimenta `nomeArquivo` do módulo de PDF); a mudança do padrão de
-      `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` para `FALSE` (`V043`); e a **auditoria**, que é tabela nova da aplicação (`V037`) e
+      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V001`; alimenta `nomeArquivo` do módulo de PDF); a mudança do padrão de
+      `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` para `FALSE` (`V001`); e a **auditoria**, que é tabela nova da aplicação (`V001`) e
       recebe os eventos de publicar (criação das linhas em lote), encerrar e excluir. A `description` de cada operação que
       depende de uma delas diz isso.
 
@@ -112,7 +112,7 @@ paths:
         A coluna "Período" do Figma (início e fim) vira só a data de início (`comecaEm`, "Começa em"; vazia em rascunho
         sem data) e, no encerrado, a data de `encerradoEmUtc`: treinamento não tem fim (seção 13 das convenções).
         `ENCERRADO`, `encerradoEmUtc` e a aba "Encerrados" dependem da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script
-        `V042`; ver `encerrarTreinamento`).
+        `V001`; ver `encerrarTreinamento`).
         O Figma não desenha a aba "Rascunhos", mas ela é necessária para o RH retomar o que salvou: acrescente-a.
         O menu "..." da linha tem **Editar** (`obterTreinamento` e `atualizarTreinamento`), **Encerrar**
         (`encerrarTreinamento`, só em `EM_ANDAMENTO`) e **Excluir** (`excluirTreinamento`). Com `certificadosEmitidos`
@@ -167,8 +167,8 @@ paths:
         Ninguém vê o treinamento antes de `publicar`. `incluiAdmitidos` e `emiteCertificado` têm padrão verdadeiro no
         banco; a API sempre grava o valor recebido (não declare o padrão no mapeamento do EF; ver `Scripts\LEIA-ME.md`).
         **Sem prazo** (seção 13 das convenções): não há `terminaEm`. As colunas `DATA_FIM`, `AVISA_POR_EMAIL` e
-        `LEMBRA_ANTES_DO_FIM` (V029) deixam de ter uso: a API deixa `DATA_FIM` `NULL`; nas outras duas **o banco nasce com
-        `FALSE`** (o `V043` trocou o padrão para `FALSE` e zerou as linhas antigas) **e a API não manda e-mail** (nem aviso
+        `LEMBRA_ANTES_DO_FIM` (V001) deixam de ter uso: a API deixa `DATA_FIM` `NULL`; nas outras duas **o banco nasce com
+        `FALSE`** (o padrão no `V001` é `FALSE`) **e a API não manda e-mail** (nem aviso
         de publicação nem lembrete); nenhum agendador as lê.
       x-perfis: [RH]
       requestBody:
@@ -227,7 +227,7 @@ paths:
         distintas com **pendência** (definição única, na descrição da tag Treinamentos: treinamento obrigatório
         `EM_ANDAMENTO` em que a pessoa tem linha `INSCRITO` ou `EM_ANDAMENTO`). O "Prazos até 31/10" que o Figma mostra
         sob esse número **não existe** (treinamento não tem prazo): o cartão mostra só o número. Separar o encerrado do
-        em andamento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`).
+        em andamento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`).
       x-perfis: [RH]
       responses:
         '200':
@@ -253,7 +253,7 @@ paths:
       description: |
         Tela 02 (adicionar colaborador, "Depois de salvar"): o texto da caixa é "Incluir no treinamento
         {`titulo`}". Em vigor = publicado, marcado como `onboarding` e **não encerrado** (pode ser agendado; um
-        treinamento de onboarding encerrado deixa de receber gente nova; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        treinamento de onboarding encerrado deixa de receber gente nova; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)).
         Normalmente vem um só item. Lista vazia: o front deixa a caixa desligada, com a dica "Nenhum treinamento de
         onboarding publicado". Mais de um item: o texto vira "Incluir nos treinamentos de onboarding" e o cadastro
         inclui a pessoa em todos. Marcada a caixa, o front manda `incluirNoOnboarding: true` no cadastro (fatia 1); ver
@@ -368,8 +368,8 @@ paths:
         `AGENDADO`, `comecaEm`. Os demais campos precisam vir com o valor atual; se vierem diferentes, 422
         `TREINAMENTO_CAMPO_TRAVADO`. Em especial `emiteCertificado` não muda depois de publicado: desligar depois de
         emitir faria certificados já entregues responderem "não encontrado" na validação, e ligar exporia conclusões
-        antigas (V029). **Treinamento `ENCERRADO`** não muda mais nada: 422 `TREINAMENTO_ENCERRADO` (a situação
-        `ENCERRADO` depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`; ver
+        antigas (V001). **Treinamento `ENCERRADO`** não muda mais nada: 422 `TREINAMENTO_ENCERRADO` (a situação
+        `ENCERRADO` depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V001`; ver
         `encerrarTreinamento`). Os dois 422 têm sentidos distintos (ver "Códigos de erro desta fatia", na tag
         Treinamentos): `TREINAMENTO_CAMPO_TRAVADO` é campo que não muda depois de publicado e
         `TREINAMENTO_ENCERRADO` é treinamento que o RH encerrou.
@@ -476,17 +476,17 @@ paths:
         quando se chega aqui), as linhas dos participantes, o público escolhido e o treinamento; depois apaga do
         armazenamento de arquivos os PDFs dos módulos. Quem tinha o treinamento deixa de vê-lo e perde o andamento. O evento
         entra na auditoria (`TREINAMENTOS`, `EXCLUIU`) com o título e o número de `pendentes` (a auditoria é tabela nova da
-        aplicação, script `V037`).
+        aplicação, script `V001`).
 
         **O que li no banco:** `TREINAMENTOS_FUNCIONARIOS`, `TREINAMENTOS_CERTIFICADOS`, `TREINAMENTOS_MODULOS` e
         `TREINAMENTOS_PUBLICO` têm chave estrangeira para `TREINAMENTOS` sem `ON DELETE` (no MySQL/InnoDB isso é
         `RESTRICT`: o banco recusa apagar o treinamento enquanto houver linha filha, por isso a API apaga os filhos
         antes, na ordem acima), e `TREINAMENTOS_MODULOS_PROGRESSO` aponta para `TREINAMENTOS_MODULOS` do mesmo jeito
-        (`Criacao_Tabelas`:403-464, V026, V029). Não há trigger de `DELETE` em nenhuma dessas tabelas (os de `DELETE`
+        (`Criacao_Tabelas`:403-464, V001). Não há trigger de `DELETE` em nenhuma dessas tabelas (os de `DELETE`
         do banco são só os de `FUNCIONARIOS`, `HOLERITES`, `ADVERTENCIAS` e `FORMULARIOS_PERGUNTAS`). Logo o banco aceita
         a exclusão física. Li também que os triggers `TRG_TREINAMENTOS_FUNCIONARIOS_AFTER_INSERT` e `_AFTER_UPDATE`
         (`Criacao_Triggers`:768-791) criam a linha em `TREINAMENTOS_CERTIFICADOS` sempre que a pessoa vira `CONCLUIDO`,
-        inclusive com `emiteCertificado` falso (V029, "SOBRE EMITE_CERTIFICADO = FALSO"): por isso, para a API, "certificado
+        inclusive com `emiteCertificado` falso (V001, "SOBRE EMITE_CERTIFICADO = FALSO"): por isso, para a API, "certificado
         emitido" é a conclusão em treinamento que emite certificado, e não a mera existência da linha. Não existe coluna
         para ocultar ou arquivar treinamento.
       x-perfis: [RH]
@@ -524,7 +524,7 @@ paths:
         obrigatório). **Nenhum e-mail sai** (seção 12 das convenções): publicar não avisa ninguém; o RH usa um Aviso, se
         quiser.
         A criação em lote das linhas entra na auditoria como evento explícito (roadmap, decisão 5; a auditoria é tabela
-        nova da aplicação, script `V037`).
+        nova da aplicação, script `V001`).
         Publicar de novo, inclusive um treinamento já encerrado: 422 `TREINAMENTO_JA_PUBLICADO` (código só desta rota; o
         `PUT` e as rotas de módulo usam outros). Não existe "despublicar": publicado não volta a rascunho (depois só se
         encerra e, sem certificado emitido, se exclui).
@@ -615,11 +615,11 @@ paths:
         - Os certificados já emitidos continuam valendo e o conteúdo continua aberto a quem tem acesso ("Rever
           conteúdo"). Como um certificado emitido impede a exclusão (`excluirTreinamento`), **encerrar é a única saída**
           de um treinamento que já emitiu certificado. O evento entra na auditoria (`TREINAMENTOS`, `ALTEROU`; a
-          auditoria é tabela nova da aplicação, script `V037`).
+          auditoria é tabela nova da aplicação, script `V001`).
 
-        **Depende do script `V042`**: `TREINAMENTOS.ENCERRADO_EM DATETIME NULL` (o banco guarda o horário em -03:00; a
+        **Depende do script `V001`**: `TREINAMENTOS.ENCERRADO_EM DATETIME NULL` (o banco guarda o horário em -03:00; a
         conversão para `encerradoEmUtc` é do back-end; um `CHECK` só deixa encerrar o que foi publicado). A coluna
-        `DATA_FIM` ("prazo", V029) fica sem uso e nula.
+        `DATA_FIM` ("prazo", V001) fica sem uso e nula.
       x-perfis: [RH]
       parameters:
         - { $ref: '#/components/parameters/TreinamentoId' }
@@ -685,7 +685,7 @@ paths:
       summary: Acrescenta um módulo (vídeo, texto, link ou PDF) ao treinamento.
       description: |
         Passo Conteúdo, botões "Vídeo", "Arquivo PDF", "Texto" e "Link" (o botão "Aula presencial" não existe). Envio em
-        `multipart/form-data`. O módulo entra no fim (`ordem` = último + 1). O que cada `tipo` exige (o banco confere, V026,
+        `multipart/form-data`. O módulo entra no fim (`ordem` = último + 1). O que cada `tipo` exige (o banco confere, V001,
         `CHK_TREINAMENTOS_MODULOS_CONTEUDO`) e o que recusa com 400 em `errors`:
         `VIDEO`: `urlExterna`; `TEXTO`: `conteudoTexto` (texto ou markdown, nunca HTML);
         `LINK`: `urlExterna`; `PDF`: `arquivo` (PDF de até 10 MB, conferido pelo conteúdo e não só pela extensão).
@@ -693,9 +693,9 @@ paths:
         Só em **rascunho**: depois de publicado (inclusive o encerrado), 422 `TREINAMENTO_MODULOS_TRAVADOS` (a conclusão é
         por módulo e `CONCLUIDO` é definitivo; um módulo novo não reabriria quem já concluiu). O arquivo só é gravado no
         Blob depois de o banco aceitar o módulo. No módulo `PDF`, a API grava `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
-        juntos (o nome que a pessoa deu ao arquivo, `V044`) e devolve só o nome, em `nomeArquivo`.
+        juntos (o nome que a pessoa deu ao arquivo, `V001`) e devolve só o nome, em `nomeArquivo`.
       x-provisorio: >-
-        Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (roadmap, fatia 6): o contrato supõe a hipótese mais simples, só link externo; se o dono escolher o Blob, `VIDEO` passa a aceitar `arquivo` (a coluna `CAMINHO_ARQUIVO` já existe em V026). (2) Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta.
+        Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (roadmap, fatia 6): o contrato supõe a hipótese mais simples, só link externo; se o dono escolher o Blob, `VIDEO` passa a aceitar `arquivo` (a coluna `CAMINHO_ARQUIVO` já existe em V001). (2) Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta.
       x-perfis: [RH]
       parameters:
         - { $ref: '#/components/parameters/TreinamentoId' }
@@ -841,7 +841,7 @@ paths:
         Não há coluna Nota. O botão "Baixar" do certificado só aparece quando `certificadoDisponivel` é verdadeiro.
         Rascunho não tem participantes (lista vazia). O resultado de pessoas inativas continua na lista (`funcionario.ativo`).
         Treinamento encerrado continua consultável: quem não começou aparece como "Não iniciado" e quem terminou depois do
-        encerramento aparece como `CONCLUIDO` (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). A linha de resumo sob o título (o Figma: "Obrigatório para todos, com
+        encerramento aparece como `CONCLUIDO` (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). A linha de resumo sob o título (o Figma: "Obrigatório para todos, com
         certificado. 01/08 a 31/10/2026") perde o fim: use `comecaEm` ("desde 01/08") e, se houver, `encerradoEmUtc`.
         `concluidoEmUtc` é o instante em que a pessoa concluiu (o front mostra só o dia, em `America/Sao_Paulo`).
       x-perfis: [RH]
@@ -998,11 +998,11 @@ paths:
         **É esta a regra por trás da caixa "Incluir no treinamento Onboarding 2026"** do cadastro. O cadastro
         (`POST /api/rh/funcionarios`) e a confirmação da importação (`POST /api/rh/importacoes/{importacaoId}/confirmar`)
         aceitam `incluirNoOnboarding` e aplicam **esta mesma regra por dentro**, depois de gravar a pessoa (a importação
-        usa a tabela nova da aplicação `IMPORTACOES`, script `V038`, descrita na fatia 2); nesses dois fluxos o front não
+        usa a tabela nova da aplicação `IMPORTACOES`, script `V001`, descrita na fatia 2); nesses dois fluxos o front não
         chama esta rota. Ela existe para incluir depois uma pessoa já cadastrada (por exemplo, a partir da
         ficha) e é a referência do efeito e dos erros.
         Cria uma linha `INSCRITO` em `TREINAMENTOS_FUNCIONARIOS` para a pessoa em cada treinamento de onboarding em vigor
-        (publicado e **não encerrado**; ver `listarTreinamentosDeOnboarding`; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)), qualquer que seja o público; assim o
+        (publicado e **não encerrado**; ver `listarTreinamentosDeOnboarding`; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)), qualquer que seja o público; assim o
         treinamento aparece para ela quando `comecaEm` chegar. Quem já tem linha não muda e vem com
         `jaEstavaIncluida: true` (a chamada é repetível). Sem treinamento de onboarding em vigor: 422
         `SEM_TREINAMENTO_DE_ONBOARDING` (no cadastro, que grava tudo ou nada como diz a fatia 1, o mesmo 422 recusa o
@@ -1063,7 +1063,7 @@ paths:
         do Figma não existe). Entram os treinamentos em que a pessoa tem linha e os **opcionais do público dela** que ela
         ainda não escolheu (`situacao = DISPONIVEL`). Treinamento **encerrado** só aparece para quem já começou (continua
         e termina) ou concluiu; para quem estava `INSCRITO` e não começou, e para o opcional ainda não escolhido, ele some (o
-        encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)).
         `aba`: `TODOS` (padrão; tudo que ainda **não** foi concluído, como diz a nota "Os treinamentos que você já concluiu ficam
         na aba Concluídos"), `DISPONIVEIS` (`DISPONIVEL` e `NAO_INICIADO`), `EM_ANDAMENTO` e `CONCLUIDOS`. `obrigatorio`
         é o filtro "Obrigatórios e opcionais" (sem ele, os dois). `busca` procura no título e na descrição. O filtro "Todos
@@ -1116,7 +1116,7 @@ paths:
         Tela de execução (não existe no Figma): lista dos módulos com `concluido`, mais o cartão do treinamento. O
         conteúdo de cada módulo vem de `obterConteudoDeModulo`. Pessoa que não tem linha e não é do público, treinamento
         não publicado ou que ainda não começou: 404; treinamento encerrado em que ela não começou nem concluiu: 404
-        também (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Opcional do público que ela ainda não escolheu é devolvido com `situacao = DISPONIVEL`. Concluído: traz o
+        também (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). Opcional do público que ela ainda não escolheu é devolvido com `situacao = DISPONIVEL`. Concluído: traz o
         `certificado` (quando o RH deixou `emiteCertificado` ligado).
       x-perfis: [Funcionario, Gestor, RH]
       parameters:
@@ -1162,7 +1162,7 @@ paths:
         Só treinamento **opcional**, do público da pessoa, publicado e que já começou. Cria a linha `INSCRITO`. Repetir é
         inofensivo: já inscrita, devolve o treinamento sem mudar nada. Obrigatório: 422 `TREINAMENTO_NAO_E_OPCIONAL` (quem é do
         público já tem linha). Fora do público ou não visível: 404. Treinamento que o RH encerrou: 422
-        `TREINAMENTO_ENCERRADO` (ninguém novo entra; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Treinamento não tem prazo, então a
+        `TREINAMENTO_ENCERRADO` (ninguém novo entra; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). Treinamento não tem prazo, então a
         inscrição vale a qualquer momento enquanto ele não for encerrado.
       x-perfis: [Funcionario, Gestor, RH]
       parameters:
@@ -1235,7 +1235,7 @@ paths:
         (já em andamento ou concluído: devolve o estado atual, sem `UPDATE`; o banco recusa mudar um treinamento
         concluído). Não é obrigatório chamar: `concluirModuloDeTreinamento` também inicia quem ainda estava `INSCRITO`.
         Opcional sem inscrição: 422 `INSCRICAO_PENDENTE`. Treinamento que o RH encerrou e que a pessoa ainda não tinha
-        começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` continua; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` continua; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)).
       x-perfis: [Funcionario, Gestor, RH]
       parameters:
         - { $ref: '#/components/parameters/TreinamentoId' }
@@ -1382,7 +1382,7 @@ paths:
         resultam em um só `CONCLUIDO` e um só certificado.
         Opcional sem inscrição: 422 `INSCRICAO_PENDENTE`. Treinamento que o RH encerrou e que a pessoa ainda não tinha
         começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` conclui normalmente e recebe o certificado; o encerramento
-        depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Módulo de outro treinamento: 404. `concluidoEmUtc` do treinamento é o instante em que o
+        depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). Módulo de outro treinamento: 404. `concluidoEmUtc` do treinamento é o instante em que o
         último módulo foi concluído.
       x-provisorio: >-
         Formato do `numero` do certificado e modelo do PDF (roadmap, fatia 6).
@@ -1483,7 +1483,7 @@ paths:
       summary: Lista os treinamentos que valem para o meu setor, com o andamento da equipe.
       description: |
         Tela 58, lista da esquerda ("Treinamentos do setor"). Treinamentos **publicados** (agendados, em andamento e
-        encerrados; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)) que alcançam pelo menos uma pessoa do setor do gestor; rascunho não aparece. A equipe **não inclui o
+        encerrados; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)) que alcançam pelo menos uma pessoa do setor do gestor; rascunho não aparece. A equipe **não inclui o
         próprio gestor** (o Figma mostra 8 pessoas, sem ele): o que é dele vem de `GET /api/eu/treinamentos`. Obrigatórios
         primeiro, depois `comecaEm` (o mais antigo primeiro). Sem paginação (lista curta). Obrigatório: "`concluiram` de
         `totalNaEquipe` concluíram" (equipe = pessoas com linha); opcional: "`inscritos` de `totalNaEquipe` inscritos" (equipe
@@ -1738,15 +1738,15 @@ components:
     # ------------------------------------------------------------ enums
     TreinamentoSituacao:
       type: string
-      description: Situação do treinamento, calculada com a data de hoje (-03:00). `RASCUNHO` não está publicado; `AGENDADO` está publicado e `comecaEm` ainda não chegou; `EM_ANDAMENTO` está publicado, `comecaEm` já chegou e o RH não encerrou; `ENCERRADO` o RH encerrou (`encerradoEmUtc`; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`). Não há situação por data final (treinamento não tem prazo).
+      description: Situação do treinamento, calculada com a data de hoje (-03:00). `RASCUNHO` não está publicado; `AGENDADO` está publicado e `comecaEm` ainda não chegou; `EM_ANDAMENTO` está publicado, `comecaEm` já chegou e o RH não encerrou; `ENCERRADO` o RH encerrou (`encerradoEmUtc`; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V001`). Não há situação por data final (treinamento não tem prazo).
       enum: [RASCUNHO, AGENDADO, EM_ANDAMENTO, ENCERRADO]
     TreinamentoPublico:
       type: string
-      description: Para quem vale o treinamento (`TREINAMENTOS.PUBLICO`, V029). Não existe "por cargo".
+      description: Para quem vale o treinamento (`TREINAMENTOS.PUBLICO`, V001). Não existe "por cargo".
       enum: [TODOS, SETORES, PESSOAS]
     TreinamentoModuloTipo:
       type: string
-      description: Tipo do módulo (V026). `Aula presencial` do Figma não existe.
+      description: Tipo do módulo (V001). `Aula presencial` do Figma não existe.
       enum: [VIDEO, TEXTO, LINK, PDF]
     TreinamentoParticipanteSituacao:
       type: string
@@ -1830,7 +1830,7 @@ components:
         duracaoMinutos: { type: [integer, 'null'], minimum: 1, description: 'Duração estimada ("15 minutos").' }
         urlExterna: { type: [string, 'null'], description: Endereço do vídeo ou do link. }
         conteudoTexto: { type: [string, 'null'], description: "Texto do módulo (texto ou markdown, nunca HTML)." }
-        nomeArquivo: { type: [string, 'null'], description: 'Nome que a pessoa deu ao PDF enviado, guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V044`); `null` em módulo sem arquivo (vídeo, texto e link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.' }
+        nomeArquivo: { type: [string, 'null'], description: 'Nome que a pessoa deu ao PDF enviado, guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V001`); `null` em módulo sem arquivo (vídeo, texto e link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.' }
 
     TreinamentoModulosRh:
       type: object
@@ -1874,7 +1874,7 @@ components:
         titulo: { type: string }
         descricao: { type: [string, 'null'] }
         comecaEm: { type: [string, 'null'], format: date }
-        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que o RH encerrou o treinamento (`encerrarTreinamento`); `null` enquanto não encerrado. Depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`).' }
+        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Instante em que o RH encerrou o treinamento (`encerrarTreinamento`); `null` enquanto não encerrado. Depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`).' }
         obrigatorio: { type: boolean }
         onboarding: { type: boolean }
         emiteCertificado: { type: boolean }
@@ -1911,7 +1911,7 @@ components:
         emiteCertificado: { type: boolean }
         situacao: { $ref: '#/components/schemas/TreinamentoSituacao' }
         comecaEm: { type: [string, 'null'], format: date }
-        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Quando o RH encerrou; `null` enquanto não encerrado (coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`).' }
+        encerradoEmUtc: { type: [string, 'null'], format: date-time, description: 'Quando o RH encerrou; `null` enquanto não encerrado (coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V001`).' }
         publico:
           oneOf:
             - { $ref: '#/components/schemas/TreinamentoPublico' }

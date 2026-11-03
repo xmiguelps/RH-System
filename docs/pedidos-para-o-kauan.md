@@ -1,5 +1,7 @@
 # Pedidos para o Kauan (banco de dados)
 
+> **Nota de 2026-11-03:** os scripts `V006` a `V029` que este arquivo cita (os que atendem aos itens 3 a 27) foram **incorporados ao `V001` e ao `V002`** em 2026-11-03. O mapa de qual pedido virou qual mudança, o texto de cada um (nas «notas dos pedidos», no fim do `V001`) e a conferência estão em `Banco de Dados/Scripts/LEIA-ME.md`. O texto abaixo é o pedido original e não foi reescrito.
+
 Lista corrida, atualizada em 2026-10-29 (itens 12 a 27: formulários, férias, benefícios, pagamento, atestado, tabelas novas, feriados e treinamento). Cada item é algo que o Figma mostra ou que decidimos, e que o banco ainda não atende. A ideia é fazer **antes do primeiro deploy no Azure**: depois dele os scripts aplicados ficam congelados e qualquer mudança vira um script novo (com `ALTER`). Sem pressa para os itens, mas vale resolver antes disso.
 
 **Como entregar.** Os números de linha citados (`Criacao_Tabelas`, `Criacao_Triggers`, `Functions_Unificadas`) são da versão dos scripts de 2026-10-29 e mudam depois do item 1: procure pelo nome do trigger ou da tabela. Mande cada mudança em um script SQL separado, dizendo o que ele faz; quem numera as versões (`V006` a `V029` já foram usados em 2026-10-29) e coloca em `Banco de Dados/Scripts/` é o dono. Nas tabelas novas pode usar `CHECK`, `UNIQUE` e chave estrangeira; trigger, não (ver "Decidido").

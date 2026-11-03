@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: API do RH-System
-  version: 0.2.1
+  version: 0.2.2
   description: |
     Contrato escrito antes do back-end. Quem implementa a API segue este documento; quem faz o
     front-end gera tipos e dados simulados dele. Só o dono muda o contrato.
@@ -51,11 +51,11 @@ tags:
         e antes do horário de entrada mais a tolerância, o espelho diz `SEM_REGISTRO` (ainda não há batida) e
         `SituacaoHoje` diz `AINDA_NAO_COMECOU`: o espelho não faz essa distinção.
 
-      **Tabelas novas da aplicação** (scripts já escritos em `Banco de Dados/Scripts`): a **auditoria** (`V037`; a batida, a
-      correção do RH e o acesso ao arquivo do atestado vão para ela), a **fila de e-mails** (`V035`; e-mail de resultado do
-      pedido de ajuste) e as **tarefas agendadas** (`V036`; consolidação diária do banco de horas, importação e repetição
-      anual de feriados). **Colunas novas** de tabelas do grupo: `PONTOS_MARCACOES.DATA_CORRECAO` (`V039`; o "quando" da
-      correção do RH em `corrigidaEmUtc`) e `PONTOS_MANUTENCOES.CHAVE_PENDENTE` (`V040`; um só pedido pendente por dia e
+      **Tabelas novas da aplicação** (scripts já escritos em `Banco de Dados/Scripts`): a **auditoria** (`V001`; a batida, a
+      correção do RH e o acesso ao arquivo do atestado vão para ela), a **fila de e-mails** (`V001`; e-mail de resultado do
+      pedido de ajuste) e as **tarefas agendadas** (`V001`; consolidação diária do banco de horas, importação e repetição
+      anual de feriados). **Colunas novas** de tabelas do grupo: `PONTOS_MARCACOES.DATA_CORRECAO` (`V001`; o "quando" da
+      correção do RH em `corrigidaEmUtc`) e `PONTOS_MANUTENCOES.CHAVE_PENDENTE` (`V001`; um só pedido pendente por dia e
       por pessoa).
   - name: Pedidos de ajuste de ponto
     description: |
@@ -74,7 +74,7 @@ tags:
       já ter passado) e decidido depois de criado.
 
       **Quem é gestor** (usado nas regras abaixo): quem tem uma linha em `GESTORES` (a lista de
-      `GET /api/rh/gestores`, fatia 1). Li `Criacao_Tabelas:129-138` e o `V011`: `GESTORES` não tem coluna de situação; a
+      `GET /api/rh/gestores`, fatia 1). Li `Criacao_Tabelas:129-138` e o `V001`: `GESTORES` não tem coluna de situação; a
       linha vale enquanto a pessoa está ativa (`FUNCIONARIOS.ATIVO`), porque o banco recusa cadastrar gestor inativo
       (`Criacao_Triggers:154-168`). **O gestor de uma pessoa** é o gestor do setor dela (`SETORES.ID_GESTOR`, fatia 1;
       um gestor responde por **um** setor). **Só quem tem perfil `Gestor` é gestor de setor** (422
@@ -86,7 +86,7 @@ tags:
       Sofia Ramos); (2) a pessoa está num setor sem gestor (Recursos Humanos, Administrativo, Tecnologia e Compras:
       Carla Mendes, João Pedro Alves, Vanessa Lima...); (3) o gestor do setor está desligado (inativo). Só o RH decide, e
       quem do RH decide precisa estar **também em `GESTORES`**: o trigger do banco exige um `ID_GESTOR` na decisão final
-      e recusa quando ele é a própria pessoa do pedido (`Criacao_Triggers:547-561`; `V011`, linhas 27-30 e 46-52). Nos
+      e recusa quando ele é a própria pessoa do pedido (`Criacao_Triggers:547-561`; nota «(antigo V011)» do `V001`). Nos
       demais casos o pedido nasce com `etapa: GESTOR`.
 
       **Gestor ausente** (a ausência que antes se chamava "chave de aprovação automática"): é ligada pelo RH em
@@ -121,15 +121,15 @@ tags:
       de outra equipe são 404** (fora do escopo, nunca 422). Decisão do dono (2026-10-30): **o RH pode recusar o que o
       gestor aprovou**. O atestado tem o código próprio `ATESTADO_JA_DECIDIDO` (ver a tag "Atestados").
 
-      **O RH e o próprio pedido** (conferi `Criacao_Triggers:535-567`, `V011` e `Scripts\LEIA-ME.md:98`; as duas
+      **O RH e o próprio pedido** (conferi `Criacao_Triggers:535-567`, `V001` e `Scripts\LEIA-ME.md`, seção «O que eu gostaria que você questionasse»; as duas
       coisas valem). O trigger só compara o **`ID_GESTOR`** com a pessoa do pedido
       (`O gestor nao pode analisar a propria solicitacao.`); nenhuma regra do banco compara `ID_FUNCIONARIO_RH`
-      (quem do RH confirmou) com ela, e o `LEIA-ME.md:98` diz que o dono aceitou "o RH pode confirmar o próprio
+      (quem do RH confirmou) com ela, e o `LEIA-ME.md` (seção «O que eu gostaria que você questionasse») diz que o dono aceitou "o RH pode confirmar o próprio
       pedido" e que por isso nenhum `CHECK` foi criado. Efeito, **inferido** dessas leituras (não rodei o banco):
       se o pedido **passou pelo gestor**, o `ID_GESTOR` é o do gestor e o RH, mesmo sendo a pessoa do pedido, confirma;
       se o pedido **não passou pelo gestor**, o `ID_GESTOR` vira o de quem do RH decide, e quem é a pessoa do pedido
       não pode decidi-lo (422 `PEDIDO_PROPRIO`). Se a **única** pessoa do RH cadastrada em `GESTORES` é também quem
-      pediu, ninguém consegue decidir o pedido dela (aviso do `V011`, linhas 50-52).
+      pediu, ninguém consegue decidir o pedido dela (aviso da nota «(antigo V011)» do `V001`).
 
       **Textos de `motivoNaoPodeDecidir`:** são **cinco textos fixos**, definidos no schema `PontoPedidoAjuste`; a
       fatia 7 os copia, palavra por palavra, para as férias.
@@ -145,7 +145,7 @@ tags:
       e-mail. A etapa do gestor aprovada sozinha pelo "gestor ausente" não é decisão de ninguém e **não** manda e-mail
       (escolha minha, a avisar o dono): a pessoa só recebe quando o RH decide. A correção direta do RH
       (`PUT .../ponto/dias/{dia}`) também **não** manda. O e-mail leva o resultado, quem decidiu e a observação, se houver;
-      o envio passa pela **fila de e-mails** (tabela nova da aplicação, script `V035`) e uma falha de envio
+      o envio passa pela **fila de e-mails** (tabela nova da aplicação, script `V001`) e uma falha de envio
       não desfaz a decisão. A pessoa vê o resultado também em "Meus pedidos de ajuste".
   - name: Banco de horas
     description: Saldo e extrato do banco de horas. Só lançamentos automáticos (Crédito e Débito); não há lançamento manual, folga nem compensação.
@@ -155,7 +155,7 @@ tags:
     description: |
       O funcionário envia o atestado (dado de saúde); o gestor da equipe vê o arquivo; só o RH valida ou recusa.
       Validado vira "Falta compensada". O acesso ao arquivo fica registrado na auditoria (tabela nova da aplicação,
-      script `V037`), na área `ATESTADOS` (`AuditoriaArea`, fatia 1; ação `BAIXOU`). **Só o atestado validado, de dia inteiro, faz a pessoa aparecer como `ATESTADO` em
+      script `V001`), na área `ATESTADOS` (`AuditoriaArea`, fatia 1; ação `BAIXOU`). **Só o atestado validado, de dia inteiro, faz a pessoa aparecer como `ATESTADO` em
       `SituacaoHoje`**: enquanto está `ENVIADO` (esperando o RH) ela não aparece (hoje, Carla Mendes e João Pedro Alves,
       atestados 43 e 44).
 
@@ -222,11 +222,11 @@ tags:
       ele. Só o RH acompanha.
 
       **Colunas e tabelas novas que este assunto pede (scripts já escritos em `Banco de Dados/Scripts`; o contrato só descreve
-      a dependência):** a coluna do lembrete automático (ligado ou desligado) em `FORMULARIOS`, `LEMBRETE_AUTOMATICO` (`V045`);
+      a dependência):** a coluna do lembrete automático (ligado ou desligado) em `FORMULARIOS`, `LEMBRETE_AUTOMATICO` (`V001`);
       as colunas do arquivo enviado numa resposta em `FORMULARIOS_RESPOSTAS`, `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
-      (`V046`); e as tabelas da aplicação de **tarefas agendadas** (`V036`; publicação agendada, encerramento pelo prazo,
-      reabertura de formulário recorrente, lembrete automático e a marca "lembrete enviado hoje"), **fila de e-mails** (`V035`)
-      e **auditoria** (`V037`).
+      (`V001`); e as tabelas da aplicação de **tarefas agendadas** (`V001`; publicação agendada, encerramento pelo prazo,
+      reabertura de formulário recorrente, lembrete automático e a marca "lembrete enviado hoje"), **fila de e-mails** (`V001`)
+      e **auditoria** (`V001`).
   - name: Formulário público
     description: Página do candidato externo, aberta por link, sem login.
   - name: Treinamentos
@@ -256,7 +256,7 @@ tags:
       coluna): `RASCUNHO` (não publicado), `AGENDADO` (publicado, ainda não chegou `comecaEm`), `EM_ANDAMENTO`
       (publicado, `comecaEm` já chegou e o RH não encerrou) e `ENCERRADO` (o RH encerrou; `encerradoEmUtc` diz quando).
       Não há mais situação por data final. `ENCERRADO` e `encerradoEmUtc` dependem da coluna nova
-      `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver "Banco: o que é novo", abaixo).
+      `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver "Banco: o que é novo", abaixo).
 
       **Situação da pessoa no treinamento** (`TreinamentoParticipanteSituacao`): `INSCRITO` (tem linha em
       `TREINAMENTOS_FUNCIONARIOS` e ainda não começou; o Figma chama de "Não iniciado"), `EM_ANDAMENTO` e `CONCLUIDO`.
@@ -286,10 +286,10 @@ tags:
       com linha ainda não concluída, respondem 409 `CONFIRMACAO_NECESSARIA` com `pendentes` (e `emAndamento` e
       `naoIniciaram`) e só executam quando a chamada é repetida com `confirmar=true`.
 
-      **Banco: o que é novo** (scripts já escritos em `Banco de Dados/Scripts`): a coluna `TREINAMENTOS.ENCERRADO_EM` (`V042`;
+      **Banco: o que é novo** (scripts já escritos em `Banco de Dados/Scripts`): a coluna `TREINAMENTOS.ENCERRADO_EM` (`V001`;
       instante do encerramento; dela dependem a situação `ENCERRADO` e `encerradoEmUtc`); a coluna
-      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V044`; alimenta `nomeArquivo` do módulo de PDF); a mudança do padrão de
-      `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` para `FALSE` (`V043`); e a **auditoria**, que é tabela nova da aplicação (`V037`) e
+      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V001`; alimenta `nomeArquivo` do módulo de PDF); a mudança do padrão de
+      `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` para `FALSE` (`V001`); e a **auditoria**, que é tabela nova da aplicação (`V001`) e
       recebe os eventos de publicar (criação das linhas em lote), encerrar e excluir. A `description` de cada operação que
       depende de uma delas diz isso.
 
@@ -654,11 +654,11 @@ paths:
         Grava o colaborador, os dados pessoais (CPF e telefone), os benefícios escolhidos e, com
         `enviarConvite = true`, cria o login e coloca o e-mail de convite na fila (ver "Senha e convite").
         Tudo na mesma transação. **Ninguém recebe senha:** o login nasce sem senha utilizável.
-        O convite depende das **tabelas novas da aplicação** de convite (`V033`, com a marca de senha provisória `V032`) e de
-        fila de e-mails (`V035`).
+        O convite depende das **tabelas novas da aplicação** de convite (`V001`, com a marca de senha provisória `V001`) e de
+        fila de e-mails (`V001`).
 
         **Regras**
-        - A **matrícula** é **gerada pelo sistema** (contador `SEQUENCIAS`, script `V030`) e é somente leitura (não vem no corpo).
+        - A **matrícula** é **gerada pelo sistema** (contador `SEQUENCIAS`, script `V001`) e é somente leitura (não vem no corpo).
         - O **gestor** é o gestor do setor escolhido (a tela mostra o nome, que vem de `GET /api/rh/setores`).
           Setor sem gestor deixa o colaborador sem gestor (os pedidos de ponto e de férias dele vão direto ao RH,
           `CONVENCOES.md`, seção 9).
@@ -1137,7 +1137,7 @@ paths:
         (a partir da fatia 3, depois de o banco de horas daquele dia fechar; se esse momento já passou, grava na
         hora). Resposta: a ficha com `desligamento.situacao = AGENDADO` ou, se já foi gravado, `EFETIVADO`.
         O desligamento agendado e a tarefa que o efetiva no dia seguinte são **tabelas novas da aplicação** (desligamento
-        agendado, script `V034`; tarefas agendadas, script `V036`).
+        agendado, script `V001`; tarefas agendadas, script `V001`).
 
         Ao efetivar, o banco faz sozinho o que o grupo definiu: desativa o login, desativa os benefícios e cancela
         as férias futuras (`SOLICITADA` ou `APROVADA`), **sem aviso à pessoa e sem registro próprio dessas
@@ -1319,8 +1319,8 @@ paths:
         `enviarConvite = true` faz de uma vez o "Ativar" e o "Reenviar convite" (o link do convite não valeria com o login
         desativado), com o e-mail de convite na fila. Quem já definiu a senha entra com ela depois do "Ativar", e
         `enviarConvite = true` para ela dá 422 `SENHA_JA_DEFINIDA` (o front só mostra a caixa quando faz sentido). Padrão
-        `false`. O convite depende das **tabelas novas da aplicação** de convite (`V033`, com a marca de senha provisória `V032`) e de
-        fila de e-mails (`V035`).
+        `false`. O convite depende das **tabelas novas da aplicação** de convite (`V001`, com a marca de senha provisória `V001`) e de
+        fila de e-mails (`V001`).
 
         **Erros:** a nova `dataAdmissao` não pode ser anterior ao último dia de trabalho do vínculo anterior (400 em
         `dataAdmissao`); cadastro que **já está ativo** (inclusive com desligamento só agendado: cancele-o antes): 409
@@ -2558,7 +2558,7 @@ paths:
         (`soDecidePedidosDeGestores = true`) não há etapa do gestor para aprovar sozinha: a marcação é recusada com 422
         `GESTOR_SEM_EQUIPE`. Marcar, desmarcar e a data de volta valem para qualquer motivo de ausência.
 
-        No banco, a marcação é `GESTORES.APROVACAO_AUTOMATICA` e `GESTORES.APROVACAO_AUTOMATICA_ATE` (script V011; o
+        No banco, a marcação é `GESTORES.APROVACAO_AUTOMATICA` e `GESTORES.APROVACAO_AUTOMATICA_ATE` (script V001; o
         nome das colunas não mudou).
       x-perfis:
         - RH
@@ -2642,7 +2642,7 @@ paths:
         saúde) e `aceitaTrajeto` (o pedido pede o trajeto, como no vale-transporte). No catálogo de demonstração só os
         benefícios 3 (Plano odontológico) e 6 (Auxílio-creche) são `opcional`: são os dois "Disponíveis para você" que a
         tela 44 mostra ao Bruno, que já tem o 1, o 2, o 4 e o 5 (os "Seus benefícios" das telas 44 e 46).
-        **Depende do script SQL `V031`**: três colunas booleanas em `BENEFICIOS`, `OPCIONAL`, `ACEITA_DEPENDENTES` e
+        **Depende do script SQL `V001`**: três colunas booleanas em `BENEFICIOS`, `OPCIONAL`, `ACEITA_DEPENDENTES` e
         `ACEITA_TRAJETO` (a tabela tinha só nome e descrição, `Criacao_Tabelas:536-542`). Nascem `FALSE`: o benefício que já existia
         fica "só o RH concede, sem dependentes e sem trajeto", e a API grava o valor que o RH marcou.
       x-perfis:
@@ -2729,7 +2729,7 @@ paths:
       description: |
         Tela 29, cadastro "Benefícios". Só o perfil `RH`. Nome único (409 `NOME_JA_CADASTRADO`). O corpo traz as três marcas
         do catálogo (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`), que **dependem do
-        script SQL `V031`** (colunas `OPCIONAL`, `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` em `BENEFICIOS`).
+        script SQL `V001`** (colunas `OPCIONAL`, `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` em `BENEFICIOS`).
       x-perfis:
         - RH
       requestBody:
@@ -2777,7 +2777,7 @@ paths:
       summary: Altera um benefício do catálogo.
       description: |
         Tela 29, cadastro "Benefícios". Só o perfil `RH`. Substitui nome, descrição e as três marcas do catálogo
-        (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`; dependem do script SQL `V031`).
+        (`opcional`, `aceitaDependentes`, `aceitaTrajeto`; ver `GET /api/rh/beneficios`; dependem do script SQL `V001`).
       x-perfis:
         - RH
       parameters:
@@ -3053,8 +3053,8 @@ paths:
       description: |
         Tela 29 ("Reenviar convite") e menu "..." da ficha. Só o perfil `RH`. Cria o login se ainda não existe
         (sem senha utilizável), invalida o convite anterior e coloca o e-mail na fila. O link vale 7 dias. Depende das
-        **tabelas novas da aplicação** de convite (token, `V033`) e de fila de e-mails (`V035`), e da marca de senha provisória
-        em `USUARIOS` (`V032`), que a API liga ao criar o login por convite e desliga quando a pessoa define a senha.
+        **tabelas novas da aplicação** de convite (token, `V001`) e de fila de e-mails (`V001`), e da marca de senha provisória
+        em `USUARIOS` (`V001`), que a API liga ao criar o login por convite e desliga quando a pessoa define a senha.
         A pessoa precisa estar **ativa** (422 `FUNCIONARIO_INATIVO`) e ter **e-mail corporativo** (sem ele, 422
         `FUNCIONARIO_SEM_EMAIL_CORPORATIVO`: o RH completa o cadastro antes).
         Quem já definiu a senha **não** recebe convite: 422 `SENHA_JA_DEFINIDA` (a pessoa usa "Esqueci minha
@@ -3250,7 +3250,7 @@ paths:
         e-mail (da lista fechada de e-mails, `CONVENCOES.md`, seção 12), importação e download de arquivos, de **todas as
         fatias** (cada fatia registra os seus eventos). Os cancelamentos automáticos da inativação **não** têm registro
         próprio (decisão do dono). **Nunca** aparecem senha, hash nem token; valores de colunas sensíveis não são
-        gravados (ver `AuditoriaMudanca.valorOculto`). O log é uma **tabela nova da aplicação** (auditoria; script `V037`).
+        gravados (ver `AuditoriaMudanca.valorOculto`). O log é uma **tabela nova da aplicação** (auditoria; script `V001`).
 
         **Formulário anônimo (privacidade, decisão do dono, 2026-10-30):** a auditoria **não pode permitir descobrir quem
         respondeu nem quem ainda não participou**. Por isso:
@@ -3492,8 +3492,8 @@ paths:
         ativo com login, o e-mail com o link é colocado na fila; o link vale **1 hora** e é de **uso único**
         (um pedido novo invalida o anterior). O e-mail tem o botão "Definir nova senha" apontando para
         `<endereço do front>/definir-senha?token=<token>`. Limite de 5 pedidos por minuto por IP (429). O link de
-        redefinição e a fila de e-mails são **tabelas novas da aplicação** (token de convite e de redefinição, `V033`; fila de
-        e-mails, `V035`).
+        redefinição e a fila de e-mails são **tabelas novas da aplicação** (token de convite e de redefinição, `V001`; fila de
+        e-mails, `V001`).
       x-perfis:
         - Publico
       security: []
@@ -3526,7 +3526,7 @@ paths:
         defina a sua senha") ou `REDEFINICAO` ("Defina uma nova senha"). Link inexistente, já usado ou vencido
         recebem a **mesma** resposta 422 `LINK_INVALIDO_OU_VENCIDO` (não revela qual). O token do convite vale
         **7 dias**; o da redefinição, 1 hora. Limite de 5 tentativas por minuto por IP (429). Os dois tokens vivem na
-        **tabela nova da aplicação** de convite e redefinição (script `V033`).
+        **tabela nova da aplicação** de convite e redefinição (script `V001`).
       x-perfis:
         - Publico
       security: []
@@ -3571,7 +3571,7 @@ paths:
         abertas da pessoa são encerradas. Devolve 204; a pessoa então **entra** pela tela de login (não há login
         automático). Se a pessoa estiver inativa ou o login desativado, o link não vale (422, mesma resposta).
         Limite de 5 tentativas por minuto por IP (429). O token consumido é o da **tabela nova da aplicação** de convite
-        e redefinição (script `V033`).
+        e redefinição (script `V001`).
       x-perfis:
         - Publico
       security: []
@@ -3713,7 +3713,7 @@ paths:
         branco são ignoradas. Guarda o arquivo por até **1 hora** (`expiraEmUtc`) para a confirmação; ele é
         apagado depois de confirmado ou vencido. A resposta é sempre uma prévia; **o RH corrige a planilha e envia
         de novo** enquanto houver erro. A importação (o `importacaoId`, a situação e a prévia guardada) vive numa **tabela
-        nova da aplicação** (importações; `V038`), não nas tabelas de colaboradores.
+        nova da aplicação** (importações; `V001`), não nas tabelas de colaboradores.
 
         **CPF ou e-mail de um cadastro inativo:** esta importação só cadastra gente nova. Se o CPF ou o e-mail corporativo
         de uma linha já pertence a um cadastro **inativo** (alguém que saiu da empresa), a linha recebe um erro em `CPF` ou
@@ -3945,7 +3945,7 @@ paths:
         setor, benefícios, dados pessoais). **Ninguém recebe senha:** com `enviarConvite = true` (padrão) cada
         pessoa recebe o convite de acesso por e-mail (fila, com limite de vazão); com `false`, ninguém recebe agora
         e o RH envia depois em Cadastros, Usuários do sistema. O convite depende das **tabelas novas da aplicação** de
-        convite (token) e de fila de e-mails (`V033` e `V035`).
+        convite (token) e de fila de e-mails (`V001`).
 
         **"Depois de salvar": as mesmas caixas do cadastro** (`POST /api/rh/funcionarios`, tela 02), com o **mesmo efeito**,
         valendo para **todas** as pessoas da planilha:
@@ -4110,7 +4110,7 @@ paths:
           `GET /api/eu/ponto/banco-de-horas`.
         - `bancoHoras.atualizadoAte` é o **último dia consolidado**, **global** (o mesmo para todas as pessoas; não é
           por pessoa), e vem da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script
-          `V036`). Ver `GET /api/eu/ponto/banco-de-horas`. É o "Atualizado até ontem".
+          `V001`). Ver `GET /api/eu/ponto/banco-de-horas`. É o "Atualizado até ontem".
       x-perfis:
         - Funcionario
         - Gestor
@@ -4162,7 +4162,7 @@ paths:
         - O dia do ponto é criado junto, vazio, se ainda não existir. A carga do dia vem do cargo (semanal ÷ 5).
         - Bater em feriado, folga ou férias é aceito (a batida entra como qualquer outra e vira hora extra).
           **Escolha minha:** os documentos não proíbem e um teste do roadmap cobre "ponto em feriado".
-        - A batida é registrada na auditoria (com IP e origem; tabela nova da aplicação, script `V037`).
+        - A batida é registrada na auditoria (com IP e origem; tabela nova da aplicação, script `V001`).
         - A primeira entrada do dia faz a pessoa passar a `TRABALHANDO` em `SituacaoHoje` (e continua assim mesmo
           depois da saída).
         - Recusas do banco (422, mensagem original em `regraDoBanco`): `Nao e possivel registrar ponto de
@@ -4737,7 +4737,7 @@ paths:
         - o dia, **depois de aplicar os itens**, precisa fechar em pares `ENTRADA` e `SAIDA` alternados e em ordem
           (a validação da sequência fica com a aplicação): `PONTO_SEQUENCIA_INVALIDA`;
         - só um pedido em análise por dia: 409 `PONTO_PEDIDO_JA_EM_ANALISE`. A regra vale **também no banco** (script
-          `V040`): só pode haver **um** pedido `PENDENTE` por dia e por pessoa (a chave é o registro de ponto da pessoa
+          `V001`): só pode haver **um** pedido `PENDENTE` por dia e por pessoa (a chave é o registro de ponto da pessoa
           naquele dia). Por isso a **segunda tentativa simultânea** (duplo clique, duas abas) cai **no mesmo 409
           `PONTO_PEDIDO_JA_EM_ANALISE`**: a API continua conferindo antes de gravar e, se o banco recusar por essa chave,
           devolve o mesmo erro, nunca um 500;
@@ -5331,7 +5331,7 @@ paths:
 
         O extrato tem **só `CREDITO` e `DEBITO`** (decisão do dono, design seção 7: sem folga nem compensação; o
         "Compensação, folga de meio período" do Figma é só um Débito). Não existe lançamento manual: os lançamentos
-        vêm da **consolidação diária** do agendador (tarefas agendadas: tabela nova da aplicação, script `V036`), que:
+        vêm da **consolidação diária** do agendador (tarefas agendadas: tabela nova da aplicação, script `V001`), que:
         - grava no máximo **uma linha por pessoa e por dia** (`diaReferencia`); rodar duas vezes não duplica;
         - ao subir depois de uma parada, recupera todos os dias que ficaram para trás;
         - recalcula o dia quando um ajuste de ponto é aprovado ou o RH corrige o dia;
@@ -5350,7 +5350,7 @@ paths:
         no fim erra até alguns minutos (`Scripts\LEIA-ME.md`, "Armadilhas novas"); e `FN_CALCULAR_SALDO_BANCO_HORAS`,
         a função do banco, soma horas, então **não** deve ser usada para este campo.
         `atualizadoAte` é o **último dia consolidado**: o dia de referência da consolidação diária mais recente que
-        terminou (tarefa agendada de consolidação do banco de horas, `TAREFAS_AGENDADAS`, script `V036`). É um valor
+        terminou (tarefa agendada de consolidação do banco de horas, `TAREFAS_AGENDADAS`, script `V001`). É um valor
         **global** (o mesmo para todas as pessoas, não é por pessoa) e normalmente é ontem. **Dia com saldo zero não
         tem linha** no banco: `atualizadoAte` não depende de a pessoa ter lançamento naquele dia. Só é `null` se a
         consolidação nunca rodou.
@@ -6221,7 +6221,7 @@ paths:
         (outra equipe, pedido de outro gestor ou pedido do próprio gestor: 404). Grava `decisaoGestor` com `decisao:
         APROVADA`; o pedido continua `PENDENTE` e passa para a `etapa: RH`. Nenhuma batida é alterada ainda. **A pessoa
         recebe e-mail com o resultado** (a decisão do gestor, `CONVENCOES.md`, seção 12; o envio passa pela fila de
-        e-mails, tabela nova da aplicação, script `V035`) e vê o resultado em "Meus pedidos de ajuste".
+        e-mails, tabela nova da aplicação, script `V001`) e vê o resultado em "Meus pedidos de ajuste".
         `observacao` é opcional, vai em `decisaoGestor.observacao` e aparece para a pessoa.
 
         Erros, os mesmos das férias (`CONVENCOES.md`, seção 9):
@@ -6334,7 +6334,7 @@ paths:
         gestor: 404). Se o gestor recusa, o pedido **acaba na hora**: `status: REJEITADA`, `etapa: CONCLUIDA`,
         `decisaoGestor` com `decisao: REJEITADA` e `decisaoRh: null`, e o RH não confirma. Nenhuma batida é alterada.
         **A pessoa recebe e-mail com o resultado** (`CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação,
-        script `V035`). `observacao` é opcional, vai em `decisaoGestor.observacao` e aparece para a pessoa. Mesmos
+        script `V001`). `observacao` é opcional, vai em `decisaoGestor.observacao` e aparece para a pessoa. Mesmos
         erros da aprovação: 409 `PEDIDO_JA_DECIDIDO` e 409 `PEDIDO_ETAPA_INCORRETA`.
       x-perfis:
         - Gestor
@@ -6494,7 +6494,7 @@ paths:
       summary: Devolve o link temporário do arquivo de um atestado da equipe.
       description: |
         **Só o gestor**, só atestado da equipe dele (outro: **404**). O arquivo é dado de saúde: o acesso fica
-        **registrado na auditoria** (quem, quando, qual atestado, IP e origem; tabela nova da aplicação, script `V037`;
+        **registrado na auditoria** (quem, quando, qual atestado, IP e origem; tabela nova da aplicação, script `V001`;
         área `ATESTADOS`, ação `BAIXOU`) a cada link gerado. Nunca há link público; o link vale pouco tempo e baixa
         como anexo.
       x-perfis:
@@ -6788,8 +6788,8 @@ paths:
           impede apagar essa batida).
 
         Depois de gravar, o banco de horas do dia é recalculado e o fato vai para a auditoria (tabela nova da aplicação,
-        script `V037`; a batida antiga fica no log). As batidas corrigidas ou incluídas levam `origem: CORRIGIDA_RH` e a
-        data da correção na coluna `DATA_CORRECAO` (`V039`), gravadas juntas. Devolve o dia já corrigido. O banco ainda recusa dia anterior à admissão e
+        script `V001`; a batida antiga fica no log). As batidas corrigidas ou incluídas levam `origem: CORRIGIDA_RH` e a
+        data da correção na coluna `DATA_CORRECAO` (`V001`), gravadas juntas. Devolve o dia já corrigido. O banco ainda recusa dia anterior à admissão e
         funcionário inativo (422, `regraDoBanco`; o de pessoa inativa traz `codigo: FUNCIONARIO_INATIVO`).
       x-perfis:
         - RH
@@ -7640,9 +7640,9 @@ paths:
         linha nova; item com `marcacaoId` altera a batida existente), todas com `origem: CORRIGIDA_RH`; grava
         `status: APROVADA`, `etapa: CONCLUIDA` e `decisaoRh` (`decisao: APROVADA`, quem do RH confirmou, quando e a
         `observacao`, que substitui a do gestor); recalcula o banco de horas do dia; registra na auditoria (tabela nova da
-        aplicação, script `V037`; a batida antiga fica no log). **A pessoa recebe e-mail com o resultado**
-        (a decisão do RH, `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V035`). As
-        batidas aplicadas levam também a data da correção em `DATA_CORRECAO` (`V039`).
+        aplicação, script `V001`; a batida antiga fica no log). **A pessoa recebe e-mail com o resultado**
+        (a decisão do RH, `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V001`). As
+        batidas aplicadas levam também a data da correção em `DATA_CORRECAO` (`V001`).
 
         Recusas (os mesmos códigos das férias, `CONVENCOES.md`, seções 9 e 11):
         - 409 `PEDIDO_ETAPA_INCORRETA`: o pedido ainda está na etapa do gestor (`podeDecidir` é `false`);
@@ -7834,7 +7834,7 @@ paths:
         `PEDIDO_RH_FORA_DE_GESTORES` e 422 `PEDIDO_PROPRIO` como na aprovação (o trigger também roda quando o
         status vira `REJEITADA`). Grava `status: REJEITADA`, `etapa: CONCLUIDA` e `decisaoRh` (`decisao: REJEITADA`, quem
         do RH e quando); nenhuma batida é alterada. **A pessoa recebe e-mail com o resultado** (a decisão do RH,
-        `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V035`). `observacao` é
+        `CONVENCOES.md`, seção 12; fila de e-mails, tabela nova da aplicação, script `V001`). `observacao` é
         opcional, vai em `decisaoRh.observacao` (e substitui a do gestor) e aparece para a pessoa.
       x-perfis:
         - RH
@@ -7960,7 +7960,7 @@ paths:
         os do tipo `EMPRESA` se existirem. Lista curta, **sem paginação**, por data. `mes` vazio devolve o ano
         todo. Só `ativo: true`, a menos que `incluirInativos=true`. Nacionais e estaduais "entram sozinhos"
         (importados automaticamente pelo agendador, que depende da tabela nova de tarefas agendadas da aplicação, script
-        `V036`) e não se editam (`podeEditar: false`). A tabela do banco já
+        `V001`) e não se editam (`podeEditar: false`). A tabela do banco já
         traz os nacionais de 2026 sem acento nos nomes; a API devolve os nomes como estão guardados. Se a empresa
         ainda não tem UF e município configurados (Cadastros > Empresa, fatia 1), esta lista **não dá erro**: vêm só
         os nacionais e os do tipo `EMPRESA` (**escolha minha**, para a tela abrir numa instalação nova). O erro
@@ -8417,7 +8417,7 @@ paths:
       summary: Devolve o link temporário do arquivo de um atestado.
       description: |
         **Só o RH.** O arquivo é dado de saúde: cada link gerado fica **registrado na auditoria** (quem, quando,
-        qual atestado, IP e origem; tabela nova da aplicação, script `V037`; área `ATESTADOS`, ação `BAIXOU`). Nunca há
+        qual atestado, IP e origem; tabela nova da aplicação, script `V001`; área `ATESTADOS`, ação `BAIXOU`). Nunca há
         link público; o link vale pouco tempo e baixa como anexo.
       x-perfis:
         - RH
@@ -8458,7 +8458,7 @@ paths:
         consolidação do banco de horas recalcula os dias do atestado. O atestado de dias inteiros validado que cobre
         hoje faz a pessoa aparecer como `ATESTADO` em `SituacaoHoje` (só depois de validado: enquanto `ENVIADO`, como o 43
         da Carla Mendes e o 44 do João Pedro Alves hoje, a pessoa não aparece como `ATESTADO`). O RH pode validar o
-        próprio atestado (o dono aceitou que o RH confirme o próprio pedido, `Scripts\LEIA-ME.md:98`). Não há e-mail
+        próprio atestado (o dono aceitou que o RH confirme o próprio pedido, `Scripts\LEIA-ME.md`, seção «O que eu gostaria que você questionasse»). Não há e-mail
         para o atestado (lista fechada, `CONVENCOES.md`, seção 12).
         409 `ATESTADO_JA_DECIDIDO` se já foi validado ou recusado (código do atestado, que tem uma só decisão; não é o
         `PEDIDO_JA_DECIDIDO` dos pedidos em duas etapas).
@@ -8917,7 +8917,7 @@ paths:
         na auditoria (área `AVISOS`, ação `EXCLUIU`). O Figma não desenha o botão "Excluir": a tela do RH precisa dele nos avisos
         rascunho e agendado.
 
-        **O que se leu no banco** (`Criacao_Tabelas`, `Criacao_Triggers` e `V013`): `AVISOS` só tem triggers de `INSERT`, nada trava o `DELETE`;
+        **O que se leu no banco** (`Criacao_Tabelas`, `Criacao_Triggers` e `V001`): `AVISOS` só tem triggers de `INSERT`, nada trava o `DELETE`;
         `AVISOS_VISUALIZACOES` tem chave estrangeira para `AVISOS` sem `ON DELETE CASCADE`, e o trigger `TRG_AVISOS_AFTER_INSERT` cria uma linha
         dessas por funcionário ativo já na criação do aviso (inclusive do rascunho). Por isso a API apaga primeiro essas linhas (todas "não lidas",
         porque aviso não publicado não pode ser aberto) e depois o aviso, na mesma transação. Nenhuma outra tabela aponta para `AVISOS`.
@@ -10142,7 +10142,7 @@ paths:
         - `decisao: MANTER`: a advertência volta a `APLICADA` (`desfechoDaContestacao: MANTIDA`).
         - `decisao: ACATAR`: a advertência passa a `CANCELADA` (`desfechoDaContestacao: ACATADA`); cancelada não muda mais de status (trigger do banco).
         - `resposta` é o texto que o RH escreve para a pessoa: **vai por e-mail** à pessoa e **não fica guardado** no banco (o Kauan decide se guarda;
-          ver `V014`), só na auditoria. Por isso a pessoa não vê a resposta na tela, só a nova situação.
+          ver `V001`), só na auditoria. Por isso a pessoa não vê a resposta na tela, só a nova situação.
         Não há outra forma de cancelar uma advertência.
       x-perfis:
         - RH
@@ -11261,7 +11261,7 @@ paths:
 
         `sentidoAvaliacao` é obrigatório quando `tipo = AVALIACAO` e proibido nos outros tipos. A prévia "Como o
         candidato vai ver" é montada pelo front com o que a pessoa digitou; não há rota para ela.
-      x-provisorio: "Sugestão anônima: o dono decidiu que a Sugestão aceita várias respostas da mesma pessoa, mas não disse se ela pode ser anônima. Hipótese usada aqui: não pode (o resultado anônimo só sai depois de encerrar e a Sugestão é sempre aberta; o registro de participação do banco, V019, aceita uma só linha por pessoa). Se o dono quiser sugestão anônima, muda: a regra de 400 sai, a Sugestão volta a ter público mínimo de 5 e o resultado fica preso ao encerramento manual."
+      x-provisorio: "Sugestão anônima: o dono decidiu que a Sugestão aceita várias respostas da mesma pessoa, mas não disse se ela pode ser anônima. Hipótese usada aqui: não pode (o resultado anônimo só sai depois de encerrar e a Sugestão é sempre aberta; o registro de participação do banco, V001, aceita uma só linha por pessoa). Se o dono quiser sugestão anônima, muda: a regra de 400 sai, a Sugestão volta a ter público mínimo de 5 e o resultado fica preso ao encerramento manual."
       x-perfis:
         - RH
       requestBody:
@@ -11429,7 +11429,7 @@ paths:
           de um jeito e ser de outro. O resto: **sem resposta**, tudo pode mudar, exceto que um formulário publicado por
           link (`alvo = LINK`) não sai de `ENTREVISTA` (422 `LINK_SO_PARA_ENTREVISTA`, ver `publicarFormulario`); **com
           resposta** (`temRespostas`), só `titulo` e `descricao`. O banco é a segunda barreira da troca de `anonimo` depois
-          da primeira resposta (chave estrangeira composta de `V017`), mas a API responde 409 antes de chegar nele.
+          da primeira resposta (chave estrangeira composta de `V001`), mas a API responde 409 antes de chegar nele.
         - `ENCERRADO`: nada muda (422 `FORMULARIO_ENCERRADO`).
         Passar para anônimo (só em rascunho ou agendado) com uma pergunta de envio de arquivo, ou com link público, é
         recusado (422 `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`). Sugestão (`OUTRO`) nunca é anônima (400 em
@@ -11520,7 +11520,7 @@ paths:
         respostas sem volta, a tela confirma também nos formulários que não pedem `confirmar`.
 
         **O que a exclusão faz (o que LI nos scripts do banco; a exclusão em si não foi rodada num MySQL):** nenhuma chave
-        estrangeira de formulário tem `ON DELETE` (`Criacao_Tabelas` e `V015` a `V019`), então o banco recusa apagar o
+        estrangeira de formulário tem `ON DELETE` (`Criacao_Tabelas` e `V001`), então o banco recusa apagar o
         formulário enquanto houver linha filha, e não há coluna de ocultação em `FORMULARIOS`: a exclusão é **física**, feita
         pela API em **uma transação**, nesta ordem: respostas (`FORMULARIOS_RESPOSTAS`, inclusive as anônimas e as de
         candidato), participações anônimas (`FORMULARIOS_PARTICIPACOES`), destinatários, candidatos, alternativas,
@@ -11529,7 +11529,7 @@ paths:
         trigger de exclusão em `FORMULARIOS_RESPOSTAS` nem nas tabelas novas (a lista de triggers de formulário tem só o
         insert do formulário, o update e o delete da pergunta e o insert da resposta), então apagar a resposta é permitido.
         Depois de gravar a transação, a API apaga do armazenamento os arquivos enviados (respostas de envio de arquivo e
-        currículos). Formulário recorrente deixa de reabrir. A auditoria (tabela da aplicação, script `V037`)
+        currículos). Formulário recorrente deixa de reabrir. A auditoria (tabela da aplicação, script `V001`)
         registra "Excluiu" com o título e **quantas** respostas foram apagadas, sem respondente; **no anônimo que ainda
         não encerrou, sem a contagem** (regra 6 em "Formulários").
       x-provisorio: "O dono falou só do formulário publicado (seção 13 das convenções diz 'a qualquer momento'). Hipótese usada aqui: o formulário encerrado também se exclui, com a mesma regra (sem confirmação, porque ninguém mais pode responder). Se o dono quiser proteger o encerrado, volta o 422 FORMULARIO_JA_PUBLICADO nele e o item Excluir some da lista para formulários encerrados."
@@ -11841,7 +11841,7 @@ paths:
 
         **`agendarPara` num rascunho não é guardado.** O banco só tem o dia agendado enquanto o formulário está `AGENDADO`:
         é a data de publicação preenchida (com o formulário inativo e sem encerramento) que o faz `AGENDADO`, e um rascunho
-        não pode ter essa data (`V015`). Por isso, ao salvar a publicação de um formulário `RASCUNHO`, o `agendarPara` do
+        não pode ter essa data (`V001`). Por isso, ao salvar a publicação de um formulário `RASCUNHO`, o `agendarPara` do
         corpo é aceito (valem as regras de campo), mas **não é guardado**: o formulário continua `RASCUNHO` e a resposta
         traz `publicacao.agendarPara: null`. Quem reabre o rascunho encontra a data vazia, e **a tela precisa mandar a data
         de novo ao agendar** (em `publicarFormulario`, com `agendarPara`). Os demais campos da etapa (`alvo`, setores,
@@ -11937,7 +11937,7 @@ paths:
           pessoas passam a ver o formulário em `listarMeusFormularios`. Setor vale para **quem está no setor agora**;
           num formulário **não anônimo**, quem for admitido ou trocar para o setor depois também passa a receber o
           formulário aberto. Num formulário **anônimo** não: o público é a fotografia do dia da publicação (regra 2 em
-          "Formulários"; o back-end pode guardar uma linha por pessoa em `FORMULARIOS_DESTINATARIOS`, que o `V018`
+          "Formulários"; o back-end pode guardar uma linha por pessoa em `FORMULARIOS_DESTINATARIOS`, que o `V001`
           permite, em vez da linha do setor).
         - **Avaliações:** quem avalia quem sai de `sentidoAvaliacao` e de quem é gestor de quem (equipe = setor do
           gestor). `GESTOR_AVALIA_EQUIPE`: as pessoas escolhidas são os **gestores**, e cada um avalia cada pessoa
@@ -11955,10 +11955,10 @@ paths:
           há a quem lembrar por link); se o `prazo` está a 7 dias ou menos do dia da publicação, não há lembrete
           automático; em formulário recorrente, vale em cada rodada. Segue a regra de no máximo um lembrete por pessoa,
           por formulário e por dia, que o lembrete manual também usa (ver `lembrarQuemFaltaFormulario`). **Banco:** o
-          liga e desliga é uma **coluna nova em `FORMULARIOS`**, `LEMBRETE_AUTOMATICO` (script `V045`); o estado "lembrete
-          enviado hoje" vive na **tabela de tarefas agendadas da aplicação** (também nova, script `V036`), nunca no
+          liga e desliga é uma **coluna nova em `FORMULARIOS`**, `LEMBRETE_AUTOMATICO` (script `V001`); o estado "lembrete
+          enviado hoje" vive na **tabela de tarefas agendadas da aplicação** (também nova, script `V001`), nunca no
           formulário. O padrão "ligada" é da **API**: ao criar o formulário ela grava `true`; o padrão do banco é `FALSE` de
-          propósito (`V045`), para que a caixa desligada nunca vire ligada por omissão do valor. **No anônimo** o lembrete vai a quem ainda não participou, sem guardar o destinatário nem contar
+          propósito (`V001`), para que a caixa desligada nunca vire ligada por omissão do valor. **No anônimo** o lembrete vai a quem ainda não participou, sem guardar o destinatário nem contar
           quantos foram: o limite é um lembrete do formulário por dia e a auditoria só diz que o lembrete saiu (regra 6).
           Hoje (07/10) a Pesquisa de clima 2026 (anônima, prazo 31/10) ainda não recebeu lembrete automático: o primeiro
           sai em 24/10.
@@ -11979,7 +11979,7 @@ paths:
         (`proximaReaberturaEmUtc` vazio); o RH cria outro formulário com um público de 5 ou mais.
 
         A publicação agendada, o encerramento pelo prazo, a reabertura e o lembrete automático são tarefas da **tabela de
-        tarefas agendadas da aplicação** (tabela nova, script `V036`).
+        tarefas agendadas da aplicação** (tabela nova, script `V001`).
       x-perfis:
         - RH
       parameters:
@@ -12539,7 +12539,7 @@ paths:
       summary: Mostra o que uma pessoa respondeu (botão Ver respostas).
       description: |
         Só para formulário **com nome**. Em formulário anônimo não existe: 422 `FORMULARIO_ANONIMO`, porque a resposta
-        anônima não guarda quem respondeu (`V017`). Nas avaliações, `avaliadoId` diz de qual avaliação se fala (uma
+        anônima não guarda quem respondeu (`V001`). Nas avaliações, `avaliadoId` diz de qual avaliação se fala (uma
         pessoa responde uma vez por avaliado); é obrigatório nelas e proibido nos outros tipos (400). Pessoa que não
         respondeu: 404.
 
@@ -13096,7 +13096,7 @@ paths:
         `FORMULARIO_SUGESTAO`). Quem já respondeu, quem foi pedido e não deve responder, ou quem já recebeu lembrete
         **hoje** deste formulário (manual ou automático), entra em `ignorados` (no máximo um lembrete por pessoa, por
         formulário, por dia; chave de idempotência do e-mail: formulário + pessoa + dia, na fila de e-mails da
-        aplicação, tabela nova, script `V035`).
+        aplicação, tabela nova, script `V001`).
 
         **Formulário anônimo:** só vale com `funcionarioIds` vazio (mandar uma pessoa específica revelaria quem falta:
         422 `FORMULARIO_ANONIMO`); o lembrete vai a quem não participou, sem mostrar a lista. **A resposta só diz que o
@@ -13105,7 +13105,7 @@ paths:
         ninguém (nada sai) e quando o lembrete de hoje já tinha saído, para o contraste não revelar nada. Aqui o limite
         é **um lembrete do formulário por dia**, e não por pessoa: guardar "formulário + pessoa + dia" seria guardar
         quem ainda não participou; a marca "lembrete enviado hoje" fica na **tabela de tarefas agendadas da aplicação**
-        (tabela nova, script `V036`), nunca no formulário. A auditoria registra só "lembrete enviado" (quem
+        (tabela nova, script `V001`), nunca no formulário. A auditoria registra só "lembrete enviado" (quem
         mandou e quando), **sem destinatário e sem número** (regra 6 em "Formulários"). O mesmo vale para o lembrete
         automático (ver `publicarFormulario`), que também não informa quantos nem quem. Hoje (07/10) a Pesquisa de clima
         2026 ainda não recebeu o automático: o primeiro sai em 24/10.
@@ -13367,7 +13367,7 @@ paths:
         `ignorados` vazios, igual com muitas pessoas a lembrar ou com nenhuma): o gestor não fica sabendo quantas pessoas
         da equipe dele faltam. O limite é um lembrete do formulário por dia **e por alcance** (o setor do gestor, aqui;
         todos, no do RH e no automático), guardado na tabela de tarefas agendadas da aplicação (tabela nova, script
-        `V036`), e a auditoria registra só "lembrete enviado", sem número e sem destinatário. Formulário fora
+        `V001`), e a auditoria registra só "lembrete enviado", sem número e sem destinatário. Formulário fora
         da equipe (inclusive Sugestão) e **avaliação do gestor** (`EQUIPE_AVALIA_GESTOR`: quem é avaliado não lembra
         ninguém): 404.
         Decisão do dono (2026-11-02): o botão fica, e este e-mail entra na lista fechada de `CONVENCOES.md`, seção 12.
@@ -13720,14 +13720,14 @@ paths:
         Sugestão** (`OUTRO`, caixa sempre aberta; decisão do dono, 2026-10-30) **aceita várias respostas da mesma pessoa**,
         e o 409 `JA_RESPONDIDO` só existe para os outros tipos. Em formulário com nome o banco **não** impede a repetição
         (`FORMULARIOS_RESPOSTAS` não tem chave única por pessoa), então a API confere e grava na mesma transação, para
-        dois envios ao mesmo tempo não passarem; no anônimo a chave única da participação (`V019`) impede (por isso a
+        dois envios ao mesmo tempo não passarem; no anônimo a chave única da participação (`V001`) impede (por isso a
         Sugestão nunca é anônima). Como o banco não tem tabela de "envio", a API grava **o mesmo instante** em
         `DATA_RESPOSTA` de todas as linhas de um envio, e é por pessoa e por esse instante que a Sugestão separa um envio
         do outro (`obterRespostasDeFuncionario`). Nas avaliações `avaliadoId` é obrigatório e precisa estar em
         `avaliados` (422 `AVALIADO_INVALIDO`); nos outros tipos é proibido.
 
         **Formulário anônimo:** a resposta é gravada **sem funcionário, sem candidato e com hora grosseira (só o dia)**
-        (`V017`). A aplicação registra à parte só que a pessoa participou (`FORMULARIOS_PARTICIPACOES`, sem data nem
+        (`V001`). A aplicação registra à parte só que a pessoa participou (`FORMULARIOS_PARTICIPACOES`, sem data nem
         ligação com a resposta), com chave `participacaoId` UUID v4 gerada pela aplicação, devolvida no recibo. **A
         auditoria não registra nada disto**: nem o autor nem a hora da resposta, nem a participação (nem com nome, nem com
         hora; regra 6 em "Formulários"). Como o anonimato não muda depois de publicado, a pessoa nunca responde achando que
@@ -13735,9 +13735,9 @@ paths:
 
         **Resposta com arquivo** (pergunta `ARQUIVO`): o arquivo fica no armazenamento e o banco guarda só a referência, na
         própria linha da resposta (`FORMULARIOS_RESPOSTAS`): `CAMINHO_ARQUIVO` (interno, nunca devolvido) e
-        `NOME_ARQUIVO_ORIGINAL` (o nome que a pessoa deu, devolvido em `arquivo.nome`), sempre **os dois juntos** (`V046`). **Resposta
+        `NOME_ARQUIVO_ORIGINAL` (o nome que a pessoa deu, devolvido em `arquivo.nome`), sempre **os dois juntos** (`V001`). **Resposta
         anônima nunca tem arquivo:** formulário anônimo não tem pergunta `ARQUIVO` (422 `ANONIMO_SEM_ARQUIVO` ao montar o
-        formulário), e, como segunda barreira, o banco recusa (`V046`) arquivo numa resposta anônima. Então, no formulário
+        formulário), e, como segunda barreira, o banco recusa (`V001`) arquivo numa resposta anônima. Então, no formulário
         anônimo, não há parte `arquivos` no envio.
       x-perfis:
         - Funcionario
@@ -14036,7 +14036,7 @@ paths:
         A coluna "Período" do Figma (início e fim) vira só a data de início (`comecaEm`, "Começa em"; vazia em rascunho
         sem data) e, no encerrado, a data de `encerradoEmUtc`: treinamento não tem fim (seção 13 das convenções).
         `ENCERRADO`, `encerradoEmUtc` e a aba "Encerrados" dependem da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script
-        `V042`; ver `encerrarTreinamento`).
+        `V001`; ver `encerrarTreinamento`).
         O Figma não desenha a aba "Rascunhos", mas ela é necessária para o RH retomar o que salvou: acrescente-a.
         O menu "..." da linha tem **Editar** (`obterTreinamento` e `atualizarTreinamento`), **Encerrar**
         (`encerrarTreinamento`, só em `EM_ANDAMENTO`) e **Excluir** (`excluirTreinamento`). Com `certificadosEmitidos`
@@ -14181,8 +14181,8 @@ paths:
         Ninguém vê o treinamento antes de `publicar`. `incluiAdmitidos` e `emiteCertificado` têm padrão verdadeiro no
         banco; a API sempre grava o valor recebido (não declare o padrão no mapeamento do EF; ver `Scripts\LEIA-ME.md`).
         **Sem prazo** (seção 13 das convenções): não há `terminaEm`. As colunas `DATA_FIM`, `AVISA_POR_EMAIL` e
-        `LEMBRA_ANTES_DO_FIM` (V029) deixam de ter uso: a API deixa `DATA_FIM` `NULL`; nas outras duas **o banco nasce com
-        `FALSE`** (o `V043` trocou o padrão para `FALSE` e zerou as linhas antigas) **e a API não manda e-mail** (nem aviso
+        `LEMBRA_ANTES_DO_FIM` (V001) deixam de ter uso: a API deixa `DATA_FIM` `NULL`; nas outras duas **o banco nasce com
+        `FALSE`** (o padrão no `V001` é `FALSE`) **e a API não manda e-mail** (nem aviso
         de publicação nem lembrete); nenhum agendador as lê.
       x-perfis:
         - RH
@@ -14248,7 +14248,7 @@ paths:
         distintas com **pendência** (definição única, na descrição da tag Treinamentos: treinamento obrigatório
         `EM_ANDAMENTO` em que a pessoa tem linha `INSCRITO` ou `EM_ANDAMENTO`). O "Prazos até 31/10" que o Figma mostra
         sob esse número **não existe** (treinamento não tem prazo): o cartão mostra só o número. Separar o encerrado do
-        em andamento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`).
+        em andamento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`).
       x-perfis:
         - RH
       responses:
@@ -14279,7 +14279,7 @@ paths:
       description: |
         Tela 02 (adicionar colaborador, "Depois de salvar"): o texto da caixa é "Incluir no treinamento
         {`titulo`}". Em vigor = publicado, marcado como `onboarding` e **não encerrado** (pode ser agendado; um
-        treinamento de onboarding encerrado deixa de receber gente nova; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        treinamento de onboarding encerrado deixa de receber gente nova; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)).
         Normalmente vem um só item. Lista vazia: o front deixa a caixa desligada, com a dica "Nenhum treinamento de
         onboarding publicado". Mais de um item: o texto vira "Incluir nos treinamentos de onboarding" e o cadastro
         inclui a pessoa em todos. Marcada a caixa, o front manda `incluirNoOnboarding: true` no cadastro (fatia 1); ver
@@ -14443,8 +14443,8 @@ paths:
         `AGENDADO`, `comecaEm`. Os demais campos precisam vir com o valor atual; se vierem diferentes, 422
         `TREINAMENTO_CAMPO_TRAVADO`. Em especial `emiteCertificado` não muda depois de publicado: desligar depois de
         emitir faria certificados já entregues responderem "não encontrado" na validação, e ligar exporia conclusões
-        antigas (V029). **Treinamento `ENCERRADO`** não muda mais nada: 422 `TREINAMENTO_ENCERRADO` (a situação
-        `ENCERRADO` depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`; ver
+        antigas (V001). **Treinamento `ENCERRADO`** não muda mais nada: 422 `TREINAMENTO_ENCERRADO` (a situação
+        `ENCERRADO` depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V001`; ver
         `encerrarTreinamento`). Os dois 422 têm sentidos distintos (ver "Códigos de erro desta fatia", na tag
         Treinamentos): `TREINAMENTO_CAMPO_TRAVADO` é campo que não muda depois de publicado e
         `TREINAMENTO_ENCERRADO` é treinamento que o RH encerrou.
@@ -14571,17 +14571,17 @@ paths:
         quando se chega aqui), as linhas dos participantes, o público escolhido e o treinamento; depois apaga do
         armazenamento de arquivos os PDFs dos módulos. Quem tinha o treinamento deixa de vê-lo e perde o andamento. O evento
         entra na auditoria (`TREINAMENTOS`, `EXCLUIU`) com o título e o número de `pendentes` (a auditoria é tabela nova da
-        aplicação, script `V037`).
+        aplicação, script `V001`).
 
         **O que li no banco:** `TREINAMENTOS_FUNCIONARIOS`, `TREINAMENTOS_CERTIFICADOS`, `TREINAMENTOS_MODULOS` e
         `TREINAMENTOS_PUBLICO` têm chave estrangeira para `TREINAMENTOS` sem `ON DELETE` (no MySQL/InnoDB isso é
         `RESTRICT`: o banco recusa apagar o treinamento enquanto houver linha filha, por isso a API apaga os filhos
         antes, na ordem acima), e `TREINAMENTOS_MODULOS_PROGRESSO` aponta para `TREINAMENTOS_MODULOS` do mesmo jeito
-        (`Criacao_Tabelas`:403-464, V026, V029). Não há trigger de `DELETE` em nenhuma dessas tabelas (os de `DELETE`
+        (`Criacao_Tabelas`:403-464, V001). Não há trigger de `DELETE` em nenhuma dessas tabelas (os de `DELETE`
         do banco são só os de `FUNCIONARIOS`, `HOLERITES`, `ADVERTENCIAS` e `FORMULARIOS_PERGUNTAS`). Logo o banco aceita
         a exclusão física. Li também que os triggers `TRG_TREINAMENTOS_FUNCIONARIOS_AFTER_INSERT` e `_AFTER_UPDATE`
         (`Criacao_Triggers`:768-791) criam a linha em `TREINAMENTOS_CERTIFICADOS` sempre que a pessoa vira `CONCLUIDO`,
-        inclusive com `emiteCertificado` falso (V029, "SOBRE EMITE_CERTIFICADO = FALSO"): por isso, para a API, "certificado
+        inclusive com `emiteCertificado` falso (V001, "SOBRE EMITE_CERTIFICADO = FALSO"): por isso, para a API, "certificado
         emitido" é a conclusão em treinamento que emite certificado, e não a mera existência da linha. Não existe coluna
         para ocultar ou arquivar treinamento.
       x-perfis:
@@ -14627,7 +14627,7 @@ paths:
         obrigatório). **Nenhum e-mail sai** (seção 12 das convenções): publicar não avisa ninguém; o RH usa um Aviso, se
         quiser.
         A criação em lote das linhas entra na auditoria como evento explícito (roadmap, decisão 5; a auditoria é tabela
-        nova da aplicação, script `V037`).
+        nova da aplicação, script `V001`).
         Publicar de novo, inclusive um treinamento já encerrado: 422 `TREINAMENTO_JA_PUBLICADO` (código só desta rota; o
         `PUT` e as rotas de módulo usam outros). Não existe "despublicar": publicado não volta a rascunho (depois só se
         encerra e, sem certificado emitido, se exclui).
@@ -14749,11 +14749,11 @@ paths:
         - Os certificados já emitidos continuam valendo e o conteúdo continua aberto a quem tem acesso ("Rever
           conteúdo"). Como um certificado emitido impede a exclusão (`excluirTreinamento`), **encerrar é a única saída**
           de um treinamento que já emitiu certificado. O evento entra na auditoria (`TREINAMENTOS`, `ALTEROU`; a
-          auditoria é tabela nova da aplicação, script `V037`).
+          auditoria é tabela nova da aplicação, script `V001`).
 
-        **Depende do script `V042`**: `TREINAMENTOS.ENCERRADO_EM DATETIME NULL` (o banco guarda o horário em -03:00; a
+        **Depende do script `V001`**: `TREINAMENTOS.ENCERRADO_EM DATETIME NULL` (o banco guarda o horário em -03:00; a
         conversão para `encerradoEmUtc` é do back-end; um `CHECK` só deixa encerrar o que foi publicado). A coluna
-        `DATA_FIM` ("prazo", V029) fica sem uso e nula.
+        `DATA_FIM` ("prazo", V001) fica sem uso e nula.
       x-perfis:
         - RH
       parameters:
@@ -14841,7 +14841,7 @@ paths:
       summary: Acrescenta um módulo (vídeo, texto, link ou PDF) ao treinamento.
       description: |
         Passo Conteúdo, botões "Vídeo", "Arquivo PDF", "Texto" e "Link" (o botão "Aula presencial" não existe). Envio em
-        `multipart/form-data`. O módulo entra no fim (`ordem` = último + 1). O que cada `tipo` exige (o banco confere, V026,
+        `multipart/form-data`. O módulo entra no fim (`ordem` = último + 1). O que cada `tipo` exige (o banco confere, V001,
         `CHK_TREINAMENTOS_MODULOS_CONTEUDO`) e o que recusa com 400 em `errors`:
         `VIDEO`: `urlExterna`; `TEXTO`: `conteudoTexto` (texto ou markdown, nunca HTML);
         `LINK`: `urlExterna`; `PDF`: `arquivo` (PDF de até 10 MB, conferido pelo conteúdo e não só pela extensão).
@@ -14849,8 +14849,8 @@ paths:
         Só em **rascunho**: depois de publicado (inclusive o encerrado), 422 `TREINAMENTO_MODULOS_TRAVADOS` (a conclusão é
         por módulo e `CONCLUIDO` é definitivo; um módulo novo não reabriria quem já concluiu). O arquivo só é gravado no
         Blob depois de o banco aceitar o módulo. No módulo `PDF`, a API grava `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
-        juntos (o nome que a pessoa deu ao arquivo, `V044`) e devolve só o nome, em `nomeArquivo`.
-      x-provisorio: "Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (roadmap, fatia 6): o contrato supõe a hipótese mais simples, só link externo; se o dono escolher o Blob, `VIDEO` passa a aceitar `arquivo` (a coluna `CAMINHO_ARQUIVO` já existe em V026). (2) Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta."
+        juntos (o nome que a pessoa deu ao arquivo, `V001`) e devolve só o nome, em `nomeArquivo`.
+      x-provisorio: "Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (roadmap, fatia 6): o contrato supõe a hipótese mais simples, só link externo; se o dono escolher o Blob, `VIDEO` passa a aceitar `arquivo` (a coluna `CAMINHO_ARQUIVO` já existe em V001). (2) Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta."
       x-perfis:
         - RH
       parameters:
@@ -15070,7 +15070,7 @@ paths:
         Não há coluna Nota. O botão "Baixar" do certificado só aparece quando `certificadoDisponivel` é verdadeiro.
         Rascunho não tem participantes (lista vazia). O resultado de pessoas inativas continua na lista (`funcionario.ativo`).
         Treinamento encerrado continua consultável: quem não começou aparece como "Não iniciado" e quem terminou depois do
-        encerramento aparece como `CONCLUIDO` (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). A linha de resumo sob o título (o Figma: "Obrigatório para todos, com
+        encerramento aparece como `CONCLUIDO` (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). A linha de resumo sob o título (o Figma: "Obrigatório para todos, com
         certificado. 01/08 a 31/10/2026") perde o fim: use `comecaEm` ("desde 01/08") e, se houver, `encerradoEmUtc`.
         `concluidoEmUtc` é o instante em que a pessoa concluiu (o front mostra só o dia, em `America/Sao_Paulo`).
       x-perfis:
@@ -15343,11 +15343,11 @@ paths:
         **É esta a regra por trás da caixa "Incluir no treinamento Onboarding 2026"** do cadastro. O cadastro
         (`POST /api/rh/funcionarios`) e a confirmação da importação (`POST /api/rh/importacoes/{importacaoId}/confirmar`)
         aceitam `incluirNoOnboarding` e aplicam **esta mesma regra por dentro**, depois de gravar a pessoa (a importação
-        usa a tabela nova da aplicação `IMPORTACOES`, script `V038`, descrita na fatia 2); nesses dois fluxos o front não
+        usa a tabela nova da aplicação `IMPORTACOES`, script `V001`, descrita na fatia 2); nesses dois fluxos o front não
         chama esta rota. Ela existe para incluir depois uma pessoa já cadastrada (por exemplo, a partir da
         ficha) e é a referência do efeito e dos erros.
         Cria uma linha `INSCRITO` em `TREINAMENTOS_FUNCIONARIOS` para a pessoa em cada treinamento de onboarding em vigor
-        (publicado e **não encerrado**; ver `listarTreinamentosDeOnboarding`; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)), qualquer que seja o público; assim o
+        (publicado e **não encerrado**; ver `listarTreinamentosDeOnboarding`; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)), qualquer que seja o público; assim o
         treinamento aparece para ela quando `comecaEm` chegar. Quem já tem linha não muda e vem com
         `jaEstavaIncluida: true` (a chamada é repetível). Sem treinamento de onboarding em vigor: 422
         `SEM_TREINAMENTO_DE_ONBOARDING` (no cadastro, que grava tudo ou nada como diz a fatia 1, o mesmo 422 recusa o
@@ -15415,7 +15415,7 @@ paths:
         do Figma não existe). Entram os treinamentos em que a pessoa tem linha e os **opcionais do público dela** que ela
         ainda não escolheu (`situacao = DISPONIVEL`). Treinamento **encerrado** só aparece para quem já começou (continua
         e termina) ou concluiu; para quem estava `INSCRITO` e não começou, e para o opcional ainda não escolhido, ele some (o
-        encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)).
         `aba`: `TODOS` (padrão; tudo que ainda **não** foi concluído, como diz a nota "Os treinamentos que você já concluiu ficam
         na aba Concluídos"), `DISPONIVEIS` (`DISPONIVEL` e `NAO_INICIADO`), `EM_ANDAMENTO` e `CONCLUIDOS`. `obrigatorio`
         é o filtro "Obrigatórios e opcionais" (sem ele, os dois). `busca` procura no título e na descrição. O filtro "Todos
@@ -15511,7 +15511,7 @@ paths:
         Tela de execução (não existe no Figma): lista dos módulos com `concluido`, mais o cartão do treinamento. O
         conteúdo de cada módulo vem de `obterConteudoDeModulo`. Pessoa que não tem linha e não é do público, treinamento
         não publicado ou que ainda não começou: 404; treinamento encerrado em que ela não começou nem concluiu: 404
-        também (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Opcional do público que ela ainda não escolheu é devolvido com `situacao = DISPONIVEL`. Concluído: traz o
+        também (o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). Opcional do público que ela ainda não escolheu é devolvido com `situacao = DISPONIVEL`. Concluído: traz o
         `certificado` (quando o RH deixou `emiteCertificado` ligado).
       x-perfis:
         - Funcionario
@@ -15591,7 +15591,7 @@ paths:
         Só treinamento **opcional**, do público da pessoa, publicado e que já começou. Cria a linha `INSCRITO`. Repetir é
         inofensivo: já inscrita, devolve o treinamento sem mudar nada. Obrigatório: 422 `TREINAMENTO_NAO_E_OPCIONAL` (quem é do
         público já tem linha). Fora do público ou não visível: 404. Treinamento que o RH encerrou: 422
-        `TREINAMENTO_ENCERRADO` (ninguém novo entra; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Treinamento não tem prazo, então a
+        `TREINAMENTO_ENCERRADO` (ninguém novo entra; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). Treinamento não tem prazo, então a
         inscrição vale a qualquer momento enquanto ele não for encerrado.
       x-perfis:
         - Funcionario
@@ -15720,7 +15720,7 @@ paths:
         (já em andamento ou concluído: devolve o estado atual, sem `UPDATE`; o banco recusa mudar um treinamento
         concluído). Não é obrigatório chamar: `concluirModuloDeTreinamento` também inicia quem ainda estava `INSCRITO`.
         Opcional sem inscrição: 422 `INSCRICAO_PENDENTE`. Treinamento que o RH encerrou e que a pessoa ainda não tinha
-        começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` continua; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)).
+        começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` continua; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)).
       x-perfis:
         - Funcionario
         - Gestor
@@ -15919,7 +15919,7 @@ paths:
         resultam em um só `CONCLUIDO` e um só certificado.
         Opcional sem inscrição: 422 `INSCRICAO_PENDENTE`. Treinamento que o RH encerrou e que a pessoa ainda não tinha
         começado: 422 `TREINAMENTO_ENCERRADO` (quem já estava `EM_ANDAMENTO` conclui normalmente e recebe o certificado; o encerramento
-        depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)). Módulo de outro treinamento: 404. `concluidoEmUtc` do treinamento é o instante em que o
+        depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)). Módulo de outro treinamento: 404. `concluidoEmUtc` do treinamento é o instante em que o
         último módulo foi concluído.
       x-provisorio: Formato do `numero` do certificado e modelo do PDF (roadmap, fatia 6).
       x-perfis:
@@ -16059,7 +16059,7 @@ paths:
       summary: Lista os treinamentos que valem para o meu setor, com o andamento da equipe.
       description: |
         Tela 58, lista da esquerda ("Treinamentos do setor"). Treinamentos **publicados** (agendados, em andamento e
-        encerrados; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`)) que alcançam pelo menos uma pessoa do setor do gestor; rascunho não aparece. A equipe **não inclui o
+        encerrados; o encerramento depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`)) que alcançam pelo menos uma pessoa do setor do gestor; rascunho não aparece. A equipe **não inclui o
         próprio gestor** (o Figma mostra 8 pessoas, sem ele): o que é dele vem de `GET /api/eu/treinamentos`. Obrigatórios
         primeiro, depois `comecaEm` (o mais antigo primeiro). Sem paginação (lista curta). Obrigatório: "`concluiram` de
         `totalNaEquipe` concluíram" (equipe = pessoas com linha); opcional: "`inscritos` de `totalNaEquipe` inscritos" (equipe
@@ -16786,7 +16786,7 @@ paths:
         **E-mail.** **Criar** o pedido não manda e-mail (a pessoa vê o pedido no histórico de `GET /api/eu/ferias`). Depois, a pessoa
         recebe **um e-mail a cada decisão** (lista fechada, `CONVENCOES.md`, seção 12): quando o gestor aprova, recusa ou sugere outra
         data, e quando o RH confirma ou recusa (as recusas levam o motivo). A aprovação automática do "gestor ausente" não é decisão de
-        ninguém e **não** manda e-mail. O e-mail entra na **fila de e-mails**, tabela nova da aplicação (script `V035`).
+        ninguém e **não** manda e-mail. O e-mail entra na **fila de e-mails**, tabela nova da aplicação (script `V001`).
 
         **Em qual período aquisitivo entra:** o servidor escolhe o período **mais antigo** que ainda tem saldo
         suficiente para os dias do pedido (gozo mais abono). Não há campo para escolher.
@@ -16965,7 +16965,7 @@ paths:
         Só vale para o pedido da própria pessoa na situação `SUGESTAO_DE_DATA` (`etapa: GESTOR`, esperando a resposta dela).
         As datas sugeridas passam a ser `dataInicio` e `dataFim` do pedido e o pedido vira `COM_O_RH` (`etapa: RH`). Ao aceitar, a etapa
         do gestor se encerra: `decisaoGestor` passa a `APROVADA` (com as datas sugeridas), `decididaPor` é o gestor que sugeriu e
-        `decididaEmUtc` é o momento em que a pessoa aceitou (o banco guarda `RESULTADO_GESTOR = SUGERIU_DATA`, V011 e V020: a tradução é
+        `decididaEmUtc` é o momento em que a pessoa aceitou (o banco guarda `RESULTADO_GESTOR = SUGERIU_DATA`, V001: a tradução é
         da API). Enquanto a pessoa não responde, `decisaoGestor` é `null` e quem sugeriu e quando estão em `sugestao.sugeridaPor` e
         `sugestao.sugeridaEmUtc`. As regras do pedido são conferidas de novo com as datas novas, **menos** a antecedência de 30 dias
         (a data foi escolhida pelo gestor); inclusive `CABE_NO_SALDO`, porque só agora os dias das datas sugeridas passam a ser
@@ -17382,7 +17382,7 @@ paths:
         O pedido passa para a etapa do RH: `situacao: COM_O_RH` e `etapa: RH` (o `status` do banco continua `SOLICITADA`: só muda na
         decisão final do RH); `decisaoGestor` passa a `APROVADA`. Só vale para pedido da equipe em `COM_O_GESTOR`. **Manda e-mail à
         pessoa** com o resultado (lista fechada, `CONVENCOES.md`, seção 12; o e-mail entra na fila de e-mails, tabela nova da
-        aplicação, script `V035`).
+        aplicação, script `V001`).
 
         Erros, nesta ordem: 404 (pedido que não existe, pedido de outro setor, **pedido do próprio gestor** ou de outro gestor: os dois
         últimos ficam fora da equipe dele e a API não revela qual dos casos é; o pedido de quem é gestor só o RH decide); 409
@@ -17478,7 +17478,7 @@ paths:
         O pedido vira `REJEITADA` (`status: REJEITADA`, `etapa: CONCLUIDA`) e não vai para o RH ("se o gestor recusa, o pedido acaba
         na hora": decisão do dono, 2026-10-29); `decisaoGestor` passa a `REJEITADA`. O corpo traz o **`motivo`, obrigatório (5 a 500
         caracteres)**: ele vai em `decisaoGestor.observacao` e **a pessoa o vê** (no histórico de `GET /api/eu/ferias` e no e-mail). O motivo
-        mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V041`). **Manda e-mail à pessoa** com o resultado e o motivo (lista
+        mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V001`). **Manda e-mail à pessoa** com o resultado e o motivo (lista
         fechada, `CONVENCOES.md`, seção 12). O Figma (tela 51) não desenha "Recusar" no pedido de férias; os documentos dizem que o gestor
         pode recusar, e valem. Mesmos erros de `aprovarFeriasComoGestor`, mais 400 quando o motivo falta ou foge de 5 a 500 caracteres.
       x-perfis:
@@ -18226,7 +18226,7 @@ paths:
         já aprovou** (o RH pode recusar o que o gestor aprovou: decisão do dono, 2026-10-30). Mesmos erros e mesma regra de quem do
         RH pode decidir de `confirmarFeriasComoRh` (o banco exige o gestor gravado também na recusa). `decisaoRh` passa a `REJEITADA`. O
         corpo traz o **`motivo`, obrigatório (5 a 500 caracteres)**: ele vai em `decisaoRh.observacao` e **a pessoa o vê** (no histórico de
-        `GET /api/eu/ferias` e no e-mail). O motivo mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V041`, a mesma coluna da
+        `GET /api/eu/ferias` e no e-mail). O motivo mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V001`, a mesma coluna da
         recusa do gestor: quem recusa é o gestor **ou** o RH, nunca os dois). **Manda e-mail à
         pessoa** com o resultado e o motivo (lista fechada, `CONVENCOES.md`, seção 12). Erros: os de `confirmarFeriasComoRh`, mais 400
         quando o motivo falta ou foge de 5 a 500 caracteres.
@@ -18830,7 +18830,7 @@ paths:
         - `dependentesCadastrados`: dependentes já aprovados em qualquer benefício, sem repetir, para o modal
           "Quem vai entrar no plano" (a pessoa marca quem entra; "Você" aparece sempre marcado).
 
-        **Depende do script SQL `V031`**: o catálogo `BENEFICIOS` tinha só nome e descrição, e o script acrescenta `OPCIONAL`,
+        **Depende do script SQL `V001`**: o catálogo `BENEFICIOS` tinha só nome e descrição, e o script acrescenta `OPCIONAL`,
         `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` (decisão do dono, 2026-10-30; as três nascem `FALSE`, e a API grava o valor do RH). O
         contrato já usa os três.
 
@@ -20346,7 +20346,7 @@ paths:
           de data, no máximo 8. **Não entram** "Fim do período de experiência" nem "Treinamento presencial": **cortados** (sem
           experiência e sem turmas presenciais, decisão do dono, 2026-10-28 e 2026-10-29); o Figma os desenha e o front os esconde.
         - `treinamentosEmAndamento`: treinamentos **publicados e já liberados** (a data de início, quando há, já chegou) que o RH
-          não encerrou (`TREINAMENTOS.ENCERRADO_EM` vazio: **coluna nova**, script `V042`, fatia 6). **Sem prazo**
+          não encerrou (`TREINAMENTOS.ENCERRADO_EM` vazio: **coluna nova**, script `V001`, fatia 6). **Sem prazo**
           (`CONVENCOES.md`, seção 13). Em ordem de liberação, do mais antigo para o mais novo, no máximo 5
           ("18 de 24 concluíram"; dados da fatia 6, `/api/rh/treinamentos`). O link "Gerenciar treinamentos" é da fatia 6.
         - `presencaAgora`: o cartão "Presença agora" (ver `PainelPresencaAgora`: `contagensHoje` é o `PresencaContagens` da base, por
@@ -20356,7 +20356,7 @@ paths:
           "Ver quem está sem registro" usa `GET /api/rh/painel/presenca/sem-registro`.
         - `ultimasAlteracoes`: as 4 primeiras linhas de `GET /api/rh/auditoria?apenasAlteracoes=true` (fatia 1; o parâmetro tira do log
           as marcações de ponto, os downloads, os logins e os acessos negados, e **só** este painel o usa; esta rota não copia o schema da
-          auditoria), do mais novo para o mais antigo, já em frase. O log é uma **tabela nova da aplicação** (script `V037`). O
+          auditoria), do mais novo para o mais antigo, já em frase. O log é uma **tabela nova da aplicação** (script `V001`). O
           link "Abrir log de auditoria" é da fatia 1.
       x-provisorio: "Pedidos de benefício contam como pendência do RH (o Figma só desenha quatro tipos). Pergunta ao dono: o tipo BENEFICIOS fica na lista de pendências? Se não, ele sai de `pendencias`."
       x-perfis:
@@ -22280,16 +22280,16 @@ components:
           type: boolean
           description: |
             A própria pessoa pode pedir este benefício (aparece em "Disponíveis para você", tela 44). `false`: só o RH o dá.
-            **Exige o script SQL `V031`**: coluna `OPCIONAL` em `BENEFICIOS`.
+            **Exige o script SQL `V001`**: coluna `OPCIONAL` em `BENEFICIOS`.
         aceitaDependentes:
           type: boolean
           description: |
-            O pedido deixa incluir dependentes (como o plano de saúde). **Exige o script SQL `V031`**: coluna `ACEITA_DEPENDENTES`
+            O pedido deixa incluir dependentes (como o plano de saúde). **Exige o script SQL `V001`**: coluna `ACEITA_DEPENDENTES`
             em `BENEFICIOS`.
         aceitaTrajeto:
           type: boolean
           description: |
-            O pedido pede o trajeto (como o vale-transporte). **Exige o script SQL `V031`**: coluna `ACEITA_TRAJETO` em `BENEFICIOS`.
+            O pedido pede o trajeto (como o vale-transporte). **Exige o script SQL `V001`**: coluna `ACEITA_TRAJETO` em `BENEFICIOS`.
         quantidadePessoas:
           type: integer
           minimum: 0
@@ -22327,13 +22327,13 @@ components:
           maxLength: 255
         opcional:
           type: boolean
-          description: A própria pessoa pode pedir o benefício (ver `BeneficioCatalogoItem`). **Exige o script SQL `V031`**.
+          description: A própria pessoa pode pedir o benefício (ver `BeneficioCatalogoItem`). **Exige o script SQL `V001`**.
         aceitaDependentes:
           type: boolean
-          description: O pedido deixa incluir dependentes. **Exige o script SQL `V031`**.
+          description: O pedido deixa incluir dependentes. **Exige o script SQL `V001`**.
         aceitaTrajeto:
           type: boolean
-          description: O pedido pede o trajeto. **Exige o script SQL `V031`**.
+          description: O pedido pede o trajeto. **Exige o script SQL `V001`**.
     EmpresaUf:
       type: string
       description: Sigla da UF. O banco só confere o formato; a API confere que a sigla existe.
@@ -23034,7 +23034,7 @@ components:
           format: date-time
           description: |
             Quando o RH corrigiu ou incluiu a batida; `null` se `origem` é `SISTEMA`. A fonte é a **coluna**
-            `PONTOS_MARCACOES.DATA_CORRECAO` (script `V039`), não o log de auditoria: a coluna `ORIGEM` diz quem e
+            `PONTOS_MARCACOES.DATA_CORRECAO` (script `V001`), não o log de auditoria: a coluna `ORIGEM` diz quem e
             `DATA_CORRECAO` diz quando, e um `CHECK` do banco as amarra (`CORRIGIDA_RH` tem a data, `SISTEMA` não tem).
             A aplicação grava as duas juntas, no mesmo `INSERT` ou `UPDATE`, tanto na correção direta do RH
             (`PUT .../ponto/dias/{dia}`) quanto na aprovação de um pedido de ajuste. O banco guarda a coluna em -03:00 e a
@@ -23133,7 +23133,7 @@ components:
             - string
             - "null"
           format: date
-          description: 'Último dia consolidado ("Atualizado até ontem"): valor global (o mesmo para todas as pessoas), tirado da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V036`). `null` só se a consolidação nunca rodou.'
+          description: 'Último dia consolidado ("Atualizado até ontem"): valor global (o mesmo para todas as pessoas), tirado da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V001`). `null` só se a consolidação nunca rodou.'
     PontoHoje:
       type: object
       description: Cartão "Seu ponto hoje" da própria pessoa.
@@ -23806,7 +23806,7 @@ components:
                 - string
                 - "null"
               format: date
-              description: "Último dia consolidado: valor global (o mesmo para todas as pessoas), da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V036`). `null` só se a consolidação nunca rodou."
+              description: "Último dia consolidado: valor global (o mesmo para todas as pessoas), da tarefa agendada de consolidação do banco de horas (`TAREFAS_AGENDADAS`, script `V001`). `null` só se a consolidação nunca rodou."
             itens:
               type: array
               items:
@@ -24395,7 +24395,7 @@ components:
                   description: Todos os avisos vigentes.
     HoleriteTipo:
       type: string
-      description: Tipo do holerite (valores de `HOLERITES.TIPO_HOLERITE`, `V012`). Mensal, 13º salário ou férias.
+      description: Tipo do holerite (valores de `HOLERITES.TIPO_HOLERITE`, `V001`). Mensal, 13º salário ou férias.
       enum:
         - MENSAL
         - DECIMO_TERCEIRO
@@ -24708,7 +24708,7 @@ components:
     AdvertenciaSituacao:
       type: string
       description: |
-        Valores do banco (`ADVERTENCIAS.STATUS_ADVERTENCIA`, `V014`). `PENDENTE`: "Aguardando ciência". `APLICADA`: "Ciente". `CONTESTADA`: "Contestada",
+        Valores do banco (`ADVERTENCIAS.STATUS_ADVERTENCIA`, `V001`). `PENDENTE`: "Aguardando ciência". `APLICADA`: "Ciente". `CONTESTADA`: "Contestada",
         esperando o RH. `CANCELADA`: contestação acatada; não muda mais.
         Fluxo: `PENDENTE` → `APLICADA` ou `CONTESTADA`; `CONTESTADA` → `APLICADA` (mantida) ou `CANCELADA` (acatada).
       enum:
@@ -25148,7 +25148,7 @@ components:
     FormularioSentidoAvaliacao:
       type: string
       description: |
-        Quem avalia quem, só em `tipo = AVALIACAO` (`V015`). `GESTOR_AVALIA_EQUIPE` é a "Avaliação da equipe" (o gestor
+        Quem avalia quem, só em `tipo = AVALIACAO` (`V001`). `GESTOR_AVALIA_EQUIPE` é a "Avaliação da equipe" (o gestor
         avalia cada pessoa do setor dele); `EQUIPE_AVALIA_GESTOR` é a "Avaliação do gestor" (a equipe avalia o gestor).
       enum:
         - GESTOR_AVALIA_EQUIPE
@@ -25156,7 +25156,7 @@ components:
     FormularioSituacao:
       type: string
       description: |
-        Estado do formulário (sem coluna própria: sai de `ATIVO`, `DATA_PUBLICACAO` e `DATA_ENCERRAMENTO`, `V015`).
+        Estado do formulário (sem coluna própria: sai de `ATIVO`, `DATA_PUBLICACAO` e `DATA_ENCERRAMENTO`, `V001`).
         `RASCUNHO` não foi publicado nem agendado; `AGENDADO` tem data de publicação futura; `PUBLICADO` aceita respostas;
         `ENCERRADO` não aceita mais (por prazo vencido ou pelo RH). Rótulos: Rascunho, Agendado, Publicado, Encerrado.
       enum:
@@ -25323,7 +25323,7 @@ components:
           type: boolean
           description: |
             O RH marca ao criar. **Não muda depois de publicado**, em nenhum sentido (409 `ANONIMATO_FIXO_APOS_PUBLICAR`;
-            o banco é a segunda barreira depois da primeira resposta, `V017`). Antes de publicar (rascunho e agendado)
+            o banco é a segunda barreira depois da primeira resposta, `V001`). Antes de publicar (rascunho e agendado)
             pode mudar. Sugestão (`OUTRO`) nunca é anônima (400). As regras do anônimo estão na lista "Formulário anônimo" do
             assunto Formulários.
     FormularioRecorrencia:
@@ -25404,8 +25404,8 @@ components:
             efeito com `prazo` e com `alvo` `SETORES` ou `PESSOAS` (por link não há a quem lembrar); a tela esconde a caixa
             nos outros casos. Detalhes em `publicarFormulario`. O lembrete manual do RH continua à parte
             (`lembrarQuemFaltaFormulario`). **Banco:** é uma **coluna nova em `FORMULARIOS`**, `LEMBRETE_AUTOMATICO` (lembrete
-            automático ligado ou desligado; script `V045`); o estado "lembrete enviado hoje" vive na **tabela de tarefas
-            agendadas da aplicação** (`V036`), nunca no formulário. No anônimo o lembrete automático não guarda destinatário nem
+            automático ligado ou desligado; script `V001`); o estado "lembrete enviado hoje" vive na **tabela de tarefas
+            agendadas da aplicação** (`V001`), nunca no formulário. No anônimo o lembrete automático não guarda destinatário nem
             número (regra 6 em "Formulários").
     FormularioSetor:
       type: object
@@ -25463,7 +25463,7 @@ components:
             - $ref: "#/components/schemas/FormularioRecorrencia"
         lembreteAutomatico:
           type: boolean
-          description: A caixa do lembrete 7 dias antes do prazo (padrão ligada, gravado pela API; coluna nova em `FORMULARIOS`, `LEMBRETE_AUTOMATICO`, script `V045`). Ver `FormularioPublicacaoComando`.
+          description: A caixa do lembrete 7 dias antes do prazo (padrão ligada, gravado pela API; coluna nova em `FORMULARIOS`, `LEMBRETE_AUTOMATICO`, script `V001`). Ver `FormularioPublicacaoComando`.
         publicadoEmUtc:
           type:
             - string
@@ -25878,7 +25878,7 @@ components:
           type: integer
         nome:
           type: string
-          description: Nome original do arquivo (`FORMULARIOS_RESPOSTAS.NOME_ARQUIVO_ORIGINAL`, script `V046`). O caminho de armazenamento (`CAMINHO_ARQUIVO`) nunca é devolvido.
+          description: Nome original do arquivo (`FORMULARIOS_RESPOSTAS.NOME_ARQUIVO_ORIGINAL`, script `V001`). O caminho de armazenamento (`CAMINHO_ARQUIVO`) nunca é devolvido.
     RespostaFormularioDada:
       type: object
       description: |
@@ -26529,7 +26529,7 @@ components:
           items:
             type: integer
             minimum: 1
-          x-provisorio: "Se a múltipla escolha aceita mais de uma opção ainda está em aberto (V016: 'a confirmar com o dono'). Hipótese mais simples usada aqui: uma só (maxItems 1). Se o dono aceitar várias, tira-se o maxItems e a pergunta ganha um campo 'permiteVariasOpcoes'; o formato da resposta já é uma lista para isto não quebrar o front."
+          x-provisorio: "Se a múltipla escolha aceita mais de uma opção ainda está em aberto (V001: 'a confirmar com o dono'). Hipótese mais simples usada aqui: uma só (maxItems 1). Se o dono aceitar várias, tira-se o maxItems e a pergunta ganha um campo 'permiteVariasOpcoes'; o formato da resposta já é uma lista para isto não quebrar o front."
         valorEscala:
           type: integer
           minimum: 1
@@ -26671,7 +26671,7 @@ components:
           description: Texto de agradecimento para a tela de confirmação.
     TreinamentoSituacao:
       type: string
-      description: Situação do treinamento, calculada com a data de hoje (-03:00). `RASCUNHO` não está publicado; `AGENDADO` está publicado e `comecaEm` ainda não chegou; `EM_ANDAMENTO` está publicado, `comecaEm` já chegou e o RH não encerrou; `ENCERRADO` o RH encerrou (`encerradoEmUtc`; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`). Não há situação por data final (treinamento não tem prazo).
+      description: Situação do treinamento, calculada com a data de hoje (-03:00). `RASCUNHO` não está publicado; `AGENDADO` está publicado e `comecaEm` ainda não chegou; `EM_ANDAMENTO` está publicado, `comecaEm` já chegou e o RH não encerrou; `ENCERRADO` o RH encerrou (`encerradoEmUtc`; depende da coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V001`). Não há situação por data final (treinamento não tem prazo).
       enum:
         - RASCUNHO
         - AGENDADO
@@ -26679,14 +26679,14 @@ components:
         - ENCERRADO
     TreinamentoPublico:
       type: string
-      description: Para quem vale o treinamento (`TREINAMENTOS.PUBLICO`, V029). Não existe "por cargo".
+      description: Para quem vale o treinamento (`TREINAMENTOS.PUBLICO`, V001). Não existe "por cargo".
       enum:
         - TODOS
         - SETORES
         - PESSOAS
     TreinamentoModuloTipo:
       type: string
-      description: Tipo do módulo (V026). `Aula presencial` do Figma não existe.
+      description: Tipo do módulo (V001). `Aula presencial` do Figma não existe.
       enum:
         - VIDEO
         - TEXTO
@@ -26834,7 +26834,7 @@ components:
           type:
             - string
             - "null"
-          description: Nome que a pessoa deu ao PDF enviado, guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V044`); `null` em módulo sem arquivo (vídeo, texto e link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.
+          description: Nome que a pessoa deu ao PDF enviado, guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V001`); `null` em módulo sem arquivo (vídeo, texto e link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.
     TreinamentoModulosRh:
       type: object
       required:
@@ -26929,7 +26929,7 @@ components:
             - string
             - "null"
           format: date-time
-          description: Instante em que o RH encerrou o treinamento (`encerrarTreinamento`); `null` enquanto não encerrado. Depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V042`; ver `encerrarTreinamento`).
+          description: Instante em que o RH encerrou o treinamento (`encerrarTreinamento`); `null` enquanto não encerrado. Depende da coluna nova `TREINAMENTOS.ENCERRADO_EM` (script `V001`; ver `encerrarTreinamento`).
         obrigatorio:
           type: boolean
         onboarding:
@@ -27001,7 +27001,7 @@ components:
             - string
             - "null"
           format: date-time
-          description: Quando o RH encerrou; `null` enquanto não encerrado (coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V042`).
+          description: Quando o RH encerrou; `null` enquanto não encerrado (coluna nova `TREINAMENTOS.ENCERRADO_EM`, script `V001`).
         publico:
           oneOf:
             - $ref: "#/components/schemas/TreinamentoPublico"
@@ -27831,8 +27831,8 @@ components:
       type: string
       description: |
         Situação de um pedido de férias, já pronta para o front. É um campo **extra**: `status` e `etapa` vêm sempre junto
-        (`CONVENCOES.md`, seção 9). Vem do `STATUS_FERIAS` do banco mais as colunas da etapa do gestor (V011) e da sugestão de data
-        (V020):
+        (`CONVENCOES.md`, seção 9). Vem do `STATUS_FERIAS` do banco mais as colunas da etapa do gestor (V001) e da sugestão de data
+        (V001):
 
         - `COM_O_GESTOR`: `SOLICITADA`, `etapa: GESTOR`, esperando o gestor.
         - `SUGESTAO_DE_DATA`: `SOLICITADA`, `etapa: GESTOR`; o gestor sugeriu outras datas e a pessoa ainda não respondeu (ninguém
@@ -28261,7 +28261,7 @@ components:
             A decisão da etapa do gestor (`DecisaoDeEtapa` da base); `null` enquanto ele não decidiu, nos pedidos sem etapa do gestor
             e em `SUGESTAO_DE_DATA` (a sugestão está em `sugestao`; depois que a pessoa aceita, vira `APROVADA`; se ela recusa ou a
             sugestão expira, continua `null` e o pedido é `CANCELADA`). Ao recusar, o `observacao` traz o motivo (obrigatório, 5 a 500
-            caracteres). Do banco (V011 e V020): `RESULTADO_GESTOR` `APROVOU` vira `APROVADA`, `RECUSOU` vira `REJEITADA` e
+            caracteres). Do banco (V001): `RESULTADO_GESTOR` `APROVOU` vira `APROVADA`, `RECUSOU` vira `REJEITADA` e
             `SUGERIU_DATA` só vira `APROVADA` quando a pessoa aceita (`decididaEmUtc` é então a data da resposta dela).
           oneOf:
             - $ref: "#/components/schemas/DecisaoDeEtapa"
@@ -28398,7 +28398,7 @@ components:
           maxLength: 500
           description: |
             Obrigatório. Vai em `decisaoGestor.observacao` ou `decisaoRh.observacao` e **a pessoa o vê** (no histórico e no e-mail de
-            resultado). Texto, nunca HTML. Coluna nova de `FERIAS`, `MOTIVO_RECUSA` (script `V041`): o banco confere que a recusa
+            resultado). Texto, nunca HTML. Coluna nova de `FERIAS`, `MOTIVO_RECUSA` (script `V001`): o banco confere que a recusa
             tem motivo e que ele não é vazio; os 5 a 500 caracteres são conferidos pela API.
     FeriasCalendarioItem:
       type: object
@@ -28510,7 +28510,7 @@ components:
           minLength: 1
           maxLength: 30
           description: Texto livre por enquanto (o banco não limita). Os exemplos usam FILHO, FILHA e CONJUGE.
-          x-provisorio: "Os valores de parentesco ainda não foram decididos (V024: texto livre). Se o dono fechar uma lista (filho, cônjuge...), vira enum e o front mostra um seletor."
+          x-provisorio: "Os valores de parentesco ainda não foram decididos (V001: texto livre). Se o dono fechar uma lista (filho, cônjuge...), vira enum e o front mostra um seletor."
         dataNascimento:
           type: string
           format: date
@@ -29051,8 +29051,8 @@ components:
           description: |
             Desde quando espera o RH.
             **Exceção, `ADMISSAO_COM_DOCUMENTOS_PENDENTES`:** não há instante guardado para ela. Li a tabela `FUNCIONARIOS`
-            (`CREATE TABLE` do grupo, mais os `ALTER TABLE` de `V006` e `V030`) e ela **não tem coluna de data de cadastro**
-            (só `DATA_ADMISSAO`, um `DATE`); `FORMULARIOS_DESTINATARIOS` (`V018`, onde a pessoa é atribuída ao formulário de
+            (`CREATE TABLE` do grupo, já com as colunas acrescentadas depois, no `V001`) e ela **não tem coluna de data de cadastro**
+            (só `DATA_ADMISSAO`, um `DATE`); `FORMULARIOS_DESTINATARIOS` (`V001`, onde a pessoa é atribuída ao formulário de
             admissão) também não guarda data. Por isso, para este tipo, `desdeEmUtc` é a **data da admissão às 00:00 no fuso
             -03:00, convertida para UTC** (admissão em `2026-10-13` vira `2026-10-13T03:00:00Z`). Como só entra quem começa em
             até 7 dias, esse instante é de hoje ou do futuro: ele **ordena** a fila (quem começa antes vem primeiro), mas

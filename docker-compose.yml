@@ -1,0 +1,31 @@
+# MySQL local para desenvolvimento e para a integração do front.
+# O banco nasce VAZIO: quem cria as tabelas é o executor de scripts da API (back-end/), não este compose.
+# Os parâmetros do servidor valem também para os testes (MySqlFixture) e para o Azure:
+#   --default-time-zone=-03:00            os triggers do grupo usam CURDATE() e NOW() (Brasil, sem horário de verão)
+#   --log-bin-trust-function-creators=1   com o log binário ligado (padrão do mysql:8.4), o usuário restrito do banco
+#                                         recebe o erro 1419 ao criar o primeiro trigger sem este parâmetro
+services:
+  mysql:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=-03:00
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-rh_system}
+    ports:
+      - "${MYSQL_PORTA:-3306}:3306"
+    volumes:
+      - mysql_dados:/var/lib/mysql
+    healthcheck:
+      # -h 127.0.0.1 evita o servidor temporário de inicialização, que só atende por socket.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+volumes:
+  mysql_dados:

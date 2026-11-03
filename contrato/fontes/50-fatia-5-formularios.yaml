@@ -1,7 +1,6 @@
 # Fatia 5: formulários (entrevista por link, admissão, avaliação, pesquisa, sugestão; sem quiz).
 # Telas: RH 16 a 21, funcionário 39 e 40, gestor 57 e a página pública do candidato (sem print).
-# Banco: FORMULARIOS, FORMULARIOS_PERGUNTAS, FORMULARIOS_RESPOSTAS (tabelas do grupo) e V015 a V019, mais V045 (lembrete automático),
-# V046 (arquivo na resposta) e, das tabelas da aplicação, V035 (fila de e-mails), V036 (tarefas agendadas) e V037 (auditoria).
+# Banco (tudo no V001): FORMULARIOS, FORMULARIOS_PERGUNTAS, FORMULARIOS_RESPOSTAS (tabelas do grupo, com as colunas acrescentadas depois, inclusive o lembrete automático e o arquivo na resposta) e, das tabelas da aplicação, a fila de e-mails, as tarefas agendadas e a auditoria.
 tags:
   - name: Formulários
     description: |
@@ -55,11 +54,11 @@ tags:
       ele. Só o RH acompanha.
 
       **Colunas e tabelas novas que este assunto pede (scripts já escritos em `Banco de Dados/Scripts`; o contrato só descreve
-      a dependência):** a coluna do lembrete automático (ligado ou desligado) em `FORMULARIOS`, `LEMBRETE_AUTOMATICO` (`V045`);
+      a dependência):** a coluna do lembrete automático (ligado ou desligado) em `FORMULARIOS`, `LEMBRETE_AUTOMATICO` (`V001`);
       as colunas do arquivo enviado numa resposta em `FORMULARIOS_RESPOSTAS`, `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
-      (`V046`); e as tabelas da aplicação de **tarefas agendadas** (`V036`; publicação agendada, encerramento pelo prazo,
-      reabertura de formulário recorrente, lembrete automático e a marca "lembrete enviado hoje"), **fila de e-mails** (`V035`)
-      e **auditoria** (`V037`).
+      (`V001`); e as tabelas da aplicação de **tarefas agendadas** (`V001`; publicação agendada, encerramento pelo prazo,
+      reabertura de formulário recorrente, lembrete automático e a marca "lembrete enviado hoje"), **fila de e-mails** (`V001`)
+      e **auditoria** (`V001`).
   - name: Formulário público
     description: Página do candidato externo, aberta por link, sem login.
 
@@ -303,7 +302,7 @@ paths:
 
         `sentidoAvaliacao` é obrigatório quando `tipo = AVALIACAO` e proibido nos outros tipos. A prévia "Como o
         candidato vai ver" é montada pelo front com o que a pessoa digitou; não há rota para ela.
-      x-provisorio: "Sugestão anônima: o dono decidiu que a Sugestão aceita várias respostas da mesma pessoa, mas não disse se ela pode ser anônima. Hipótese usada aqui: não pode (o resultado anônimo só sai depois de encerrar e a Sugestão é sempre aberta; o registro de participação do banco, V019, aceita uma só linha por pessoa). Se o dono quiser sugestão anônima, muda: a regra de 400 sai, a Sugestão volta a ter público mínimo de 5 e o resultado fica preso ao encerramento manual."
+      x-provisorio: "Sugestão anônima: o dono decidiu que a Sugestão aceita várias respostas da mesma pessoa, mas não disse se ela pode ser anônima. Hipótese usada aqui: não pode (o resultado anônimo só sai depois de encerrar e a Sugestão é sempre aberta; o registro de participação do banco, V001, aceita uma só linha por pessoa). Se o dono quiser sugestão anônima, muda: a regra de 400 sai, a Sugestão volta a ter público mínimo de 5 e o resultado fica preso ao encerramento manual."
       x-perfis: [RH]
       requestBody:
         required: true
@@ -443,7 +442,7 @@ paths:
           de um jeito e ser de outro. O resto: **sem resposta**, tudo pode mudar, exceto que um formulário publicado por
           link (`alvo = LINK`) não sai de `ENTREVISTA` (422 `LINK_SO_PARA_ENTREVISTA`, ver `publicarFormulario`); **com
           resposta** (`temRespostas`), só `titulo` e `descricao`. O banco é a segunda barreira da troca de `anonimo` depois
-          da primeira resposta (chave estrangeira composta de `V017`), mas a API responde 409 antes de chegar nele.
+          da primeira resposta (chave estrangeira composta de `V001`), mas a API responde 409 antes de chegar nele.
         - `ENCERRADO`: nada muda (422 `FORMULARIO_ENCERRADO`).
         Passar para anônimo (só em rascunho ou agendado) com uma pergunta de envio de arquivo, ou com link público, é
         recusado (422 `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`). Sugestão (`OUTRO`) nunca é anônima (400 em
@@ -518,7 +517,7 @@ paths:
         respostas sem volta, a tela confirma também nos formulários que não pedem `confirmar`.
 
         **O que a exclusão faz (o que LI nos scripts do banco; a exclusão em si não foi rodada num MySQL):** nenhuma chave
-        estrangeira de formulário tem `ON DELETE` (`Criacao_Tabelas` e `V015` a `V019`), então o banco recusa apagar o
+        estrangeira de formulário tem `ON DELETE` (`Criacao_Tabelas` e `V001`), então o banco recusa apagar o
         formulário enquanto houver linha filha, e não há coluna de ocultação em `FORMULARIOS`: a exclusão é **física**, feita
         pela API em **uma transação**, nesta ordem: respostas (`FORMULARIOS_RESPOSTAS`, inclusive as anônimas e as de
         candidato), participações anônimas (`FORMULARIOS_PARTICIPACOES`), destinatários, candidatos, alternativas,
@@ -527,7 +526,7 @@ paths:
         trigger de exclusão em `FORMULARIOS_RESPOSTAS` nem nas tabelas novas (a lista de triggers de formulário tem só o
         insert do formulário, o update e o delete da pergunta e o insert da resposta), então apagar a resposta é permitido.
         Depois de gravar a transação, a API apaga do armazenamento os arquivos enviados (respostas de envio de arquivo e
-        currículos). Formulário recorrente deixa de reabrir. A auditoria (tabela da aplicação, script `V037`)
+        currículos). Formulário recorrente deixa de reabrir. A auditoria (tabela da aplicação, script `V001`)
         registra "Excluiu" com o título e **quantas** respostas foram apagadas, sem respondente; **no anônimo que ainda
         não encerrou, sem a contagem** (regra 6 em "Formulários").
       x-provisorio: "O dono falou só do formulário publicado (seção 13 das convenções diz 'a qualquer momento'). Hipótese usada aqui: o formulário encerrado também se exclui, com a mesma regra (sem confirmação, porque ninguém mais pode responder). Se o dono quiser proteger o encerrado, volta o 422 FORMULARIO_JA_PUBLICADO nele e o item Excluir some da lista para formulários encerrados."
@@ -753,7 +752,7 @@ paths:
 
         **`agendarPara` num rascunho não é guardado.** O banco só tem o dia agendado enquanto o formulário está `AGENDADO`:
         é a data de publicação preenchida (com o formulário inativo e sem encerramento) que o faz `AGENDADO`, e um rascunho
-        não pode ter essa data (`V015`). Por isso, ao salvar a publicação de um formulário `RASCUNHO`, o `agendarPara` do
+        não pode ter essa data (`V001`). Por isso, ao salvar a publicação de um formulário `RASCUNHO`, o `agendarPara` do
         corpo é aceito (valem as regras de campo), mas **não é guardado**: o formulário continua `RASCUNHO` e a resposta
         traz `publicacao.agendarPara: null`. Quem reabre o rascunho encontra a data vazia, e **a tela precisa mandar a data
         de novo ao agendar** (em `publicarFormulario`, com `agendarPara`). Os demais campos da etapa (`alvo`, setores,
@@ -835,7 +834,7 @@ paths:
           pessoas passam a ver o formulário em `listarMeusFormularios`. Setor vale para **quem está no setor agora**;
           num formulário **não anônimo**, quem for admitido ou trocar para o setor depois também passa a receber o
           formulário aberto. Num formulário **anônimo** não: o público é a fotografia do dia da publicação (regra 2 em
-          "Formulários"; o back-end pode guardar uma linha por pessoa em `FORMULARIOS_DESTINATARIOS`, que o `V018`
+          "Formulários"; o back-end pode guardar uma linha por pessoa em `FORMULARIOS_DESTINATARIOS`, que o `V001`
           permite, em vez da linha do setor).
         - **Avaliações:** quem avalia quem sai de `sentidoAvaliacao` e de quem é gestor de quem (equipe = setor do
           gestor). `GESTOR_AVALIA_EQUIPE`: as pessoas escolhidas são os **gestores**, e cada um avalia cada pessoa
@@ -853,10 +852,10 @@ paths:
           há a quem lembrar por link); se o `prazo` está a 7 dias ou menos do dia da publicação, não há lembrete
           automático; em formulário recorrente, vale em cada rodada. Segue a regra de no máximo um lembrete por pessoa,
           por formulário e por dia, que o lembrete manual também usa (ver `lembrarQuemFaltaFormulario`). **Banco:** o
-          liga e desliga é uma **coluna nova em `FORMULARIOS`**, `LEMBRETE_AUTOMATICO` (script `V045`); o estado "lembrete
-          enviado hoje" vive na **tabela de tarefas agendadas da aplicação** (também nova, script `V036`), nunca no
+          liga e desliga é uma **coluna nova em `FORMULARIOS`**, `LEMBRETE_AUTOMATICO` (script `V001`); o estado "lembrete
+          enviado hoje" vive na **tabela de tarefas agendadas da aplicação** (também nova, script `V001`), nunca no
           formulário. O padrão "ligada" é da **API**: ao criar o formulário ela grava `true`; o padrão do banco é `FALSE` de
-          propósito (`V045`), para que a caixa desligada nunca vire ligada por omissão do valor. **No anônimo** o lembrete vai a quem ainda não participou, sem guardar o destinatário nem contar
+          propósito (`V001`), para que a caixa desligada nunca vire ligada por omissão do valor. **No anônimo** o lembrete vai a quem ainda não participou, sem guardar o destinatário nem contar
           quantos foram: o limite é um lembrete do formulário por dia e a auditoria só diz que o lembrete saiu (regra 6).
           Hoje (07/10) a Pesquisa de clima 2026 (anônima, prazo 31/10) ainda não recebeu lembrete automático: o primeiro
           sai em 24/10.
@@ -877,7 +876,7 @@ paths:
         (`proximaReaberturaEmUtc` vazio); o RH cria outro formulário com um público de 5 ou mais.
 
         A publicação agendada, o encerramento pelo prazo, a reabertura e o lembrete automático são tarefas da **tabela de
-        tarefas agendadas da aplicação** (tabela nova, script `V036`).
+        tarefas agendadas da aplicação** (tabela nova, script `V001`).
       x-perfis: [RH]
       parameters:
         - $ref: '#/components/parameters/FormularioId'
@@ -1305,7 +1304,7 @@ paths:
       summary: Mostra o que uma pessoa respondeu (botão Ver respostas).
       description: |
         Só para formulário **com nome**. Em formulário anônimo não existe: 422 `FORMULARIO_ANONIMO`, porque a resposta
-        anônima não guarda quem respondeu (`V017`). Nas avaliações, `avaliadoId` diz de qual avaliação se fala (uma
+        anônima não guarda quem respondeu (`V001`). Nas avaliações, `avaliadoId` diz de qual avaliação se fala (uma
         pessoa responde uma vez por avaliado); é obrigatório nelas e proibido nos outros tipos (400). Pessoa que não
         respondeu: 404.
 
@@ -1724,7 +1723,7 @@ paths:
         `FORMULARIO_SUGESTAO`). Quem já respondeu, quem foi pedido e não deve responder, ou quem já recebeu lembrete
         **hoje** deste formulário (manual ou automático), entra em `ignorados` (no máximo um lembrete por pessoa, por
         formulário, por dia; chave de idempotência do e-mail: formulário + pessoa + dia, na fila de e-mails da
-        aplicação, tabela nova, script `V035`).
+        aplicação, tabela nova, script `V001`).
 
         **Formulário anônimo:** só vale com `funcionarioIds` vazio (mandar uma pessoa específica revelaria quem falta:
         422 `FORMULARIO_ANONIMO`); o lembrete vai a quem não participou, sem mostrar a lista. **A resposta só diz que o
@@ -1733,7 +1732,7 @@ paths:
         ninguém (nada sai) e quando o lembrete de hoje já tinha saído, para o contraste não revelar nada. Aqui o limite
         é **um lembrete do formulário por dia**, e não por pessoa: guardar "formulário + pessoa + dia" seria guardar
         quem ainda não participou; a marca "lembrete enviado hoje" fica na **tabela de tarefas agendadas da aplicação**
-        (tabela nova, script `V036`), nunca no formulário. A auditoria registra só "lembrete enviado" (quem
+        (tabela nova, script `V001`), nunca no formulário. A auditoria registra só "lembrete enviado" (quem
         mandou e quando), **sem destinatário e sem número** (regra 6 em "Formulários"). O mesmo vale para o lembrete
         automático (ver `publicarFormulario`), que também não informa quantos nem quem. Hoje (07/10) a Pesquisa de clima
         2026 ainda não recebeu o automático: o primeiro sai em 24/10.
@@ -1889,7 +1888,7 @@ paths:
         `ignorados` vazios, igual com muitas pessoas a lembrar ou com nenhuma): o gestor não fica sabendo quantas pessoas
         da equipe dele faltam. O limite é um lembrete do formulário por dia **e por alcance** (o setor do gestor, aqui;
         todos, no do RH e no automático), guardado na tabela de tarefas agendadas da aplicação (tabela nova, script
-        `V036`), e a auditoria registra só "lembrete enviado", sem número e sem destinatário. Formulário fora
+        `V001`), e a auditoria registra só "lembrete enviado", sem número e sem destinatário. Formulário fora
         da equipe (inclusive Sugestão) e **avaliação do gestor** (`EQUIPE_AVALIA_GESTOR`: quem é avaliado não lembra
         ninguém): 404.
         Decisão do dono (2026-11-02): o botão fica, e este e-mail entra na lista fechada de `CONVENCOES.md`, seção 12.
@@ -2155,14 +2154,14 @@ paths:
         Sugestão** (`OUTRO`, caixa sempre aberta; decisão do dono, 2026-10-30) **aceita várias respostas da mesma pessoa**,
         e o 409 `JA_RESPONDIDO` só existe para os outros tipos. Em formulário com nome o banco **não** impede a repetição
         (`FORMULARIOS_RESPOSTAS` não tem chave única por pessoa), então a API confere e grava na mesma transação, para
-        dois envios ao mesmo tempo não passarem; no anônimo a chave única da participação (`V019`) impede (por isso a
+        dois envios ao mesmo tempo não passarem; no anônimo a chave única da participação (`V001`) impede (por isso a
         Sugestão nunca é anônima). Como o banco não tem tabela de "envio", a API grava **o mesmo instante** em
         `DATA_RESPOSTA` de todas as linhas de um envio, e é por pessoa e por esse instante que a Sugestão separa um envio
         do outro (`obterRespostasDeFuncionario`). Nas avaliações `avaliadoId` é obrigatório e precisa estar em
         `avaliados` (422 `AVALIADO_INVALIDO`); nos outros tipos é proibido.
 
         **Formulário anônimo:** a resposta é gravada **sem funcionário, sem candidato e com hora grosseira (só o dia)**
-        (`V017`). A aplicação registra à parte só que a pessoa participou (`FORMULARIOS_PARTICIPACOES`, sem data nem
+        (`V001`). A aplicação registra à parte só que a pessoa participou (`FORMULARIOS_PARTICIPACOES`, sem data nem
         ligação com a resposta), com chave `participacaoId` UUID v4 gerada pela aplicação, devolvida no recibo. **A
         auditoria não registra nada disto**: nem o autor nem a hora da resposta, nem a participação (nem com nome, nem com
         hora; regra 6 em "Formulários"). Como o anonimato não muda depois de publicado, a pessoa nunca responde achando que
@@ -2170,9 +2169,9 @@ paths:
 
         **Resposta com arquivo** (pergunta `ARQUIVO`): o arquivo fica no armazenamento e o banco guarda só a referência, na
         própria linha da resposta (`FORMULARIOS_RESPOSTAS`): `CAMINHO_ARQUIVO` (interno, nunca devolvido) e
-        `NOME_ARQUIVO_ORIGINAL` (o nome que a pessoa deu, devolvido em `arquivo.nome`), sempre **os dois juntos** (`V046`). **Resposta
+        `NOME_ARQUIVO_ORIGINAL` (o nome que a pessoa deu, devolvido em `arquivo.nome`), sempre **os dois juntos** (`V001`). **Resposta
         anônima nunca tem arquivo:** formulário anônimo não tem pergunta `ARQUIVO` (422 `ANONIMO_SEM_ARQUIVO` ao montar o
-        formulário), e, como segunda barreira, o banco recusa (`V046`) arquivo numa resposta anônima. Então, no formulário
+        formulário), e, como segunda barreira, o banco recusa (`V001`) arquivo numa resposta anônima. Então, no formulário
         anônimo, não há parte `arquivos` no envio.
       x-perfis: [Funcionario, Gestor, RH]
       parameters:
@@ -2793,13 +2792,13 @@ components:
     FormularioSentidoAvaliacao:
       type: string
       description: |
-        Quem avalia quem, só em `tipo = AVALIACAO` (`V015`). `GESTOR_AVALIA_EQUIPE` é a "Avaliação da equipe" (o gestor
+        Quem avalia quem, só em `tipo = AVALIACAO` (`V001`). `GESTOR_AVALIA_EQUIPE` é a "Avaliação da equipe" (o gestor
         avalia cada pessoa do setor dele); `EQUIPE_AVALIA_GESTOR` é a "Avaliação do gestor" (a equipe avalia o gestor).
       enum: [GESTOR_AVALIA_EQUIPE, EQUIPE_AVALIA_GESTOR]
     FormularioSituacao:
       type: string
       description: |
-        Estado do formulário (sem coluna própria: sai de `ATIVO`, `DATA_PUBLICACAO` e `DATA_ENCERRAMENTO`, `V015`).
+        Estado do formulário (sem coluna própria: sai de `ATIVO`, `DATA_PUBLICACAO` e `DATA_ENCERRAMENTO`, `V001`).
         `RASCUNHO` não foi publicado nem agendado; `AGENDADO` tem data de publicação futura; `PUBLICADO` aceita respostas;
         `ENCERRADO` não aceita mais (por prazo vencido ou pelo RH). Rótulos: Rascunho, Agendado, Publicado, Encerrado.
       enum: [RASCUNHO, AGENDADO, PUBLICADO, ENCERRADO]
@@ -2905,7 +2904,7 @@ components:
           type: boolean
           description: |
             O RH marca ao criar. **Não muda depois de publicado**, em nenhum sentido (409 `ANONIMATO_FIXO_APOS_PUBLICAR`;
-            o banco é a segunda barreira depois da primeira resposta, `V017`). Antes de publicar (rascunho e agendado)
+            o banco é a segunda barreira depois da primeira resposta, `V001`). Antes de publicar (rascunho e agendado)
             pode mudar. Sugestão (`OUTRO`) nunca é anônima (400). As regras do anônimo estão na lista "Formulário anônimo" do
             assunto Formulários.
     FormularioRecorrencia:
@@ -2967,8 +2966,8 @@ components:
             efeito com `prazo` e com `alvo` `SETORES` ou `PESSOAS` (por link não há a quem lembrar); a tela esconde a caixa
             nos outros casos. Detalhes em `publicarFormulario`. O lembrete manual do RH continua à parte
             (`lembrarQuemFaltaFormulario`). **Banco:** é uma **coluna nova em `FORMULARIOS`**, `LEMBRETE_AUTOMATICO` (lembrete
-            automático ligado ou desligado; script `V045`); o estado "lembrete enviado hoje" vive na **tabela de tarefas
-            agendadas da aplicação** (`V036`), nunca no formulário. No anônimo o lembrete automático não guarda destinatário nem
+            automático ligado ou desligado; script `V001`); o estado "lembrete enviado hoje" vive na **tabela de tarefas
+            agendadas da aplicação** (`V001`), nunca no formulário. No anônimo o lembrete automático não guarda destinatário nem
             número (regra 6 em "Formulários").
     FormularioSetor:
       type: object
@@ -3003,7 +3002,7 @@ components:
             - { $ref: '#/components/schemas/FormularioRecorrencia' }
         lembreteAutomatico:
           type: boolean
-          description: A caixa do lembrete 7 dias antes do prazo (padrão ligada, gravado pela API; coluna nova em `FORMULARIOS`, `LEMBRETE_AUTOMATICO`, script `V045`). Ver `FormularioPublicacaoComando`.
+          description: A caixa do lembrete 7 dias antes do prazo (padrão ligada, gravado pela API; coluna nova em `FORMULARIOS`, `LEMBRETE_AUTOMATICO`, script `V001`). Ver `FormularioPublicacaoComando`.
         publicadoEmUtc:
           type: [string, 'null']
           format: date-time
@@ -3238,7 +3237,7 @@ components:
       required: [respostaId, nome]
       properties:
         respostaId: { type: integer }
-        nome: { type: string, description: 'Nome original do arquivo (`FORMULARIOS_RESPOSTAS.NOME_ARQUIVO_ORIGINAL`, script `V046`). O caminho de armazenamento (`CAMINHO_ARQUIVO`) nunca é devolvido.' }
+        nome: { type: string, description: 'Nome original do arquivo (`FORMULARIOS_RESPOSTAS.NOME_ARQUIVO_ORIGINAL`, script `V001`). O caminho de armazenamento (`CAMINHO_ARQUIVO`) nunca é devolvido.' }
     RespostaFormularioDada:
       type: object
       description: |
@@ -3594,7 +3593,7 @@ components:
           minItems: 1
           maxItems: 1
           items: { type: integer, minimum: 1 }
-          x-provisorio: "Se a múltipla escolha aceita mais de uma opção ainda está em aberto (V016: 'a confirmar com o dono'). Hipótese mais simples usada aqui: uma só (maxItems 1). Se o dono aceitar várias, tira-se o maxItems e a pergunta ganha um campo 'permiteVariasOpcoes'; o formato da resposta já é uma lista para isto não quebrar o front."
+          x-provisorio: "Se a múltipla escolha aceita mais de uma opção ainda está em aberto (V001: 'a confirmar com o dono'). Hipótese mais simples usada aqui: uma só (maxItems 1). Se o dono aceitar várias, tira-se o maxItems e a pergunta ganha um campo 'permiteVariasOpcoes'; o formato da resposta já é uma lista para isto não quebrar o front."
         valorEscala: { type: integer, minimum: 1, maximum: 5 }
         arquivoIndice:
           type: integer

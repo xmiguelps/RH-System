@@ -2,6 +2,10 @@
 
 Regra de versão: ver `CONVENCOES.md`, seção 14. A versão fica em `fontes/00-base.yaml` (`info.version`).
 
+## 0.2.2 — 2026-11-03 (rascunho)
+
+- Só texto (versão de correção, `CONVENCOES.md`, seção 14): as citações aos scripts de banco `V006` a `V048` foram reescritas depois que o dono juntou os 42 scripts da aplicação dentro do `V001` e do `V002` (2026-11-03). Onde o contrato dizia "script `V042`", agora diz `V001`; as citações com número de linha passaram a apontar para a tabela ou para a nota «(antigo Vnnn)» do `V001`. Nenhuma rota, campo, exemplo ou código de erro mudou.
+
 ## 0.2.1 — 2026-11-02 (rascunho)
 
 - Texto do 400: o `detail` de `Erro400Validacao` passa a ser "Confira os campos indicados." (o padrão que a API usa em todo 400). O texto "Preencha o e-mail e a senha." ficou só na rota `entrar`, que usa a nova resposta `Erro400Login`. O exemplo do 400 de `publicarTreinamento` também usa o texto padrão (o que falta vem em `errors`). Nenhuma rota nem campo mudou. Decisão do dono (2026-11-02): os botões "Lembrar quem não viu" (aviso, `lembrarQuemNaoViuAviso`) e "Lembrar quem falta" do gestor (`lembrarQuemFaltaNaEquipe`) ficam; os dois e-mails entram na lista fechada (`CONVENCOES.md`, seção 12) e as duas rotas deixam de ser provisórias. O número do certificado fica `CERT-{ano}-{id}` (decisão do dono, 2026-11-02): `CertificadoResumo.numero` deixa de ser provisório.

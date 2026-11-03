@@ -1,10 +1,10 @@
 # Fatia 7: gestão (férias, benefícios, pagamento e painéis).
-# Convenções em contrato/CONVENCOES.md. Fonte de verdade dos campos: Banco de Dados/Scripts V007, V011, V020, V021, V024, V025 e V027
+# Convenções em contrato/CONVENCOES.md. Fonte de verdade dos campos: Banco de Dados/Scripts V001
 # e as tabelas FERIAS, BENEFICIOS e BENEFICIOS_FUNCIONARIOS do script de tabelas do grupo. **Dependem de scripts SQL novos, já escritos
-# em `Banco de Dados/Scripts`:** os campos `opcional`, `aceitaDependentes` e `aceitaTrajeto` do catálogo `BENEFICIOS` (`V031`; decisão do
-# dono, 2026-10-30); a coluna do **motivo da recusa de férias** em `FERIAS` (`V041`, `MOTIVO_RECUSA`); `TREINAMENTOS.ENCERRADO_EM`
-# (`V042`; painel do RH, "Treinamentos em andamento"); e as **tabelas novas da aplicação** de fila de e-mails (`V035`; e-mail de
-# resultado do pedido de férias) e de auditoria (`V037`; `ultimasAlteracoes` do painel do RH).
+# em `Banco de Dados/Scripts`:** os campos `opcional`, `aceitaDependentes` e `aceitaTrajeto` do catálogo `BENEFICIOS` (`V001`; decisão do
+# dono, 2026-10-30); a coluna do **motivo da recusa de férias** em `FERIAS` (`V001`, `MOTIVO_RECUSA`); `TREINAMENTOS.ENCERRADO_EM`
+# (`V001`; painel do RH, "Treinamentos em andamento"); e as **tabelas novas da aplicação** de fila de e-mails (`V001`; e-mail de
+# resultado do pedido de férias) e de auditoria (`V001`; `ultimasAlteracoes` do painel do RH).
 tags:
   - name: Férias
     description: Saldo, pedido, aprovação em duas etapas (gestor e depois RH), calendário e registro pelo RH.
@@ -269,7 +269,7 @@ paths:
         **E-mail.** **Criar** o pedido não manda e-mail (a pessoa vê o pedido no histórico de `GET /api/eu/ferias`). Depois, a pessoa
         recebe **um e-mail a cada decisão** (lista fechada, `CONVENCOES.md`, seção 12): quando o gestor aprova, recusa ou sugere outra
         data, e quando o RH confirma ou recusa (as recusas levam o motivo). A aprovação automática do "gestor ausente" não é decisão de
-        ninguém e **não** manda e-mail. O e-mail entra na **fila de e-mails**, tabela nova da aplicação (script `V035`).
+        ninguém e **não** manda e-mail. O e-mail entra na **fila de e-mails**, tabela nova da aplicação (script `V001`).
 
         **Em qual período aquisitivo entra:** o servidor escolhe o período **mais antigo** que ainda tem saldo
         suficiente para os dias do pedido (gozo mais abono). Não há campo para escolher.
@@ -397,7 +397,7 @@ paths:
         Só vale para o pedido da própria pessoa na situação `SUGESTAO_DE_DATA` (`etapa: GESTOR`, esperando a resposta dela).
         As datas sugeridas passam a ser `dataInicio` e `dataFim` do pedido e o pedido vira `COM_O_RH` (`etapa: RH`). Ao aceitar, a etapa
         do gestor se encerra: `decisaoGestor` passa a `APROVADA` (com as datas sugeridas), `decididaPor` é o gestor que sugeriu e
-        `decididaEmUtc` é o momento em que a pessoa aceitou (o banco guarda `RESULTADO_GESTOR = SUGERIU_DATA`, V011 e V020: a tradução é
+        `decididaEmUtc` é o momento em que a pessoa aceitou (o banco guarda `RESULTADO_GESTOR = SUGERIU_DATA`, V001: a tradução é
         da API). Enquanto a pessoa não responde, `decisaoGestor` é `null` e quem sugeriu e quando estão em `sugestao.sugeridaPor` e
         `sugestao.sugeridaEmUtc`. As regras do pedido são conferidas de novo com as datas novas, **menos** a antecedência de 30 dias
         (a data foi escolhida pelo gestor); inclusive `CABE_NO_SALDO`, porque só agora os dias das datas sugeridas passam a ser
@@ -640,7 +640,7 @@ paths:
         O pedido passa para a etapa do RH: `situacao: COM_O_RH` e `etapa: RH` (o `status` do banco continua `SOLICITADA`: só muda na
         decisão final do RH); `decisaoGestor` passa a `APROVADA`. Só vale para pedido da equipe em `COM_O_GESTOR`. **Manda e-mail à
         pessoa** com o resultado (lista fechada, `CONVENCOES.md`, seção 12; o e-mail entra na fila de e-mails, tabela nova da
-        aplicação, script `V035`).
+        aplicação, script `V001`).
 
         Erros, nesta ordem: 404 (pedido que não existe, pedido de outro setor, **pedido do próprio gestor** ou de outro gestor: os dois
         últimos ficam fora da equipe dele e a API não revela qual dos casos é; o pedido de quem é gestor só o RH decide); 409
@@ -698,7 +698,7 @@ paths:
         O pedido vira `REJEITADA` (`status: REJEITADA`, `etapa: CONCLUIDA`) e não vai para o RH ("se o gestor recusa, o pedido acaba
         na hora": decisão do dono, 2026-10-29); `decisaoGestor` passa a `REJEITADA`. O corpo traz o **`motivo`, obrigatório (5 a 500
         caracteres)**: ele vai em `decisaoGestor.observacao` e **a pessoa o vê** (no histórico de `GET /api/eu/ferias` e no e-mail). O motivo
-        mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V041`). **Manda e-mail à pessoa** com o resultado e o motivo (lista
+        mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V001`). **Manda e-mail à pessoa** com o resultado e o motivo (lista
         fechada, `CONVENCOES.md`, seção 12). O Figma (tela 51) não desenha "Recusar" no pedido de férias; os documentos dizem que o gestor
         pode recusar, e valem. Mesmos erros de `aprovarFeriasComoGestor`, mais 400 quando o motivo falta ou foge de 5 a 500 caracteres.
       x-perfis: [Gestor]
@@ -1147,7 +1147,7 @@ paths:
         já aprovou** (o RH pode recusar o que o gestor aprovou: decisão do dono, 2026-10-30). Mesmos erros e mesma regra de quem do
         RH pode decidir de `confirmarFeriasComoRh` (o banco exige o gestor gravado também na recusa). `decisaoRh` passa a `REJEITADA`. O
         corpo traz o **`motivo`, obrigatório (5 a 500 caracteres)**: ele vai em `decisaoRh.observacao` e **a pessoa o vê** (no histórico de
-        `GET /api/eu/ferias` e no e-mail). O motivo mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V041`, a mesma coluna da
+        `GET /api/eu/ferias` e no e-mail). O motivo mora numa **coluna nova de `FERIAS`**, `MOTIVO_RECUSA` (script `V001`, a mesma coluna da
         recusa do gestor: quem recusa é o gestor **ou** o RH, nunca os dois). **Manda e-mail à
         pessoa** com o resultado e o motivo (lista fechada, `CONVENCOES.md`, seção 12). Erros: os de `confirmarFeriasComoRh`, mais 400
         quando o motivo falta ou foge de 5 a 500 caracteres.
@@ -1507,7 +1507,7 @@ paths:
         - `dependentesCadastrados`: dependentes já aprovados em qualquer benefício, sem repetir, para o modal
           "Quem vai entrar no plano" (a pessoa marca quem entra; "Você" aparece sempre marcado).
 
-        **Depende do script SQL `V031`**: o catálogo `BENEFICIOS` tinha só nome e descrição, e o script acrescenta `OPCIONAL`,
+        **Depende do script SQL `V001`**: o catálogo `BENEFICIOS` tinha só nome e descrição, e o script acrescenta `OPCIONAL`,
         `ACEITA_DEPENDENTES` e `ACEITA_TRAJETO` (decisão do dono, 2026-10-30; as três nascem `FALSE`, e a API grava o valor do RH). O
         contrato já usa os três.
 
@@ -2384,7 +2384,7 @@ paths:
           de data, no máximo 8. **Não entram** "Fim do período de experiência" nem "Treinamento presencial": **cortados** (sem
           experiência e sem turmas presenciais, decisão do dono, 2026-10-28 e 2026-10-29); o Figma os desenha e o front os esconde.
         - `treinamentosEmAndamento`: treinamentos **publicados e já liberados** (a data de início, quando há, já chegou) que o RH
-          não encerrou (`TREINAMENTOS.ENCERRADO_EM` vazio: **coluna nova**, script `V042`, fatia 6). **Sem prazo**
+          não encerrou (`TREINAMENTOS.ENCERRADO_EM` vazio: **coluna nova**, script `V001`, fatia 6). **Sem prazo**
           (`CONVENCOES.md`, seção 13). Em ordem de liberação, do mais antigo para o mais novo, no máximo 5
           ("18 de 24 concluíram"; dados da fatia 6, `/api/rh/treinamentos`). O link "Gerenciar treinamentos" é da fatia 6.
         - `presencaAgora`: o cartão "Presença agora" (ver `PainelPresencaAgora`: `contagensHoje` é o `PresencaContagens` da base, por
@@ -2394,7 +2394,7 @@ paths:
           "Ver quem está sem registro" usa `GET /api/rh/painel/presenca/sem-registro`.
         - `ultimasAlteracoes`: as 4 primeiras linhas de `GET /api/rh/auditoria?apenasAlteracoes=true` (fatia 1; o parâmetro tira do log
           as marcações de ponto, os downloads, os logins e os acessos negados, e **só** este painel o usa; esta rota não copia o schema da
-          auditoria), do mais novo para o mais antigo, já em frase. O log é uma **tabela nova da aplicação** (script `V037`). O
+          auditoria), do mais novo para o mais antigo, já em frase. O log é uma **tabela nova da aplicação** (script `V001`). O
           link "Abrir log de auditoria" é da fatia 1.
       x-provisorio: "Pedidos de benefício contam como pendência do RH (o Figma só desenha quatro tipos). Pergunta ao dono: o tipo BENEFICIOS fica na lista de pendências? Se não, ele sai de `pendencias`."
       x-perfis: [RH]
@@ -2748,8 +2748,8 @@ components:
       type: string
       description: |
         Situação de um pedido de férias, já pronta para o front. É um campo **extra**: `status` e `etapa` vêm sempre junto
-        (`CONVENCOES.md`, seção 9). Vem do `STATUS_FERIAS` do banco mais as colunas da etapa do gestor (V011) e da sugestão de data
-        (V020):
+        (`CONVENCOES.md`, seção 9). Vem do `STATUS_FERIAS` do banco mais as colunas da etapa do gestor (V001) e da sugestão de data
+        (V001):
 
         - `COM_O_GESTOR`: `SOLICITADA`, `etapa: GESTOR`, esperando o gestor.
         - `SUGESTAO_DE_DATA`: `SOLICITADA`, `etapa: GESTOR`; o gestor sugeriu outras datas e a pessoa ainda não respondeu (ninguém
@@ -3032,7 +3032,7 @@ components:
             A decisão da etapa do gestor (`DecisaoDeEtapa` da base); `null` enquanto ele não decidiu, nos pedidos sem etapa do gestor
             e em `SUGESTAO_DE_DATA` (a sugestão está em `sugestao`; depois que a pessoa aceita, vira `APROVADA`; se ela recusa ou a
             sugestão expira, continua `null` e o pedido é `CANCELADA`). Ao recusar, o `observacao` traz o motivo (obrigatório, 5 a 500
-            caracteres). Do banco (V011 e V020): `RESULTADO_GESTOR` `APROVOU` vira `APROVADA`, `RECUSOU` vira `REJEITADA` e
+            caracteres). Do banco (V001): `RESULTADO_GESTOR` `APROVOU` vira `APROVADA`, `RECUSOU` vira `REJEITADA` e
             `SUGERIU_DATA` só vira `APROVADA` quando a pessoa aceita (`decididaEmUtc` é então a data da resposta dela).
           oneOf:
             - $ref: '#/components/schemas/DecisaoDeEtapa'
@@ -3136,7 +3136,7 @@ components:
           maxLength: 500
           description: |
             Obrigatório. Vai em `decisaoGestor.observacao` ou `decisaoRh.observacao` e **a pessoa o vê** (no histórico e no e-mail de
-            resultado). Texto, nunca HTML. Coluna nova de `FERIAS`, `MOTIVO_RECUSA` (script `V041`): o banco confere que a recusa
+            resultado). Texto, nunca HTML. Coluna nova de `FERIAS`, `MOTIVO_RECUSA` (script `V001`): o banco confere que a recusa
             tem motivo e que ele não é vazio; os 5 a 500 caracteres são conferidos pela API.
 
     FeriasCalendarioItem:
@@ -3211,7 +3211,7 @@ components:
           minLength: 1
           maxLength: 30
           description: Texto livre por enquanto (o banco não limita). Os exemplos usam FILHO, FILHA e CONJUGE.
-          x-provisorio: "Os valores de parentesco ainda não foram decididos (V024: texto livre). Se o dono fechar uma lista (filho, cônjuge...), vira enum e o front mostra um seletor."
+          x-provisorio: "Os valores de parentesco ainda não foram decididos (V001: texto livre). Se o dono fechar uma lista (filho, cônjuge...), vira enum e o front mostra um seletor."
         dataNascimento: { type: string, format: date, description: 'Não pode ser futura.' }
 
     BeneficioAdesaoDependente:
@@ -3540,8 +3540,8 @@ components:
           description: |
             Desde quando espera o RH.
             **Exceção, `ADMISSAO_COM_DOCUMENTOS_PENDENTES`:** não há instante guardado para ela. Li a tabela `FUNCIONARIOS`
-            (`CREATE TABLE` do grupo, mais os `ALTER TABLE` de `V006` e `V030`) e ela **não tem coluna de data de cadastro**
-            (só `DATA_ADMISSAO`, um `DATE`); `FORMULARIOS_DESTINATARIOS` (`V018`, onde a pessoa é atribuída ao formulário de
+            (`CREATE TABLE` do grupo, já com as colunas acrescentadas depois, no `V001`) e ela **não tem coluna de data de cadastro**
+            (só `DATA_ADMISSAO`, um `DATE`); `FORMULARIOS_DESTINATARIOS` (`V001`, onde a pessoa é atribuída ao formulário de
             admissão) também não guarda data. Por isso, para este tipo, `desdeEmUtc` é a **data da admissão às 00:00 no fuso
             -03:00, convertida para UTC** (admissão em `2026-10-13` vira `2026-10-13T03:00:00Z`). Como só entra quem começa em
             até 7 dias, esse instante é de hoje ou do futuro: ele **ordena** a fila (quem começa antes vem primeiro), mas

@@ -37,7 +37,7 @@ Ordem de trabalho (**[minha escolha]** na ordem entre contrato e planos; o resto
 
 1. Este design aprovado.
 2. **Escolha das bibliotecas do front** (seção 6), com conferência de versões e um teste descartável do build sob a política de segurança.
-3. **Contrato de todas as rotas, das fatias 0 a 8** (seção 5), em `contrato/` (feito em 2026-10-30: 224 operações; convenções, elenco e cenário de demonstração também ali). **Mais os scripts SQL novos** (`V030` em diante: colunas novas e tabelas da aplicação que o contrato exige), **todos prontos antes de o back-end começar** (dono, 2026-10-30), escritos pelo lado da aplicação como `V006` a `V029` e conferidos depois pelo Kauan.
+3. **Contrato de todas as rotas, das fatias 0 a 8** (seção 5), em `contrato/` (feito em 2026-10-30: 224 operações; convenções, elenco e cenário de demonstração também ali). **Mais os scripts SQL novos** (`V001` em diante: colunas novas e tabelas da aplicação que o contrato exige), **todos prontos antes de o back-end começar** (dono, 2026-10-30), escritos pelo lado da aplicação como `V001` e conferidos depois pelo Kauan.
 4. **Plano do back-end** e **plano do front-end** (seções 4 e 5), pelo `superpowers:writing-plans`.
 5. Os dois planos e o contrato passam pelo `revisor-de-plano` antes de qualquer execução.
 6. **Entrega** (dono, 2026-10-30), a pedido do dono: commit do planejamento, do contrato e das telas (`Figma/telas/`) em `docs/planejamento`, PR para a `main` e merge. **O back-end e o front só começam a executar depois de o contrato e os planos estarem na `main`** (dono, 2026-10-30: depois do contrato só faltam os dois planos e a execução dos dois lados), e a branch da pessoa do front parte da `main`. Se ela ainda não tiver permissão de escrita no repositório, o dono resolve antes.
@@ -71,7 +71,7 @@ Onde ficam os arquivos **[minha escolha]**: contrato em `contrato/` (a pasta **a
 **"Pronto" no front [minha escolha]:** em cada fatia, testes com MSW seguindo o contrato, lint, `format:check` e o build passando sob a política de segurança. Passo que exige a API real (integração) a sessão **não roda**: registra "pendente de integração" no `PROGRESSO.md`, consulta `contrato/STATUS.md` quando precisar saber se a rota existe, e segue em frente.
 
 **Contrato primeiro, para todas as fatias** (decidido) e **sem o front esperar o back-end**:
-- O contrato das fatias 0 a 8 é escrito **durante o planejamento**, a partir das telas, do spec e das tabelas dos scripts `V001` a `V029`: para cada rota, o que se envia, o que volta, os erros e as regras por perfil.
+- O contrato das fatias 0 a 8 é escrito **durante o planejamento**, a partir das telas, do spec e das tabelas do `V001`: para cada rota, o que se envia, o que volta, os erros e as regras por perfil.
 - **Formato [minha escolha]:** um único documento OpenAPI com exemplos, a partir do qual o front gera os tipos e os handlers do MSW. O roadmap (decisão 1b) já apontava que um JSON escrito à mão por rota "não escala para dezenas de endpoints". Isto **muda** o que o dono ouviu na conversa ("um arquivo de exemplo por rota"): muda o como, não o quê.
 - **Só o dono muda o contrato.** Se o front precisar de algo que não está lá, a sessão **não edita**: usa o fluxo de dúvidas. Cada mudança entra em um registro de mudanças com número de versão, e os testes do front falham quando o contrato muda, apontando quais telas foram afetadas.
 - Itens que dependem de decisão do dono ainda aberta (roadmap, "Decisões do dono" de cada fatia, e spec 13.6) ficam marcados como **provisórios** no contrato **[minha escolha]**. A sessão os constrói normalmente; a lista de provisórios diz quais decisões podem mudá-los.
@@ -98,7 +98,7 @@ Já decidida pelo plano da fatia 0: Vite, React, TypeScript, Vitest, Testing Lib
 
 ## 7. Decisões do dono sobre as telas (2026-10-30, a consolidar por tela no plano do front)
 
-- **Tela 39** (formulários do funcionário, "Pesquisa de clima"): tirar "O RH vê os resultados agrupados por setor". Resposta anônima não guarda funcionário nem setor (`V017`, linhas 139-140).
+- **Tela 39** (formulários do funcionário, "Pesquisa de clima"): tirar "O RH vê os resultados agrupados por setor". Resposta anônima não guarda funcionário nem setor (`CHK_FORMULARIOS_RESPOSTAS_ANONIMA_SEM_AUTOR`, tabela `FORMULARIOS_RESPOSTAS` do `V001`).
 - **Tela 03** (ficha, RH): CPF e telefone **completos, sem máscara**. O gestor continua sem ver CPF e vê o telefone mascarado.
 - **Tela 29** (Cadastros): **Níveis de acesso fica de fora**; **Gestores fica**, com a chave de aprovação automática (2026-10-29); Cargos, Setores e Benefícios como já decidido; **Usuários do sistema entra**, mínimo: lista com a situação de cada login (convite enviado, senha definida), reenviar convite, botões **"Ativar" e "Desativar"**, sem apagar. Apoio: `USUARIOS.ATIVO` (`Criacao_Tabelas:201`), trigger de inativação (`Criacao_Triggers:121-125`), reativação só com colaborador ativo (`:297-306`).
 - **Sem pedir folga** usando o banco de horas. O extrato (telas 33 e 47) mostra só **Crédito e Débito** (`BANCOS_HORAS.TIPO_LANCAMENTO`, `Criacao_Tabelas:396`); "Compensação, folga de meio período" vira um Débito, sem a palavra "compensação".

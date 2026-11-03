@@ -70,7 +70,7 @@ paths:
         branco são ignoradas. Guarda o arquivo por até **1 hora** (`expiraEmUtc`) para a confirmação; ele é
         apagado depois de confirmado ou vencido. A resposta é sempre uma prévia; **o RH corrige a planilha e envia
         de novo** enquanto houver erro. A importação (o `importacaoId`, a situação e a prévia guardada) vive numa **tabela
-        nova da aplicação** (importações; `V038`), não nas tabelas de colaboradores.
+        nova da aplicação** (importações; `V001`), não nas tabelas de colaboradores.
 
         **CPF ou e-mail de um cadastro inativo:** esta importação só cadastra gente nova. Se o CPF ou o e-mail corporativo
         de uma linha já pertence a um cadastro **inativo** (alguém que saiu da empresa), a linha recebe um erro em `CPF` ou
@@ -222,7 +222,7 @@ paths:
         setor, benefícios, dados pessoais). **Ninguém recebe senha:** com `enviarConvite = true` (padrão) cada
         pessoa recebe o convite de acesso por e-mail (fila, com limite de vazão); com `false`, ninguém recebe agora
         e o RH envia depois em Cadastros, Usuários do sistema. O convite depende das **tabelas novas da aplicação** de
-        convite (token) e de fila de e-mails (`V033` e `V035`).
+        convite (token) e de fila de e-mails (`V001`).
 
         **"Depois de salvar": as mesmas caixas do cadastro** (`POST /api/rh/funcionarios`, tela 02), com o **mesmo efeito**,
         valendo para **todas** as pessoas da planilha:

@@ -65,7 +65,7 @@ Conferência: 32 operações no contrato, 32 acima.
 - **Tela 18:** sem "Quiz", sem selo "Eliminatória", sem "Nota dada pelo RH", sem "Correta:" e sem pontos.
 - **Tela 19:** somem as linhas de quiz e de nota; entram os itens do anônimo. Há três situações (OK, AVISO, BLOQUEIO).
 - **Tela 20:** **não tem** "Nota mínima para seguir", **"Enviar o resultado por e-mail ao RH"** nem **"Convidar aprovados para a entrevista"** (decisão do dono, 2026-10-30; o design, seção 9, ainda as lista como "em aberto": vale o contrato). Entram "Lembrar quem não respondeu 7 dias antes do prazo" (ligada por padrão) e o bloco "Repetir". Nenhum e-mail de "formulário publicado" nem de "formulário atribuído" (`contrato/CONVENCOES.md`, seção 12).
-- **Tela 39:** **sem a frase "O RH vê os resultados agrupados por setor"** (a resposta anônima não guarda funcionário nem setor: `Banco de Dados/Scripts/V017`, linhas 139 e 140). Sem quiz, sem nota. Mostre `descricao` como vier.
+- **Tela 39:** **sem a frase "O RH vê os resultados agrupados por setor"** (a resposta anônima não guarda funcionário nem setor: `CHK_FORMULARIOS_RESPOSTAS_ANONIMA_SEM_AUTOR`, tabela `FORMULARIOS_RESPOSTAS` do `Banco de Dados/Scripts/V001`). Sem quiz, sem nota. Mostre `descricao` como vier.
 - **Tela 40:** sem os dois quizzes; no formulário anônimo, sem data e sem "Ver minhas respostas".
 - **Tela 57:** sem quizzes; **a avaliação do gestor não aparece para o gestor** (ele é o avaliado e não acompanha). Esconder "Lembrar Diego por e-mail" é da tela 51, não desta.
 - **Sugestão:** caixa sempre aberta (`prazo` e `recorrencia` vazios), **nunca anônima**, aceita várias respostas da mesma pessoa (sem 409 `JA_RESPONDIDO`), o cartão fica sempre em "Disponível" e a pessoa não relê o que mandou.
