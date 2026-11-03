@@ -12,7 +12,11 @@ builder.Services.AdicionarTratamentoDeErros();
 builder.Services.AdicionarDocumentacao(builder.Configuration);
 
 // Enums saem como texto ("RH", "Gestor"), não como número.
-builder.Services.ConfigureHttpJsonOptions(opcoes => opcoes.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.ConfigureHttpJsonOptions(opcoes =>
+{
+    opcoes.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    opcoes.SerializerOptions.NumberHandling = JsonNumberHandling.Strict; // o contrato diz integer: nada de aceitar "42" como número
+});
 
 var app = builder.Build();
 

@@ -208,6 +208,21 @@ public class AutenticacaoEndpointsTests(MySqlFixture mysql)
         Assert.Equal("senha", (await LerAsync(resposta)).GetProperty("errors").EnumerateObject().Single().Name);
     }
 
+    [Theory]
+    [InlineData("/api/auth/entrar")]
+    [InlineData("/api/auth/renovar")]
+    [InlineData("/api/auth/sair")]
+    public async Task Corpo_ausente_ou_JSON_invalido_devolve_400_ProblemDetails_e_nunca_500(string rota)
+    {
+        var cliente = (await ApiAsync()).CreateClient();
+
+        var semCorpo = await cliente.PostAsync(rota, content: null);
+        var invalido = await cliente.PostAsync(rota, new StringContent("{ isto nao e json", System.Text.Encoding.UTF8, "application/json"));
+
+        await AssertProblemaAsync(semCorpo, 400, "Dados inválidos.", "Confira os campos indicados.");
+        await AssertProblemaAsync(invalido, 400, "Dados inválidos.", "Confira os campos indicados.");
+    }
+
     [Fact]
     public async Task Entrar_com_senha_unicode_funciona()
     {

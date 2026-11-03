@@ -50,15 +50,17 @@ public static class AutenticacaoEndpoints
         return rotas;
     }
 
-    private static async Task<IResult> Entrar(EntrarComando? comando, EntrarCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
+    // O corpo é obrigatório no contrato (requestBody.required): sem parâmetro anulável, o documento gerado também o declara obrigatório.
+    // Corpo ausente ou JSON inválido vira 400 pelo tratador global; campo vazio, pela validação abaixo.
+    private static async Task<IResult> Entrar(EntrarComando comando, EntrarCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
     {
         var erros = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(comando?.Email))
+        if (string.IsNullOrWhiteSpace(comando.Email))
         {
             erros["email"] = ["O e-mail é obrigatório."];
         }
 
-        if (string.IsNullOrWhiteSpace(comando?.Senha))
+        if (string.IsNullOrWhiteSpace(comando.Senha))
         {
             erros["senha"] = ["A senha é obrigatória."];
         }
@@ -72,7 +74,7 @@ public static class AutenticacaoEndpoints
             return Problemas.Resultado(http, StatusCodes.Status400BadRequest, "Dados inválidos.", "Preencha o e-mail e a senha.", erros);
         }
 
-        var resultado = await casoDeUso.ExecutarAsync(comando!, ct);
+        var resultado = await casoDeUso.ExecutarAsync(comando, ct);
         return resultado.Falha switch
         {
             null => Results.Ok(resultado.Sessao),
@@ -82,25 +84,25 @@ public static class AutenticacaoEndpoints
         };
     }
 
-    private static async Task<IResult> Renovar(RenovarComando? comando, RenovarTokenCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> Renovar(RenovarComando comando, RenovarTokenCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
     {
         if (RefreshVazio(comando) is { } erro)
         {
             return Problemas.Resultado(http, StatusCodes.Status400BadRequest, "Dados inválidos.", "Confira os campos indicados.", erro);
         }
 
-        var sessao = await casoDeUso.ExecutarAsync(comando!, ct);
+        var sessao = await casoDeUso.ExecutarAsync(comando, ct);
         return sessao is null ? Problemas.NaoAutenticado(http) : Results.Ok(sessao);
     }
 
-    private static async Task<IResult> Sair(RenovarComando? comando, SairCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> Sair(RenovarComando comando, SairCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
     {
         if (RefreshVazio(comando) is { } erro)
         {
             return Problemas.Resultado(http, StatusCodes.Status400BadRequest, "Dados inválidos.", "Confira os campos indicados.", erro);
         }
 
-        await casoDeUso.ExecutarAsync(comando!, ct);
+        await casoDeUso.ExecutarAsync(comando, ct);
         return Results.NoContent();
     }
 
@@ -115,8 +117,8 @@ public static class AutenticacaoEndpoints
         return usuario is null ? Problemas.NaoAutenticado(http) : Results.Ok(usuario);
     }
 
-    private static Dictionary<string, string[]>? RefreshVazio(RenovarComando? comando) =>
-        string.IsNullOrWhiteSpace(comando?.RefreshToken)
+    private static Dictionary<string, string[]>? RefreshVazio(RenovarComando comando) =>
+        string.IsNullOrWhiteSpace(comando.RefreshToken)
             ? new Dictionary<string, string[]> { ["refreshToken"] = ["O refresh token é obrigatório."] }
             : null;
 }

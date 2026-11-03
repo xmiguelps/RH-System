@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using MySqlConnector;
 
 namespace RHSystem.Api.Configuracao;
@@ -103,6 +104,10 @@ public static class TratamentoDeErrosExtensions
     {
         servicos.AddProblemDetails();
         servicos.AddExceptionHandler<TratadorGlobalDeErros>();
+
+        // Corpo ausente ou JSON inválido: por padrão só o ambiente de desenvolvimento lança BadHttpRequestException; nos demais o framework
+        // responde um 400 sem corpo, direto. Sempre lançar faz o tratador global montar o ProblemDetails do contrato em todo ambiente.
+        servicos.Configure<RouteHandlerOptions>(opcoes => opcoes.ThrowOnBadRequest = true);
         return servicos;
     }
 }
