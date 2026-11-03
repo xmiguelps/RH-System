@@ -12,14 +12,38 @@ using RHSystem.Infrastructure.Autenticacao;
 
 namespace RHSystem.Api.IntegrationTests.Infra;
 
-/// <summary>Um relógio que anda com o tempo real e pode ser avançado pelo teste (por exemplo, para vencer um token).</summary>
+/// <summary>
+/// Um relógio que anda com o tempo real e pode ser avançado pelo teste (por exemplo, para vencer um token) ou fixado num instante (o dia dos
+/// exemplos do contrato). Depois de <see cref="Fixar"/> ele não anda sozinho; <see cref="Avancar"/> continua somando.
+/// </summary>
 public sealed class RelogioDeTeste : IRelogio
 {
     private long _deslocamentoEmTicks;
+    private long _fixoEmTicks; // 0 = anda com o tempo real
 
-    public DateTime AgoraUtc => DateTime.UtcNow.AddTicks(Interlocked.Read(ref _deslocamentoEmTicks));
+    public DateTime AgoraUtc
+    {
+        get
+        {
+            var fixo = Interlocked.Read(ref _fixoEmTicks);
+            var baseUtc = fixo == 0 ? DateTime.UtcNow : new DateTime(fixo, DateTimeKind.Utc);
+            return baseUtc.AddTicks(Interlocked.Read(ref _deslocamentoEmTicks));
+        }
+    }
 
     public void Avancar(TimeSpan tempo) => Interlocked.Add(ref _deslocamentoEmTicks, tempo.Ticks);
+
+    /// <summary>Para o relógio no instante dado (Kind Utc); zera o avanço.</summary>
+    public void Fixar(DateTime utc)
+    {
+        if (utc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("O instante precisa ter Kind = Utc.", nameof(utc));
+        }
+
+        Interlocked.Exchange(ref _deslocamentoEmTicks, 0);
+        Interlocked.Exchange(ref _fixoEmTicks, utc.Ticks);
+    }
 }
 
 /// <summary>
@@ -44,6 +68,34 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
     public RelogioDeTeste Relogio { get; } = new();
 
     public string Conexao { get; } = conexao;
+
+    private readonly SemaphoreSlim _travaDoElenco = new(1, 1);
+    private ElencoDeTeste? _elenco;
+
+    /// <summary>Semeia o elenco de <c>contrato/ELENCO.md</c> (uma vez por banco) e fixa o relógio falso em 2026-10-07T12:42:00Z.</summary>
+    public async Task<ElencoDeTeste> SemearElencoAsync()
+    {
+        await _travaDoElenco.WaitAsync();
+        try
+        {
+            return _elenco ??= await ElencoDeTeste.SemearAsync(this);
+        }
+        finally
+        {
+            _travaDoElenco.Release();
+        }
+    }
+
+    /// <summary>Um cliente com o token que o emissor de verdade emitiu para a pessoa do elenco (sem passar pelo login).</summary>
+    public HttpClient ClienteComo(PessoaDeTeste pessoa)
+    {
+        var elenco = _elenco ?? throw new InvalidOperationException("Chame SemearElencoAsync antes de ClienteComo.");
+        var cliente = CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", elenco.TokensPorUsuario[pessoa.UsuarioId]);
+        return cliente;
+    }
+
+    public HttpClient ClienteAnonimo() => CreateClient();
 
     public static async Task<ApiFactory> CriarAsync(MySqlFixture mysql)
     {

@@ -56,6 +56,31 @@ internal static class RotasDeTeste
         rotas.GrupoEu().MapGet("/__teste/ator", (IAtorAtual ator) => Results.Ok(Descrever(ator))).ExcludeFromDescription();
         rotas.GrupoPublico().MapGet("/__teste/ator", (IAtorAtual ator) => Results.Ok(Descrever(ator))).ExcludeFromDescription();
         rotas.MapGet("/__teste/sem-familia", () => Results.Ok()).ExcludeFromDescription();
+
+        // O padrão de escopo que as fatias seguintes copiam: a consulta parte de DaEquipe e termina em OuNaoEncontrado, então "não existe" e
+        // "é de outro setor" dão a mesma resposta. Sem equipe (gestor sem setor): lista vazia, e 404 ao pedir uma pessoa.
+        rotas.GrupoGestor().MapGet(
+            "/__teste/equipe",
+            async (IEscopoDoUsuario escopo, AppDbContext db, CancellationToken ct) =>
+            {
+                var equipe = await escopo.ObterEquipeAsync(ct);
+                if (equipe is null)
+                {
+                    return Results.Ok(Array.Empty<object>());
+                }
+
+                var pessoas = await db.Funcionarios.DaEquipe(equipe).OrderBy(f => f.Nome).Select(f => new { f.Id, f.Nome }).ToListAsync(ct);
+                return Results.Ok(pessoas);
+            }).ExcludeFromDescription();
+
+        rotas.GrupoGestor().MapGet(
+            "/__teste/equipe/{id:int}",
+            async (int id, IEscopoDoUsuario escopo, AppDbContext db, CancellationToken ct) =>
+            {
+                var equipe = await escopo.ObterEquipeAsync(ct) ?? throw new NaoEncontradoException();
+                var pessoa = (await db.Funcionarios.DaEquipe(equipe).Where(f => f.Id == id).Select(f => new { f.Id, f.Nome }).FirstOrDefaultAsync(ct)).OuNaoEncontrado();
+                return Results.Ok(pessoa);
+            }).ExcludeFromDescription();
     }
 
     private static object Descrever(IAtorAtual ator) => new
