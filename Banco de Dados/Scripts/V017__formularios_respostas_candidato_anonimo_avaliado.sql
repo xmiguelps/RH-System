@@ -69,9 +69,9 @@
 --   - A auditoria NAO registra o autor nem a hora de resposta anonima.
 --   - "Quem ja respondeu" fica em FORMULARIOS_PARTICIPACOES (V019),
 --     separada e sem ordem, sem ligacao com as respostas.
---   CONTRA QUEM O ANONIMATO VALE (decisao do dono, ainda nao tomada):
---   vale contra quem USA A APLICACAO (RH e gestor), que nunca ve nome,
---   numero nem hora da resposta anonima. NAO vale contra quem le o BANCO ou
+--   CONTRA QUEM O ANONIMATO VALE (decisao do dono, 2026-10-29: basta valer
+--   contra quem usa a aplicacao): RH e gestor nunca veem nome, numero nem
+--   hora da resposta anonima. NAO vale contra quem le o BANCO ou
 --   o BACKUP: o ID das respostas e sequencial e compartilhado com os
 --   formularios com nome (quem responde um formulario com nome e logo
 --   depois um anonimo deixa IDs vizinhos), e o log binario do servidor

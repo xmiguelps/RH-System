@@ -1,8 +1,10 @@
-# Scripts novos do banco (V006 a V029)
+# Scripts novos do banco (V006 a V047)
 
-Estes 24 scripts fazem o que a lista `docs/pedidos-para-o-kauan.md` pedia ao Kauan (itens 3 a 27). Foram escritos pelo lado da aplicação, a pedido do dono (2026-10-29), **para o Kauan conferir depois**. Cada script começa com um comentário que explica **por que** existe, **o que faz**, quais decisões foram tomadas e o que **fica com a aplicação**. Leia o comentário antes do SQL.
+**Atualização de 2026-10-30:** a pasta ganhou 18 scripts (`V030` a `V047`), escritos pelo lado da aplicação a partir do **contrato da API** (`contrato/`), a pedido do dono, para **todo o esquema ficar pronto antes de o back-end começar**; o Kauan confere depois, como nos `V006` a `V029`. Veja "Scripts V030 a V047" mais abaixo. Os números são provisórios: o dono pode renumerar.
 
-Nada do que o grupo escreveu foi alterado: os três arquivos em `Banco de Dados/` continuam como estavam.
+Os 24 scripts `V006` a `V029` fazem o que a lista `docs/pedidos-para-o-kauan.md` pedia ao Kauan (itens 3 a 27). Foram escritos pelo lado da aplicação, a pedido do dono (2026-10-29), **para o Kauan conferir depois**. Cada script começa com um comentário que explica **por que** existe, **o que faz**, quais decisões foram tomadas e o que **fica com a aplicação**. Leia o comentário antes do SQL.
+
+Dos três arquivos do grupo em `Banco de Dados/`, **só o de triggers foi alterado** (itens 1 e 2, com autorização do dono; veja "Itens 1 e 2" abaixo). As tabelas e as funções continuam como estavam.
 
 ## Quais itens estão aqui
 
@@ -32,6 +34,51 @@ Nada do que o grupo escreveu foi alterado: os três arquivos em `Banco de Dados/
 | `V027` | 25 | exceções do dia de pagamento |
 | `V028` | 26 | feriados: "repetir todo ano" |
 | `V029` | 27 | treinamentos: rascunho, público e "emitir certificado" |
+
+## Scripts V030 a V047 (2026-10-30): colunas e tabelas que o contrato da API exige
+
+Testados em conjunto num MySQL 8.4.13 limpo com `--default-time-zone=-03:00`: os arquivos do grupo e `V006` a `V047` aplicam sem erro e deixam **47 tabelas, 36 triggers, 8 funções e 238 índices**. **Sem triggers novos.** Cada script começa com um comentário que diz por que existe, o que faz e o que fica com a aplicação.
+
+| Script | O que faz |
+|---|---|
+| `V030` | matrícula gerada pelo sistema (tabela `SEQUENCIAS` e `CHECK` de 5 dígitos em `FUNCIONARIOS.MATRICULA`) |
+| `V031` | `BENEFICIOS`: `OPCIONAL`, `ACEITA_DEPENDENTES`, `ACEITA_TRAJETO` |
+| `V032` | `USUARIOS.SENHA_PROVISORIA` (convite ainda não aceito) |
+| `V033` | `USUARIOS_TOKENS_SENHA` (convite e redefinição: só o hash, uso único) |
+| `V034` | `DESLIGAMENTOS_AGENDADOS` (agendar, efetivar, cancelar, readmitir) |
+| `V035` | `FILA_EMAILS` (idempotência, vazão, carga apagada ao terminar, lembrete anônimo sem destinatário) |
+| `V036` | `TAREFAS_AGENDADAS` (estado idempotente) |
+| `V037` | `AUDITORIA_EVENTOS` e `AUDITORIA_MUDANCAS` (só inclusão, `VALOR_OCULTO`) |
+| `V038` | `IMPORTACOES` (prévia em JSON, validade de 1 hora, tudo ou nada) |
+| `V039` | `PONTOS_MARCACOES.DATA_CORRECAO` (quando a batida foi corrigida) |
+| `V040` | um pedido de ajuste de ponto pendente por dia (coluna calculada e chave única) |
+| `V041` | `FERIAS.MOTIVO_RECUSA` (obrigatório ao recusar) |
+| `V042` | `TREINAMENTOS.ENCERRADO_EM` |
+| `V043` | `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` do treinamento passam a nascer `FALSE` |
+| `V044` | `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` |
+| `V045` | `FORMULARIOS.LEMBRETE_AUTOMATICO` |
+| `V046` | arquivo na resposta do formulário (`CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`; anônimo nunca tem arquivo) |
+| `V047` | 17 índices para os filtros do contrato |
+
+**Armadilhas novas (para o mapeamento do EF e para a aplicação):**
+- Tabelas só da aplicação (`V033` a `V038`) guardam `DATETIME` em **UTC**, diferente das tabelas do grupo (`-03:00`); cada script diz o fuso. O padrão `DEFAULT (UTC_TIMESTAMP(6))` deve ser mapeado como "gerado na inclusão", senão o EF manda `0001-01-01`.
+- **Colunas calculadas** (mapear como calculadas, fora do `INSERT`): `USUARIOS_TOKENS_SENHA.EM_ABERTO`, `DESLIGAMENTOS_AGENDADOS.VIGENTE` e `CHAVE_PENDENTE` (`V040`).
+- **Chave de idempotência** (`FILA_EMAILS` e `TAREFAS_AGENDADAS`): ASCII, começa por "TIPO:", única; o erro 1062 significa "já existe" e se trata como sucesso.
+- **Matrícula:** `UPDATE SEQUENCIAS ... LAST_INSERT_ID(ULTIMO_VALOR + 1)` na **mesma transação e conexão** do cadastro: sem buraco; cadastros simultâneos esperam.
+- **Fila de e-mails:** a `CARGA` (que pode ter o token do link) fica nula quando a mensagem termina. O lembrete de formulário anônimo (sigiloso) não tem `ID_FUNCIONARIO` e nunca chega a `ENVIADO`; a aplicação apaga a linha ao enviar, e o limite diário fica em `TAREFAS_AGENDADAS`.
+- **Auditoria:** sem trigger (só inclusão é regra da aplicação). `VALOR_OCULTO` verdadeiro exige antes e depois nulos.
+- `IMPORTACOES.PREVIA` tem dado pessoal: o banco recusa `CONFIRMADA` com `PREVIA`. A limpeza das vencidas é tarefa agendada.
+- **Rascunho de aviso:** o trigger põe `NOW()` em `DATA_PUBLICACAO`; para "sem data prevista", `UPDATE ... SET DATA_PUBLICACAO = NULL` logo depois do `INSERT`.
+- Sem `CHECK` em `TIPO_CONTRATO`, `TIPO_DOCUMENTO` e `TIPO_ADVERTENCIA` (listas provisórias no contrato).
+- `LEMBRETE_AUTOMATICO`, `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` têm padrão `FALSE` no banco **de propósito**: a API grava `TRUE` onde o contrato pede ligado (padrão do banco que o EF omite é armadilha).
+- **Pergunta de arquivo:** grave o **nome** do arquivo também em `RESPOSTA` (o trigger recusa obrigatória vazia), e `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL` juntos.
+- **Permutar `ORDEM`** (perguntas, alternativas, módulos): `ORDEM + 1000` e depois o valor final (o `CHECK` recusa negativo). Para subir posições depois de apagar, `UPDATE` com `ORDER BY ORDEM`.
+- **Banco de horas:** converta **cada linha** para minutos e depois some. Somar horas e converter no fim erra até alguns minutos (medido), e `FN_CALCULAR_SALDO_BANCO_HORAS` soma horas.
+- O trigger de treinamento cria o certificado com **UUID versão 1** e também quando `EMITE_CERTIFICADO` é `FALSE`: a aplicação troca o código por v4 e apaga essas linhas ao excluir.
+- **Excluir formulário e treinamento:** apague os filhos na ordem do contrato (as chaves estrangeiras não têm `ON DELETE`).
+- `V039`, `V040` e `V041` usam um `ALTER` só: se falharem, nada fica pela metade. `V030` faz o `ALTER` antes do `CREATE`: matrícula antiga fora do formato derruba o script sem deixar nada parcial.
+
+**O que o Kauan deve conferir:** `V030` (contador no lugar de `AUTO_INCREMENT`), `V031` e `V032` (colunas em tabelas dele), `V040` (chave única sobre coluna calculada em `PONTOS_MANUTENCOES`), `V041` (o terceiro `CHECK` deixa passar recusa antiga sem motivo), `V043` (mexe no padrão do `V029`), `V046` (altera `FORMULARIOS_RESPOSTAS`, do `V017`) e `V047` (só índices). **Decisões do dono:** triggers de imutabilidade na auditoria; as listas `CLT`/`ESTAGIO`, tipos de documento e `VERBAL`/`ESCRITA`; a coluna com o nome de quem do RH aplicou a advertência; o saldo do banco de horas em horas com 2 casas contra minutos no contrato; o trigger de certificado com UUID v1.
 
 ## Itens 1 e 2: feitos direto no SEU arquivo de triggers (para você validar)
 
