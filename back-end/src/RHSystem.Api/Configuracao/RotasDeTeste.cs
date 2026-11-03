@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using RHSystem.Api.Autorizacao;
 using RHSystem.Application.Comum;
+using RHSystem.Application.Escopo;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Persistencia;
@@ -38,7 +40,34 @@ internal static class RotasDeTeste
 
         MapErros(grupo.MapGroup("/erros"));
         MapJson(grupo.MapGroup("/json"));
+        MapAutorizacao(rotas);
     }
+
+    /// <summary>
+    /// Uma rota em cada família (<c>/__teste/ping</c>), uma que devolve o <c>IAtorAtual</c> e uma FORA de qualquer família e sem
+    /// <c>AllowAnonymous</c>, para a regra de reserva decidir (ver <c>FamiliasDeRotaTests</c> e <c>AtorAtualTests</c>).
+    /// </summary>
+    private static void MapAutorizacao(IEndpointRouteBuilder rotas)
+    {
+        rotas.GrupoRh().MapGet("/__teste/ping", () => Results.Ok()).ExcludeFromDescription();
+        rotas.GrupoGestor().MapGet("/__teste/ping", () => Results.Ok()).ExcludeFromDescription();
+        rotas.GrupoEu().MapGet("/__teste/ping", () => Results.Ok()).ExcludeFromDescription();
+        rotas.GrupoPublico().MapGet("/__teste/ping", () => Results.Ok()).ExcludeFromDescription();
+        rotas.GrupoEu().MapGet("/__teste/ator", (IAtorAtual ator) => Results.Ok(Descrever(ator))).ExcludeFromDescription();
+        rotas.GrupoPublico().MapGet("/__teste/ator", (IAtorAtual ator) => Results.Ok(Descrever(ator))).ExcludeFromDescription();
+        rotas.MapGet("/__teste/sem-familia", () => Results.Ok()).ExcludeFromDescription();
+    }
+
+    private static object Descrever(IAtorAtual ator) => new
+    {
+        tipo = ator.Tipo,
+        usuarioId = ator.UsuarioId,
+        funcionarioId = ator.FuncionarioId,
+        perfil = ator.Perfil,
+        nome = ator.Nome,
+        ip = ator.Ip,
+        canal = ator.Canal,
+    };
 
     /// <summary>Uma rota por tipo de valor do JSON do contrato (ver <c>JsonDoContratoTests</c>); as de POST devolvem o que leram.</summary>
     private static void MapJson(RouteGroupBuilder json)

@@ -1,4 +1,5 @@
 using RHSystem.Api.Autenticacao;
+using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
 using RHSystem.Api.Saude;
 using RHSystem.Infrastructure;
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AdicionarInfraestrutura(builder.Configuration);
 builder.Services.AdicionarCasosDeUsoDeAutenticacao();
 builder.Services.AdicionarAutenticacaoJwt(builder.Configuration);
+builder.Services.AdicionarAutorizacaoPorPerfil();
 builder.Services.AdicionarTratamentoDeErros();
 builder.Services.AdicionarProxyReverso(builder.Configuration);
 builder.Services.AdicionarCors(builder.Configuration);

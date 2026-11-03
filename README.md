@@ -89,6 +89,13 @@ O teste de divergência compara o contrato com o documento nativo da API, então
 - Respostas de erro saem como `application/problem+json`. A rota do documento é `/openapi/v1.json`.
 - O .NET aceita número escrito como texto por padrão e então escreve `["integer","string"]`; a API configura `JsonNumberHandling.Strict`, e o documento sai `integer`. Um parâmetro de corpo anulável saía como "null ou objeto" e sem `required`; os endpoints declaram o corpo obrigatório, como o contrato.
 - Quando uma rota nova entra, o `operationId` dela entra em `ContratoDivergenciaTests.OperationIdsNoEscopo` **no mesmo passo**.
+- **Propriedade com conversor de JSON próprio perde o `type` no documento.** Medido: com o conversor de `DateTime` do contrato (`JsonDoContrato`), `acessoExpiraEmUtc` saiu sem tipo (`[]`, e o contrato diz `[string]`). Por isso `EsquemasDoContrato` (um transformador de esquema ligado em `AdicionarDocumentacao`) devolve `string` + `date-time` ao instante e `string` + o padrão `HH:mm` ao horário do dia. Conversor novo, esquema novo no mesmo passo.
+- **Quem muda o JSON roda `ContratoDivergenciaTests`.** O conserto acima só apareceu porque a Task 5 rodou esse teste; a Task 4, que criou o conversor, não o rodava.
+
+### Decisões do back-end (medidas)
+
+- **Regra de reserva da autorização** (rota sem política e sem `AllowAnonymous` exige login). Medido com a reserva escrita como `RequireAuthenticatedUser` puro: o anônimo recebia **401** em `/nao-existe`, `/api/nao-existe`, `/api/rh/nao-existe` e em `/openapi/v1.json` e `/scalar/v1` com `Documentacao:Habilitada=false`, e as respostas de rejeição do roteamento (405 de método errado e 415 de tipo de mídia errado) também viravam 401. Hoje a reserva exige login **só de rota real** (`RouteEndpoint`): o que não casou com rota e as rejeições do roteamento seguem como antes (404, 405, 415, todos `application/problem+json`). Rota real sem política segue 401 para o anônimo. Os testes `SondaDaPoliticaDeReservaTests` e `FamiliasDeRotaTests` fixam os dois lados. Não medi o `MapFallback` (a saída que o plano previa); escolhi esta porque mantém o 405 e o 415 da fatia 0.
+- **Perfil no token.** `/api/rh`, `/api/gestor` e `/api/eu` olham o claim `perfil` como texto exato (`RH`, `Gestor`, `Funcionario`): token válido sem o claim, com `rh` minúsculo ou com um número recebe 403, inclusive em `/api/auth/eu`.
 
 ## Front-end
 
