@@ -219,8 +219,56 @@ public class AutenticacaoEndpointsTests(MySqlFixture mysql)
         var semCorpo = await cliente.PostAsync(rota, content: null);
         var invalido = await cliente.PostAsync(rota, new StringContent("{ isto nao e json", System.Text.Encoding.UTF8, "application/json"));
 
-        await AssertProblemaAsync(semCorpo, 400, "Dados inválidos.", "Confira os campos indicados.");
-        await AssertProblemaAsync(invalido, 400, "Dados inválidos.", "Confira os campos indicados.");
+        // O contrato manda o ProblemaDeValidacao (com "errors") e, em entrar, o texto do Erro400Login; nas outras rotas, o genérico.
+        var detalhe = rota == "/api/auth/entrar" ? "Preencha o e-mail e a senha." : "Confira os campos indicados.";
+        await AssertProblemaAsync(semCorpo, 400, "Dados inválidos.", detalhe);
+        await AssertProblemaAsync(invalido, 400, "Dados inválidos.", detalhe);
+        Assert.Equal(JsonValueKind.Object, (await LerAsync(semCorpo)).GetProperty("errors").ValueKind);
+        Assert.Equal(JsonValueKind.Object, (await LerAsync(invalido)).GetProperty("errors").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{ \"email\": 1, \"senha\": 2 }")]
+    public async Task Entrar_com_corpo_de_tipo_errado_devolve_o_400_do_contrato_com_errors(string corpo)
+    {
+        var cliente = (await ApiAsync()).CreateClient();
+
+        var resposta = await cliente.PostAsync("/api/auth/entrar", new StringContent(corpo, System.Text.Encoding.UTF8, "application/json"));
+
+        await AssertProblemaAsync(resposta, 400, "Dados inválidos.", "Preencha o e-mail e a senha.");
+        Assert.Equal(JsonValueKind.Object, (await LerAsync(resposta)).GetProperty("errors").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("/api/auth/entrar")]
+    [InlineData("/api/auth/renovar")]
+    public async Task Corpo_com_tipo_de_midia_errado_devolve_415_ProblemDetails_e_nao_400(string rota)
+    {
+        // O status do BadHttpRequestException vale: 415 e 413 não são "dados inválidos" (400).
+        var cliente = (await ApiAsync()).CreateClient();
+
+        var resposta = await cliente.PostAsync(rota, new StringContent("email=a&senha=b", System.Text.Encoding.UTF8, "text/plain"));
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, resposta.StatusCode);
+        Assert.Equal("application/problem+json", resposta.Content.Headers.ContentType?.MediaType);
+        var corpoDoErro = await LerAsync(resposta);
+        Assert.Equal(415, corpoDoErro.GetProperty("status").GetInt32());
+        Assert.False(string.IsNullOrWhiteSpace(corpoDoErro.GetProperty("traceId").GetString()));
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/nao-existe", 404, "Não encontrado.", "O registro não foi encontrado.")]
+    [InlineData("GET", "/api/auth/entrar", 405, "Requisição inválida.", "Confira a requisição e tente de novo.")]
+    public async Task Resposta_vazia_do_framework_vira_ProblemDetails_em_portugues(string metodo, string rota, int status, string titulo, string detalhe)
+    {
+        // 404 de rota que não existe e 405 de método errado saem sem corpo por padrão; o contrato manda application/problem+json em todo erro.
+        var cliente = (await ApiAsync()).CreateClient();
+
+        var resposta = await cliente.SendAsync(new HttpRequestMessage(new HttpMethod(metodo), rota));
+
+        await AssertProblemaAsync(resposta, status, titulo, detalhe);
     }
 
     [Fact]

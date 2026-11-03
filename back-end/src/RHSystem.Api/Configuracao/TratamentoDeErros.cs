@@ -73,15 +73,40 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
             return true;
         }
 
-        if (excecao is BadHttpRequestException)
+        if (excecao is BadHttpRequestException requisicaoInvalida)
         {
-            await Problemas.EscreverAsync(contexto, StatusCodes.Status400BadRequest, "Dados inválidos.", "Confira os campos indicados.");
+            await EscreverRequisicaoInvalidaAsync(contexto, requisicaoInvalida.StatusCode);
             return true;
         }
 
         log.LogError(excecao, "Erro inesperado em {Metodo} {Caminho}", contexto.Request.Method, contexto.Request.Path);
         await Problemas.EscreverAsync(contexto, StatusCodes.Status500InternalServerError, "Erro no servidor.", "Erro no servidor. Tente novamente em instantes.");
         return true;
+    }
+
+    /// <summary>
+    /// Corpo ausente, JSON inválido ou de tipo errado. O 400 segue o contrato: o <c>ProblemaDeValidacao</c> (com <c>errors</c>) e, na rota
+    /// <c>entrar</c>, o texto do <c>Erro400Login</c>; nas outras, "Confira os campos indicados.". Outro status do framework (415 de tipo de mídia
+    /// errado, 413 de corpo grande demais) é respeitado: não são "dados inválidos".
+    /// </summary>
+    private static async Task EscreverRequisicaoInvalidaAsync(HttpContext contexto, int status)
+    {
+        if (status != StatusCodes.Status400BadRequest)
+        {
+            await Problemas.EscreverAsync(contexto, status, "Requisição inválida.", "Confira a requisição e tente de novo.");
+            return;
+        }
+
+        // O middleware de exceções zera o endpoint da requisição antes de chamar o tratador; o original vem na feature.
+        var endpoint = contexto.Features.Get<IExceptionHandlerFeature>()?.Endpoint ?? contexto.GetEndpoint();
+        var emEntrar = endpoint?.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "entrar";
+        var erros = new Dictionary<string, string[]> { ["corpo"] = ["O corpo da requisição é obrigatório e precisa ser um JSON válido."] };
+        await Problemas.Resultado(
+            contexto,
+            StatusCodes.Status400BadRequest,
+            "Dados inválidos.",
+            emEntrar ? "Preencha o e-mail e a senha." : "Confira os campos indicados.",
+            erros).ExecuteAsync(contexto);
     }
 
     private static string? MensagemDeTriggerDoBanco(Exception excecao)
@@ -100,6 +125,29 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
 
 public static class TratamentoDeErrosExtensions
 {
+    /// <summary>
+    /// Resposta de erro SEM corpo vinda do framework (404 de rota inexistente, 405, 415) vira <c>application/problem+json</c> com os textos do
+    /// contrato, como todo erro da API. Resposta que já tem corpo (401, 403, 422, 429 e 500 montados aqui) não é tocada.
+    /// </summary>
+    public static WebApplication UsarRespostasDeErroPadrao(this WebApplication app)
+    {
+        app.UseStatusCodePages(contexto =>
+        {
+            var http = contexto.HttpContext;
+            var status = http.Response.StatusCode;
+            var (titulo, detalhe) = status switch
+            {
+                StatusCodes.Status401Unauthorized => ("Não autenticado.", "Entre novamente para continuar."),
+                StatusCodes.Status403Forbidden => ("Sem permissão.", "Você não tem permissão para esta ação."),
+                StatusCodes.Status404NotFound => ("Não encontrado.", "O registro não foi encontrado."),
+                >= 500 => ("Erro no servidor.", "Erro no servidor. Tente novamente em instantes."),
+                _ => ("Requisição inválida.", "Confira a requisição e tente de novo."),
+            };
+            return Problemas.EscreverAsync(http, status, titulo, detalhe);
+        });
+        return app;
+    }
+
     public static IServiceCollection AdicionarTratamentoDeErros(this IServiceCollection servicos)
     {
         servicos.AddProblemDetails();

@@ -28,6 +28,7 @@ var app = builder.Build();
 // A ordem importa: o proxy corrige o IP antes de tudo; o limite de tentativas vem antes da autenticação.
 app.UsarProxyReverso();
 app.UseExceptionHandler();
+app.UsarRespostasDeErroPadrao();
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();

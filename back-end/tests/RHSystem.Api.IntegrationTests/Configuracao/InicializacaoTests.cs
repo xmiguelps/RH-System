@@ -25,33 +25,6 @@ public class InicializacaoTests(MySqlFixture mysql)
         public IReadOnlyList<ScriptSql> Carregar() => scripts;
     }
 
-    private sealed class ColetorDeLogs : ILoggerProvider
-    {
-        public List<string> Mensagens { get; } = [];
-
-        public ILogger CreateLogger(string categoria) => new Registrador(Mensagens);
-
-        public void Dispose()
-        {
-        }
-
-        private sealed class Registrador(List<string> mensagens) : ILogger
-        {
-            public IDisposable? BeginScope<TState>(TState state)
-                where TState : notnull => null;
-
-            public bool IsEnabled(LogLevel logLevel) => true;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            {
-                lock (mensagens)
-                {
-                    mensagens.Add(formatter(state, exception) + (exception?.ToString() ?? string.Empty));
-                }
-            }
-        }
-    }
-
     private static async Task<long> ContarAsync(string conexao, string sql)
     {
         await using var c = new MySqlConnection(conexao);

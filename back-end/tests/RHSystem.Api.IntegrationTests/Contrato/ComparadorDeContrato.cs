@@ -77,6 +77,32 @@ public static class ComparadorDeContrato
         return divergencias;
     }
 
+    /// <summary>
+    /// As operações (`MÉTODO caminho`) que NÃO têm <c>operationId</c>. Elas não entram no índice nem no escopo; sem esta lista uma rota
+    /// mapeada sem <c>.WithName</c> sumiria da comparação em silêncio.
+    /// </summary>
+    public static IReadOnlyList<string> OperacoesSemOperationId(JsonNode documento)
+    {
+        var semId = new List<string>();
+        if (documento["paths"] is not JsonObject caminhos)
+        {
+            return semId;
+        }
+
+        foreach (var (caminho, item) in caminhos)
+        {
+            foreach (var metodo in Metodos)
+            {
+                if (item is JsonObject itemDoCaminho && itemDoCaminho[metodo] is JsonObject operacao && operacao["operationId"] is null)
+                {
+                    semId.Add($"{metodo.ToUpperInvariant()} {caminho}");
+                }
+            }
+        }
+
+        return semId;
+    }
+
     // ----- índice das operações -----
 
     private static Dictionary<string, Operacao> Operacoes(JsonNode documento)
@@ -149,6 +175,10 @@ public static class ComparadorDeContrato
         CompararParametros(id, docContrato, c, docApi, g, saida);
     }
 
+    /// <summary>`required: true` vem como texto no YAML convertido e como boolean no JSON gerado; as duas formas são "sim".</summary>
+    private static bool Obrigatorio(JsonNode? no) =>
+        string.Equals(no?["required"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+
     private static JsonObject? Conteudo(JsonNode documento, JsonNode? no) =>
         Desreferenciar(documento, no) is JsonObject objeto ? objeto["content"] as JsonObject : null;
 
@@ -165,6 +195,13 @@ public static class ComparadorDeContrato
         {
             saida.Add($"{id}: o corpo da requisição existe só {(corpoC is null ? "na API" : "no contrato")}.");
             return;
+        }
+
+        var obrigatorioC = Obrigatorio(corpoC);
+        var obrigatorioG = Obrigatorio(corpoG);
+        if (obrigatorioC != obrigatorioG)
+        {
+            saida.Add($"{id}: o corpo da requisição é {(obrigatorioC ? "obrigatório" : "opcional")} no contrato e {(obrigatorioG ? "obrigatório" : "opcional")} na API.");
         }
 
         CompararMidias(id, "do corpo da requisição", docC, Conteudo(docC, corpoC), docG, Conteudo(docG, corpoG), ["application/json", "multipart/form-data"], saida);
@@ -228,8 +265,10 @@ public static class ComparadorDeContrato
 
         foreach (var chave in paramsC.Keys.Intersect(paramsG.Keys).Order())
         {
-            var (obrigatorioC, tiposC) = paramsC[chave];
-            var (obrigatorioG, tiposG) = paramsG[chave];
+            var (obrigatorioC, canonicoC) = paramsC[chave];
+            var (obrigatorioG, canonicoG) = paramsG[chave];
+            var tiposC = canonicoC.Tipos;
+            var tiposG = canonicoG.Tipos;
             if (obrigatorioC != obrigatorioG)
             {
                 saida.Add($"{id}: o parâmetro {chave} é {(obrigatorioC ? "obrigatório" : "opcional")} no contrato e {(obrigatorioG ? "obrigatório" : "opcional")} na API.");
@@ -239,12 +278,22 @@ public static class ComparadorDeContrato
             {
                 saida.Add($"{id}: o tipo do parâmetro {chave} é [{string.Join(", ", tiposC.Order())}] no contrato e [{string.Join(", ", tiposG.Order())}] na API.");
             }
+
+            if (canonicoC.Formato != canonicoG.Formato)
+            {
+                saida.Add($"{id}: o formato do parâmetro {chave} é '{canonicoC.Formato ?? "(nenhum)"}' no contrato e '{canonicoG.Formato ?? "(nenhum)"}' na API.");
+            }
+
+            if (!canonicoC.Valores.SetEquals(canonicoG.Valores))
+            {
+                saida.Add($"{id}: os valores do enum do parâmetro {chave} são [{string.Join(", ", canonicoC.Valores.Order())}] no contrato e [{string.Join(", ", canonicoG.Valores.Order())}] na API.");
+            }
         }
     }
 
-    private static Dictionary<string, (bool Obrigatorio, HashSet<string> Tipos)> Parametros(JsonNode documento, Operacao operacao)
+    private static Dictionary<string, (bool Obrigatorio, Canonico Schema)> Parametros(JsonNode documento, Operacao operacao)
     {
-        var resultado = new Dictionary<string, (bool, HashSet<string>)>();
+        var resultado = new Dictionary<string, (bool, Canonico)>();
         foreach (var lista in new[] { operacao.ParametrosDoCaminho, operacao.No["parameters"] })
         {
             if (lista is not JsonArray itens)
@@ -262,7 +311,7 @@ public static class ComparadorDeContrato
                 var nome = parametro["name"]?.GetValue<string>() ?? string.Empty;
                 var onde = parametro["in"]?.GetValue<string>() ?? string.Empty;
                 var obrigatorio = onde == "path" || parametro["required"]?.ToString() == "true";
-                resultado[$"{onde}:{nome}"] = (obrigatorio, Canonizar(documento, parametro["schema"], new Stack<string>()).Tipos);
+                resultado[$"{onde}:{nome}"] = (obrigatorio, Canonizar(documento, parametro["schema"], new Stack<string>()));
             }
         }
 

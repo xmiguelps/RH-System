@@ -51,6 +51,7 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
             .ToList();
 
         Assert.NotEmpty(geradas);
+        Assert.Empty(ComparadorDeContrato.OperacoesSemOperationId(documento)); // rota sem .WithName não pode sumir da comparação
         Assert.True(
             geradas.All(OperationIdsNoEscopo.Contains),
             "Há rota implementada fora do escopo do teste de divergência: " + string.Join(", ", geradas.Where(id => !OperationIdsNoEscopo.Contains(id))));

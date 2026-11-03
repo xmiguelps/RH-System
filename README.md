@@ -67,6 +67,8 @@ dotnet user-secrets set "Seed:AdminSenha" "<uma-senha>" --project back-end/src/R
 | `Documentacao:Habilitada` | publica o documento OpenAPI e a interface | `false` |
 | `Seed:AdminNome`, `Seed:AdminEmail`, `Seed:AdminSenha` | administrador inicial | vazios (sem seed) |
 
+**Atrás de um proxy (produção):** ligue `ProxyReverso:Habilitado` **e** informe `ProxyReverso:ProxiesConfiaveis` (IPs ou redes CIDR do proxy da plataforma; a lista certa do Azure é definida no deploy, Task 14). Sem a lista só o `127.0.0.1` é confiável, o `X-Forwarded-For` é ignorado e todas as pessoas dividem o mesmo limite de tentativas de login: a API avisa no log (`Warning`) quando isso acontece.
+
 Nos serviços do Azure, os nomes viram variáveis de ambiente com `__` no lugar de `:` (por exemplo `Jwt__Chave`). Segredo nunca vai para o repositório.
 
 ### Testes

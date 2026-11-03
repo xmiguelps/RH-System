@@ -50,6 +50,13 @@ public static class ProxyReversoExtensions
     {
         if (app.Configuration.GetValue<bool>(Habilitado))
         {
+            var confiaveis = app.Configuration.GetSection("ProxyReverso:ProxiesConfiaveis").Get<string[]>()?.Where(p => !string.IsNullOrWhiteSpace(p)).ToArray();
+            if (confiaveis is null or { Length: 0 })
+            {
+                app.Logger.LogWarning(
+                    "ProxyReverso:Habilitado está ligado sem ProxyReverso:ProxiesConfiaveis: só o endereço 127.0.0.1 é aceito como proxy. Atrás de um proxy de verdade (o front de borda do Azure), o X-Forwarded-For seria ignorado e todas as pessoas dividiriam o mesmo limite de tentativas de login. Informe os IPs ou redes (CIDR) do proxy.");
+            }
+
             app.UseForwardedHeaders();
         }
 

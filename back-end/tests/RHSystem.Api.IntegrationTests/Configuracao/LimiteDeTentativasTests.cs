@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 using RHSystem.Api.IntegrationTests.Infra;
 
 namespace RHSystem.Api.IntegrationTests.Configuracao;
@@ -95,5 +97,31 @@ public class LimiteDeTentativasTests(MySqlFixture mysql)
         }
 
         Assert.Equal(HttpStatusCode.TooManyRequests, (await TentarAsync(cliente, "198.51.100.99")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Proxy_habilitado_sem_proxies_confiaveis_avisa_no_log_e_com_a_lista_nao_avisa()
+    {
+        // Achado da revisão final: com o proxy ligado e a lista vazia só o 127.0.0.1 é confiável, o X-Forwarded-For de um proxy de verdade
+        // é ignorado e todo mundo cai no mesmo balde do limite de login. Ninguém percebia: agora a subida avisa.
+        var api = await ApiCompartilhada.ObterAsync(mysql);
+
+        var semLista = new ColetorDeLogs();
+        await api.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("ProxyReverso:Habilitado", "true");
+            b.ConfigureLogging(l => l.AddProvider(semLista));
+        }).CreateClient().GetAsync("/health");
+
+        var comLista = new ColetorDeLogs();
+        await api.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("ProxyReverso:Habilitado", "true");
+            b.UseSetting("ProxyReverso:ProxiesConfiaveis:0", "10.0.0.0/8");
+            b.ConfigureLogging(l => l.AddProvider(comLista));
+        }).CreateClient().GetAsync("/health");
+
+        Assert.Contains(semLista.Mensagens, m => m.StartsWith("[Warning]") && m.Contains("ProxiesConfiaveis") && m.Contains("127.0.0.1"));
+        Assert.DoesNotContain(comLista.Mensagens, m => m.Contains("ProxiesConfiaveis"));
     }
 }

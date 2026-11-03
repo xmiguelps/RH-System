@@ -184,6 +184,43 @@ public class ComparadorDeContratoTests
     }
 
     [Fact]
+    public void Comparador_acusa_format_e_enum_diferentes_nos_parametros()
+    {
+        // Achado da revisão final: só o tipo do parâmetro era comparado; date x date-time e enum de query passavam em branco.
+        JsonNode Documento(string schema) => Doc($$"""{ "/x": { "get": { "operationId": "op", "parameters": [{ "name": "q", "in": "query", "schema": {{schema}} }], "responses": { "204": { "description": "ok" } } } } }""");
+
+        var contrato = Documento("""{ "type": "string", "format": "date" }""");
+        Assert.Empty(Comparar(contrato, Documento("""{ "type": "string", "format": "date" }"""), "op"));
+        Assert.Contains(Comparar(contrato, Documento("""{ "type": "string", "format": "date-time" }"""), "op"), d => d.Contains("query:q") && d.Contains("formato"));
+
+        var comEnum = Documento("""{ "type": "string", "enum": ["ASC", "DESC"] }""");
+        Assert.Empty(Comparar(comEnum, Documento("""{ "type": "string", "enum": ["DESC", "ASC"] }"""), "op"));
+        Assert.Contains(Comparar(comEnum, Documento("""{ "type": "string", "enum": ["ASC"] }"""), "op"), d => d.Contains("query:q") && d.Contains("enum"));
+    }
+
+    [Fact]
+    public void Comparador_acusa_corpo_obrigatorio_de_um_lado_e_opcional_do_outro()
+    {
+        JsonNode Documento(string required) => Doc($$"""{ "/x": { "post": { "operationId": "op", "requestBody": { {{required}} "content": { "application/json": { "schema": { "type": "object" } } } }, "responses": { "204": { "description": "ok" } } } } }""");
+
+        Assert.Empty(Comparar(Documento("\"required\": \"true\","), Documento("\"required\": true,"), "op")); // YAML vira texto; JSON vira boolean: é a mesma coisa
+        Assert.Contains(Comparar(Documento("\"required\": \"true\","), Documento(string.Empty), "op"), d => d.Contains("obrigatório no contrato") && d.Contains("opcional na API"));
+        Assert.Contains(Comparar(Documento(string.Empty), Documento("\"required\": true,"), "op"), d => d.Contains("opcional no contrato") && d.Contains("obrigatório na API"));
+    }
+
+    [Fact]
+    public void OperacoesSemOperationId_lista_a_rota_que_ficou_sem_WithName()
+    {
+        // Uma operação sem operationId não entra no índice nem no escopo: antes sumia dos dois testes em silêncio.
+        var documento = Doc("""{ "/a": { "get": { "operationId": "a", "responses": {} }, "post": { "responses": {} } }, "/b": { "parameters": [], "delete": { "responses": {} } } }""");
+
+        var semId = ComparadorDeContrato.OperacoesSemOperationId(documento);
+
+        Assert.Equal(["DELETE /b", "POST /a"], semId.Order());
+        Assert.Empty(ComparadorDeContrato.OperacoesSemOperationId(Doc("""{ "/a": { "get": { "operationId": "a", "responses": {} } } }""")));
+    }
+
+    [Fact]
     public void Comparador_acusa_quando_se_tira_o_campo_cargo_de_UsuarioResposta_do_contrato_real_em_memoria()
     {
         // Controle positivo com o contrato verdadeiro: sem falso positivo no que bate e com o alarme no que não bate.
