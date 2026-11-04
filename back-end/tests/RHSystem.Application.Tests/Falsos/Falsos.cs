@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging;
+using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Domain.Autenticacao;
 
@@ -163,6 +164,52 @@ public sealed class LogColetor<T> : ILogger<T>
         Registros.Add((logLevel, formatter(state, exception)));
 }
 
+/// <summary>
+/// Um <see cref="IAuditor"/> que só anota o que lhe pedem: qual método, com qual ator e evento, e em que pé estava a unidade de trabalho na hora
+/// (quantos <c>SalvarAsync</c> já tinham rodado e se havia transação). <see cref="Falhar"/> faz o registro lançar, depois de anotado.
+/// </summary>
+public sealed class AuditorFalso(UnidadeDeTrabalhoFalsa unidade) : IAuditor
+{
+    public sealed record Chamada(string Metodo, AtorDoEvento? Ator, EventoDeAuditoriaNovo Evento, TimeSpan? Janela, int SalvarChamadasNaHora, bool EmTransacaoNaHora);
+
+    public List<Chamada> Chamadas { get; } = [];
+
+    public bool Falhar { get; set; }
+
+    public void Registrar(EventoDeAuditoriaNovo evento) => Anotar(nameof(Registrar), null, evento, null);
+
+    public void RegistrarComo(AtorDoEvento ator, EventoDeAuditoriaNovo evento) => Anotar(nameof(RegistrarComo), ator, evento, null);
+
+    public Task RegistrarEGravarAsync(EventoDeAuditoriaNovo evento, CancellationToken ct)
+    {
+        Anotar(nameof(RegistrarEGravarAsync), null, evento, null);
+        return Task.CompletedTask;
+    }
+
+    public Task RegistrarEGravarComoAsync(AtorDoEvento ator, EventoDeAuditoriaNovo evento, CancellationToken ct)
+    {
+        Anotar(nameof(RegistrarEGravarComoAsync), ator, evento, null);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> RegistrarEGravarComLimiteAsync(AtorDoEvento ator, EventoDeAuditoriaNovo evento, TimeSpan janela, CancellationToken ct)
+    {
+        Anotar(nameof(RegistrarEGravarComLimiteAsync), ator, evento, janela);
+        return Task.FromResult(true);
+    }
+
+    public IDisposable SuspenderRegistroAutomatico() => throw new NotSupportedException("O login não suspende o registro automático.");
+
+    private void Anotar(string metodo, AtorDoEvento? ator, EventoDeAuditoriaNovo evento, TimeSpan? janela)
+    {
+        Chamadas.Add(new Chamada(metodo, ator, evento, janela, unidade.SalvarChamadas, unidade.EmTransacao));
+        if (Falhar)
+        {
+            throw new InvalidOperationException("auditoria fora do ar (falha de teste)");
+        }
+    }
+}
+
 /// <summary>Monta funcionários e usuários do Domain, que não têm construtores públicos para Id, Cargo e Setor (o EF os preenche).</summary>
 public static class Dominio
 {
@@ -200,6 +247,7 @@ public sealed class Cenario
         Relogio = new RelogioFalso(new DateTime(2026, 10, 7, 12, 42, 0, 700, DateTimeKind.Utc));
         Emissor = new EmissorDeTokensFalso(Relogio);
         Tokens = new RefreshTokenRepositorioEmMemoria(Unidade);
+        Auditor = new AuditorFalso(Unidade);
     }
 
     public RelogioFalso Relogio { get; }
@@ -214,9 +262,11 @@ public sealed class Cenario
 
     public RefreshTokenRepositorioEmMemoria Tokens { get; }
 
+    public AuditorFalso Auditor { get; }
+
     public LogColetor<EntrarCasoDeUso> LogDaEntrada { get; } = new();
 
-    public EntrarCasoDeUso Entrar() => new(Usuarios, Tokens, Unidade, Hasher, Emissor, Relogio, LogDaEntrada);
+    public EntrarCasoDeUso Entrar() => new(Usuarios, Tokens, Unidade, Hasher, Emissor, Relogio, Auditor, LogDaEntrada);
 
     public RenovarTokenCasoDeUso Renovar() => new(Usuarios, Tokens, Unidade, Emissor, Relogio);
 

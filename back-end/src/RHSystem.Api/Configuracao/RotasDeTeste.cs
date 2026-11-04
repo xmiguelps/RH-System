@@ -159,6 +159,7 @@ internal static class RotasDeTeste
         });
 
         // DATA_DESLIGAMENTO antes de DATA_ADMISSAO: o CHECK CHK_FUNCIONARIOS_DATAS recusa (e o ATIVO = FALSE deixa o outro CHECK em paz).
+        // AUDITORIA-OK: rota de teste (só existe com Testes:RotasDeTeste) e o INSERT é recusado pelo banco: nada é gravado
         erros.MapGet("/check", async (AppDbContext db, CancellationToken ct) =>
             await db.Database.ExecuteSqlRawAsync(
                 "INSERT INTO FUNCIONARIOS (NOME, DATA_ADMISSAO, DATA_DESLIGAMENTO, ATIVO, EMAIL_CORPORATIVO) VALUES ('Check de Teste', '2026-02-01', '2026-01-01', FALSE, 'check.teste@empresa.com.br')",

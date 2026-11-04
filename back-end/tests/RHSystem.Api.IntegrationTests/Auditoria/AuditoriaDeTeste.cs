@@ -207,10 +207,32 @@ internal static class AuditoriaDeTeste
         }
 
         var eventos = await consulta.OrderBy(e => e.Id).ToListAsync();
-        return [.. eventos.Select(e => new EventoLido(
-            e.Id, e.Quando, e.AtorTipo, e.FuncionarioAtorId, e.AtorNome, e.AtorPerfil, e.Area, e.Acao, e.Descricao, e.RegistroAfetado,
-            e.Entidade, e.IdRegistro, e.Canal, e.Ip, [.. e.Mudancas.OrderBy(m => m.Ordem)]))];
+        return [.. eventos.Select(Ler)];
     }
+
+    /// <summary>Os eventos feitos por uma pessoa (de qualquer entidade, ou nenhuma), lidos por um contexto SEM interceptor, mais novos por último.</summary>
+    public static async Task<List<EventoLido>> EventosDoAtorAsync(string conexao, int funcionarioId)
+    {
+        await using var db = ContextoDeTeste.Novo(conexao);
+        var eventos = await db.EventosDeAuditoria.Include(e => e.Mudancas).Where(e => e.FuncionarioAtorId == funcionarioId).OrderBy(e => e.Id).ToListAsync();
+        return [.. eventos.Select(Ler)];
+    }
+
+    /// <summary>Quantos eventos há no log inteiro e o texto de TODOS os campos de TODOS eles (ator, descrição, registro, entidade, IP e mudanças), para varrer atrás de algo que não pode estar lá.</summary>
+    public static async Task<(int Total, string Texto)> TudoDoLogAsync(string conexao)
+    {
+        await using var db = ContextoDeTeste.Novo(conexao);
+        var eventos = await db.EventosDeAuditoria.Include(e => e.Mudancas).ToListAsync();
+        var textos = eventos
+            .SelectMany(e => new[] { e.AtorNome, e.Descricao, e.RegistroAfetado, e.Entidade, e.Ip }
+                .Concat(e.Mudancas.SelectMany(m => new[] { m.Campo, m.ValorAntes, m.ValorDepois })))
+            .Where(t => t is not null);
+        return (eventos.Count, string.Join('\n', textos));
+    }
+
+    private static EventoLido Ler(EventoDeAuditoria e) => new(
+        e.Id, e.Quando, e.AtorTipo, e.FuncionarioAtorId, e.AtorNome, e.AtorPerfil, e.Area, e.Acao, e.Descricao, e.RegistroAfetado,
+        e.Entidade, e.IdRegistro, e.Canal, e.Ip, [.. e.Mudancas.OrderBy(m => m.Ordem)]);
 
     public static async Task ExecutarAsync(string conexao, string sql)
     {

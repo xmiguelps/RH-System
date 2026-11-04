@@ -23,6 +23,7 @@ public sealed class RefreshTokenRepositorio(AppDbContext db) : IRefreshTokenRepo
     /// </summary>
     public async Task<bool> TentarRevogarAsync(string tokenHash, DateTime agoraUtc, CancellationToken ct)
     {
+        // AUDITORIA-OK: tabela técnica, sem registro por decisão (o evento de acesso é o do login; o refresh token não é fato de negócio)
         var linhas = await db.RefreshTokens
             .Where(t => t.TokenHash == tokenHash && t.RevogadoEm == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevogadoEm, agoraUtc), ct);
@@ -31,6 +32,7 @@ public sealed class RefreshTokenRepositorio(AppDbContext db) : IRefreshTokenRepo
 
     public async Task RevogarTodosDoUsuarioAsync(int usuarioId, DateTime agoraUtc, CancellationToken ct)
     {
+        // AUDITORIA-OK: tabela técnica, sem registro por decisão (o refresh token não é fato de negócio)
         await db.RefreshTokens
             .Where(t => t.UsuarioId == usuarioId && t.RevogadoEm == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevogadoEm, agoraUtc), ct);
