@@ -61,9 +61,9 @@ internal sealed class AtorDeTeste : IAtorAtual
 
     public string Nome { get; init; } = "Teste";
 
-    public string? Ip => null;
+    public string? Ip { get; init; }
 
-    public CanalDeOrigem Canal => CanalDeOrigem.Portal;
+    public CanalDeOrigem Canal => Tipo == TipoDeAtorAtual.Sistema ? CanalDeOrigem.Sistema : CanalDeOrigem.Portal;
 
     public static AtorDeTeste Pessoa(PessoaDeTeste pessoa) =>
         new() { Tipo = TipoDeAtorAtual.Pessoa, UsuarioId = pessoa.UsuarioId, FuncionarioId = pessoa.FuncionarioId, Perfil = pessoa.Perfil, Nome = pessoa.Nome };

@@ -9,6 +9,8 @@ public class FuncionarioConfiguracao : IEntityTypeConfiguration<Funcionario>
     public void Configure(EntityTypeBuilder<Funcionario> builder)
     {
         builder.ToTable("FUNCIONARIOS");
+        builder.Ignore(f => f.NomeParaAuditoria);
+        builder.Ignore(f => f.RegistroAfetado);
         builder.HasKey(f => f.Id);
         builder.Property(f => f.Id).HasColumnName("ID_FUNCIONARIO");
         builder.Property(f => f.Nome).HasColumnName("NOME");

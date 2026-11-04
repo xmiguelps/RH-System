@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Escopo;
+using RHSystem.Infrastructure.Auditoria;
 using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Escopo;
@@ -44,7 +46,17 @@ public static class DependencyInjection
             throw new InvalidOperationException("Faltam Jwt:Emissor e Jwt:Audiencia na configuração.");
         }
 
-        services.AddDbContext<AppDbContext>(opcoes => opcoes.UseMySql(conexao, new MySqlServerVersion(versaoDoServidor)));
+        // O interceptor da auditoria vem do escopo (ele lê o ator da requisição). O AddDbContext e o AddDbContextFactory (o contexto próprio do Auditor)
+        // precisam do mesmo ServiceLifetime (Scoped), senão o DbContextOptions entra em conflito; o AddDbContext vem primeiro.
+        // ATENÇÃO: o EF Core 9 ACUMULA a configuração de cada AddDbContext/AddDbContextFactory. Passar a MESMA função às duas chamadas registrava o
+        // interceptor duas vezes (medido: o contexto tinha dois AuditoriaInterceptor), e o seed do administrador "salvava" sem gravar. A configuração
+        // mora só no AddDbContext; a fábrica herda dela (AuditoriaNoContainerTests confere que há um interceptor só).
+        services.AddScoped<ContextoDeAuditoria>();
+        services.AddScoped<AuditoriaInterceptor>();
+        services.AddDbContext<AppDbContext>(
+            (sp, opcoes) => opcoes.UseMySql(conexao, new MySqlServerVersion(versaoDoServidor)).AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>()));
+        services.AddDbContextFactory<AppDbContext>(_ => { }, ServiceLifetime.Scoped);
+        services.AddScoped<IAuditor, Auditor>();
 
         services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
         services.AddScoped<IRefreshTokenRepositorio, RefreshTokenRepositorio>();

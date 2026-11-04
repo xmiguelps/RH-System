@@ -9,6 +9,8 @@ public class BeneficioConfiguracao : IEntityTypeConfiguration<Beneficio>
     public void Configure(EntityTypeBuilder<Beneficio> builder)
     {
         builder.ToTable("BENEFICIOS");
+        builder.Ignore(b => b.NomeParaAuditoria);
+        builder.Ignore(b => b.RegistroAfetado);
         builder.HasKey(b => b.Id);
         builder.Property(b => b.Id).HasColumnName("ID_BENEFICIO");
         builder.Property(b => b.Nome).HasColumnName("NOME_BENEFICIO");

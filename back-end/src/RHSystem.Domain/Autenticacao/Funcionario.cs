@@ -1,7 +1,10 @@
+using RHSystem.Domain.Auditoria;
+
 namespace RHSystem.Domain.Autenticacao;
 
-/// <summary>Uma linha de <c>FUNCIONARIOS</c> (as colunas que o login usa).</summary>
-public class Funcionario
+/// <summary>Uma linha de <c>FUNCIONARIOS</c> (as colunas que o login usa). A auditoria registra as propriedades marcadas com <c>[Auditar]</c>.</summary>
+[Auditado(AuditoriaArea.Colaboradores, "Colaborador")]
+public class Funcionario : IAuditavel
 {
     private Funcionario()
     {
@@ -9,26 +12,37 @@ public class Funcionario
 
     public int Id { get; private set; }
 
+    [Auditar("Nome")]
     public string Nome { get; private set; } = string.Empty;
 
+    [Auditar("E-mail corporativo")]
     public string? EmailCorporativo { get; private set; }
 
+    [Auditar("Data de admissão")]
     public DateOnly DataAdmissao { get; private set; }
 
+    [Auditar("Situação")]
     public bool Ativo { get; private set; } = true;
 
     /// <summary>Cinco dígitos (<c>00482</c>), gerada pelo sistema; sem matrícula ainda (por exemplo o administrador do seed), é nula.</summary>
+    [Auditar("Matrícula")]
     public string? Matricula { get; private set; }
 
     public NivelDeAcesso? NivelDeAcesso { get; private set; }
 
+    [Auditar("Cargo")]
     public int? CargoId { get; private set; }
 
     public Cargo? Cargo { get; private set; }
 
+    [Auditar("Setor")]
     public int? SetorId { get; private set; }
 
     public Setor? Setor { get; private set; }
+
+    public string NomeParaAuditoria => Nome;
+
+    public string RegistroAfetado => Matricula is null ? $"Colaborador {Nome}" : $"Colaborador {Nome}, matrícula {Matricula}";
 
     /// <summary>O perfil vem do nome do nível de acesso; sem nível, ou com nível desconhecido, é nulo (e o login recusa).</summary>
     public Perfil? Perfil => Perfis.PerfilPorNome(NivelDeAcesso?.Nome);
