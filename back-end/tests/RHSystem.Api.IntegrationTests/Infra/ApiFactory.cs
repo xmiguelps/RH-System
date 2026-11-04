@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MySqlConnector;
+using RHSystem.Api.IntegrationTests.Agendamento;
 using RHSystem.Api.IntegrationTests.Emails;
+using RHSystem.Application.Agendamento;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Emails;
 using RHSystem.Domain.Autenticacao;
@@ -72,6 +74,9 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
     /// <summary>O envio de e-mail dos testes: em memória (o serviço em segundo plano fica desligado e os testes chamam <c>ProcessarCicloAsync</c> direto).</summary>
     public EnviadorDeEmailEmMemoria Enviador { get; } = new();
 
+    /// <summary>O que as tarefas de teste do agendador anotam (o serviço em segundo plano fica desligado: os testes chamam o ciclo direto).</summary>
+    public RegistroDeTarefasDeTeste Tarefas { get; } = new();
+
     public string Conexao { get; } = conexao;
 
     private readonly SemaphoreSlim _travaDoElenco = new(1, 1);
@@ -120,6 +125,7 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         builder.UseSetting("Testes:RotasDeTeste", "true");
         builder.UseSetting("Autenticacao:LimiteLoginPorMinuto", "1000"); // só o teste do limite usa 5
         builder.UseSetting("Database:AplicarScriptsAoIniciar", "false"); // o banco já vem com os scripts
+        builder.UseSetting("Agendador:Ativo", "false"); // sem o servico em segundo plano do agendador: os testes chamam o ciclo direto
         builder.UseSetting("Email:EnvioAtivo", "false"); // sem o serviço em segundo plano: os testes chamam o ciclo de envio direto
         builder.UseSetting("Cors:OrigensPermitidas:0", OrigemPermitida);
         builder.ConfigureServices(servicos =>
@@ -130,6 +136,12 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
             servicos.AddSingleton<IEnviadorDeEmail>(Enviador);
             servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_ENVIO", "Aviso de teste enviado"));
             servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_SIGILOSO", "Lembrete anonimo de teste enviado"));
+            servicos.AddSingleton(Tarefas);
+            // A que lança na recuperacao vem ANTES das outras: o teste prova que as que vem depois dela ainda recuperam.
+            servicos.AddScoped<ITarefaAgendada, TarefaQueNaoRecuperaDeTeste>();
+            servicos.AddScoped<ITarefaAgendada, TarefaDeTeste>();
+            servicos.AddScoped<ITarefaAgendada, TarefaRecuperavelDeTeste>();
+            servicos.AddScoped<ITarefaAgendada, TarefaAuditadaDeTeste>();
             servicos.AddSingleton<IStartupFilter, IpDeOrigemParaTeste>();
         });
     }

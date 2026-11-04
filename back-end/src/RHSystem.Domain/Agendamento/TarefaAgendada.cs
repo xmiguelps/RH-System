@@ -86,6 +86,49 @@ public partial class TarefaAgendada
         };
     }
 
+    /// <summary>O tamanho de <c>ULTIMO_ERRO</c>.</summary>
+    public const int TamanhoMaximoDoUltimoErro = 500;
+
+    /// <summary>
+    /// Uma execução começou: <c>EM_EXECUCAO</c> com a reserva (<c>CHK_TAREFAS_AGENDADAS_RESERVA</c>: reservada se e só se está <c>EM_EXECUCAO</c>), a hora da tentativa e uma
+    /// tentativa a mais (aqui a tentativa conta quando COMEÇA, e não quando falha).
+    /// </summary>
+    public void Reservar(DateTime reservadaAteUtc, DateTime agoraUtc)
+    {
+        Situacao = SituacaoDaTarefa.EmExecucao;
+        ReservadaAte = reservadaAteUtc;
+        UltimaTentativaEm = agoraUtc;
+        Tentativas++;
+    }
+
+    /// <summary><c>CONCLUIDA</c> com a hora (<c>CHK_TAREFAS_AGENDADAS_CONCLUIDA_EM</c>: hora se e só se concluída) e a reserva limpa, num <c>UPDATE</c> só.</summary>
+    public void MarcarComoConcluida(DateTime agoraUtc)
+    {
+        Situacao = SituacaoDaTarefa.Concluida;
+        ConcluidaEm = agoraUtc;
+        ReservadaAte = null;
+        UltimoErro = null;
+    }
+
+    /// <summary>Falhou e vai tentar de novo: volta a <c>PENDENTE</c> para <paramref name="executarAposUtc"/>, com a reserva LIMPA no mesmo <c>UPDATE</c> (toda saída de <c>EM_EXECUCAO</c> a limpa).</summary>
+    public void AgendarNovaTentativa(DateTime executarAposUtc, string erro)
+    {
+        Situacao = SituacaoDaTarefa.Pendente;
+        ExecutarApos = executarAposUtc;
+        ReservadaAte = null;
+        UltimoErro = Cortar(erro);
+    }
+
+    /// <summary>Desistiu (tentativas esgotadas, ou tipo sem executor): <c>FALHOU</c> com a reserva limpa.</summary>
+    public void MarcarComoFalhou(string erro)
+    {
+        Situacao = SituacaoDaTarefa.Falhou;
+        ReservadaAte = null;
+        UltimoErro = Cortar(erro);
+    }
+
+    private static string Cortar(string erro) => erro.Length <= TamanhoMaximoDoUltimoErro ? erro : erro[..TamanhoMaximoDoUltimoErro];
+
     [GeneratedRegex(@"^[A-Z][A-Z0-9_]{2,49}\z")]
     private static partial Regex NomeDeTipo();
 }

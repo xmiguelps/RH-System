@@ -73,6 +73,10 @@ dotnet user-secrets set "Seed:AdminSenha" "<uma-senha>" --project back-end/src/R
 | `Email:Smtp:Servidor`, `Email:Smtp:Porta`, `Email:Smtp:Seguranca` | o servidor SMTP (`Nenhuma`, `StartTls` ou `Ssl`) | vazio, 587, `StartTls` (`localhost`, 1025, `Nenhuma` em `Development`, o Mailpit) |
 | `Email:Smtp:Usuario`, `Email:Smtp:Senha` | credencial do provedor | vazios; **a senha só por user-secrets ou configuração do App Service** |
 | `App:UrlDoFront` | base dos links dos e-mails (cada renderizador monta o seu link) | vazio (`http://localhost:5173` em `Development`) |
+| `Agendador:Ativo` | liga o serviço em segundo plano do agendador (recuperação na subida e a cada hora, um ciclo a cada N segundos) | `true` (`false` nos testes, que chamam o ciclo direto) |
+| `Agendador:IntervaloSegundos`, `Agendador:RecuperacaoMinutos`, `Agendador:LoteMaximoPorCiclo` | um ciclo a cada N segundos, a recuperação a cada M minutos, até L tarefas por ciclo | 30, 60 e 10 |
+| `Agendador:ReservaMinutos`, `Agendador:MaximoDeTentativas` | a tarefa reservada por um executor que caiu volta a valer depois de N minutos; desiste (`FALHOU`) na tentativa M | 10 e 5 (esperas de 1, 5, 30 e 60 min entre as tentativas) |
+| `Retencao:TarefasDias`, `Retencao:EmailsDias` | por quantos dias o que já terminou fica em `TAREFAS_AGENDADAS` e em `FILA_EMAILS` (o endereço é dado pessoal) antes de a limpeza apagar | 30 e 90 |
 
 **Atrás de um proxy (produção):** ligue `ProxyReverso:Habilitado` **e** informe `ProxyReverso:ProxiesConfiaveis` (IPs ou redes CIDR do proxy da plataforma; a lista certa do Azure é definida no deploy, Task 14). Sem a lista só o `127.0.0.1` é confiável, o `X-Forwarded-For` é ignorado e todas as pessoas dividem o mesmo limite de tentativas de login: a API avisa no log (`Warning`) quando isso acontece.
 
@@ -106,6 +110,33 @@ O teste de divergência compara o contrato com o documento nativo da API, então
 - **Regra de reserva da autorização** (rota sem política e sem `AllowAnonymous` exige login). Medido com a reserva escrita como `RequireAuthenticatedUser` puro: o anônimo recebia **401** em `/nao-existe`, `/api/nao-existe`, `/api/rh/nao-existe` e em `/openapi/v1.json` e `/scalar/v1` com `Documentacao:Habilitada=false`, e as respostas de rejeição do roteamento (405 de método errado e 415 de tipo de mídia errado) também viravam 401. Hoje a reserva exige login **só de rota real** (`RouteEndpoint`): o que não casou com rota e as rejeições do roteamento seguem como antes (404, 405, 415, todos `application/problem+json`). Rota real sem política segue 401 para o anônimo. Os testes `SondaDaPoliticaDeReservaTests` e `FamiliasDeRotaTests` fixam os dois lados. Não medi o `MapFallback` (a saída que o plano previa); escolhi esta porque mantém o 405 e o 415 da fatia 0.
 - **Perfil no token.** `/api/rh`, `/api/gestor` e `/api/eu` olham o claim `perfil` como texto exato (`RH`, `Gestor`, `Funcionario`): token válido sem o claim, com `rh` minúsculo ou com um número recebe 403, inclusive em `/api/auth/eu`.
 
+### Agendador e Always On
+
+O que roda depois, sem ninguém pedir, é uma **tarefa agendada** (`TAREFAS_AGENDADAS`): uma linha com tipo, chave de idempotência e a hora a partir da qual pode rodar. Um serviço em segundo plano (`AgendadorHostedService`) faz, a cada `Agendador:IntervaloSegundos`, um ciclo: reserva até `LoteMaximoPorCiclo` tarefas vencidas com `SELECT ... FOR UPDATE SKIP LOCKED` (a técnica medida na sonda `SkipLockedPeloFromSqlTests`), executa cada uma em escopo próprio (sem `HttpContext`, então o ator da auditoria é o **Sistema**) e a marca `CONCLUIDA`; se lançar exceção, ela volta a `PENDENTE` com espera de 1, 5, 30 e 60 minutos e, na 5ª tentativa, vira `FALHOU`.
+
+- **Cada tarefa é idempotente e recupera o que ficou para trás.** O processo pode cair entre agir e marcar `CONCLUIDA`, então a tarefa confere o estado real antes de agir. Na subida e a cada `RecuperacaoMinutos` o serviço chama `RecuperarAsync` de cada tipo, que cria (pelo `IAgendador`, sem duplicar) o que a parada deixou de fazer.
+- **Duas limpezas já existem:** `LIMPAR_TAREFAS` apaga `CONCLUIDA` e `CANCELADA` com mais de `Retencao:TarefasDias` (nunca `PENDENTE`, `EM_EXECUCAO` nem `FALHOU`) e `LIMPAR_EMAILS` apaga `ENVIADO`, `FALHOU`, `DEVOLVIDO` e `CANCELADO` com mais de `Retencao:EmailsDias` (nunca `PENDENTE` nem `EM_ENVIO`). Cada fatia acrescenta as suas (`AddScoped<ITarefaAgendada, ...>`).
+- **Exige Always On.** Com o App Service dormindo (plano sem Always On) **nada roda**; ao acordar, a recuperação refaz o que passou, mas um desligamento agendado, por exemplo, só se efetiva depois disso. Always On é recurso do plano pago do App Service: a Task 14 da fatia 0 (Step 2) é o passo em que o dono escolhe o plano.
+
 ## Front-end
 
-Será descrito aqui quando o front existir (plano em `docs/plano-front-end/`).
+O front-end (React 19, TypeScript, Vite) está em `front-end/`, feito por Lucas num repositório à parte e trazido para cá (fatias 0 a 6 prontas; a fatia 7 começou e não está completa). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.
+
+### Rodar o front para ver as telas
+
+Precisa de **Node** na faixa de `package.json` (`^22.22.2` ou `^24.15.0`; confira com `node -v`). Da raiz do repositório:
+
+```
+cd front-end
+npm ci
+npm run dev
+```
+
+Abra **http://localhost:5173**. O `npm run dev` primeiro gera os tipos e os dados simulados a partir de `contrato/openapi.yaml` (`predev`) e depois sobe o Vite.
+
+- **Os dados são simulados (MSW), e a API não precisa estar de pé.** O front intercepta as chamadas `/api/...` no navegador e responde com os exemplos do contrato. É o padrão em `npm run dev`; não precisa de arquivo `.env`.
+- **O login simulado ignora o que você digita** (use um e-mail com formato válido e qualquer senha) e **entra sempre como Ana Souza, perfil RH**. Os dados de exemplo são os mesmos para qualquer id (a tela de cada pessoa mostra os mesmos dados). **Não há seletor de perfil hoje**: com os dados simulados, as telas de gestor e de funcionário não aparecem (o exemplo do login vem do contrato e a pasta `src/shared/mocks/gerado/` é gerada de novo a cada `npm run dev`, então não adianta editá-la).
+- **Falar com a API de verdade:** copie `front-end/.env.example` para `front-end/.env.local` e ponha `VITE_MOCKS=nao` (e `VITE_API_URL=http://localhost:5000`, a API rodando como em "Rodar a API"). **Hoje só existem na API o login, a sessão, a saúde e a auditoria** (ver `contrato/STATUS.md`): as outras telas dão erro nesse modo até as rotas ficarem prontas.
+- **Só os componentes:** `VITE_VITRINE=sim npm run dev` (no PowerShell: `$env:VITE_VITRINE="sim"; npm run dev`) habilita a rota `/eu/vitrine`, uma página de prova dos componentes.
+
+Outros comandos de `front-end/`: `npm test` (Vitest), `npm run lint`, `npm run build` (gera `dist/`), `npm run csp` (confere a política de segurança do site, precisa do Edge ou do Chrome instalado) e `npm run format:check`. **Hoje o `format:check` falha** em 6 arquivos de `src/features/ferias/` (a fatia 7 começada e sem formatar).

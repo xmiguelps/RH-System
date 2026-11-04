@@ -3,11 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RHSystem.Application.Agendamento;
 using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Escopo;
+using RHSystem.Infrastructure.Agendamento;
+using RHSystem.Infrastructure.Agendamento.Tarefas;
 using RHSystem.Infrastructure.Auditoria;
 using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Colaboradores;
@@ -73,6 +76,21 @@ public static class DependencyInjection
         services.AddScoped<IFilaDeEmails, FilaDeEmails>();
         services.AddScoped<IProcessadorDeEmails, ProcessadorDeEmails>();
         services.AddHostedService<EnvioDeEmailsHostedService>();
+
+        // Agendador: o que roda depois, com recuperacao e idempotencia. Cada fatia acrescenta a sua ITarefaAgendada (AddScoped); aqui entram as duas limpezas.
+        var agendador = new OpcoesDoAgendador();
+        configuration.GetSection(OpcoesDoAgendador.Secao).Bind(agendador);
+        agendador.Validar();
+        services.AddSingleton(agendador);
+        var retencao = new OpcoesDeRetencao();
+        configuration.GetSection(OpcoesDeRetencao.Secao).Bind(retencao);
+        retencao.Validar();
+        services.AddSingleton(retencao);
+        services.AddScoped<IAgendador, Agendador>();
+        services.AddScoped<IExecutorDeTarefas, ExecutorDeTarefas>();
+        services.AddScoped<ITarefaAgendada, LimparTarefasAntigasTarefa>();
+        services.AddScoped<ITarefaAgendada, LimparEmailsAntigosTarefa>();
+        services.AddHostedService<AgendadorHostedService>();
 
         services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
         services.AddScoped<IRefreshTokenRepositorio, RefreshTokenRepositorio>();
