@@ -7,7 +7,7 @@ Colunas: `fatia` (0 a 8) e `situação`: `planejada` (só no contrato), `em anda
 | Fatia | Assunto | Situação |
 |---|---|---|
 | 0 | Login, sessão e saúde | planejada |
-| 1 | Colaboradores e base transversal | planejada |
+| 1 | Colaboradores e base transversal | em andamento |
 | 2 | Importação por Excel | planejada |
 | 3 | Ponto | planejada |
 | 4 | Comunicação e documentos | planejada |
@@ -26,3 +26,6 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `POST /api/auth/sair` | sair | em andamento | |
 | `GET /api/auth/eu` | obterUsuarioLogado | em andamento | |
 | `GET /health` | verificarSaude | em andamento | |
+| `GET /api/rh/auditoria` | listarEventosDeAuditoria | em andamento | |
+| `GET /api/rh/auditoria/exportacao` | exportarAuditoria | em andamento | |
+| `GET /api/rh/auditoria/{eventoId}` | obterEventoDeAuditoria | em andamento | |

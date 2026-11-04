@@ -57,6 +57,7 @@ public static class DependencyInjection
             (sp, opcoes) => opcoes.UseMySql(conexao, new MySqlServerVersion(versaoDoServidor)).AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>()));
         services.AddDbContextFactory<AppDbContext>(_ => { }, ServiceLifetime.Scoped);
         services.AddScoped<IAuditor, Auditor>();
+        services.AddScoped<IConsultaDeAuditoria, ConsultaDeAuditoria>();
 
         services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
         services.AddScoped<IRefreshTokenRepositorio, RefreshTokenRepositorio>();

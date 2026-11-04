@@ -23,6 +23,9 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "sair",
         "obterUsuarioLogado",
         "verificarSaude",
+        "listarEventosDeAuditoria",
+        "exportarAuditoria",
+        "obterEventoDeAuditoria",
     ];
 
     private async Task<JsonNode> DocumentoGeradoAsync() =>
