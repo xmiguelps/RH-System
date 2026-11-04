@@ -29,7 +29,7 @@ cp .env.example .env        # no PowerShell: Copy-Item .env.example .env
 docker compose up -d --wait
 ```
 
-Sobe o MySQL 8.4 em `localhost:3306` (troque `MYSQL_PORTA` no `.env` se a porta estiver ocupada), com o banco **vazio** `rh_system`. Quem cria as tabelas é a API, ao iniciar. O servidor usa `utf8mb4`, o fuso `-03:00` e `log_bin_trust_function_creators=1`, os mesmos valores dos testes e do Azure.
+Sobe o MySQL 8.4 e o **Mailpit** (captador de e-mail de desenvolvimento). **Ver os e-mails de desenvolvimento: `http://localhost:8025`** (SMTP na porta 1025; troque `MAILPIT_SMTP_PORTA` e `MAILPIT_UI_PORTA` no `.env` se estiverem ocupadas). Nada sai para a internet. O MySQL fica em `localhost:3306` (troque `MYSQL_PORTA` no `.env` se a porta estiver ocupada), com o banco **vazio** `rh_system`. Quem cria as tabelas é a API, ao iniciar. O servidor usa `utf8mb4`, o fuso `-03:00` e `log_bin_trust_function_creators=1`, os mesmos valores dos testes e do Azure.
 
 ## Back-end
 
@@ -66,6 +66,13 @@ dotnet user-secrets set "Seed:AdminSenha" "<uma-senha>" --project back-end/src/R
 | `ProxyReverso:Habilitado`, `ProxyReverso:ProxiesConfiaveis` | confiar em `X-Forwarded-For` de proxies da lista (IPs ou CIDR) | `false` |
 | `Documentacao:Habilitada` | publica o documento OpenAPI e a interface | `false` |
 | `Seed:AdminNome`, `Seed:AdminEmail`, `Seed:AdminSenha` | administrador inicial | vazios (sem seed) |
+| `Email:EnvioAtivo` | liga o serviço em segundo plano que envia a fila de e-mails | `false` (`true` em `Development`): sem provedor configurado a fila só acumula e nada vira `FALHOU` por engano |
+| `Email:IntervaloSegundos`, `Email:LoteMaximoPorCiclo` | um ciclo de envio a cada N segundos, com até M mensagens | 10 e 20 (500 convites saem em 25 ciclos) |
+| `Email:MaximoDeTentativas`, `Email:ReservaMinutos` | desiste (`FALHOU`) na tentativa N; a mensagem reservada por um processador que caiu volta a valer depois de M minutos | 5 e 5 (esperas de 1, 5, 30 e 120 min entre as tentativas) |
+| `Email:Remetente`, `Email:NomeDoRemetente` | de quem o e-mail sai | vazio e `RH System` (`Remetente` é obrigatório com o envio ligado) |
+| `Email:Smtp:Servidor`, `Email:Smtp:Porta`, `Email:Smtp:Seguranca` | o servidor SMTP (`Nenhuma`, `StartTls` ou `Ssl`) | vazio, 587, `StartTls` (`localhost`, 1025, `Nenhuma` em `Development`, o Mailpit) |
+| `Email:Smtp:Usuario`, `Email:Smtp:Senha` | credencial do provedor | vazios; **a senha só por user-secrets ou configuração do App Service** |
+| `App:UrlDoFront` | base dos links dos e-mails (cada renderizador monta o seu link) | vazio (`http://localhost:5173` em `Development`) |
 
 **Atrás de um proxy (produção):** ligue `ProxyReverso:Habilitado` **e** informe `ProxyReverso:ProxiesConfiaveis` (IPs ou redes CIDR do proxy da plataforma; a lista certa do Azure é definida no deploy, Task 14). Sem a lista só o `127.0.0.1` é confiável, o `X-Forwarded-For` é ignorado e todas as pessoas dividem o mesmo limite de tentativas de login: a API avisa no log (`Warning`) quando isso acontece.
 
@@ -94,6 +101,8 @@ O teste de divergência compara o contrato com o documento nativo da API, então
 
 ### Decisões do back-end (medidas)
 
+- **Reserva da fila de e-mails e do agendador: `FromSql` com `SELECT ... FOR UPDATE SKIP LOCKED`, dentro de `ExecutarEmTransacaoAsync`** (sonda `SkipLockedPeloFromSqlTests`, que fica como teste de regressão). Medido no MySQL 8.4 do contêiner: roda e devolve as n primeiras linhas na ordem; com a transação da primeira conexão aberta, um `SELECT ... NOWAIT` na segunda falha com o erro **3572** (controle positivo: a primeira conexão de fato trava as linhas); duas conexões com a MESMA consulta recebem linhas diferentes, sem esperar; e um `1062` dentro da transação não a aborta (o `INSERT` seguinte e o `COMMIT` funcionam). O `EnfileirarAsync` depende do último: chave repetida vira `false`, não perde o resto da transação.
+- **Pacote com falha conhecida puxado pelo MailKit.** O MailKit/MimeKit pedem `System.Security.Cryptography.Pkcs 10.0.0`, que tem duas falhas de CPU ao interpretar CMS/S-MIME de origem externa (GHSA-846f-f764-76mx, alta; GHSA-2fmv-rv2c-59x7, moderada; corrigidas na 10.0.13). Aqui só se ENVIA e-mail comum, então a exposição é pequena, mas a versão corrigida (10.0.14) está fixada por referência direta em `Infrastructure` e em `Directory.Packages.props`. Versões escolhidas em 2026-11-04: MailKit 4.18.1 (27/09/2026; a 4.18.2 tinha 12 dias) e Mailpit v1.31.6 (15/10/2026).
 - **Regra de reserva da autorização** (rota sem política e sem `AllowAnonymous` exige login). Medido com a reserva escrita como `RequireAuthenticatedUser` puro: o anônimo recebia **401** em `/nao-existe`, `/api/nao-existe`, `/api/rh/nao-existe` e em `/openapi/v1.json` e `/scalar/v1` com `Documentacao:Habilitada=false`, e as respostas de rejeição do roteamento (405 de método errado e 415 de tipo de mídia errado) também viravam 401. Hoje a reserva exige login **só de rota real** (`RouteEndpoint`): o que não casou com rota e as rejeições do roteamento seguem como antes (404, 405, 415, todos `application/problem+json`). Rota real sem política segue 401 para o anônimo. Os testes `SondaDaPoliticaDeReservaTests` e `FamiliasDeRotaTests` fixam os dois lados. Não medi o `MapFallback` (a saída que o plano previa); escolhi esta porque mantém o 405 e o 415 da fatia 0.
 - **Perfil no token.** `/api/rh`, `/api/gestor` e `/api/eu` olham o claim `perfil` como texto exato (`RH`, `Gestor`, `Funcionario`): token válido sem o claim, com `rh` minúsculo ou com um número recebe 403, inclusive em `/api/auth/eu`.
 

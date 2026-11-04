@@ -6,10 +6,12 @@ using Microsoft.Extensions.Logging;
 using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Emails;
 using RHSystem.Application.Escopo;
 using RHSystem.Infrastructure.Auditoria;
 using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Colaboradores;
+using RHSystem.Infrastructure.Emails;
 using RHSystem.Infrastructure.Escopo;
 using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Persistencia;
@@ -58,6 +60,19 @@ public static class DependencyInjection
         services.AddDbContextFactory<AppDbContext>(_ => { }, ServiceLifetime.Scoped);
         services.AddScoped<IAuditor, Auditor>();
         services.AddScoped<IConsultaDeAuditoria, ConsultaDeAuditoria>();
+
+        // Fila de e-mails e envio. Sem Email:EnvioAtivo (o padrao do appsettings.json) o servico em segundo plano nem comeca e a fila so acumula.
+        var email = new OpcoesDeEmail();
+        configuration.GetSection(OpcoesDeEmail.Secao).Bind(email);
+        email.Validar();
+        services.AddSingleton(email);
+        var app = new OpcoesDoApp();
+        configuration.GetSection(OpcoesDoApp.Secao).Bind(app);
+        services.AddSingleton(app);
+        services.AddSingleton<IEnviadorDeEmail, SmtpEnviadorDeEmail>();
+        services.AddScoped<IFilaDeEmails, FilaDeEmails>();
+        services.AddScoped<IProcessadorDeEmails, ProcessadorDeEmails>();
+        services.AddHostedService<EnvioDeEmailsHostedService>();
 
         services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
         services.AddScoped<IRefreshTokenRepositorio, RefreshTokenRepositorio>();

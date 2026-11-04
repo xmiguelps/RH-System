@@ -63,7 +63,8 @@ public partial class EmailNaFila
         int? referenciaId = null,
         int? funcionarioId = null,
         bool sigiloso = false,
-        string? carga = null)
+        string? carga = null,
+        DateTime? proximaTentativaEmUtc = null)
     {
         // CHK_FILA_EMAILS_TIPO
         if (tipo is null || !NomeDeTipo().IsMatch(tipo))
@@ -100,10 +101,70 @@ public partial class EmailNaFila
             Carga = carga,
             Situacao = SituacaoDoEmail.Pendente,
             Tentativas = 0,
-            ProximaTentativaEm = agoraUtc,
+            ProximaTentativaEm = proximaTentativaEmUtc ?? agoraUtc,
             CriadoEm = agoraUtc,
         };
     }
+
+    /// <summary>O tamanho de <c>ULTIMO_ERRO</c>.</summary>
+    public const int TamanhoMaximoDoUltimoErro = 500;
+
+    /// <summary>Reserva a mensagem para um processador até <paramref name="reservadoAteUtc"/> (<c>CHK_FILA_EMAILS_RESERVA</c>: reservada se e só se está <c>EM_ENVIO</c>).</summary>
+    public void Reservar(DateTime reservadoAteUtc)
+    {
+        Situacao = SituacaoDoEmail.EmEnvio;
+        ReservadoAte = reservadoAteUtc;
+    }
+
+    /// <summary>
+    /// Saiu: <c>ENVIADO</c>, com a data, a carga apagada (<c>CHK_FILA_EMAILS_CARGA_SO_ENQUANTO_ESPERA</c>) e a reserva limpa, tudo num <c>UPDATE</c> só. Mensagem
+    /// sigilosa nunca fica <c>ENVIADO</c> (<c>CHK_FILA_EMAILS_SIGILOSO_NAO_FICA</c>): quem trata a apaga.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A mensagem é sigilosa.</exception>
+    public void MarcarComoEnviado(DateTime agoraUtc)
+    {
+        ExigirNaoSigilosa();
+        Situacao = SituacaoDoEmail.Enviado;
+        EnviadoEm = agoraUtc;
+        Carga = null;
+        ReservadoAte = null;
+        UltimoErro = null;
+    }
+
+    /// <summary>
+    /// Falha temporária: soma uma tentativa e volta a <c>PENDENTE</c> para <paramref name="proximaTentativaEmUtc"/>, com a reserva LIMPA no mesmo <c>UPDATE</c>
+    /// (toda saída de <c>EM_ENVIO</c> limpa a reserva). <paramref name="erro"/> é só o nome da exceção e o status, nunca a mensagem dela.
+    /// </summary>
+    public void AgendarNovaTentativa(DateTime proximaTentativaEmUtc, string erro)
+    {
+        Tentativas++;
+        Situacao = SituacaoDoEmail.Pendente;
+        ProximaTentativaEm = proximaTentativaEmUtc;
+        ReservadoAte = null;
+        UltimoErro = Cortar(erro);
+    }
+
+    /// <summary>Desistiu (falha permanente ou tentativas esgotadas): <c>FALHOU</c>, com a carga apagada e a reserva limpa. Sigilosa nunca fica <c>FALHOU</c>: quem trata a apaga.</summary>
+    /// <exception cref="InvalidOperationException">A mensagem é sigilosa.</exception>
+    public void MarcarComoFalhou(string erro)
+    {
+        ExigirNaoSigilosa();
+        Tentativas++;
+        Situacao = SituacaoDoEmail.Falhou;
+        Carga = null;
+        ReservadoAte = null;
+        UltimoErro = Cortar(erro);
+    }
+
+    private void ExigirNaoSigilosa()
+    {
+        if (Sigiloso)
+        {
+            throw new InvalidOperationException("Mensagem sigilosa não fica em situação final: ela é apagada (CHK_FILA_EMAILS_SIGILOSO_NAO_FICA).");
+        }
+    }
+
+    private static string Cortar(string erro) => erro.Length <= TamanhoMaximoDoUltimoErro ? erro : erro[..TamanhoMaximoDoUltimoErro];
 
     /// <summary>O mesmo que <c>LIKE '%_@_%'</c>: um <c>@</c> com pelo menos um caractere antes e um depois.</summary>
     private static bool TemArrobaComAlgoAoRedor(string? valor)

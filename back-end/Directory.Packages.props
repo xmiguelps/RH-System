@@ -26,11 +26,15 @@
   <ItemGroup Label="Infraestrutura">
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.14" />
+    <PackageVersion Include="MailKit" Version="4.18.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.14" />
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.23.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     <PackageVersion Include="MySqlConnector" Version="2.6.2" />
+    <!-- O MailKit/MimeKit pedem a 10.0.0, que tem duas falhas conhecidas (GHSA-846f-f764-76mx, alta; GHSA-2fmv-rv2c-59x7, moderada; corrigidas na 10.0.13). A referencia direta em Infrastructure faz valer esta. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup Label="Banco de dados (EF Core 9.x com o provider Pomelo 9.0.0; nada de EF Core 10)">

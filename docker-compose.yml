@@ -27,5 +27,19 @@ services:
       retries: 30
       start_period: 20s
 
+  # Captador de e-mail de desenvolvimento: a API envia por SMTP para cá e os e-mails aparecem em http://localhost:8025 (nada sai para a internet).
+  # Versão estável fixada (conferida em 2026-11-04, v1.31.6 de 15/10/2026); nunca "latest". Os testes usam a mesma imagem (MailpitFixture).
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "${MAILPIT_SMTP_PORTA:-1025}:1025"
+      - "${MAILPIT_UI_PORTA:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
 volumes:
   mysql_dados:

@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MySqlConnector;
+using RHSystem.Api.IntegrationTests.Emails;
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Emails;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
 
@@ -67,6 +69,9 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
 
     public RelogioDeTeste Relogio { get; } = new();
 
+    /// <summary>O envio de e-mail dos testes: em memória (o serviço em segundo plano fica desligado e os testes chamam <c>ProcessarCicloAsync</c> direto).</summary>
+    public EnviadorDeEmailEmMemoria Enviador { get; } = new();
+
     public string Conexao { get; } = conexao;
 
     private readonly SemaphoreSlim _travaDoElenco = new(1, 1);
@@ -115,11 +120,16 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         builder.UseSetting("Testes:RotasDeTeste", "true");
         builder.UseSetting("Autenticacao:LimiteLoginPorMinuto", "1000"); // só o teste do limite usa 5
         builder.UseSetting("Database:AplicarScriptsAoIniciar", "false"); // o banco já vem com os scripts
+        builder.UseSetting("Email:EnvioAtivo", "false"); // sem o serviço em segundo plano: os testes chamam o ciclo de envio direto
         builder.UseSetting("Cors:OrigensPermitidas:0", OrigemPermitida);
         builder.ConfigureServices(servicos =>
         {
             servicos.RemoveAll<IRelogio>();
             servicos.AddSingleton<IRelogio>(Relogio);
+            servicos.RemoveAll<IEnviadorDeEmail>();
+            servicos.AddSingleton<IEnviadorDeEmail>(Enviador);
+            servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_ENVIO", "Aviso de teste enviado"));
+            servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_SIGILOSO", "Lembrete anonimo de teste enviado"));
             servicos.AddSingleton<IStartupFilter, IpDeOrigemParaTeste>();
         });
     }
