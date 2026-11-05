@@ -111,6 +111,11 @@ public static class DependencyInjection
         // registrarem (AddScoped); sem nenhuma, não faz nada (dívida registrada em contrato/STATUS.md).
         services.AddScoped<IPedidosParadosNoGestor, PedidosParadosNoGestorComposto>();
 
+        // Situação de hoje: a fonte padrão só conhece o fim de semana (nada de ponto, atestado, férias nem horário ainda). A fatia 3 registra a fonte dela DEPOIS desta (o último
+        // registro vale) e a ficha e a lista de colaboradores passam a mostrar a situação de verdade sem mudar aqui.
+        services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaSemRegistros>();
+        services.AddScoped<ISituacaoDeHoje, SituacaoDeHojeServico>();
+
         services.AddSingleton<ISenhaHasher, SenhaHasher>();
         services.AddSingleton<IRelogio, RelogioDoSistema>();
         services.AddSingleton<IEmissorDeTokens>(sp => new EmissorDeTokensJwt(jwt, sp.GetRequiredService<IRelogio>()));
