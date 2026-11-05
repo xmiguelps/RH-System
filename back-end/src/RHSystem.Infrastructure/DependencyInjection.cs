@@ -113,6 +113,13 @@ public static class DependencyInjection
         services.AddScoped<ILinksDeSenha, LinksDeSenha>();
         services.AddScoped<IConsultaDeUsuariosDoSistema, ConsultaDeUsuariosDoSistema>();
         services.AddScoped<IConsultaDeFuncionarios, ConsultaDeFuncionarios>();
+
+        // As caixas "Depois de salvar" do cadastro dependem das fatias 5 e 6: as versões padrão dizem a verdade (indisponível) e ficam registradas ANTES de qualquer outra, para as fatias donas
+        // registrarem as delas depois (AddScoped: o último registro vale).
+        services.AddScoped<IInclusaoNoOnboarding, OnboardingIndisponivel>();
+        services.AddScoped<IEnvioDoFormularioDeAdmissao, FormularioDeAdmissaoIndisponivel>();
+        services.AddScoped<IGestorDoFuncionario, GestorDoFuncionario>();
+        services.AddScoped<ICadastroDeFuncionarios, CadastroDeFuncionarios>();
         var limiteDeSenhaAtual = configuration.GetValue<int?>("Autenticacao:LimiteSenhaAtualPorMinuto") ?? 5;
         if (limiteDeSenhaAtual < 1)
         {

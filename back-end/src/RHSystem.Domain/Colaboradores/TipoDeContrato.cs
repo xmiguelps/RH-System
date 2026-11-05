@@ -1,10 +1,13 @@
 namespace RHSystem.Domain.Colaboradores;
 
-/// <summary>Os tipos de contrato que o contrato da API conhece. No banco é texto livre (<c>"CLT"</c>, <c>"ESTAGIO"</c>).</summary>
+/// <summary>
+/// Os tipos de contrato que o contrato da API conhece. No banco é texto livre (<c>"CLT"</c>, <c>"ESTAGIO"</c>). Os valores começam em 1 para que o campo omitido no JSON (o valor zero) não passe por
+/// <c>CLT</c> em silêncio: a validação do cadastro o recusa como <c>tipoContrato</c> (o mesmo que <c>Perfil</c> faz).
+/// </summary>
 public enum TipoDeContrato
 {
-    Clt,
-    Estagio,
+    Clt = 1,
+    Estagio = 2,
 }
 
 public static class TiposDeContrato

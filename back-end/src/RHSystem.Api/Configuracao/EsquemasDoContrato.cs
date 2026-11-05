@@ -19,10 +19,25 @@ public static class EsquemasDoContrato
             return Task.CompletedTask;
         });
 
-    /// <summary>Ajusta o esquema de <paramref name="tipo"/> se ele for <c>DateTime</c> ou <c>TimeOnly</c> (anuláveis também); os outros tipos ficam como estão.</summary>
+    /// <summary>
+    /// Ajusta o esquema de <paramref name="tipo"/> se ele for <c>DateTime</c> ou <c>TimeOnly</c> (anuláveis também) e tira o <c>null</c> de dentro de um enum (o gerador o escreve no componente compartilhado
+    /// quando alguma propriedade usa o enum anulável, e aí toda propriedade que o referencia, até a obrigatória, passa a aceitar null no documento; a propriedade anulável já leva o seu próprio
+    /// <c>oneOf</c> com null). Os outros tipos ficam como estão.
+    /// </summary>
     public static void Aplicar(OpenApiSchema esquema, Type tipo)
     {
         var subjacente = Nullable.GetUnderlyingType(tipo) ?? tipo;
+        if (subjacente.IsEnum && esquema.Enum is { } valores)
+        {
+            for (var i = valores.Count - 1; i >= 0; i--)
+            {
+                if (valores[i] is null)
+                {
+                    valores.RemoveAt(i);
+                }
+            }
+        }
+
         var texto = subjacente == tipo ? JsonSchemaType.String : JsonSchemaType.String | JsonSchemaType.Null;
 
         if (subjacente == typeof(DateTime))

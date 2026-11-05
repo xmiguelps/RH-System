@@ -1,5 +1,7 @@
+using System.Text.Json.Nodes;
 using Microsoft.OpenApi;
 using RHSystem.Api.Configuracao;
+using RHSystem.Domain.Colaboradores;
 
 namespace RHSystem.Api.IntegrationTests.Configuracao;
 
@@ -29,6 +31,19 @@ public class EsquemasDoContratoTests
 
         Assert.Equal(JsonSchemaType.String, horario.Type);
         Assert.Equal("^([01][0-9]|2[0-3]):[0-5][0-9]$", horario.Pattern); // o mesmo de horarioEntrada no contrato
+    }
+
+    [Theory]
+    [InlineData(typeof(TipoDeContrato))]
+    [InlineData(typeof(TipoDeContrato?))]
+    public void Enum_perde_o_null_do_componente_porque_a_anulabilidade_fica_no_uso_da_propriedade(Type tipo)
+    {
+        // O gerador escreve o enum anulável com null DENTRO do componente compartilhado, e aí toda propriedade que referencia o enum (inclusive as obrigatórias) passa a aceitar null no documento.
+        var esquema = new OpenApiSchema { Enum = [JsonValue.Create("CLT")!, JsonValue.Create("ESTAGIO")!, null!] };
+
+        EsquemasDoContrato.Aplicar(esquema, tipo);
+
+        Assert.Equal(["CLT", "ESTAGIO"], esquema.Enum!.Select(valor => valor.ToString()));
     }
 
     [Theory]

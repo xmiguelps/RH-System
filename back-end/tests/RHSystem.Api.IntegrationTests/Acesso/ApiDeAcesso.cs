@@ -90,6 +90,24 @@ internal sealed class ApiDeAcesso
     /// <summary>Faz do colaborador (ativo) um gestor: a linha em <c>GESTORES</c>.</summary>
     public Task NovoGestorAsync(int funcionarioId) => Sql.ExecutarAsync(Conexao, $"INSERT INTO GESTORES (ID_FUNCIONARIO) VALUES ({funcionarioId})");
 
+    /// <summary>
+    /// Como <see cref="NaTransacaoAsync{T}"/>, num hospedeiro à parte em que <paramref name="configurar"/> troca ou acrescenta serviços (fontes falsas das fatias que ainda não existem, por exemplo). O ator
+    /// continua sendo o RH.
+    /// </summary>
+    public async Task<T> NaTransacaoComAsync<T>(Action<IServiceCollection> configurar, Func<IServiceProvider, Task<T>> acao)
+    {
+        var elenco = Elenco;
+        await using var fabrica = Api.WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IAtorAtual>();
+            servicos.AddScoped<IAtorAtual>(_ => AtorDeTeste.Pessoa(elenco.Rh));
+            configurar(servicos);
+        }));
+        using var escopo = fabrica.Services.CreateScope();
+        var unidade = escopo.ServiceProvider.GetRequiredService<IUnidadeDeTrabalho>();
+        return await unidade.ExecutarEmTransacaoAsync(() => acao(escopo.ServiceProvider), CancellationToken.None);
+    }
+
     /// <summary>Roda a ação num escopo em que o ator é o RH, sem abrir transação.</summary>
     public async Task<T> NoEscopoAsync<T>(Func<IServiceProvider, Task<T>> acao)
     {

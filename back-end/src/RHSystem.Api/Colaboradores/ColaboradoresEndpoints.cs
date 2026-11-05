@@ -30,6 +30,7 @@ public static class ColaboradoresEndpoints
     public static IServiceCollection AdicionarCasosDeUsoDeColaboradores(this IServiceCollection servicos)
     {
         servicos.AddScoped<ListarFuncionariosCasoDeUso>();
+        servicos.AddScoped<CriarFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterFichaDoFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterIndicadoresDoFuncionarioCasoDeUso>();
         return servicos;
@@ -43,6 +44,17 @@ public static class ColaboradoresEndpoints
             .WithName("listarFuncionarios")
             .Produces<FuncionarioListaRespostaRh>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status500InternalServerError);
+
+        grupo.MapPost("/funcionarios", Criar)
+            .WithName("criarFuncionario")
+            .Produces<FuncionarioFichaRh>(StatusCodes.Status201Created)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status409Conflict,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
 
         grupo.MapGet("/funcionarios/{funcionarioId:int}", ObterFicha)
             .WithName("obterFichaDoFuncionario")
@@ -59,6 +71,12 @@ public static class ColaboradoresEndpoints
 
     private static async Task<FuncionarioListaRespostaRh> Listar([AsParameters] FiltrosDaListaDeFuncionarios f, ListarFuncionariosCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(f.Pagina, f.TamanhoPagina, f.Busca, f.Situacao, f.SetorId, f.TipoContrato, f.OrdenarPor, f.Direcao, ct);
+
+    private static async Task<IResult> Criar(FuncionarioCriarComando comando, CriarFuncionarioCasoDeUso casoDeUso, CancellationToken ct)
+    {
+        var ficha = await casoDeUso.ExecutarAsync(comando, ct);
+        return Results.Created($"/api/rh/funcionarios/{ficha.Id}", ficha);
+    }
 
     private static async Task<FuncionarioFichaRh> ObterFicha(int funcionarioId, ObterFichaDoFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, ct);
