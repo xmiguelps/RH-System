@@ -325,6 +325,30 @@ public class SenhaPublicaTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Dois_usos_simultaneos_do_mesmo_link_de_redefinicao_dao_um_204_e_os_outros_422_e_a_senha_e_a_do_vencedor()
+    {
+        // No link de REDEFINIÇÃO só o UPDATE atômico do link protege o uso único (o convite tem ainda a conferência de SenhaProvisoria dentro da transação).
+        var api = await ApiAsync();
+        var pessoa = await api.NovaPessoaAsync("definir-redef-simultaneo", login: TipoDeLogin.SenhaDefinida);
+        var token = await NovaRedefinicaoAsync(api, pessoa);
+        var cliente = api.Api.ClienteAnonimo();
+        var largada = new TaskCompletionSource();
+        var tarefas = Enumerable.Range(0, 20).Select(i => Task.Run(async () =>
+        {
+            await largada.Task;
+            return (Indice: i, Status: (int)(await PostAsync(cliente, "/api/auth/senha/definir", new { token, novaSenha = $"Senha#Redefinida{i:D2}" })).StatusCode);
+        })).ToList();
+
+        largada.SetResult();
+        var resultados = await Task.WhenAll(tarefas);
+
+        Assert.Equal(1, resultados.Count(r => r.Status == 204));
+        Assert.Equal(19, resultados.Count(r => r.Status == 422));
+        var vencedor = resultados.Single(r => r.Status == 204).Indice;
+        await EntrarAsync(cliente, pessoa.Email!, $"Senha#Redefinida{vencedor:D2}"); // a senha gravada é a de quem consumiu o link
+    }
+
+    [Fact]
     public async Task Definir_por_redefinicao_revoga_todos_os_refresh_tokens_da_pessoa()
     {
         var api = await ApiAsync();
@@ -365,10 +389,14 @@ public class SenhaPublicaTests(MySqlFixture mysql)
         var token = await NovoConviteAsync(api, pessoa);
         await Sql.ExecutarAsync(api.Conexao, $"UPDATE USUARIOS SET SENHA_PROVISORIA = FALSE WHERE ID_FUNCIONARIO = {pessoa.FuncionarioId}"); // a senha foi definida por outro caminho
 
-        var resposta = await PostAsync(api.Api.ClienteAnonimo(), "/api/auth/senha/definir", new { token, novaSenha = NovaSenha });
+        var cliente = api.Api.ClienteAnonimo();
+
+        var resposta = await PostAsync(cliente, "/api/auth/senha/definir", new { token, novaSenha = NovaSenha });
 
         Assert.Equal(422, (int)resposta.StatusCode);
         Assert.Equal(CodigoDeLinkInvalido, (await CorpoAsync(resposta)).GetProperty("codigo").GetString());
+        // Também na conferência (validar-link): o convite de quem já tem senha não vale, e a rota que só confere diz o mesmo. (A conferência de dentro da transação do definir sozinha já recusaria o definir.)
+        Assert.Equal(422, (await ValidarAsync(cliente, token)).Item1);
     }
 
     [Fact]
