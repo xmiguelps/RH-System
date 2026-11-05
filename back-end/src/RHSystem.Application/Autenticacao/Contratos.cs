@@ -1,3 +1,4 @@
+using System.Data;
 using RHSystem.Domain.Autenticacao;
 
 namespace RHSystem.Application.Autenticacao;
@@ -27,6 +28,13 @@ public interface IUnidadeDeTrabalho
     Task SalvarAsync(CancellationToken ct);
 
     Task<T> ExecutarEmTransacaoAsync<T>(Func<Task<T>> acao, CancellationToken ct);
+
+    /// <summary>
+    /// A mesma transação, com o nível de isolamento escolhido para ELA (vale só para esta transação; a conexão volta ao padrão). A reserva das filas (e-mails e agendador)
+    /// usa <see cref="IsolationLevel.ReadCommitted"/>: no padrão (REPEATABLE READ) o <c>SELECT ... FOR UPDATE SKIP LOCKED</c> segura bloqueios de intervalo no índice e o
+    /// <c>UPDATE</c> seguinte, que move a linha de <c>PENDENTE</c> para <c>EM_ENVIO</c> no mesmo índice, dá deadlock entre dois processadores (medido; ver README).
+    /// </summary>
+    Task<T> ExecutarEmTransacaoAsync<T>(Func<Task<T>> acao, IsolationLevel nivel, CancellationToken ct);
 }
 
 public interface ISenhaHasher

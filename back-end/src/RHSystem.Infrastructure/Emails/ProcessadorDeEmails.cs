@@ -81,6 +81,7 @@ public sealed class ProcessadorDeEmails(
                 await db.SaveChangesAsync(ct);
                 return elegiveis;
             },
+            System.Data.IsolationLevel.ReadCommitted, // no padrão (REPEATABLE READ) dois processadores dão deadlock aqui (medido: sonda DeadlockNaReservaDeEmailsTests)
             ct);
     }
 

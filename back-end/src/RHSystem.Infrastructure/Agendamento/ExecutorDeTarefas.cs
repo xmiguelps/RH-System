@@ -102,6 +102,7 @@ public sealed class ExecutorDeTarefas(
                 await db.SaveChangesAsync(ct);
                 return elegiveis;
             },
+            System.Data.IsolationLevel.ReadCommitted, // no padrão (REPEATABLE READ) dois executores dão deadlock aqui (medido: sonda DeadlockNaReservaDeTarefasTests)
             ct);
     }
 

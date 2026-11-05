@@ -76,6 +76,8 @@ public sealed class UnidadeDeTrabalhoFalsa : IUnidadeDeTrabalho
             EmTransacao = false;
         }
     }
+
+    public Task<T> ExecutarEmTransacaoAsync<T>(Func<Task<T>> acao, System.Data.IsolationLevel nivel, CancellationToken ct) => ExecutarEmTransacaoAsync(acao, ct);
 }
 
 public sealed class UsuarioRepositorioEmMemoria : IUsuarioRepositorio
