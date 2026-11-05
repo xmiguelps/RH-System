@@ -276,7 +276,7 @@ public class CriarFuncionarioTests(MySqlFixture mysql)
     public async Task Criar_com_beneficioIds_null_ou_omitido_vale_como_sem_beneficios_e_o_ficha_nao_tem_beneficio_ativo()
     {
         var api = await ApiAsync();
-        var (cargo, setor) = await CargoESetorAsync(api, "criar10");
+        var (cargo, setor) = await CargoESetorAsync(api, "criar11");
         var cliente = api.Api.ClienteComo(api.Elenco.Rh);
         var comNull = (Dictionary<string, object?>)Corpo(cargo, setor);
         comNull["beneficioIds"] = null;
