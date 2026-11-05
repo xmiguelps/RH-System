@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
@@ -23,7 +24,8 @@ internal static class Problemas
         string detalhe,
         IDictionary<string, string[]>? erros = null,
         string? regraDoBanco = null,
-        string? codigo = null)
+        string? codigo = null,
+        IReadOnlyDictionary<string, object?>? extensoes = null)
     {
         contexto.Items[ItemDoContexto] = true;
         var problema = new ProblemDetails { Status = status, Title = titulo, Detail = detalhe };
@@ -43,8 +45,20 @@ internal static class Problemas
             problema.Extensions["codigo"] = codigo;
         }
 
+        // Extras do corpo (ProblemaDeApiException): a chave sai em camelCase e nunca sobrescreve o que a resposta já tem nem os campos fixos do ProblemDetails.
+        foreach (var (chave, valor) in extensoes ?? new Dictionary<string, object?>())
+        {
+            var nome = JsonNamingPolicy.CamelCase.ConvertName(chave);
+            if (!CamposReservados.Contains(nome) && !problema.Extensions.ContainsKey(nome))
+            {
+                problema.Extensions[nome] = valor;
+            }
+        }
+
         return problema;
     }
+
+    private static readonly HashSet<string> CamposReservados = new(["title", "status", "detail", "traceId", "codigo", "type", "instance"], StringComparer.Ordinal);
 
     public static IResult Resultado(
         HttpContext contexto,
@@ -53,8 +67,9 @@ internal static class Problemas
         string detalhe,
         IDictionary<string, string[]>? erros = null,
         string? regraDoBanco = null,
-        string? codigo = null) =>
-        Results.Problem(Criar(contexto, status, titulo, detalhe, erros, regraDoBanco, codigo));
+        string? codigo = null,
+        IReadOnlyDictionary<string, object?>? extensoes = null) =>
+        Results.Problem(Criar(contexto, status, titulo, detalhe, erros, regraDoBanco, codigo, extensoes));
 
     public static Task EscreverAsync(HttpContext contexto, int status, string titulo, string detalhe) =>
         Resultado(contexto, status, titulo, detalhe).ExecuteAsync(contexto);
@@ -92,6 +107,14 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
     {
         switch (excecao)
         {
+            case ProblemaDeApiException problema:
+                foreach (var (cabecalho, valor) in problema.Cabecalhos ?? new Dictionary<string, string>())
+                {
+                    contexto.Response.Headers[cabecalho] = valor;
+                }
+
+                await Problemas.Resultado(contexto, problema.Status, problema.Titulo, problema.Detalhe, codigo: problema.Codigo, extensoes: problema.Extensoes).ExecuteAsync(contexto);
+                return true;
             case NaoEncontradoException naoEncontrado:
                 await Problemas.EscreverPadraoAsync(contexto, StatusCodes.Status404NotFound, naoEncontrado.Detalhe);
                 return true;

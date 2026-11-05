@@ -149,6 +149,46 @@ internal static class RotasDeTeste
         erros.MapPost("/corpo", (CorpoDeTeste corpo) => Results.Ok(corpo));
         erros.MapGet("/numero/{n}", (int n) => Results.Ok(n));
 
+        // ProblemaDeApiException (título próprio, extras do corpo, cabeçalhos).
+        erros.MapGet("/problema", () => { throw new ProblemaDeApiException(422, "Link inválido ou vencido.", "Este link não vale mais. Peça um novo ao RH ou use \"Esqueci minha senha\".", "LINK_INVALIDO_OU_VENCIDO"); });
+        erros.MapGet("/problema-sem-codigo", () => { throw new ProblemaDeApiException(422, "Título próprio.", "Detalhe próprio."); });
+        erros.MapGet("/problema-com-extensao", () =>
+        {
+            throw new ProblemaDeApiException(
+                409,
+                "Colaborador já cadastrado.",
+                "Já existe um colaborador com este CPF.",
+                "CPF_JA_CADASTRADO",
+                new Dictionary<string, object?> { ["CadastroExistente"] = new { FuncionarioId = 12, Nome = "Bruno Lima", Ativo = false } });
+        });
+        erros.MapGet("/problema-com-extensao-reservada", () =>
+        {
+            throw new ProblemaDeApiException(
+                422,
+                "Título de verdade.",
+                "Detalhe de verdade.",
+                "CODIGO_DE_VERDADE",
+                new Dictionary<string, object?>
+                {
+                    ["title"] = "Título falso.",
+                    ["status"] = 1,
+                    ["Detail"] = "Detalhe falso.",
+                    ["traceId"] = "traceId-falso",
+                    ["codigo"] = "CODIGO_FALSO",
+                    ["type"] = "tipo-falso",
+                    ["instance"] = "instancia-falsa",
+                    ["outra"] = 5,
+                });
+        });
+        erros.MapGet("/problema-429", () =>
+        {
+            throw new ProblemaDeApiException(
+                429,
+                "Muitas tentativas.",
+                "Muitas tentativas. Aguarde um minuto e tente de novo.",
+                cabecalhos: new Dictionary<string, string> { ["Retry-After"] = "37" });
+        });
+
         // Dois funcionários com o mesmo EMAIL_CORPORATIVO no mesmo SaveChanges: a chave única do banco recusa (1062) e nada fica gravado.
         erros.MapGet("/chave-unica", async (AppDbContext db, CancellationToken ct) =>
         {
