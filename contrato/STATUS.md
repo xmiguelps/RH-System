@@ -40,6 +40,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `POST /api/rh/usuarios/{funcionarioId}/convite` | enviarConviteDeAcesso | em andamento | login desativado não recebe convite (o RH usa Ativar antes) |
 | `POST /api/rh/usuarios/{funcionarioId}/ativar` | ativarUsuarioDoSistema | em andamento | |
 | `POST /api/rh/usuarios/{funcionarioId}/desativar` | desativarUsuarioDoSistema | em andamento | encerra as sessões da pessoa; ninguém desativa o próprio login |
+| `GET /api/rh/funcionarios` | listarFuncionarios | em andamento | parcial: `situacaoHoje` só conhece fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4 e 7; sem benefícios de dependentes até a 7 |
+| `GET /api/rh/funcionarios/{funcionarioId}` | obterFichaDoFuncionario | em andamento | parcial: `situacaoHoje` só conhece fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4 e 7; sem benefícios de dependentes até a 7 |
+| `GET /api/rh/funcionarios/{funcionarioId}/indicadores` | obterIndicadoresDoFuncionario | em andamento | parcial: `situacaoHoje` só conhece fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4 e 7; sem benefícios de dependentes até a 7 |
 
 ## Pendências conhecidas
 

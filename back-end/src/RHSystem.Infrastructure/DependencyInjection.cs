@@ -112,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IServicoDeConvite, ServicoDeConvite>();
         services.AddScoped<ILinksDeSenha, LinksDeSenha>();
         services.AddScoped<IConsultaDeUsuariosDoSistema, ConsultaDeUsuariosDoSistema>();
+        services.AddScoped<IConsultaDeFuncionarios, ConsultaDeFuncionarios>();
         var limiteDeSenhaAtual = configuration.GetValue<int?>("Autenticacao:LimiteSenhaAtualPorMinuto") ?? 5;
         if (limiteDeSenhaAtual < 1)
         {

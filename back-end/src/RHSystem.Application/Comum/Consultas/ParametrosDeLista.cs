@@ -1,6 +1,9 @@
 namespace RHSystem.Application.Comum.Consultas;
 
-/// <summary>No JSON e na consulta: <c>ASC</c> ou <c>DESC</c>.</summary>
+/// <summary>
+/// No JSON: <c>ASC</c> ou <c>DESC</c>. Na consulta (<c>?direcao=ASC</c>) este tipo NÃO entra no <c>[AsParameters]</c>: o binder do minimal API só entende o nome do C# (<c>Asc</c>) e recusaria o
+/// <c>ASC</c> do contrato com um 400 de corpo (medido na fatia 1b). A rota recebe o texto e o caso de uso o lê com <c>EnumsDeConsulta.Ler&lt;DirecaoDeOrdenacao&gt;</c>.
+/// </summary>
 public enum DirecaoDeOrdenacao
 {
     Asc,

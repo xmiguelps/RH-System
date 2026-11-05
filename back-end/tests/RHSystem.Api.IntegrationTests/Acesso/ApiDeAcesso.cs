@@ -66,6 +66,19 @@ internal sealed class ApiDeAcesso
         }
     }
 
+    /// <summary>
+    /// Um cliente HTTP do RH do elenco com um token de acesso emitido AGORA, no instante do relógio falso. Para os testes que mudam o relógio (o token de <c>ClienteComo</c> vale 15 minutos a partir de
+    /// 2026-10-07T12:42Z e a API mede a validade pelo mesmo relógio).
+    /// </summary>
+    public async Task<HttpClient> ClienteDoRhAgoraAsync()
+    {
+        await using var db = ContextoDeTeste.Novo(Conexao);
+        var usuario = await db.Usuarios.Include(u => u.Funcionario).ThenInclude(f => f.NivelDeAcesso).SingleAsync(u => u.Id == Elenco.Rh.UsuarioId);
+        var cliente = Api.CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Api.Services.GetRequiredService<IEmissorDeTokens>().EmitirAcesso(usuario).Token);
+        return cliente;
+    }
+
     /// <summary>Roda a ação num escopo em que o ator é o RH, dentro de uma transação (como o caso de uso que chama o serviço faria).</summary>
     public async Task<T> NaTransacaoAsync<T>(Func<IServiceProvider, Task<T>> acao)
     {
@@ -73,6 +86,9 @@ internal sealed class ApiDeAcesso
         var unidade = escopo.ServiceProvider.GetRequiredService<IUnidadeDeTrabalho>();
         return await unidade.ExecutarEmTransacaoAsync(() => acao(escopo.ServiceProvider), CancellationToken.None);
     }
+
+    /// <summary>Faz do colaborador (ativo) um gestor: a linha em <c>GESTORES</c>.</summary>
+    public Task NovoGestorAsync(int funcionarioId) => Sql.ExecutarAsync(Conexao, $"INSERT INTO GESTORES (ID_FUNCIONARIO) VALUES ({funcionarioId})");
 
     /// <summary>Roda a ação num escopo em que o ator é o RH, sem abrir transação.</summary>
     public async Task<T> NoEscopoAsync<T>(Func<IServiceProvider, Task<T>> acao)

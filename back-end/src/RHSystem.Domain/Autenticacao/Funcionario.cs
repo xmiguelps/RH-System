@@ -137,9 +137,12 @@ public class Funcionario : IAuditavel
     }
 
     /// <summary>Inativo se não está ativo; em admissão se a data de admissão ainda não chegou; senão ativo. <paramref name="hoje"/> é o dia no fuso do Brasil.</summary>
-    public SituacaoCadastral Situacao(DateOnly hoje) =>
-        !Ativo ? SituacaoCadastral.Inativo
-        : DataAdmissao > hoje ? SituacaoCadastral.EmAdmissao
+    public SituacaoCadastral Situacao(DateOnly hoje) => CalcularSituacao(Ativo, DataAdmissao, hoje);
+
+    /// <summary>A mesma regra para quem lê só as colunas (as listas projetam sem carregar a entidade): inativo, em admissão ou ativo.</summary>
+    public static SituacaoCadastral CalcularSituacao(bool ativo, DateOnly dataAdmissao, DateOnly hoje) =>
+        !ativo ? SituacaoCadastral.Inativo
+        : dataAdmissao > hoje ? SituacaoCadastral.EmAdmissao
         : SituacaoCadastral.Ativo;
 
     /// <summary>
