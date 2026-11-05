@@ -404,8 +404,51 @@ public class EditarFuncionarioTests(MySqlFixture mysql)
         Assert.Equal(("FUNCIONARIO_INATIVO", "Não é possível dar benefício a um colaborador inativo."), (problema.GetProperty("codigo").GetString(), problema.GetProperty("detail").GetString()));
         Assert.Equal(0, await LinhasDoBeneficioAsync(api, inativo.Id, beneficio));
 
+        // Devolver um benefício aprovado que estava desativado também é "dar": o inativo não o recebe de volta.
+        var devolvido = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio devolvido editar12");
+        await SementeDoCadastro.BeneficioDoColaboradorAsync(api.Conexao, inativo.Id, devolvido, ativo: false);
+        var devolucao = await EditarAsync(api, inativo.Id, Corpo(inativo, beneficios: [devolvido]));
+        Assert.Equal(422, (int)devolucao.StatusCode);
+        Assert.Equal("FUNCIONARIO_INATIVO", (await CorpoAsync(devolucao)).GetProperty("codigo").GetString());
+        var linha = await LinhaAsync(api, inativo.Id, devolvido);
+        Assert.Equal((false, "APROVADO"), (linha!.Value.Ativo, linha.Value.Status));
+
         // Editar o inativo sem dar benefício nenhum passa.
         Assert.Equal(200, (int)(await EditarAsync(api, inativo.Id, Corpo(inativo))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Editar_o_perfil_de_outra_pessoa_troca_o_nivel_de_acesso()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar18");
+
+        var resposta = await EditarAsync(api, pessoa.Id, Corpo(pessoa, perfil: "Gestor"));
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal("Gestor", (await CorpoAsync(resposta)).GetProperty("perfil").GetString());
+        Assert.Equal("Funcionario Gestor", await Sql.EscalarAsync(api.Conexao, $"SELECT n.NOME_NIVEL_ACESSO FROM FUNCIONARIOS f JOIN NIVEIS_DE_ACESSO n ON n.ID_NIVEL_ACESSO = f.ID_NIVEL_ACESSO WHERE f.ID_FUNCIONARIO = {pessoa.Id}"));
+    }
+
+    [Fact]
+    public async Task Editar_sem_beneficioIds_ou_sem_endereco_devolve_400_e_nao_apaga_os_beneficios()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar19");
+        var beneficio = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio editar19");
+        await SementeDoCadastro.BeneficioDoColaboradorAsync(api.Conexao, pessoa.Id, beneficio);
+        var corpo = Corpo(pessoa);
+        corpo.Remove("beneficioIds");
+        corpo.Remove("endereco");
+
+        var recusada = await EditarAsync(api, pessoa.Id, corpo);
+
+        Assert.Equal(400, (int)recusada.StatusCode);
+        var erros = (await CorpoAsync(recusada)).GetProperty("errors");
+        Assert.True(erros.TryGetProperty("beneficioIds", out _));
+        Assert.True(erros.TryGetProperty("endereco", out _));
+        var linha = await LinhaAsync(api, pessoa.Id, beneficio);
+        Assert.Equal((true, "APROVADO"), (linha!.Value.Ativo, linha.Value.Status)); // a substituição completa nunca vale como "tirar todos"
     }
 
     [Fact]
