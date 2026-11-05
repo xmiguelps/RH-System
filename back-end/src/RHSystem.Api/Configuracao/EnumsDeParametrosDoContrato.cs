@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using RHSystem.Application.Acesso;
 using RHSystem.Domain.Auditoria;
 
 namespace RHSystem.Api.Configuracao;
@@ -20,6 +21,7 @@ public static class EnumsDeParametrosDoContrato
         [("listarEventosDeAuditoria", "acao")] = typeof(AuditoriaAcao),
         [("exportarAuditoria", "area")] = typeof(AuditoriaArea),
         [("exportarAuditoria", "acao")] = typeof(AuditoriaAcao),
+        [("listarUsuariosDoSistema", "situacao")] = typeof(UsuarioSistemaSituacao),
     };
 
     /// <summary>Tem de vir DEPOIS de <see cref="NomesDeParametrosDoContrato"/>: a chave usa o nome já em camelCase.</summary>

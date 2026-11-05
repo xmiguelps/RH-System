@@ -20,4 +20,7 @@ public sealed class UsuarioRepositorio(AppDbContext db) : IUsuarioRepositorio
 
     public Task<Usuario?> ObterPorIdAsync(int id, CancellationToken ct) =>
         ComDependencias.FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public Task<Usuario?> ObterPorFuncionarioIdAsync(int funcionarioId, CancellationToken ct) =>
+        ComDependencias.FirstOrDefaultAsync(u => u.FuncionarioId == funcionarioId, ct);
 }

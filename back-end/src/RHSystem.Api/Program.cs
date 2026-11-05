@@ -13,6 +13,7 @@ builder.Services.AdicionarInfraestrutura(builder.Configuration);
 builder.Services.AdicionarCasosDeUsoDeAutenticacao();
 builder.Services.AdicionarCasosDeUsoDeAuditoria();
 builder.Services.AdicionarCasosDeUsoDeAcesso();
+builder.Services.AdicionarCasosDeUsoDeUsuariosDoSistema();
 builder.Services.AdicionarCasosDeUsoDePainel();
 builder.Services.AdicionarAutenticacaoJwt(builder.Configuration);
 builder.Services.AdicionarAutorizacaoPorPerfil();
@@ -39,6 +40,7 @@ app.UseAuthorization();
 
 app.MapAutenticacao();
 app.MapSenha();
+app.MapUsuariosDoSistema();
 app.MapAuditoria();
 app.MapContadoresDoMenu();
 app.MapSaude();

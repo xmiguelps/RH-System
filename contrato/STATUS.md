@@ -36,6 +36,10 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `POST /api/auth/senha/validar-link` | validarLinkDeSenha | em andamento | |
 | `POST /api/auth/senha/definir` | definirSenhaPeloLink | em andamento | sem login automático |
 | `POST /api/eu/senha` | trocarMinhaSenha | em andamento | troca de senha com a sessão atual mantida; limitação do `rth` na decisão 2 do plano |
+| `GET /api/rh/usuarios` | listarUsuariosDoSistema | em andamento | |
+| `POST /api/rh/usuarios/{funcionarioId}/convite` | enviarConviteDeAcesso | em andamento | login desativado não recebe convite (o RH usa Ativar antes) |
+| `POST /api/rh/usuarios/{funcionarioId}/ativar` | ativarUsuarioDoSistema | em andamento | |
+| `POST /api/rh/usuarios/{funcionarioId}/desativar` | desativarUsuarioDoSistema | em andamento | encerra as sessões da pessoa; ninguém desativa o próprio login |
 
 ## Pendências conhecidas
 

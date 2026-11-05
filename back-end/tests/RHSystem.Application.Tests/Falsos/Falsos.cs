@@ -95,6 +95,9 @@ public sealed class UsuarioRepositorioEmMemoria : IUsuarioRepositorio
 
     public Task<Usuario?> ObterPorIdAsync(int id, CancellationToken ct) =>
         Task.FromResult(Todos.Find(u => u.Id == id));
+
+    public Task<Usuario?> ObterPorFuncionarioIdAsync(int funcionarioId, CancellationToken ct) =>
+        Task.FromResult(Todos.Find(u => u.FuncionarioId == funcionarioId));
 }
 
 public sealed class RefreshTokenRepositorioEmMemoria(UnidadeDeTrabalhoFalsa unidade) : IRefreshTokenRepositorio

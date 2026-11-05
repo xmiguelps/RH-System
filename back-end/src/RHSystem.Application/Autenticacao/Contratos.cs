@@ -9,6 +9,9 @@ public interface IUsuarioRepositorio
     Task<Usuario?> ObterPorEmailCorporativoAsync(string emailNormalizado, CancellationToken ct);
 
     Task<Usuario?> ObterPorIdAsync(int id, CancellationToken ct);
+
+    /// <summary>O login do colaborador (rastreado, com as mesmas dependências), ou <c>null</c> se ele ainda não tem login.</summary>
+    Task<Usuario?> ObterPorFuncionarioIdAsync(int funcionarioId, CancellationToken ct);
 }
 
 public interface IRefreshTokenRepositorio
