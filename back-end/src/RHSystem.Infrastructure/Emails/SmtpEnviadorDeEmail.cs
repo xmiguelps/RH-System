@@ -52,11 +52,19 @@ public sealed class SmtpEnviadorDeEmail(OpcoesDeEmail opcoes) : IEnviadorDeEmail
 
     /// <summary>
     /// <c>5xx</c> do servidor = permanente; <c>4xx</c>, rede, protocolo, TLS, autenticação e tempo esgotado = temporária (a falta de senha ou o provedor fora do ar passam
-    /// e o e-mail sai quando voltar). O status vai junto, porque a mensagem da exceção pode trazer o endereço e não é guardada.
+    /// e o e-mail sai quando voltar). <b>Exceção: remetente recusado (<c>MAIL FROM</c>, por exemplo 550 5.7.1 por domínio não verificado) também é temporária</b>: é problema de
+    /// CONFIGURAÇÃO que vale para toda mensagem, e dá-la como permanente apagaria a carga (e o token do convite) de tudo o que o ciclo tentasse; corrigido o remetente, a fila
+    /// manda. Já a caixa do destinatário e o conteúdo recusados valem só para aquela mensagem: permanentes. O status vai junto, porque a mensagem da exceção pode trazer o
+    /// endereço e não é guardada.
     /// </summary>
     public static FalhaDeEnvioException Classificar(Exception erro) => erro switch
     {
         FalhaDeEnvioException ja => ja,
+        SmtpCommandException { ErrorCode: SmtpErrorCode.SenderNotAccepted } remetente => new FalhaDeEnvioException(
+            "O servidor SMTP recusou o remetente (configuração); vai tentar de novo.",
+            permanente: false,
+            remetente,
+            ((int)remetente.StatusCode).ToString(CultureInfo.InvariantCulture)),
         SmtpCommandException comando => new FalhaDeEnvioException(
             "O servidor SMTP recusou o comando.",
             permanente: (int)comando.StatusCode >= 500,

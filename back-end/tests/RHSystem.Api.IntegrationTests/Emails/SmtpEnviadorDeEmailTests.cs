@@ -107,4 +107,20 @@ public class SmtpEnviadorDeEmailTests(MailpitFixture mailpit) : IClassFixture<Ma
             Assert.Null(falha.StatusSmtp);
         });
     }
+
+    [Fact]
+    public void Remetente_recusado_e_falha_temporaria_porque_vale_para_toda_mensagem_e_mensagem_recusada_e_permanente()
+    {
+        // MAIL FROM recusado (550 5.7.1: domínio não verificado, remetente não autorizado) é problema de CONFIGURAÇÃO e vale para TODA mensagem: corrigido o remetente, a fila
+        // precisa poder mandar. Dar como permanente apagaria a carga (e o token do convite) de tudo o que o ciclo tentasse, e o RH teria de reemitir um a um.
+        var remetente = SmtpEnviadorDeEmail.Classificar(new SmtpCommandException(SmtpErrorCode.SenderNotAccepted, SmtpStatusCode.MailboxUnavailable, "550 5.7.1 remetente não autorizado"));
+        var mensagem = SmtpEnviadorDeEmail.Classificar(new SmtpCommandException(SmtpErrorCode.MessageNotAccepted, SmtpStatusCode.TransactionFailed, "554 conteúdo recusado"));
+        var destinatario = SmtpEnviadorDeEmail.Classificar(new SmtpCommandException(SmtpErrorCode.RecipientNotAccepted, SmtpStatusCode.MailboxUnavailable, "550 caixa inexistente"));
+
+        Assert.False(remetente.Permanente);
+        Assert.Equal("550", remetente.StatusSmtp); // o status vai junto mesmo na temporária
+        Assert.True(mensagem.Permanente); // o conteúdo desta mensagem foi recusado: repetir não adianta
+        Assert.Equal("554", mensagem.StatusSmtp);
+        Assert.True(destinatario.Permanente); // a caixa deste destinatário não existe: continua permanente
+    }
 }

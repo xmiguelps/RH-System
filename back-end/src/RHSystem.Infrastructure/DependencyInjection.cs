@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -58,8 +59,16 @@ public static class DependencyInjection
         // mora só no AddDbContext; a fábrica herda dela (AuditoriaNoContainerTests confere que há um interceptor só).
         services.AddScoped<ContextoDeAuditoria>();
         services.AddScoped<AuditoriaInterceptor>();
+        // A mensagem da exceção de uma chave repetida (1062) traz o VALOR da chave ("Duplicate entry '<valor>'"): o código a trata como sucesso, mas o EF registraria a falha
+        // de gravação em nível Error, com a exceção, por conta própria. Medido (ChaveRepetidaNoLogTests e o controle de mutação): o evento que leva o valor é o
+        // SaveChangesFailed; "Failed executing DbCommand" (RelationalEventId.CommandError) NÃO o leva e continua em Error, com o SQL, para diagnosticar falha de verdade. O
+        // SaveChangesFailed desce para Debug (fora do log padrão); o que falha de verdade sobe como exceção e quem a trata registra (o tratador de erros e os serviços em
+        // segundo plano, que só escrevem o tipo da exceção).
         services.AddDbContext<AppDbContext>(
-            (sp, opcoes) => opcoes.UseMySql(conexao, new MySqlServerVersion(versaoDoServidor)).AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>()));
+            (sp, opcoes) => opcoes
+                .UseMySql(conexao, new MySqlServerVersion(versaoDoServidor))
+                .AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>())
+                .ConfigureWarnings(avisos => avisos.Log((CoreEventId.SaveChangesFailed, LogLevel.Debug))));
         services.AddDbContextFactory<AppDbContext>(_ => { }, ServiceLifetime.Scoped);
         services.AddScoped<IAuditor, Auditor>();
         services.AddScoped<IConsultaDeAuditoria, ConsultaDeAuditoria>();
