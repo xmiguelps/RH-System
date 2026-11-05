@@ -56,7 +56,10 @@ public class AtributosDeAuditoriaTests
 
         Assert.Equal(AuditoriaArea.Colaboradores, typeof(Funcionario).GetCustomAttribute<AuditadoAttribute>()!.Area);
         Assert.Equal("Colaborador", typeof(Funcionario).GetCustomAttribute<AuditadoAttribute>()!.Rotulo);
-        Assert.Equal(new[] { "Cargo", "Data de admissão", "E-mail corporativo", "Matrícula", "Nome", "Setor", "Situação" }.Order(), Campos(typeof(Funcionario)));
+        // A 1b acrescentou: Data de nascimento (sensível), Nível de acesso, Tipo de contrato e Último dia de trabalho (FuncionarioCadastroTests.Marcas_de_auditoria_da_1b os detalha).
+        Assert.Equal(
+            new[] { "Cargo", "Data de admissão", "Data de nascimento", "E-mail corporativo", "Matrícula", "Nível de acesso", "Nome", "Setor", "Situação", "Tipo de contrato", "Último dia de trabalho" }.Order(),
+            Campos(typeof(Funcionario)));
 
         Assert.Equal(AuditoriaArea.Cadastros, typeof(Setor).GetCustomAttribute<AuditadoAttribute>()!.Area);
         Assert.Equal(new[] { "Gestor", "Nome" }.Order(), Campos(typeof(Setor)));

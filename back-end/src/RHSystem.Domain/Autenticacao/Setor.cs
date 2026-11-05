@@ -22,4 +22,7 @@ public class Setor : IAuditavel
     public string NomeParaAuditoria => Nome;
 
     public string RegistroAfetado => $"Setor {Nome}";
+
+    /// <summary><paramref name="idGestor"/> é o <c>ID_GESTOR</c> de <c>GESTORES</c> (não o id do colaborador); nulo deixa o setor sem gestor.</summary>
+    public void DefinirGestor(int? idGestor) => GestorId = idGestor;
 }

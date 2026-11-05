@@ -35,6 +35,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<Beneficio> Beneficios => Set<Beneficio>();
 
+    public DbSet<BeneficioDoFuncionario> BeneficiosDosFuncionarios => Set<BeneficioDoFuncionario>();
+
+    public DbSet<FuncionarioDetalhes> DetalhesDosFuncionarios => Set<FuncionarioDetalhes>();
+
     public DbSet<EmailNaFila> EmailsNaFila => Set<EmailNaFila>();
 
     public DbSet<TarefaAgendada> TarefasAgendadas => Set<TarefaAgendada>();

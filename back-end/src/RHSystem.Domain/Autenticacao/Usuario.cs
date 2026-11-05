@@ -49,4 +49,7 @@ public class Usuario
         UltimoLoginEm = new DateTime(agoraUtc.Ticks - (agoraUtc.Ticks % TimeSpan.TicksPerSecond), agoraUtc.Kind);
 
     public void Inativar() => Ativo = false;
+
+    /// <summary>Libera o acesso de novo (o RH usa "Ativar" em Usuários do sistema; a readmissão também reativa). O trigger do banco só aceita se o funcionário estiver ativo.</summary>
+    public void Reativar() => Ativo = true;
 }

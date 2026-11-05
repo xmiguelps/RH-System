@@ -15,6 +15,9 @@ public class Cargo : IAuditavel
     [Auditar("Nome")]
     public string Nome { get; private set; } = string.Empty;
 
+    /// <summary>A carga semanal em horas (<c>CARGOS.CARGA_HORARIA</c>); nula quando o cargo não a define. Só leitura aqui: quem a escreve é a fatia 1c.</summary>
+    public decimal? CargaSemanalHoras { get; private set; }
+
     public string NomeParaAuditoria => Nome;
 
     public string RegistroAfetado => $"Cargo {Nome}";
