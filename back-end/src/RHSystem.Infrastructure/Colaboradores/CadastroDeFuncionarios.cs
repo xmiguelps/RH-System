@@ -5,6 +5,7 @@ using MySqlConnector;
 using RHSystem.Application.Acesso;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Tempo;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
@@ -55,6 +56,24 @@ public sealed class CadastroDeFuncionarios(
 
         // Por linha, e dentro dela: campos (400), duplicidades (409), regras (422). O sort é estável: o CPF continua antes do e-mail.
         return [.. problemas.OrderBy(p => p.Indice).ThenBy(p => p.Tipo)];
+    }
+
+    public async Task<IReadOnlyList<ProblemaDeCadastro>> ValidarEdicaoAsync(int funcionarioId, NovoFuncionario dados, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(dados);
+        var atual = await db.Funcionarios.AsNoTracking().Where(f => f.Id == funcionarioId).Select(f => new { f.SetorId }).SingleOrDefaultAsync(ct) ?? throw new NaoEncontradoException();
+        var lote = new[] { dados };
+        var problemas = new List<ProblemaDeCadastro>(ValidacaoDeCamposDoCadastro.Validar(0, dados, FusoBrasil.Hoje(relogio.AgoraUtc)));
+        await ConferirExistenciaAsync(lote, problemas, ct);
+        await ConferirDuplicidadeNoBancoAsync(lote, problemas, semOFuncionario: funcionarioId, ct);
+
+        // O trigger do banco só olha o ID_GESTOR quando ele muda: sem trocar de setor, o gestor inativo do setor não atrapalha a edição.
+        if (atual.SetorId != dados.SetorId)
+        {
+            await ConferirGestoresAsync(lote, problemas, ct);
+        }
+
+        return [.. problemas.OrderBy(p => p.Tipo)];
     }
 
     public async Task<ResultadoDoCadastro> CadastrarAsync(IReadOnlyList<NovoFuncionario> novos, OpcoesDoCadastro opcoes, CancellationToken ct)
@@ -108,7 +127,7 @@ public sealed class CadastroDeFuncionarios(
             funcionario.AtribuirMatricula(numeros[i]);
             db.Funcionarios.Add(funcionario);
             db.DetalhesDosFuncionarios.Add(FuncionarioDetalhes.Criar(funcionario, new DadosPessoais(novo.Cpf, novo.Telefone, null, null, null, null, null, null, null, null, null, null)));
-            await SalvarLinhaAsync(i, ct);
+            await SalvarLinhaAsync(db, i, ct);
 
             if (novo.BeneficioIds.Count > 0)
             {
@@ -117,7 +136,7 @@ public sealed class CadastroDeFuncionarios(
                     db.BeneficiosDosFuncionarios.Add(BeneficioDoFuncionario.Conceder(funcionario.Id, beneficioId));
                 }
 
-                await SalvarLinhaAsync(i, ct);
+                await SalvarLinhaAsync(db, i, ct);
             }
 
             cadastrados.Add(new FuncionarioCadastrado(funcionario.Id, numeros[i]));
@@ -131,7 +150,7 @@ public sealed class CadastroDeFuncionarios(
     }
 
     /// <summary>Grava o que está pendente; se o banco recusa, diz de QUAL linha (duplicidade de CPF, e-mail ou matrícula, ou regra de trigger).</summary>
-    private async Task SalvarLinhaAsync(int indice, CancellationToken ct)
+    internal static async Task SalvarLinhaAsync(AppDbContext db, int indice, CancellationToken ct)
     {
         try
         {

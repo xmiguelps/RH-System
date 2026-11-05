@@ -17,6 +17,25 @@ public interface ICadastroDeFuncionarios
     /// A importação envolve a chamada com <c>IAuditor.SuspenderRegistroAutomatico()</c>.
     /// </summary>
     Task<ResultadoDoCadastro> CadastrarAsync(IReadOnlyList<NovoFuncionario> novos, OpcoesDoCadastro opcoes, CancellationToken ct);
+
+    /// <summary>
+    /// SEM gravar. A MESMA validação do cadastro para a edição de <paramref name="funcionarioId"/> (campos, existência de cargo, setor e benefícios, CPF e e-mail repetidos SEM contar o próprio colaborador), com uma
+    /// diferença: o gestor do setor inativo só é problema se o setor MUDOU (o trigger do banco só olha o <c>ID_GESTOR</c> quando ele muda). Não confere as caixas "depois de salvar".
+    /// </summary>
+    /// <exception cref="Comum.NaoEncontradoException">O colaborador não existe.</exception>
+    Task<IReadOnlyList<ProblemaDeCadastro>> ValidarEdicaoAsync(int funcionarioId, NovoFuncionario dados, CancellationToken ct);
+}
+
+/// <summary>A gravação da edição. A validação é a de <see cref="ICadastroDeFuncionarios.ValidarEdicaoAsync"/> mais as regras que só a edição tem (ver <c>EdicaoDeFuncionarios</c>).</summary>
+public interface IEdicaoDeFuncionarios
+{
+    /// <summary>
+    /// <b>Exige transação aberta</b>; NÃO abre nem confirma. Valida tudo (<see cref="CadastroInvalidoException"/>: 400, 409 e 422 pelos tipos dos problemas) e grava: o colaborador, os dados pessoais (cria se faltavam), a
+    /// matrícula (quem não tem recebe a próxima), o gestor (refeito só se o setor mudou) e os benefícios.
+    /// </summary>
+    /// <exception cref="Comum.NaoEncontradoException">O colaborador não existe.</exception>
+    /// <exception cref="LinhaRecusadaException">O banco recusou a gravação (duplicidade ou regra de trigger).</exception>
+    Task EditarAsync(int funcionarioId, NovoFuncionario dados, DadosPessoaisDaEdicao pessoais, CancellationToken ct);
 }
 
 /// <summary>Quem o gestor de uma pessoa deve ser. <c>GestorId</c> é o de <c>GESTORES</c>; <c>GestorInativo</c> diz que o gestor do setor está inativo (o banco recusaria a gravação).</summary>

@@ -120,6 +120,7 @@ public static class DependencyInjection
         services.AddScoped<IEnvioDoFormularioDeAdmissao, FormularioDeAdmissaoIndisponivel>();
         services.AddScoped<IGestorDoFuncionario, GestorDoFuncionario>();
         services.AddScoped<ICadastroDeFuncionarios, CadastroDeFuncionarios>();
+        services.AddScoped<IEdicaoDeFuncionarios, EdicaoDeFuncionarios>();
         var limiteDeSenhaAtual = configuration.GetValue<int?>("Autenticacao:LimiteSenhaAtualPorMinuto") ?? 5;
         if (limiteDeSenhaAtual < 1)
         {

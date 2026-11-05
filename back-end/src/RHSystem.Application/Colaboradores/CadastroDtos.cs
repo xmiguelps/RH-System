@@ -86,3 +86,30 @@ public sealed record FuncionarioCriarComando(
     /// <summary>Propriedade à parte (e não parâmetro do construtor) para ter o padrão <c>[]</c> do contrato sem ser anulável no documento gerado: o contrato não aceita <c>null</c> aqui.</summary>
     public IReadOnlyList<int> BeneficioIds { get; init; } = [];
 }
+
+/// <summary>
+/// O corpo de <c>editarFuncionario</c> (<c>FuncionarioEditarComando</c>): a substituição COMPLETA dos campos editáveis. Tudo vem sempre; os que podem ficar vazios aceitam <c>null</c>.
+/// <c>Endereco</c> e <c>BeneficioIds</c> são obrigatórios no contrato: se faltarem (o System.Text.Json não impõe o <c>required</c>), a validação devolve 400 em vez de apagar o endereço ou todos os benefícios.
+/// </summary>
+public sealed record FuncionarioEditarComando(
+    string Nome,
+    string Cpf,
+    DateOnly DataNascimento,
+    string Telefone,
+    string EmailCorporativo,
+    string? EmailPessoal,
+    string? Rg,
+    string? RgOrgaoEmissor,
+    FuncionarioEndereco Endereco,
+    DateOnly DataAdmissao,
+    TipoDeContrato TipoContrato,
+    int CargoId,
+    int SetorId,
+    Perfil Perfil,
+    IReadOnlyList<int> BeneficioIds);
+
+/// <summary>
+/// O que só a edição tem além de <see cref="NovoFuncionario"/>: e-mail pessoal, RG, órgão emissor e endereço (o cadastro não os recebe). <paramref name="Endereco"/> nulo e
+/// <paramref name="BeneficiosInformados"/> falso são campos obrigatórios que o corpo não trouxe.
+/// </summary>
+public sealed record DadosPessoaisDaEdicao(string? EmailPessoal, string? Rg, string? RgOrgaoEmissor, FuncionarioEndereco? Endereco, bool BeneficiosInformados = true);

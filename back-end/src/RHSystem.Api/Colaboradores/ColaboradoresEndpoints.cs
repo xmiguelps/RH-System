@@ -31,6 +31,7 @@ public static class ColaboradoresEndpoints
     {
         servicos.AddScoped<ListarFuncionariosCasoDeUso>();
         servicos.AddScoped<CriarFuncionarioCasoDeUso>();
+        servicos.AddScoped<EditarFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterFichaDoFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterIndicadoresDoFuncionarioCasoDeUso>();
         return servicos;
@@ -56,6 +57,18 @@ public static class ColaboradoresEndpoints
                 StatusCodes.Status422UnprocessableEntity,
                 StatusCodes.Status500InternalServerError);
 
+        grupo.MapPut("/funcionarios/{funcionarioId:int}", Editar)
+            .WithName("editarFuncionario")
+            .Produces<FuncionarioFichaRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status409Conflict,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
         grupo.MapGet("/funcionarios/{funcionarioId:int}", ObterFicha)
             .WithName("obterFichaDoFuncionario")
             .Produces<FuncionarioFichaRh>(StatusCodes.Status200OK)
@@ -77,6 +90,9 @@ public static class ColaboradoresEndpoints
         var ficha = await casoDeUso.ExecutarAsync(comando, ct);
         return Results.Created($"/api/rh/funcionarios/{ficha.Id}", ficha);
     }
+
+    private static async Task<FuncionarioFichaRh> Editar(int funcionarioId, FuncionarioEditarComando comando, EditarFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(funcionarioId, comando, ct);
 
     private static async Task<FuncionarioFichaRh> ObterFicha(int funcionarioId, ObterFichaDoFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, ct);
