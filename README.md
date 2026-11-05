@@ -118,6 +118,24 @@ O que roda depois, sem ninguém pedir, é uma **tarefa agendada** (`TAREFAS_AGEN
 - **Duas limpezas já existem:** `LIMPAR_TAREFAS` apaga `CONCLUIDA` e `CANCELADA` com mais de `Retencao:TarefasDias` (nunca `PENDENTE`, `EM_EXECUCAO` nem `FALHOU`) e `LIMPAR_EMAILS` apaga `ENVIADO`, `FALHOU`, `DEVOLVIDO` e `CANCELADO` com mais de `Retencao:EmailsDias` (nunca `PENDENTE` nem `EM_ENVIO`). Cada fatia acrescenta as suas (`AddScoped<ITarefaAgendada, ...>`).
 - **Exige Always On.** Com o App Service dormindo (plano sem Always On) **nada roda**; ao acordar, a recuperação refaz o que passou, mas um desligamento agendado, por exemplo, só se efetiva depois disso. Always On é recurso do plano pago do App Service: a Task 14 da fatia 0 (Step 2) é o passo em que o dono escolhe o plano.
 
+### Verificação ponta a ponta da fundação (Task 12, 2026-11-04)
+
+Conferência manual com o Docker, em **banco novo**, para o seed do administrador e o evento `CRIOU` do `Sistema` nascerem com a auditoria já ligada. O plano mandava `docker compose down -v`, que apaga o volume do MySQL local de quem desenvolve; em vez disso a conferência rodou num **projeto compose separado**, com volume próprio e portas diferentes, e só esse volume foi removido no fim:
+
+```
+MYSQL_PORTA=3307 MAILPIT_SMTP_PORTA=1026 MAILPIT_UI_PORTA=8026 docker compose -p rh-verif up -d --wait
+# API em http://localhost:5055 com ConnectionStrings__Padrao (Port=3307), Email__Smtp__Porta=1026, Jwt__Chave e Seed__AdminEmail/Seed__AdminSenha
+# efêmeros (variáveis de ambiente do processo; o corpo do login ficou num arquivo fora do repositório, apagado ao fim)
+MYSQL_PORTA=3307 MAILPIT_SMTP_PORTA=1026 MAILPIT_UI_PORTA=8026 docker compose -p rh-verif down -v
+```
+
+Resultado medido (a API subiu aplicando V001 a V004 num banco vazio):
+
+- **(a)** no log: `Agendador iniciado: 2 tipo(s) recuperado(s); um ciclo a cada 30 s e recuperação a cada 60 min.`, sem nenhuma linha de aviso ou erro; as duas limpezas (`LIMPAR_TAREFAS` e `LIMPAR_EMAILS`) rodaram sozinhas (no log, o `DELETE` de cada uma e, depois dele, o `UPDATE` que grava `CONCLUIDA_EM`; não consultei a tabela para ler a situação).
+- **(b)** `POST /api/auth/entrar` com o administrador do seed devolveu `200`; `GET /api/rh/auditoria` listou exatamente 2 eventos: `ENTROU` (ator: o administrador, `PESSOA`) e `CRIOU` (ator: `Sistema`, `SISTEMA`).
+- **(c)** `GET /api/eu/contadores-do-menu` devolveu `{"avisosNaoLidos":0,"formulariosPendentes":0,"documentosPendentes":0}`; para o administrador (RH), `/api/rh/contadores-do-menu` devolveu `{"pedidosDeAjusteDePonto":0}` e `/api/gestor/contadores-do-menu`, `403`.
+- **(d)** o Mailpit abre (`HTTP 200` na interface) e a caixa está vazia (0 mensagens).
+
 ## Front-end
 
 O front-end (React 19, TypeScript, Vite) está em `front-end/`, feito por Lucas num repositório à parte e trazido para cá (fatias 0 a 6 prontas; a fatia 7 começou e não está completa). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.

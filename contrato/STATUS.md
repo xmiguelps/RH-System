@@ -29,3 +29,6 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/auditoria` | listarEventosDeAuditoria | em andamento | |
 | `GET /api/rh/auditoria/exportacao` | exportarAuditoria | em andamento | |
 | `GET /api/rh/auditoria/{eventoId}` | obterEventoDeAuditoria | em andamento | |
+| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |

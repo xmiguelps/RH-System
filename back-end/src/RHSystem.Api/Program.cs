@@ -2,6 +2,7 @@ using RHSystem.Api.Auditoria;
 using RHSystem.Api.Autenticacao;
 using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
+using RHSystem.Api.Painel;
 using RHSystem.Api.Saude;
 using RHSystem.Infrastructure;
 
@@ -10,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AdicionarInfraestrutura(builder.Configuration);
 builder.Services.AdicionarCasosDeUsoDeAutenticacao();
 builder.Services.AdicionarCasosDeUsoDeAuditoria();
+builder.Services.AdicionarCasosDeUsoDePainel();
 builder.Services.AdicionarAutenticacaoJwt(builder.Configuration);
 builder.Services.AdicionarAutorizacaoPorPerfil();
 builder.Services.AdicionarTratamentoDeErros();
@@ -35,6 +37,7 @@ app.UseAuthorization();
 
 app.MapAutenticacao();
 app.MapAuditoria();
+app.MapContadoresDoMenu();
 app.MapSaude();
 app.UsarDocumentacao();
 if (builder.Configuration.GetValue<bool>("Testes:RotasDeTeste"))
