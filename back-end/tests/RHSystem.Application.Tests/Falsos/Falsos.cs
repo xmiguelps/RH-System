@@ -36,8 +36,14 @@ public sealed class EmissorDeTokensFalso(IRelogio relogio) : IEmissorDeTokens
 
     public TimeSpan ValidadeDoRefresh => TimeSpan.FromDays(7);
 
-    public AcessoEmitido EmitirAcesso(Usuario usuario) =>
-        new($"jwt-do-usuario-{usuario.Id}", relogio.AgoraUtc.AddMinutes(15));
+    /// <summary>O hash do refresh que o chamador mandou levar na claim <c>rth</c> (nulo = token sem a claim).</summary>
+    public string? UltimoHashDaSessao { get; private set; }
+
+    public AcessoEmitido EmitirAcesso(Usuario usuario, string? hashDoRefreshDaSessao = null)
+    {
+        UltimoHashDaSessao = hashDoRefreshDaSessao;
+        return new($"jwt-do-usuario-{usuario.Id}", relogio.AgoraUtc.AddMinutes(15));
+    }
 
     public RefreshGerado NovoRefresh()
     {
@@ -136,6 +142,23 @@ public sealed class RefreshTokenRepositorioEmMemoria(UnidadeDeTrabalhoFalsa unid
 
             token.Revogar(agoraUtc);
             return Task.FromResult(true);
+        }
+    }
+
+    public List<(int UsuarioId, string? HashDaSessaoAtual)> RevogacoesDeOutros { get; } = [];
+
+    public Task<int> RevogarOutrosDoUsuarioAsync(int usuarioId, string? hashDaSessaoAtual, DateTime agoraUtc, CancellationToken ct)
+    {
+        RevogacoesDeOutros.Add((usuarioId, hashDaSessaoAtual));
+        lock (_trava)
+        {
+            var alvos = Todos.Where(t => t.UsuarioId == usuarioId && t.RevogadoEm is null && (hashDaSessaoAtual is null || t.TokenHash != hashDaSessaoAtual)).ToList();
+            foreach (var token in alvos)
+            {
+                token.Revogar(agoraUtc);
+            }
+
+            return Task.FromResult(alvos.Count);
         }
     }
 

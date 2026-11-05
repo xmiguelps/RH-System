@@ -1,3 +1,4 @@
+using RHSystem.Api.Acesso;
 using RHSystem.Api.Auditoria;
 using RHSystem.Api.Autenticacao;
 using RHSystem.Api.Autorizacao;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AdicionarInfraestrutura(builder.Configuration);
 builder.Services.AdicionarCasosDeUsoDeAutenticacao();
 builder.Services.AdicionarCasosDeUsoDeAuditoria();
+builder.Services.AdicionarCasosDeUsoDeAcesso();
 builder.Services.AdicionarCasosDeUsoDePainel();
 builder.Services.AdicionarAutenticacaoJwt(builder.Configuration);
 builder.Services.AdicionarAutorizacaoPorPerfil();
@@ -36,6 +38,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAutenticacao();
+app.MapSenha();
 app.MapAuditoria();
 app.MapContadoresDoMenu();
 app.MapSaude();

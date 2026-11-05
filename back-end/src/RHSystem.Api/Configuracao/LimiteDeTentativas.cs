@@ -8,6 +8,9 @@ public static class LimiteDeTentativasExtensions
 {
     public const string PoliticaDeLogin = "login";
 
+    /// <summary>As três rotas públicas de senha (<c>esqueci</c>, <c>validar-link</c>, <c>definir</c>): o limite vale por IP E por rota (cada uma tem o balde dela).</summary>
+    public const string PoliticaDeSenha = "senha";
+
     /// <summary>
     /// Limite de tentativas de login: <c>Autenticacao:LimiteLoginPorMinuto</c> (padrão 5) por IP, em janela de 1 minuto. Acima disso a
     /// resposta é 429 com o <c>ProblemDetails</c> do contrato e o cabeçalho <c>Retry-After</c> (o limitador do ASP.NET rejeita, por padrão,
@@ -16,6 +19,7 @@ public static class LimiteDeTentativasExtensions
     public static IServiceCollection AdicionarLimiteDeTentativas(this IServiceCollection servicos, IConfiguration configuracao)
     {
         var limite = configuracao.GetValue<int?>("Autenticacao:LimiteLoginPorMinuto") ?? 5;
+        var limiteDeSenha = configuracao.GetValue<int?>("Autenticacao:LimiteSenhaPorMinuto") ?? 5;
 
         servicos.AddRateLimiter(opcoes =>
         {
@@ -26,6 +30,17 @@ public static class LimiteDeTentativasExtensions
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = limite,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                    }));
+
+            opcoes.AddPolicy(PoliticaDeSenha, contexto =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    $"{contexto.Connection.RemoteIpAddress?.ToString() ?? "origem-desconhecida"}|{contexto.Request.Path}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = limiteDeSenha,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0,
                         AutoReplenishment = true,

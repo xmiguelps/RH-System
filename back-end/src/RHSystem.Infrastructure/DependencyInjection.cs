@@ -110,6 +110,14 @@ public static class DependencyInjection
         services.AddSingleton(senha);
         services.AddSingleton<IGeradorDeTokenDeSenha, GeradorDeTokenDeSenha>();
         services.AddScoped<IServicoDeConvite, ServicoDeConvite>();
+        services.AddScoped<ILinksDeSenha, LinksDeSenha>();
+        var limiteDeSenhaAtual = configuration.GetValue<int?>("Autenticacao:LimiteSenhaAtualPorMinuto") ?? 5;
+        if (limiteDeSenhaAtual < 1)
+        {
+            throw new InvalidOperationException("Autenticacao:LimiteSenhaAtualPorMinuto precisa ser pelo menos 1.");
+        }
+
+        services.AddSingleton<ILimiteDeSenhaAtual>(sp => new LimiteDeSenhaAtual(sp.GetRequiredService<IRelogio>(), limiteDeSenhaAtual));
         services.AddSingleton<IRenderizadorDeEmail, ConviteRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, RedefinicaoSenhaRenderizador>();
 

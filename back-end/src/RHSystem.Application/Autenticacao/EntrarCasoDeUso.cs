@@ -75,8 +75,8 @@ public sealed class EntrarCasoDeUso(
 
         var agora = relogio.AgoraUtc;
         usuario.RegistrarLogin(agora);
-        var acesso = emissor.EmitirAcesso(usuario);
         var refresh = emissor.NovoRefresh();
+        var acesso = emissor.EmitirAcesso(usuario, refresh.Hash); // o token de acesso leva o hash do refresh da sessão (claim rth)
         await tokens.AdicionarAsync(RefreshToken.Criar(usuario.Id, refresh.Hash, agora, emissor.ValidadeDoRefresh), ct);
         await unidade.SalvarAsync(ct);
 

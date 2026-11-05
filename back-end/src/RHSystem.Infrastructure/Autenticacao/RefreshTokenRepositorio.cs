@@ -30,6 +30,14 @@ public sealed class RefreshTokenRepositorio(AppDbContext db) : IRefreshTokenRepo
         return linhas == 1;
     }
 
+    public async Task<int> RevogarOutrosDoUsuarioAsync(int usuarioId, string? hashDaSessaoAtual, DateTime agoraUtc, CancellationToken ct)
+    {
+        // AUDITORIA-OK: tabela técnica, sem registro por decisão (o evento é o de senha trocada)
+        return await db.RefreshTokens
+            .Where(t => t.UsuarioId == usuarioId && t.RevogadoEm == null && (hashDaSessaoAtual == null || t.TokenHash != hashDaSessaoAtual))
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevogadoEm, agoraUtc), ct);
+    }
+
     public async Task RevogarTodosDoUsuarioAsync(int usuarioId, DateTime agoraUtc, CancellationToken ct)
     {
         // AUDITORIA-OK: tabela técnica, sem registro por decisão (o refresh token não é fato de negócio)

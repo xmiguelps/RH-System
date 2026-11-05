@@ -35,12 +35,25 @@ public sealed class EmissorDeTokensJwt : IEmissorDeTokens
 
     public TimeSpan ValidadeDoRefresh => TimeSpan.FromDays(_opcoes.RefreshDias);
 
-    public AcessoEmitido EmitirAcesso(Usuario usuario)
+    public AcessoEmitido EmitirAcesso(Usuario usuario, string? hashDoRefreshDaSessao = null)
     {
         var perfil = usuario.Funcionario.Perfil
             ?? throw new InvalidOperationException("Não se emite token para um funcionário sem perfil de acesso configurado.");
         var agora = _relogio.AgoraUtc;
         var expiraEm = agora.AddMinutes(_opcoes.AcessoMinutos);
+
+        var claims = new Dictionary<string, object>
+        {
+            ["sub"] = usuario.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["fid"] = usuario.FuncionarioId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["email"] = usuario.Funcionario.EmailCorporativo ?? string.Empty,
+            ["nome"] = usuario.Funcionario.Nome,
+            ["perfil"] = perfil.ToString(),
+        };
+        if (hashDoRefreshDaSessao is not null)
+        {
+            claims["rth"] = hashDoRefreshDaSessao; // o hash do refresh da sessão: a troca de senha mantém só este
+        }
 
         var token = _handler.CreateToken(new SecurityTokenDescriptor
         {
@@ -50,14 +63,7 @@ public sealed class EmissorDeTokensJwt : IEmissorDeTokens
             NotBefore = agora,
             Expires = expiraEm,
             SigningCredentials = _credenciais,
-            Claims = new Dictionary<string, object>
-            {
-                ["sub"] = usuario.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["fid"] = usuario.FuncionarioId.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["email"] = usuario.Funcionario.EmailCorporativo ?? string.Empty,
-                ["nome"] = usuario.Funcionario.Nome,
-                ["perfil"] = perfil.ToString(),
-            },
+            Claims = claims,
         });
 
         return new AcessoEmitido(token, expiraEm);

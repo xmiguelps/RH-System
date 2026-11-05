@@ -29,6 +29,10 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "obterContadoresDoMenuDoFuncionario",
         "obterContadoresDoMenuDoGestor",
         "obterContadoresDoMenuDoRh",
+        "solicitarRedefinicaoDeSenha",
+        "validarLinkDeSenha",
+        "definirSenhaPeloLink",
+        "trocarMinhaSenha",
     ];
 
     private async Task<JsonNode> DocumentoGeradoAsync() =>
