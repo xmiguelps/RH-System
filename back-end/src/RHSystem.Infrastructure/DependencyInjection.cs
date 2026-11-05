@@ -98,6 +98,10 @@ public static class DependencyInjection
         services.AddScoped<IGeradorDeMatriculas, GeradorDeMatriculas>();
         services.AddScoped<IEscopoDoUsuario, EscopoDoUsuario>();
 
+        // Pedidos parados no gestor: a porta única que a 1b e a 1c injetam. O composto soma as IPedidosParadosNoGestorDaFatia que as fatias 3 (ponto) e 7 (férias)
+        // registrarem (AddScoped); sem nenhuma, não faz nada (dívida registrada em contrato/STATUS.md).
+        services.AddScoped<IPedidosParadosNoGestor, PedidosParadosNoGestorComposto>();
+
         services.AddSingleton<ISenhaHasher, SenhaHasher>();
         services.AddSingleton<IRelogio, RelogioDoSistema>();
         services.AddSingleton<IEmissorDeTokens>(sp => new EmissorDeTokensJwt(jwt, sp.GetRequiredService<IRelogio>()));

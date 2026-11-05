@@ -32,3 +32,7 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
 | `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
 | `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+
+## Pendências conhecidas
+
+- **Pedidos parados no gestor (porta vazia):** trocar, tirar ou desligar um gestor e ligar "Gestor ausente" chamam `IPedidosParadosNoGestor`, mas até as fatias 3 (ponto) e 7 (férias) implementarem a deles **nenhum pedido muda de etapa** (`CONVENCOES.md`, seção 9).
