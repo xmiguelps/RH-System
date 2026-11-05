@@ -36,10 +36,17 @@ public sealed class EntrarCasoDeUso(
         var email = comando.Email.Trim().ToLowerInvariant();
         var usuario = await usuarios.ObterPorEmailCorporativoAsync(email, ct);
 
-        if (usuario is null)
+        if (usuario is null || usuario.SenhaProvisoria)
         {
-            // Sem esta verificação o tempo da resposta revelaria quais e-mails existem.
+            // Sem esta verificação o tempo da resposta revelaria quais e-mails existem. Quem recebeu o convite e ainda não escolheu a senha (SenhaProvisoria) é tratado
+            // como e-mail inexistente: o hash provisório nunca é verificado, o custo é o mesmo e a resposta é a mesma 401 da senha errada.
             hasher.Verificar(HashesFicticios.GetValue(hasher, h => h.Gerar(Guid.NewGuid().ToString("N"))), comando.Senha);
+            if (usuario is not null)
+            {
+                // A pessoa existe: o mesmo evento da senha errada (no máximo um por pessoa por minuto). O texto não revela que o convite está pendente.
+                await RegistrarAsync(usuario, AuditoriaAcao.AcessoNegado, "Tentativa de login com senha incorreta", comLimite: true, ct);
+            }
+
             return Falha(FalhaDeEntrada.CredenciaisInvalidas);
         }
 

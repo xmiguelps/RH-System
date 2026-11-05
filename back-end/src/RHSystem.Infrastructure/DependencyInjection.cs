@@ -4,12 +4,14 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RHSystem.Application.Acesso;
 using RHSystem.Application.Agendamento;
 using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Escopo;
+using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
 using RHSystem.Infrastructure.Auditoria;
@@ -100,6 +102,16 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, LimparTarefasAntigasTarefa>();
         services.AddScoped<ITarefaAgendada, LimparEmailsAntigosTarefa>();
         services.AddHostedService<AgendadorHostedService>();
+
+        // Convite e redefinição de senha: o serviço que emite o link (o token só no e-mail; o banco guarda o hash) e os dois e-mails da lista fechada.
+        var senha = new OpcoesDeSenha();
+        configuration.GetSection(OpcoesDeSenha.Secao).Bind(senha);
+        senha.Validar();
+        services.AddSingleton(senha);
+        services.AddSingleton<IGeradorDeTokenDeSenha, GeradorDeTokenDeSenha>();
+        services.AddScoped<IServicoDeConvite, ServicoDeConvite>();
+        services.AddSingleton<IRenderizadorDeEmail, ConviteRenderizador>();
+        services.AddSingleton<IRenderizadorDeEmail, RedefinicaoSenhaRenderizador>();
 
         services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
         services.AddScoped<IRefreshTokenRepositorio, RefreshTokenRepositorio>();

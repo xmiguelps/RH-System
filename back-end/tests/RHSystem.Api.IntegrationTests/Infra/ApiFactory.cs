@@ -128,6 +128,7 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         builder.UseSetting("Agendador:Ativo", "false"); // sem o servico em segundo plano do agendador: os testes chamam o ciclo direto
         builder.UseSetting("Email:EnvioAtivo", "false"); // sem o serviço em segundo plano: os testes chamam o ciclo de envio direto
         builder.UseSetting("Cors:OrigensPermitidas:0", OrigemPermitida);
+        builder.UseSetting("App:UrlDoFront", "https://app.exemplo.com.br"); // os e-mails de convite e de redefinição montam o link com ela
         builder.ConfigureServices(servicos =>
         {
             servicos.RemoveAll<IRelogio>();

@@ -58,6 +58,40 @@ public partial class UsuarioTokenSenha
         };
     }
 
+    /// <summary>O link foi usado (a pessoa escolheu a senha). Só um link em aberto pode ser usado.</summary>
+    /// <exception cref="InvalidOperationException">O link já foi usado ou invalidado.</exception>
+    public void Usar(DateTime agoraUtc)
+    {
+        ExigirUtc(agoraUtc);
+        ExigirEmAberto();
+        UsadoEm = agoraUtc;
+    }
+
+    /// <summary>O link deixou de valer (um novo foi emitido, ou a senha foi definida por outro caminho). O <c>CHECK</c> do banco nunca aceita "usado e invalidado" juntos.</summary>
+    /// <exception cref="InvalidOperationException">O link já foi usado ou invalidado.</exception>
+    public void Invalidar(DateTime agoraUtc)
+    {
+        ExigirUtc(agoraUtc);
+        ExigirEmAberto();
+        InvalidadoEm = agoraUtc;
+    }
+
+    private void ExigirEmAberto()
+    {
+        if (UsadoEm is not null || InvalidadoEm is not null)
+        {
+            throw new InvalidOperationException("O link já foi usado ou invalidado.");
+        }
+    }
+
+    private static void ExigirUtc(DateTime instante)
+    {
+        if (instante.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("O instante precisa ter Kind = Utc.", nameof(instante));
+        }
+    }
+
     [GeneratedRegex(@"^[0-9A-Fa-f]{64}\z")]
     private static partial Regex Hexadecimal64();
 }

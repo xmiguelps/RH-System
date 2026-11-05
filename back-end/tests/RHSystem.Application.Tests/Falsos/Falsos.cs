@@ -281,7 +281,9 @@ public sealed class Cenario
         bool usuarioAtivo = true,
         bool funcionarioAtivo = true,
         string? cargo = null,
-        string? setor = null)
+        string? setor = null,
+        bool senhaProvisoria = false,
+        string? hashProvisorio = null)
     {
         var funcionario = Funcionario.Criar("Ana Souza", email, new DateOnly(2026, 1, 2), new NivelDeAcesso(nivel ?? "qualquer"));
         Dominio.Definir(funcionario, nameof(Funcionario.Id), _proximoId++);
@@ -305,7 +307,7 @@ public sealed class Cenario
             funcionario.Inativar();
         }
 
-        var usuario = Usuario.Criar(funcionario, Hasher.Gerar(SenhaCerta));
+        var usuario = Usuario.Criar(funcionario, hashProvisorio ?? Hasher.Gerar(SenhaCerta), senhaProvisoria);
         Dominio.Definir(usuario, nameof(Usuario.Id), _proximoId++);
         if (!usuarioAtivo)
         {
