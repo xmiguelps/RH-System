@@ -288,6 +288,8 @@ public class UsuariosDoSistemaTests(MySqlFixture mysql)
         var item = await CorpoAsync(resposta);
         Assert.False(item.GetProperty("ativo").GetBoolean());
         Assert.Equal("SENHA_DEFINIDA", Situacao(item));
+        // Encerradas NA HORA, no banco: o renovar também recusaria sozinho (login bloqueado), então só a conferência direta separa as duas coisas.
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM REFRESH_TOKENS WHERE ID_USUARIO = {pessoa.UsuarioId} AND REVOGADO_EM IS NULL"));
         Assert.Equal(401, await RenovarAsync(anonimo, refresh)); // as sessões abertas caíram
         var entrar = await anonimo.PostAsJsonAsync("/api/auth/entrar", new { email = pessoa.Email, senha = ApiFactory.SenhaPadrao });
         Assert.Equal(403, (int)entrar.StatusCode); // senha certa, login bloqueado
@@ -299,6 +301,10 @@ public class UsuariosDoSistemaTests(MySqlFixture mysql)
         Assert.Equal(200, (int)denovo.StatusCode);
         Assert.False((await CorpoAsync(denovo)).GetProperty("ativo").GetBoolean());
         Assert.Equal(eventos, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM AUDITORIA_EVENTOS"));
+
+        // Bloquear e liberar de novo não ressuscita a sessão antiga: o refresh token de antes do bloqueio continua morto.
+        Assert.Equal(200, (int)(await PostSemCorpoAsync(cliente, $"{Lista}/{pessoa.FuncionarioId}/ativar")).StatusCode);
+        Assert.Equal(401, await RenovarAsync(anonimo, refresh));
     }
 
     [Fact]
