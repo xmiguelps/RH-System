@@ -80,6 +80,8 @@ public class EquipeDoGestorTests(MySqlFixture mysql)
         api.Api.Relogio.Fixar(new DateTime(2026, 10, 10, 12, 42, 0, DateTimeKind.Utc)); // sábado
         var gestor = await api.ClienteAgoraAsync(api.Elenco.Gestor.UsuarioId);
 
+        var semSetorNoSabado = await ListarAsync(await api.ClienteAgoraAsync(api.Elenco.GestorSemSetor.UsuarioId));
+        Assert.False(semSetorNoSabado.GetProperty("diaUtil").GetBoolean()); // a equipe vazia também diz que sábado não é dia útil
         var padrao = await ListarAsync(gestor);
         Assert.False(padrao.GetProperty("diaUtil").GetBoolean());
         Assert.All(padrao.GetProperty("itens").EnumerateArray(), i => Assert.Equal("SEM_EXPEDIENTE", i.GetProperty("situacaoHoje").GetString())); // a fonte padrão: fim de semana, ninguém trabalha
@@ -97,6 +99,27 @@ public class EquipeDoGestorTests(MySqlFixture mysql)
         Assert.Equal("SEM_EXPEDIENTE", porNome["Júlia Nunes"]);
         Assert.Equal(equipe.GetProperty("total").GetInt32(), Contagens(equipe).Sum());
         Assert.Equal((1, 1), (Contagens(equipe)[0], Contagens(equipe)[5]));
+    }
+
+    [Fact]
+    public async Task Nomes_iguais_ficam_em_ordem_de_id()
+    {
+        var api = await ApiAsync();
+        var n = Interlocked.Increment(ref _extra);
+        var cargo = await SementeDoCadastro.CargoAsync(api.Conexao, $"Cargo homonimo {n}", 44m);
+        var gestorId = (int)await Sql.ContarAsync(api.Conexao, $"SELECT ID_GESTOR FROM GESTORES WHERE ID_FUNCIONARIO = {api.Elenco.Gestor.FuncionarioId}");
+        var primeiro = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Diego Farias", $"homonimo.a.{n}@equipe.com.br", new DateOnly(2026, 1, 5), setorId: api.Elenco.SetorComercialId, cargoId: cargo, gestorId: gestorId);
+        var segundo = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Diego Farias", $"homonimo.b.{n}@equipe.com.br", new DateOnly(2026, 1, 5), setorId: api.Elenco.SetorComercialId, cargoId: cargo, gestorId: gestorId);
+
+        var equipe = await ListarAsync(api.Api.ClienteComo(api.Elenco.Gestor));
+
+        var ids = equipe.GetProperty("itens").EnumerateArray().Where(i => i.GetProperty("nome").GetString() == "Diego Farias").Select(i => i.GetProperty("id").GetInt32()).ToArray();
+        Assert.Equal([api.Elenco.MembroA.FuncionarioId, primeiro, segundo], ids); // o mesmo nome: pelo id, sempre na mesma ordem
+        var doPrimeiro = equipe.GetProperty("itens").EnumerateArray().Single(i => i.GetProperty("id").GetInt32() == primeiro);
+        Assert.Equal($"Cargo homonimo {n}", doPrimeiro.GetProperty("cargo").GetString()); // o cargo da pessoa aparece na linha
+
+        // Saem da equipe depois do teste: o banco da classe é um só e os outros testes contam a equipe de Carlos.
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE, DATA_DESLIGAMENTO = '2026-10-01' WHERE ID_FUNCIONARIO IN ({primeiro}, {segundo})");
     }
 
     [Fact]

@@ -36,7 +36,7 @@ public sealed class ConsultaDaEquipe(AppDbContext db, ISituacaoDeHoje situacaoDe
             .ToListAsync(ct);
 
         var dia = await situacaoDeHoje.ObterAsync([.. linhas.Select(l => l.Id)], ct);
-        var itens = linhas.Select(l => new FuncionarioEquipeItem(l.Id, l.Nome, l.Cargo, l.Setor, l.Ativo, dia.Situacoes[l.Id])).ToList();
+        var itens = linhas.Select(l => new FuncionarioEquipeItem(l.Id, l.Nome, l.Ativo, dia.Situacoes[l.Id], l.Cargo, l.Setor)).ToList();
         return new FuncionarioEquipeResposta(new SetorReferencia(equipe.SetorId, equipe.SetorNome), itens.Count, dia.DiaUtil, PresencaContagens.De(itens.Select(i => i.SituacaoHoje)), itens);
     }
 

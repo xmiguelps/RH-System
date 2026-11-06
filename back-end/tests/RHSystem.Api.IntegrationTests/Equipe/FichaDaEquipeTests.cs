@@ -16,6 +16,7 @@ public class FichaDaEquipeTests(MySqlFixture mysql)
 {
     private const string TelefoneDoMembroA = "11987657783";
     private static int _cpf = 700_000;
+    private static int _cargo;
 
     private async Task<ApiDeAcesso> ApiAsync()
     {
@@ -38,6 +39,8 @@ public class FichaDaEquipeTests(MySqlFixture mysql)
     {
         var api = await ApiAsync();
         await DarTelefoneAsync(api, api.Elenco.MembroA.FuncionarioId, TelefoneDoMembroA);
+        var cargo = await SementeDoCadastro.CargoAsync(api.Conexao, $"Cargo da ficha {Interlocked.Increment(ref _cargo)}", 36m);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ID_CARGO = {cargo}, TIPO_CONTRATO = 'ESTAGIO' WHERE ID_FUNCIONARIO = {api.Elenco.MembroA.FuncionarioId}");
 
         var resposta = await FichaAsync(api.Api.ClienteComo(api.Elenco.Gestor), api.Elenco.MembroA.FuncionarioId);
 
@@ -50,6 +53,8 @@ public class FichaDaEquipeTests(MySqlFixture mysql)
         Assert.Equal((api.Elenco.MembroA.FuncionarioId, api.Elenco.MembroA.Nome, true, "AINDA_NAO_COMECOU"), (ficha.GetProperty("id").GetInt32(), ficha.GetProperty("nome").GetString(), ficha.GetProperty("ativo").GetBoolean(), ficha.GetProperty("situacaoHoje").GetString()));
         Assert.Equal("Comercial", ficha.GetProperty("setor").GetString());
         Assert.Equal("2026-01-02", ficha.GetProperty("dataAdmissao").GetString());
+        Assert.Equal(($"Cargo da ficha {_cargo}", "ESTAGIO", 36m), (ficha.GetProperty("cargo").GetString(), ficha.GetProperty("tipoContrato").GetString(), ficha.GetProperty("jornadaSemanalHoras").GetDecimal()));
+        Assert.Equal("diego.farias@empresa.com.br", ficha.GetProperty("emailCorporativo").GetString());
         await resposta.AfirmarConformeAoContratoAsync("obterFichaDaEquipe");
     }
 
