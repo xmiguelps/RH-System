@@ -79,19 +79,6 @@ public sealed class ObterIndicadoresDoFuncionarioCasoDeUso(
         _ = await existencia.ObterAsync(funcionarioId, ct) ?? throw new NaoEncontradoException();
         var lista = fontes.ToList();
 
-        async Task<int?> PrimeiroAsync(IndicadorDaFicha indicador)
-        {
-            foreach (var fonte in lista.Where(f => f.Indicador == indicador))
-            {
-                if (await fonte.ObterAsync(funcionarioId, ct) is { } valor)
-                {
-                    return valor;
-                }
-            }
-
-            return null;
-        }
-
         DateOnly? dia = null;
         foreach (var fonte in proximoPagamento)
         {
@@ -103,9 +90,9 @@ public sealed class ObterIndicadoresDoFuncionarioCasoDeUso(
         }
 
         return new FuncionarioIndicadoresRh(
-            await PrimeiroAsync(IndicadorDaFicha.BancoDeHorasMinutos),
-            await PrimeiroAsync(IndicadorDaFicha.FeriasDisponiveisDias),
-            await PrimeiroAsync(IndicadorDaFicha.AdvertenciasQuantidade),
+            await FontesDeIndicador.PrimeiroAsync(lista, IndicadorDaFicha.BancoDeHorasMinutos, funcionarioId, ct),
+            await FontesDeIndicador.PrimeiroAsync(lista, IndicadorDaFicha.FeriasDisponiveisDias, funcionarioId, ct),
+            await FontesDeIndicador.PrimeiroAsync(lista, IndicadorDaFicha.AdvertenciasQuantidade, funcionarioId, ct),
             dia);
     }
 }

@@ -48,6 +48,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `POST /api/rh/funcionarios/{funcionarioId}/desligamento` | inativarFuncionario | em andamento | a condição "depois de a consolidação do banco de horas" entra com a fatia 3; os pedidos parados num gestor desligado só passam ao RH quando as fatias 3 e 7 registrarem a implementação delas da porta `IPedidosParadosNoGestor` (o composto padrão é vazio) |
 | `DELETE /api/rh/funcionarios/{funcionarioId}/desligamento` | cancelarDesligamentoAgendado | em andamento | só enquanto o desligamento está AGENDADO; depois de EFETIVADO responde 422 `SEM_DESLIGAMENTO_AGENDADO` |
 | `POST /api/rh/funcionarios/{funcionarioId}/readmissao` | readmitirFuncionario | em andamento | os pedidos parados no gestor readmitido só passam ao RH quando as fatias 3 e 7 registrarem a implementação delas da porta `IPedidosParadosNoGestor` |
+| `GET /api/gestor/equipe` | listarEquipeDoGestor | em andamento | parcial: `situacaoHoje` e `contagensHoje` conhecem só o fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4, 6 e 7 |
+| `GET /api/gestor/equipe/{funcionarioId}` | obterFichaDaEquipe | em andamento | parcial: `situacaoHoje` e `contagensHoje` conhecem só o fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4, 6 e 7 |
+| `GET /api/gestor/equipe/{funcionarioId}/indicadores` | obterIndicadoresDaEquipe | em andamento | parcial: `situacaoHoje` e `contagensHoje` conhecem só o fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4, 6 e 7 |
 
 ## Pendências conhecidas
 

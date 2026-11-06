@@ -115,6 +115,7 @@ public static class DependencyInjection
         services.AddScoped<ILinksDeSenha, LinksDeSenha>();
         services.AddScoped<IConsultaDeUsuariosDoSistema, ConsultaDeUsuariosDoSistema>();
         services.AddScoped<IConsultaDeFuncionarios, ConsultaDeFuncionarios>();
+        services.AddScoped<IConsultaDaEquipe, ConsultaDaEquipe>();
 
         // As caixas "Depois de salvar" do cadastro dependem das fatias 5 e 6: as versões padrão dizem a verdade (indisponível) e ficam registradas ANTES de qualquer outra, para as fatias donas
         // registrarem as delas depois (AddScoped: o último registro vale).

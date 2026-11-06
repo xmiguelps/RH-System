@@ -70,10 +70,16 @@ internal sealed class ApiDeAcesso
     /// Um cliente HTTP do RH do elenco com um token de acesso emitido AGORA, no instante do relógio falso. Para os testes que mudam o relógio (o token de <c>ClienteComo</c> vale 15 minutos a partir de
     /// 2026-10-07T12:42Z e a API mede a validade pelo mesmo relógio).
     /// </summary>
-    public async Task<HttpClient> ClienteDoRhAgoraAsync()
+    public Task<HttpClient> ClienteDoRhAgoraAsync() => ClienteAgoraAsync(Elenco.Rh.UsuarioId);
+
+    /// <summary>
+    /// Como <see cref="ClienteDoRhAgoraAsync"/> para qualquer pessoa com login (do elenco ou criada pelo teste): o token sai AGORA, no instante do relógio falso, com o nível que a pessoa tem
+    /// neste momento (quem mudou de nível depois de um token antigo precisa de um token novo).
+    /// </summary>
+    public async Task<HttpClient> ClienteAgoraAsync(int usuarioId)
     {
         await using var db = ContextoDeTeste.Novo(Conexao);
-        var usuario = await db.Usuarios.Include(u => u.Funcionario).ThenInclude(f => f.NivelDeAcesso).SingleAsync(u => u.Id == Elenco.Rh.UsuarioId);
+        var usuario = await db.Usuarios.Include(u => u.Funcionario).ThenInclude(f => f.NivelDeAcesso).SingleAsync(u => u.Id == usuarioId);
         var cliente = Api.CreateClient();
         cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Api.Services.GetRequiredService<IEmissorDeTokens>().EmitirAcesso(usuario).Token);
         return cliente;
