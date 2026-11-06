@@ -55,6 +55,14 @@ public static class ValidacaoDeCamposDaEdicao
             {
                 Problema("endereco.uf", "Informe a sigla do estado em maiúsculas (por exemplo SP).");
             }
+
+            foreach (var (campo, rotulo, valor, maximo) in CamposDeTexto(dados.Endereco))
+            {
+                if (valor is { } texto && texto.Length > maximo)
+                {
+                    Problema($"endereco.{campo}", $"O {rotulo} pode ter até {maximo} caracteres.");
+                }
+            }
         }
 
         if (!dados.BeneficiosInformados)
@@ -64,4 +72,14 @@ public static class ValidacaoDeCamposDaEdicao
 
         return problemas;
     }
+
+    /// <summary>Os campos de texto do endereço e o tamanho que o contrato (<c>FuncionarioEndereco</c>) e as colunas do banco aceitam: um a mais seria um erro de gravação (500), e o contrato manda 400.</summary>
+    private static IEnumerable<(string Campo, string Rotulo, string? Valor, int Maximo)> CamposDeTexto(FuncionarioEndereco e) =>
+    [
+        ("logradouro", "logradouro", e.Logradouro, 150),
+        ("numero", "número", e.Numero, 10),
+        ("complemento", "complemento", e.Complemento, 100),
+        ("bairro", "bairro", e.Bairro, 100),
+        ("cidade", "cidade", e.Cidade, 100),
+    ];
 }

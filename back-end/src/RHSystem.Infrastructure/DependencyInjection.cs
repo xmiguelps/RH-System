@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddSingleton(email);
         var app = new OpcoesDoApp();
         configuration.GetSection(OpcoesDoApp.Secao).Bind(app);
+        app.Validar(email.EnvioAtivo);
         services.AddSingleton(app);
         services.AddSingleton<IEnviadorDeEmail, SmtpEnviadorDeEmail>();
         services.AddScoped<IFilaDeEmails, FilaDeEmails>();

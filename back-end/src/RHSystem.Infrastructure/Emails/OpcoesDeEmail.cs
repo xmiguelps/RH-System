@@ -76,4 +76,17 @@ public sealed class OpcoesDoApp
     public const string Secao = "App";
 
     public string UrlDoFront { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Com o envio de e-mail ligado, a URL do front tem de ser absoluta, <c>http</c> ou <c>https</c>: sem ela o renderizador do convite e o da redefinição lançam, a fila marca cada mensagem como
+    /// <c>FALHOU</c> e o RH vê "convite enviado" sem que nada saia. Configuração faltando falha na inicialização, não no primeiro e-mail. Com o envio desligado nada sai e a URL pode faltar.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">O envio está ligado e a URL falta ou não é http/https absoluta.</exception>
+    public void Validar(bool envioAtivo)
+    {
+        if (envioAtivo && !(Uri.TryCreate(UrlDoFront, UriKind.Absolute, out var url) && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)))
+        {
+            throw new InvalidOperationException("Com Email:EnvioAtivo ligado, App:UrlDoFront precisa ser a URL do front (http ou https), por exemplo https://app.exemplo.com.br: sem ela os e-mails de convite e de redefinição ficam sem link e a fila os marca como FALHOU.");
+        }
+    }
 }

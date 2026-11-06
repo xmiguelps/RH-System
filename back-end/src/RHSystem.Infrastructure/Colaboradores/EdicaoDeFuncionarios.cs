@@ -1,6 +1,8 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using RHSystem.Application.Acesso;
 using RHSystem.Application.Auditoria;
+using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Escopo;
@@ -27,6 +29,8 @@ public sealed class EdicaoDeFuncionarios(
     IAuditor auditor,
     IGeradorDeMatriculas matriculas,
     IGestorDoFuncionario gestores,
+    ILinksDeSenha links,
+    IRelogio relogio,
     ICadastroDeFuncionarios cadastro) : IEdicaoDeFuncionarios
 {
     private const string CodigoDeCampoInvalido = ValidacaoDeCamposDoCadastro.CodigoDeCampoInvalido;
@@ -59,7 +63,12 @@ public sealed class EdicaoDeFuncionarios(
         var gestorId = setorMudou ? (await gestores.ResolverAsync(dados.SetorId, funcionarioId, ct)).GestorId : funcionario.GestorId;
         var nomeDoNivel = NomesDeNivel.DoPerfil(dados.Perfil);
         var nivel = await db.NiveisDeAcesso.SingleAsync(n => n.Nome == nomeDoNivel, ct);
+        var emailMudou = !string.Equals(funcionario.EmailCorporativo, dados.EmailCorporativo.Trim().ToLowerInvariant(), StringComparison.Ordinal);
         funcionario.AtualizarCadastro(dados.Nome, dados.EmailCorporativo, dados.DataNascimento, dados.DataAdmissao, dados.TipoContrato, dados.CargoId, dados.SetorId, gestorId, nivel);
+        if (emailMudou)
+        {
+            await InvalidarLinksEmAbertoAsync(funcionarioId, ct);
+        }
 
         if (funcionario.Matricula is null)
         {
@@ -67,7 +76,7 @@ public sealed class EdicaoDeFuncionarios(
         }
 
         GravarDadosPessoais(funcionario, dados, pessoais);
-        AplicarBeneficios(funcionarioId, dados.BeneficioIds, linhas);
+        await AplicarBeneficiosAsync(funcionario, dados.BeneficioIds, linhas, ct);
         await CadastroDeFuncionarios.SalvarLinhaAsync(db, 0, ct);
     }
 
@@ -166,8 +175,10 @@ public sealed class EdicaoDeFuncionarios(
     /// única <c>(ID_FUNCIONARIO, ID_BENEFICIO)</c> recusaria um segundo <c>INSERT</c>); aprovada e ativa: não muda. O que saiu do conjunto e está aprovado e ativo é desativado; linha pendente, recusada ou cancelada
     /// de benefício fora do conjunto não é tocada.
     /// </summary>
-    private void AplicarBeneficios(int funcionarioId, IReadOnlyList<int> desejados, List<BeneficioDoFuncionario> linhas)
+    private async Task AplicarBeneficiosAsync(Funcionario funcionario, IReadOnlyList<int> desejados, List<BeneficioDoFuncionario> linhas, CancellationToken ct)
     {
+        var funcionarioId = funcionario.Id;
+        var antes = linhas.Where(l => l.Ativo && l.Status == StatusDoPedidoDeBeneficio.Aprovado).Select(l => l.BeneficioId).ToHashSet();
         var conjunto = desejados.ToHashSet();
         foreach (var beneficioId in conjunto)
         {
@@ -189,6 +200,44 @@ public sealed class EdicaoDeFuncionarios(
         foreach (var linha in linhas.Where(l => l.Ativo && l.Status == StatusDoPedidoDeBeneficio.Aprovado && !conjunto.Contains(l.BeneficioId)))
         {
             linha.Desativar();
+        }
+
+        await RegistrarMudancaDeBeneficiosAsync(funcionario, antes, conjunto, ct);
+    }
+
+    /// <summary>
+    /// Quem deu ou tirou benefício fica no log: um evento "Benefícios de {nome}" com os NOMES dos benefícios ativos antes e depois (em ordem, separados por vírgula; vazio é <c>null</c>). Lista igual à de antes, nenhum
+    /// evento. A inativação do colaborador cancela os benefícios pelo trigger, sem registro próprio (decisão do dono), então este evento é só da edição do RH.
+    /// </summary>
+    private async Task RegistrarMudancaDeBeneficiosAsync(Funcionario funcionario, HashSet<int> antes, HashSet<int> depois, CancellationToken ct)
+    {
+        if (antes.SetEquals(depois))
+        {
+            return;
+        }
+
+        var ids = antes.Union(depois).ToList();
+        var nomes = await db.Beneficios.AsNoTracking().Where(b => ids.Contains(b.Id)).ToDictionaryAsync(b => b.Id, b => b.Nome, ct);
+
+        string? Texto(IEnumerable<int> beneficios)
+        {
+            var lista = beneficios.Select(id => nomes[id]).Order(StringComparer.Ordinal).ToList();
+            return lista.Count == 0 ? null : string.Join(", ", lista);
+        }
+
+        auditor.Registrar(new EventoDeAuditoriaNovo(AuditoriaArea.Colaboradores, AuditoriaAcao.Alterou, $"Benefícios de {funcionario.Nome}", funcionario.RegistroAfetado, "FUNCIONARIOS", funcionario.Id, [new MudancaDeAuditoriaNova("Benefícios", Texto(antes), Texto(depois))]));
+    }
+
+    /// <summary>
+    /// O e-mail corporativo mudou: os links de convite e de redefinição que já saíram foram para o endereço ANTIGO (um erro de digitação, ou alguém que já não é da empresa) e quem os tem definiria a senha e
+    /// entraria na conta. Invalida os que estão em aberto (o RH reenvia o convite para o endereço novo). Na mesma transação da edição.
+    /// </summary>
+    private async Task InvalidarLinksEmAbertoAsync(int funcionarioId, CancellationToken ct)
+    {
+        var usuarioId = await db.Usuarios.AsNoTracking().Where(u => u.FuncionarioId == funcionarioId).Select(u => (int?)u.Id).FirstOrDefaultAsync(ct);
+        if (usuarioId is { } id)
+        {
+            await links.InvalidarOutrosDaPessoaAsync(id, relogio.AgoraUtc, ct);
         }
     }
 }

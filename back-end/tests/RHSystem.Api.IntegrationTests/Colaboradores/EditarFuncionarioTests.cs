@@ -534,6 +534,56 @@ public class EditarFuncionarioTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Editar_beneficios_grava_um_evento_com_os_nomes_antes_e_depois_e_so_quando_mudam()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar20");
+        var a = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio A editar20");
+        var b = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio B editar20");
+
+        foreach (var lista in new[] { new[] { a }, new[] { b, a }, new[] { b }, new[] { b } }) // a segunda vem fora de ordem; a última não muda nada
+        {
+            Assert.Equal(200, (int)(await EditarAsync(api, pessoa.Id, Corpo(pessoa, beneficios: lista))).StatusCode);
+        }
+
+        var eventos = (await AuditoriaDeTeste.EventosAsync(api.Conexao, "FUNCIONARIOS", pessoa.Id)).Where(e => e.Descricao == $"Benefícios de {pessoa.Nome}").OrderBy(e => e.Id).ToList();
+        Assert.Equal(3, eventos.Count); // dar, dar mais um e tirar um; repetir a mesma lista não grava nada
+        Assert.All(eventos, e => Assert.Equal((AuditoriaArea.Colaboradores, AuditoriaAcao.Alterou, api.Elenco.Rh.FuncionarioId), (e.Area, e.Acao, e.FuncionarioAtorId)));
+        var mudancas = eventos.Select(e => Assert.Single(e.Mudancas)).Select(m => (m.Campo, m.ValorAntes, m.ValorDepois, m.ValorOculto)).ToList();
+        Assert.Equal(
+            [
+                ("Benefícios", (string?)null, (string?)"Beneficio A editar20", false),
+                ("Benefícios", "Beneficio A editar20", "Beneficio A editar20, Beneficio B editar20", false),
+                ("Benefícios", "Beneficio A editar20, Beneficio B editar20", "Beneficio B editar20", false),
+            ],
+            mudancas);
+    }
+
+    [Fact]
+    public async Task Trocar_o_email_corporativo_invalida_o_convite_em_aberto_e_editar_sem_trocar_nao_invalida()
+    {
+        var api = await ApiAsync();
+        var (cargo, setor) = await CargoESetorAsync(api, "editar21");
+        var login = await api.NovaPessoaAsync("editar21", login: TipoDeLogin.Provisorio); // o convite ainda não foi aceito
+        var pessoa = new Pessoa(login.FuncionarioId, login.Nome, login.Email!, CpfNovo(), cargo, setor);
+        var token = await NovoConviteAsync(api, login);
+        var anonimo = api.Api.ClienteAnonimo();
+
+        // Editar sem trocar o e-mail (o mesmo endereço, só com outra caixa de letras) não é trocar: o link continua valendo.
+        Assert.Equal(200, (int)(await EditarAsync(api, pessoa.Id, Corpo(pessoa, admissao: "2026-01-02"))).StatusCode);
+        Assert.Equal(200, (int)(await PostAsync(anonimo, "/api/auth/senha/validar-link", new { token })).StatusCode);
+        Assert.Equal(200, (int)(await EditarAsync(api, pessoa.Id, Corpo(pessoa, email: pessoa.Email.ToUpperInvariant(), admissao: "2026-01-02"))).StatusCode);
+        Assert.Equal(200, (int)(await PostAsync(anonimo, "/api/auth/senha/validar-link", new { token })).StatusCode);
+
+        // Trocar o e-mail (corrigir um endereço digitado errado): o link que foi para o endereço antigo deixa de valer, senão quem o recebeu define a senha e entra na conta.
+        Assert.Equal(200, (int)(await EditarAsync(api, pessoa.Id, Corpo(pessoa, email: EmailNovo(), admissao: "2026-01-02"))).StatusCode);
+        var usado = await PostAsync(anonimo, "/api/auth/senha/validar-link", new { token });
+        Assert.Equal(422, (int)usado.StatusCode);
+        Assert.Equal(CodigoDeLinkInvalido, (await CorpoAsync(usado)).GetProperty("codigo").GetString());
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM USUARIOS_TOKENS_SENHA WHERE ID_USUARIO = {login.UsuarioId} AND EM_ABERTO = 1")); // nenhum link em aberto sobrou
+    }
+
+    [Fact]
     public async Task Respostas_batem_com_o_schema_do_contrato()
     {
         var api = await ApiAsync();

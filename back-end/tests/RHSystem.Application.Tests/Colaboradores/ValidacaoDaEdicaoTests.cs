@@ -78,4 +78,30 @@ public class ValidacaoDaEdicaoTests
         Assert.Equal(27, siglas.Length);
         Assert.All(siglas, sigla => Assert.DoesNotContain("endereco.uf", Campos(Dados(endereco: EnderecoVazio with { Uf = sigla }))));
     }
+
+    [Theory]
+    [InlineData("logradouro", 150)]
+    [InlineData("numero", 10)]
+    [InlineData("complemento", 100)]
+    [InlineData("bairro", 100)]
+    [InlineData("cidade", 100)]
+    public void Campos_do_endereco_aceitam_o_tamanho_do_contrato_e_recusam_um_a_mais(string campo, int maximo)
+    {
+        FuncionarioEndereco Com(int tamanho)
+        {
+            var texto = new string('a', tamanho);
+            return new FuncionarioEndereco(
+                null,
+                campo == "logradouro" ? texto : null,
+                campo == "numero" ? texto : null,
+                campo == "complemento" ? texto : null,
+                campo == "bairro" ? texto : null,
+                campo == "cidade" ? texto : null,
+                null);
+        }
+
+        Assert.DoesNotContain($"endereco.{campo}", Campos(Dados(endereco: Com(maximo)))); // o contrato (e a coluna do banco) aceita até aqui
+        Assert.Contains($"endereco.{campo}", Campos(Dados(endereco: Com(maximo + 1)))); // um a mais seria um 500 do banco (coluna menor), e o contrato manda 400
+    }
+
 }
