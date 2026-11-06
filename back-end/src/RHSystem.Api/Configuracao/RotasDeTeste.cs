@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Api.Autorizacao;
 using RHSystem.Application.Comum;
+using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
@@ -35,6 +36,13 @@ internal static class RotasDeTeste
             await db.SaveChangesAsync(ct);
             db.Usuarios.Add(Usuario.Criar(funcionario, new string('x', 60)));
             await db.SaveChangesAsync(ct);
+            return Results.Ok();
+        });
+
+        // Uma operação que PRECISA da empresa (como registrar ponto, na fatia 3): sem a configuração, 422 EMPRESA_NAO_CONFIGURADA.
+        grupo.MapGet("/empresa-obrigatoria", async (IConfiguracaoDaEmpresa empresa, CancellationToken ct) =>
+        {
+            await empresa.ObterOuFalharAsync(ct);
             return Results.Ok();
         });
 

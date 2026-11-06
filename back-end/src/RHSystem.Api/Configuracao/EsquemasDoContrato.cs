@@ -1,5 +1,8 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using RHSystem.Application.Empresa;
+using RHSystem.Domain.Empresa;
 
 namespace RHSystem.Api.Configuracao;
 
@@ -16,6 +19,7 @@ public static class EsquemasDoContrato
         opcoes.AddSchemaTransformer((esquema, contexto, _) =>
         {
             Aplicar(esquema, contexto.JsonTypeInfo.Type);
+            AplicarUfDaEmpresa(esquema, contexto.JsonPropertyInfo);
             return Task.CompletedTask;
         });
 
@@ -24,6 +28,18 @@ public static class EsquemasDoContrato
     /// quando alguma propriedade usa o enum anulável, e aí toda propriedade que o referencia, até a obrigatória, passa a aceitar null no documento; a propriedade anulável já leva o seu próprio
     /// <c>oneOf</c> com null). Os outros tipos ficam como estão.
     /// </summary>
+    /// <summary>
+    /// A UF da empresa é texto no C# (o caso de uso a confere e responde 400 em <c>errors.uf</c>, o que um enum no corpo não daria), mas o contrato a declara como o enum das 27 siglas: o schema da propriedade
+    /// <c>uf</c> de <see cref="EmpresaConfiguracao"/> leva essa lista, a MESMA que o domínio usa para validar.
+    /// </summary>
+    private static void AplicarUfDaEmpresa(OpenApiSchema esquema, System.Text.Json.Serialization.Metadata.JsonPropertyInfo? propriedade)
+    {
+        if (propriedade is { Name: "uf" } && propriedade.DeclaringType == typeof(EmpresaConfiguracao))
+        {
+            esquema.Enum = [.. ConfiguracaoDaEmpresa.UfsValidas.Order(StringComparer.Ordinal).Select(uf => (JsonNode)JsonValue.Create(uf)!)];
+        }
+    }
+
     public static void Aplicar(OpenApiSchema esquema, Type tipo)
     {
         var subjacente = Nullable.GetUnderlyingType(tipo) ?? tipo;

@@ -11,6 +11,7 @@ using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Cadastros;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
+using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
@@ -20,6 +21,7 @@ using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Cadastros;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Emails;
+using RHSystem.Infrastructure.Empresa;
 using RHSystem.Infrastructure.Escopo;
 using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Persistencia;
@@ -123,6 +125,11 @@ public static class DependencyInjection
         // Cadastros de apoio (tela 29): cargos e benefícios do catálogo (fatia 1c).
         services.AddScoped<ICargosRepositorio, CargosRepositorio>();
         services.AddScoped<IBeneficiosRepositorio, BeneficiosRepositorio>();
+
+        // A configuração da empresa: uma classe serve ao cadastro (IEmpresaRepositorio) e às fatias 3 e 7 (IConfiguracaoDaEmpresa, sem cache).
+        services.AddScoped<EmpresaRepositorio>();
+        services.AddScoped<IEmpresaRepositorio>(sp => sp.GetRequiredService<EmpresaRepositorio>());
+        services.AddScoped<IConfiguracaoDaEmpresa>(sp => sp.GetRequiredService<EmpresaRepositorio>());
 
         // As caixas "Depois de salvar" do cadastro dependem das fatias 5 e 6: as versões padrão dizem a verdade (indisponível) e ficam registradas ANTES de qualquer outra, para as fatias donas
         // registrarem as delas depois (AddScoped: o último registro vale).
