@@ -62,9 +62,9 @@ public class AtributosDeAuditoriaTests
             Campos(typeof(Funcionario)));
 
         Assert.Equal(AuditoriaArea.Cadastros, typeof(Setor).GetCustomAttribute<AuditadoAttribute>()!.Area);
-        Assert.Equal(new[] { "Gestor", "Nome" }.Order(), Campos(typeof(Setor)));
+        Assert.Equal(new[] { "Descrição", "Gestor", "Nome" }.Order(), Campos(typeof(Setor))); // a 1c acrescentou a descrição
         Assert.Equal(AuditoriaArea.Cadastros, typeof(Cargo).GetCustomAttribute<AuditadoAttribute>()!.Area);
-        Assert.Equal(["Nome"], Campos(typeof(Cargo)));
+        Assert.Equal(new[] { "Carga semanal", "Descrição", "Nome" }.Order(), Campos(typeof(Cargo))); // a 1c acrescentou a descrição e a carga semanal
         Assert.Equal(AuditoriaArea.Cadastros, typeof(Beneficio).GetCustomAttribute<AuditadoAttribute>()!.Area);
         Assert.Equal(new[] { "Aceita dependentes", "Aceita trajeto", "Descrição", "Nome", "Opcional" }.Order(), Campos(typeof(Beneficio)));
     }

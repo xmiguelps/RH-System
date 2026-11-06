@@ -81,6 +81,13 @@ public class Funcionario : IAuditavel
 
     public void Inativar() => Ativo = false;
 
+    /// <summary>Troca o nível de acesso (promover a Gestor, rebaixar a Funcionário). O nível entra só pela navegação: o EF acerta <c>NivelDeAcessoId</c> na gravação.</summary>
+    public void DefinirNivel(NivelDeAcesso nivel)
+    {
+        ArgumentNullException.ThrowIfNull(nivel);
+        NivelDeAcesso = nivel;
+    }
+
     /// <summary>
     /// Os dados do cadastro e da edição de uma vez. O e-mail vai sem espaços nas pontas e em minúsculas; <paramref name="gestorId"/> é o
     /// <c>ID_GESTOR</c> de <c>GESTORES</c> (nulo limpa). O nível entra só pela navegação: o EF acerta a chave na gravação.

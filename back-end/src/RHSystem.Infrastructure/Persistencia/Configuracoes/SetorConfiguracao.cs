@@ -15,9 +15,10 @@ public class SetorConfiguracao : IEntityTypeConfiguration<Setor>
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).HasColumnName("ID_SETOR");
         builder.Property(s => s.Nome).HasColumnName("NOME_SETOR");
+        builder.Property(s => s.Descricao).HasColumnName("DESCRICAO");
         builder.Property(s => s.GestorId).HasColumnName("ID_GESTOR");
 
         // Um setor pode estar sem gestor (ID_GESTOR aceita NULL).
-        builder.HasOne<Gestor>().WithMany().HasForeignKey(s => s.GestorId).IsRequired(false);
+        builder.HasOne(s => s.Gestor).WithMany().HasForeignKey(s => s.GestorId).IsRequired(false);
     }
 }

@@ -4,7 +4,9 @@ using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
 using RHSystem.Domain.Colaboradores;
+using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Emails;
+using RHSystem.Domain.Empresa;
 using RHSystem.Domain.Importacoes;
 
 namespace RHSystem.Infrastructure.Persistencia;
@@ -48,6 +50,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MudancaDeAuditoria> MudancasDeAuditoria => Set<MudancaDeAuditoria>();
 
     public DbSet<Importacao> Importacoes => Set<Importacao>();
+
+    public DbSet<ConfiguracaoDaEmpresa> ConfiguracoesDaEmpresa => Set<ConfiguracaoDaEmpresa>();
+
+    public DbSet<DocumentoDoColaborador> Documentos => Set<DocumentoDoColaborador>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
