@@ -27,7 +27,7 @@ public sealed class OpcoesDoAgendador
     }
 }
 
-/// <summary>A seção <c>Retencao</c>: por quantos dias o que já terminou fica nas tabelas técnicas (o endereço de e-mail é dado pessoal).</summary>
+/// <summary>A seção <c>Retencao</c>: por quantos dias o que já terminou fica nas tabelas técnicas (o endereço de e-mail é dado pessoal; o hash do link de senha não tem motivo para ficar).</summary>
 public sealed class OpcoesDeRetencao
 {
     public const string Secao = "Retencao";
@@ -36,11 +36,14 @@ public sealed class OpcoesDeRetencao
 
     public int EmailsDias { get; set; } = 90;
 
+    /// <summary>Por quantos dias (da criação) um link de convite ou de redefinição de senha que já não serve fica no banco; o último convite de cada pessoa e o link ainda válido nunca saem.</summary>
+    public int TokensDeSenhaDias { get; set; } = 30;
+
     public void Validar()
     {
-        if (TarefasDias < 1 || EmailsDias < 1)
+        if (TarefasDias < 1 || EmailsDias < 1 || TokensDeSenhaDias < 1)
         {
-            throw new InvalidOperationException("Retencao:TarefasDias e Retencao:EmailsDias precisam ser pelo menos 1.");
+            throw new InvalidOperationException("Retencao:TarefasDias, Retencao:EmailsDias e Retencao:TokensDeSenhaDias precisam ser pelo menos 1.");
         }
     }
 }

@@ -113,3 +113,6 @@ public sealed record FuncionarioEditarComando(
 /// <paramref name="BeneficiosInformados"/> falso são campos obrigatórios que o corpo não trouxe.
 /// </summary>
 public sealed record DadosPessoaisDaEdicao(string? EmailPessoal, string? Rg, string? RgOrgaoEmissor, FuncionarioEndereco? Endereco, bool BeneficiosInformados = true);
+
+/// <summary>O corpo de <c>inativarFuncionario</c>: o último dia de trabalho (hoje, futuro ou passado, nunca antes da admissão). A API não recebe a palavra "desativar" da tela: a confirmação é só da interface.</summary>
+public sealed record FuncionarioInativarComando(DateOnly UltimoDiaDeTrabalho);

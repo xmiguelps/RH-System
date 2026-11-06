@@ -253,14 +253,15 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
 
         var recuperados = await RecuperarAsync(api);
 
-        // Seis tipos (as duas limpezas e quatro de teste); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
-        Assert.Equal(5, recuperados);
+        // Oito tipos (as três limpezas, a que efetiva desligamento e quatro de teste); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
+        Assert.Equal(7, recuperados);
         Assert.Contains(TarefaQueNaoRecuperaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         var tipos = (await LerAsync(api.Conexao)).Select(l => l.Tipo).Distinct().Order().ToList();
         Assert.Contains("LIMPAR_TAREFAS", tipos); // as limpezas (registradas antes) recuperaram
         Assert.Contains("LIMPAR_EMAILS", tipos);
+        Assert.Contains("LIMPAR_TOKENS_DE_SENHA", tipos);
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, tipos); // e a que vem depois da que lança também criou as suas (05/10 e 06/10)
     }
 }

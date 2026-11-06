@@ -32,6 +32,8 @@ public static class ColaboradoresEndpoints
         servicos.AddScoped<ListarFuncionariosCasoDeUso>();
         servicos.AddScoped<CriarFuncionarioCasoDeUso>();
         servicos.AddScoped<EditarFuncionarioCasoDeUso>();
+        servicos.AddScoped<InativarFuncionarioCasoDeUso>();
+        servicos.AddScoped<CancelarDesligamentoCasoDeUso>();
         servicos.AddScoped<ObterFichaDoFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterIndicadoresDoFuncionarioCasoDeUso>();
         return servicos;
@@ -79,6 +81,22 @@ public static class ColaboradoresEndpoints
             .Produces<FuncionarioIndicadoresRh>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
+        grupo.MapPost("/funcionarios/{funcionarioId:int}/desligamento", Inativar)
+            .WithName("inativarFuncionario")
+            .Produces<FuncionarioFichaRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status409Conflict,
+                StatusCodes.Status500InternalServerError);
+
+        grupo.MapDelete("/funcionarios/{funcionarioId:int}/desligamento", CancelarDesligamento)
+            .WithName("cancelarDesligamentoAgendado")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -93,6 +111,15 @@ public static class ColaboradoresEndpoints
 
     private static async Task<FuncionarioFichaRh> Editar(int funcionarioId, FuncionarioEditarComando comando, EditarFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, comando, ct);
+
+    private static async Task<FuncionarioFichaRh> Inativar(int funcionarioId, FuncionarioInativarComando comando, InativarFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(funcionarioId, comando, ct);
+
+    private static async Task<IResult> CancelarDesligamento(int funcionarioId, CancelarDesligamentoCasoDeUso casoDeUso, CancellationToken ct)
+    {
+        await casoDeUso.ExecutarAsync(funcionarioId, ct);
+        return Results.NoContent();
+    }
 
     private static async Task<FuncionarioFichaRh> ObterFicha(int funcionarioId, ObterFichaDoFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, ct);

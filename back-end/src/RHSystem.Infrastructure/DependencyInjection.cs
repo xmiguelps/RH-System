@@ -101,6 +101,8 @@ public static class DependencyInjection
         services.AddScoped<IExecutorDeTarefas, ExecutorDeTarefas>();
         services.AddScoped<ITarefaAgendada, LimparTarefasAntigasTarefa>();
         services.AddScoped<ITarefaAgendada, LimparEmailsAntigosTarefa>();
+        services.AddScoped<ITarefaAgendada, LimparTokensDeSenhaTarefa>();
+        services.AddScoped<ITarefaAgendada, EfetivarDesligamentoTarefa>();
         services.AddHostedService<AgendadorHostedService>();
 
         // Convite e redefinição de senha: o serviço que emite o link (o token só no e-mail; o banco guarda o hash) e os dois e-mails da lista fechada.
@@ -121,6 +123,8 @@ public static class DependencyInjection
         services.AddScoped<IGestorDoFuncionario, GestorDoFuncionario>();
         services.AddScoped<ICadastroDeFuncionarios, CadastroDeFuncionarios>();
         services.AddScoped<IEdicaoDeFuncionarios, EdicaoDeFuncionarios>();
+        // Desligamento: sem nenhuma ICondicaoParaEfetivarDesligamento registrada a efetivação vale; a fatia 3 registra a dela (o banco de horas do dia fechado) com AddScoped.
+        services.AddScoped<IDesligamentoDeFuncionarios, DesligamentoDeFuncionarios>();
         var limiteDeSenhaAtual = configuration.GetValue<int?>("Autenticacao:LimiteSenhaAtualPorMinuto") ?? 5;
         if (limiteDeSenhaAtual < 1)
         {

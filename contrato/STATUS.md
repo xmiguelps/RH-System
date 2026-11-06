@@ -45,6 +45,8 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/funcionarios/{funcionarioId}/indicadores` | obterIndicadoresDoFuncionario | em andamento | parcial: `situacaoHoje` só conhece fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4 e 7; sem benefícios de dependentes até a 7 |
 | `POST /api/rh/funcionarios` | criarFuncionario | em andamento | as caixas "incluir no onboarding" e "formulário de admissão" recusam com o erro do contrato até as fatias 6 e 5 |
 | `PUT /api/rh/funcionarios/{funcionarioId}` | editarFuncionario | em andamento | substituição completa; benefício dado a quem já tem linha PENDENTE, RECUSADO ou CANCELADO atualiza a mesma linha (aprova o pedido, decisão 10 do plano) |
+| `POST /api/rh/funcionarios/{funcionarioId}/desligamento` | inativarFuncionario | em andamento | a condição "depois de a consolidação do banco de horas" entra com a fatia 3; os pedidos parados num gestor desligado só passam ao RH quando as fatias 3 e 7 registrarem a implementação delas da porta `IPedidosParadosNoGestor` (o composto padrão é vazio) |
+| `DELETE /api/rh/funcionarios/{funcionarioId}/desligamento` | cancelarDesligamentoAgendado | em andamento | só enquanto o desligamento está AGENDADO; depois de EFETIVADO responde 422 `SEM_DESLIGAMENTO_AGENDADO` |
 
 ## Pendências conhecidas
 

@@ -108,6 +108,23 @@ internal sealed class ApiDeAcesso
         return await unidade.ExecutarEmTransacaoAsync(() => acao(escopo.ServiceProvider), CancellationToken.None);
     }
 
+    /// <summary>
+    /// Como <see cref="NoEscopoAsync{T}"/>, num hospedeiro à parte em que <paramref name="configurar"/> troca ou acrescenta serviços (a condição e a fatia falsas do desligamento, por exemplo). O ator
+    /// continua sendo o RH e o serviço abre a própria transação.
+    /// </summary>
+    public async Task<T> NoEscopoComAsync<T>(Action<IServiceCollection> configurar, Func<IServiceProvider, Task<T>> acao)
+    {
+        var elenco = Elenco;
+        await using var fabrica = Api.WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IAtorAtual>();
+            servicos.AddScoped<IAtorAtual>(_ => AtorDeTeste.Pessoa(elenco.Rh));
+            configurar(servicos);
+        }));
+        using var escopo = fabrica.Services.CreateScope();
+        return await acao(escopo.ServiceProvider);
+    }
+
     /// <summary>Roda a ação num escopo em que o ator é o RH, sem abrir transação.</summary>
     public async Task<T> NoEscopoAsync<T>(Func<IServiceProvider, Task<T>> acao)
     {
