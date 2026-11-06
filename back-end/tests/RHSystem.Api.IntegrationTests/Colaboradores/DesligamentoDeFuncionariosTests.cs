@@ -327,6 +327,26 @@ public class DesligamentoDeFuncionariosTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Efetivar_antes_do_dia_seguinte_ao_ultimo_dia_devolve_AindaNaoPode_e_so_no_instante_exato_efetiva()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "antes1");
+        var desligamento = await AgendadoPorSqlAsync(api, pessoa.FuncionarioId, new DateOnly(2026, 10, 7)); // o dia seguinte só começa em 2026-10-08T03:00Z
+
+        // Direto, sem passar pelo executor (que só entrega tarefa vencida): o serviço confere o horário por conta própria. Hoje, 09:42 em Brasília:
+        Assert.Equal(ResultadoDaEfetivacao.AindaNaoPode, await EfetivarComoSistemaAsync(api, desligamento));
+        api.Api.Relogio.Fixar(new DateTime(2026, 10, 8, 2, 59, 59, DateTimeKind.Utc)); // 23:59:59 de 07/10
+        Assert.Equal(ResultadoDaEfetivacao.AindaNaoPode, await EfetivarComoSistemaAsync(api, desligamento));
+        Assert.Equal("AGENDADO", await SituacaoAsync(api, pessoa.FuncionarioId));
+        Assert.True(await AtivoAsync(api, pessoa.FuncionarioId));
+        Assert.Null(await DataDeDesligamentoAsync(api, pessoa.FuncionarioId));
+
+        api.Api.Relogio.Fixar(new DateTime(2026, 10, 8, 3, 0, 0, DateTimeKind.Utc)); // 00:00:00 de 08/10
+        Assert.Equal(ResultadoDaEfetivacao.Efetivado, await EfetivarComoSistemaAsync(api, desligamento));
+        Assert.False(await AtivoAsync(api, pessoa.FuncionarioId));
+    }
+
+    [Fact]
     public async Task Efetivar_o_gestor_de_um_setor_chama_PassarParaORhAsync_com_o_id_do_gestor_uma_vez_e_nao_mexe_no_setor()
     {
         var api = await ApiAsync();
