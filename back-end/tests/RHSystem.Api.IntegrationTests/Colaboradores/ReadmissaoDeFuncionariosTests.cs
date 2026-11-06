@@ -424,6 +424,40 @@ public class ReadmissaoDeFuncionariosTests(MySqlFixture mysql)
         await (await ReadmitirAsync(api, senhaDefinida.Id, Corpo(senhaDefinida, convite: true))).AfirmarConformeAoContratoAsync("readmitirFuncionario"); // o 422
     }
 
+    [Fact]
+    public async Task Readmitir_sem_tipoContrato_ou_com_cargo_e_setor_inexistentes_devolve_400_por_campo_e_nada_muda()
+    {
+        var api = await ApiAsync();
+        var ex = await InativoAsync(api, "r19");
+
+        // O System.Text.Json deixa o enum omitido no padrão (0, que não é um tipo): sem a validação a pessoa voltaria sem tipo de contrato.
+        var semTipo = await ReadmitirAsync(api, ex.Id, new { dataAdmissao = "2026-10-05", cargoId = ex.Cargo, setorId = ex.Setor });
+        var inexistentes = await ReadmitirAsync(api, ex.Id, Corpo(ex, cargo: 987_654, setor: 987_655));
+
+        Assert.Equal(400, (int)semTipo.StatusCode);
+        Assert.True((await LerAsync(semTipo)).GetProperty("errors").TryGetProperty("tipoContrato", out _));
+        Assert.Equal(400, (int)inexistentes.StatusCode);
+        var erros = (await LerAsync(inexistentes)).GetProperty("errors");
+        Assert.True(erros.TryGetProperty("cargoId", out _) && erros.TryGetProperty("setorId", out _)); // todos os campos juntos, nunca um 500 de chave estrangeira
+        await AfirmarQueNadaMudouAsync(api, ex);
+    }
+
+    [Fact]
+    public async Task Readmitir_ex_RH_continua_RH_e_o_gestor_da_pessoa_passa_a_ser_o_do_setor_escolhido()
+    {
+        var api = await ApiAsync();
+        var rh = await InativoAsync(api, "r20a", nivel: "RH");
+        var comum = await InativoAsync(api, "r20b");
+        var (_, gestorId, setorComGestor) = await GestorDeSetorAsync(api, "readm r20 gestora");
+
+        var fichaDoRh = await LerAsync(await ReadmitirAsync(api, rh.Id, Corpo(rh)));
+        var fichaDoComum = await LerAsync(await ReadmitirAsync(api, comum.Id, Corpo(comum, setor: setorComGestor)));
+
+        Assert.Equal("RH", fichaDoRh.GetProperty("perfil").GetString()); // o nível é o que tinha; só Gestor volta como Funcionario
+        Assert.Equal("Funcionario", fichaDoComum.GetProperty("perfil").GetString());
+        Assert.Equal(gestorId, fichaDoComum.GetProperty("gestor").GetProperty("gestorId").GetInt32()); // gestor = o do setor escolhido, como no cadastro
+    }
+
     /// <summary>Chama o serviço direto (sem a API), no escopo em que o ator é o RH; a exceção do serviço sobe como está.</summary>
     private static async Task<bool> ReadmitirNoEscopoAsync(IServiceProvider sp, Ex ex, bool onboarding = false, bool convite = false)
     {
