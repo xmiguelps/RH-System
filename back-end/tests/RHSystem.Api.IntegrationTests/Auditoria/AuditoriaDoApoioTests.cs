@@ -3,13 +3,14 @@ using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Colaboradores;
+using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Empresa;
 using static RHSystem.Api.IntegrationTests.Auditoria.AuditoriaDeTeste;
 
 namespace RHSystem.Api.IntegrationTests.Auditoria;
 
 /// <summary>
-/// O que a auditoria registra do apoio (setor, gestor, empresa), com o interceptor de verdade e o relógio falso, no banco REAL. O teste do setor veio da Task 8.1 da 1a, que ainda não tinha <c>Setor.Criar</c>.
+/// O que a auditoria registra do apoio (setor, gestor, empresa, documento), com o interceptor de verdade e o relógio falso, no banco REAL. O teste do setor veio da Task 8.1 da 1a, que ainda não tinha <c>Setor.Criar</c>.
 /// Um banco para a classe; cada teste cria o que usa.
 /// </summary>
 [Collection(MySqlCollection.Nome)]
@@ -78,5 +79,24 @@ public class AuditoriaDoApoioTests(MySqlFixture mysql)
         Assert.Equal(["Horário de entrada", "Município"], eventos[1].Mudancas.Select(m => m.Campo).Order());
         var municipio = Assert.Single(eventos[1].Mudancas, m => m.Campo == "Município");
         Assert.Equal(("São Paulo", "Campinas"), (municipio.ValorAntes, municipio.ValorDepois));
+    }
+
+    [Fact]
+    public async Task Anexar_um_documento_gera_Criou_que_guarda_so_que_o_arquivo_mudou_sem_o_nome_nem_o_caminho()
+    {
+        var (conexao, ator) = await BancoAsync();
+        var pessoa = await ApoioDeTeste.CriarPessoaAsync(conexao, "Pessoa documento auditoria", Perfil.Funcionario);
+        await using var db = NovoContexto(conexao, PessoaComIp(ator), RelogioEm(Agora));
+        var funcionario = await db.Funcionarios.SingleAsync(f => f.Id == pessoa);
+        var documento = DocumentoDoColaborador.Anexar(funcionario, TipoDeDocumento.CarteiraDeTrabalho, "Digital", null, "documentos/sigiloso/caminho-secreto.pdf", "carteira-secreta.pdf", Agora);
+
+        db.Documentos.Add(documento);
+        await db.SaveChangesAsync();
+
+        var evento = Assert.Single(await EventosAsync(conexao, "FUNCIONARIOS_DOCUMENTOS", documento.Id));
+        Assert.Equal((AuditoriaArea.Documentos, AuditoriaAcao.Criou, "Documento Carteira de trabalho digital de Pessoa documento auditoria"), (evento.Area, evento.Acao, evento.RegistroAfetado));
+        Assert.Contains(evento.Mudancas, m => m is { Campo: "Arquivo", ValorAntes: null, ValorDepois: null, ValorOculto: true });
+        Assert.DoesNotContain(evento.Mudancas, m => m.Campo.Contains("aminho", StringComparison.Ordinal));
+        Assert.DoesNotContain(evento.Mudancas, m => (m.ValorAntes ?? string.Empty).Contains("secret", StringComparison.Ordinal) || (m.ValorDepois ?? string.Empty).Contains("secret", StringComparison.Ordinal));
     }
 }
