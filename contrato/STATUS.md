@@ -51,6 +51,13 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/gestor/equipe` | listarEquipeDoGestor | em andamento | parcial: `situacaoHoje` e `contagensHoje` conhecem só o fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4, 6 e 7 |
 | `GET /api/gestor/equipe/{funcionarioId}` | obterFichaDaEquipe | em andamento | parcial: `situacaoHoje` e `contagensHoje` conhecem só o fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4, 6 e 7 |
 | `GET /api/gestor/equipe/{funcionarioId}/indicadores` | obterIndicadoresDaEquipe | em andamento | parcial: `situacaoHoje` e `contagensHoje` conhecem só o fim de semana até a fatia 3; indicadores `null` até as fatias 3, 4, 6 e 7 |
+| `GET /api/rh/cargos` | listarCargos | em andamento | |
+| `POST /api/rh/cargos` | criarCargo | em andamento | |
+| `PUT /api/rh/cargos/{cargoId}` | editarCargo | em andamento | a nova carga vale só para os dias de ponto criados depois; não existe exclusão de cargo |
+| `GET /api/rh/beneficios` | listarBeneficiosDoCatalogo | em andamento | as marcas já são gravadas; `quantidadePessoas` conta os pedidos de benefício ativos (`BeneficioDoFuncionario`: 1b e 7) |
+| `POST /api/rh/beneficios` | criarBeneficioDoCatalogo | em andamento | |
+| `PUT /api/rh/beneficios/{beneficioId}` | editarBeneficioDoCatalogo | em andamento | |
+| `DELETE /api/rh/beneficios/{beneficioId}` | excluirBeneficioDoCatalogo | em andamento | só se nenhum colaborador recebeu o benefício (ativo, inativo ou pedido pendente); senão 409 `CADASTRO_EM_USO` |
 
 ## Pendências conhecidas
 

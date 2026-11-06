@@ -1,7 +1,13 @@
+using RHSystem.Application.Comum;
+
 namespace RHSystem.Application.Cadastros;
 
 /// <summary>Um erro do apoio: o <c>codigo</c> que o contrato fixa e o <c>detail</c> em português, iguais aos do exemplo da resposta no contrato.</summary>
-public sealed record MensagemDoApoio(string Codigo, string Detalhe);
+public sealed record MensagemDoApoio(string Codigo, string Detalhe)
+{
+    /// <summary>A resposta 409 com este código e este texto.</summary>
+    public ConflitoException ComoConflito() => new(Detalhe, Codigo);
+}
 
 /// <summary>
 /// Os textos e os códigos de erro dos cadastros de apoio, da empresa e dos documentos, <b>copiados dos exemplos do contrato</b> (<c>contrato/fontes/20-fatia-1-colaboradores.yaml</c>) e nunca reescritos: o front mostra o

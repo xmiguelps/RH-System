@@ -8,6 +8,7 @@ using RHSystem.Application.Acesso;
 using RHSystem.Application.Agendamento;
 using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Cadastros;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Escopo;
@@ -16,6 +17,7 @@ using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
 using RHSystem.Infrastructure.Auditoria;
 using RHSystem.Infrastructure.Autenticacao;
+using RHSystem.Infrastructure.Cadastros;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Emails;
 using RHSystem.Infrastructure.Escopo;
@@ -117,6 +119,10 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeUsuariosDoSistema, ConsultaDeUsuariosDoSistema>();
         services.AddScoped<IConsultaDeFuncionarios, ConsultaDeFuncionarios>();
         services.AddScoped<IConsultaDaEquipe, ConsultaDaEquipe>();
+
+        // Cadastros de apoio (tela 29): cargos e benefícios do catálogo (fatia 1c).
+        services.AddScoped<ICargosRepositorio, CargosRepositorio>();
+        services.AddScoped<IBeneficiosRepositorio, BeneficiosRepositorio>();
 
         // As caixas "Depois de salvar" do cadastro dependem das fatias 5 e 6: as versões padrão dizem a verdade (indisponível) e ficam registradas ANTES de qualquer outra, para as fatias donas
         // registrarem as delas depois (AddScoped: o último registro vale).
