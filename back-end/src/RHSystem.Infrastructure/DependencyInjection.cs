@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<IEdicaoDeFuncionarios, EdicaoDeFuncionarios>();
         // Desligamento: sem nenhuma ICondicaoParaEfetivarDesligamento registrada a efetivação vale; a fatia 3 registra a dela (o banco de horas do dia fechado) com AddScoped.
         services.AddScoped<IDesligamentoDeFuncionarios, DesligamentoDeFuncionarios>();
+        services.AddScoped<IReadmissaoDeFuncionarios, ReadmissaoDeFuncionarios>();
         var limiteDeSenhaAtual = configuration.GetValue<int?>("Autenticacao:LimiteSenhaAtualPorMinuto") ?? 5;
         if (limiteDeSenhaAtual < 1)
         {

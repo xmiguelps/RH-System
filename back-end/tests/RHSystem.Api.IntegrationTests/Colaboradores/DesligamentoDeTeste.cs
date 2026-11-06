@@ -95,4 +95,16 @@ internal static class DesligamentoDeTeste
     }
 
     public static string Dia(int ano, int mes, int dia) => new DateOnly(ano, mes, dia).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>Roda a ação numa thread própria que espera a barreira (os cliques começam juntos; o pool de threads demoraria a ter várias livres).</summary>
+    public static Task<T> EmParaleloAsync<T>(Barrier barreira, Func<Task<T>> acao) =>
+        Task.Factory.StartNew(
+            () =>
+            {
+                barreira.SignalAndWait();
+                return acao();
+            },
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
 }

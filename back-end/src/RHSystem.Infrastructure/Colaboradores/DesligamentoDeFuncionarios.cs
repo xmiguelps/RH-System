@@ -1,4 +1,3 @@
-using System.Data;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Agendamento;
@@ -45,14 +44,16 @@ public sealed class DesligamentoDeFuncionarios(
     private const string CampoDoUltimoDia = "ultimoDiaDeTrabalho";
 
     public Task<ResultadoDoAgendamento> AgendarAsync(int funcionarioId, DateOnly ultimoDiaDeTrabalho, CancellationToken ct) =>
-        EmTransacaoAsync(
+        OperacoesComTrava.EmTransacaoAsync(
+            db,
+            unidade,
             async () =>
             {
-                var funcionario = await TravarFuncionarioAsync(funcionarioId, ct) ?? throw new NaoEncontradoException();
+                var funcionario = await OperacoesComTrava.TravarFuncionarioAsync(db, funcionarioId, ct) ?? throw new NaoEncontradoException();
                 var agora = relogio.AgoraUtc;
                 ConferirOUltimoDia(funcionario, ultimoDiaDeTrabalho, agora);
 
-                var vigente = await TravarVigenteAsync(funcionarioId, ct);
+                var vigente = await OperacoesComTrava.TravarVigenteAsync(db, funcionarioId, ct);
                 if (!funcionario.Ativo || vigente is not null)
                 {
                     throw new ConflitoException(
@@ -87,11 +88,13 @@ public sealed class DesligamentoDeFuncionarios(
             ct);
 
     public Task CancelarAsync(int funcionarioId, CancellationToken ct) =>
-        EmTransacaoAsync(
+        OperacoesComTrava.EmTransacaoAsync(
+            db,
+            unidade,
             async () =>
             {
-                var funcionario = await TravarFuncionarioAsync(funcionarioId, ct) ?? throw new NaoEncontradoException();
-                var vigente = await TravarVigenteAsync(funcionarioId, ct);
+                var funcionario = await OperacoesComTrava.TravarFuncionarioAsync(db, funcionarioId, ct) ?? throw new NaoEncontradoException();
+                var vigente = await OperacoesComTrava.TravarVigenteAsync(db, funcionarioId, ct);
                 if (vigente is not { Situacao: SituacaoDoDesligamento.Agendado })
                 {
                     throw new ErroDeNegocioException("SEM_DESLIGAMENTO_AGENDADO", "Não há desligamento agendado para cancelar.");
@@ -124,11 +127,13 @@ public sealed class DesligamentoDeFuncionarios(
             return ResultadoDaEfetivacao.NaoEstavaAgendado;
         }
 
-        return await EmTransacaoAsync(
+        return await OperacoesComTrava.EmTransacaoAsync(
+            db,
+            unidade,
             async () =>
             {
-                var funcionario = await TravarFuncionarioAsync(funcionarioId.Value, ct);
-                var desligamento = await TravarPorIdAsync(desligamentoId, ct);
+                var funcionario = await OperacoesComTrava.TravarFuncionarioAsync(db, funcionarioId.Value, ct);
+                var desligamento = await OperacoesComTrava.TravarPorIdAsync(db, desligamentoId, ct);
                 if (funcionario is null || desligamento is null)
                 {
                     return ResultadoDaEfetivacao.NaoEstavaAgendado;
@@ -200,62 +205,4 @@ public sealed class DesligamentoDeFuncionarios(
     }
 
     private static string Data(DateOnly dia) => dia.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-
-    /// <summary>
-    /// A transação do método, <c>READ COMMITTED</c>. Se algo lança, o que o contexto acumulou (a pessoa já "desligada" em memória, por exemplo) é descartado: a recuperação chama a efetivação várias vezes
-    /// no mesmo escopo, e uma pessoa que falhou não pode ser gravada junto da próxima.
-    /// </summary>
-    private async Task<T> EmTransacaoAsync<T>(Func<Task<T>> acao, CancellationToken ct)
-    {
-        try
-        {
-            return await unidade.ExecutarEmTransacaoAsync(acao, IsolationLevel.ReadCommitted, ct);
-        }
-        catch
-        {
-            db.ChangeTracker.Clear();
-            throw;
-        }
-    }
-
-    private async Task<Funcionario?> TravarFuncionarioAsync(int funcionarioId, CancellationToken ct)
-    {
-        var jaRastreado = db.ChangeTracker.Entries<Funcionario>().Any(e => e.Entity.Id == funcionarioId);
-        var pessoa = (await db.Funcionarios.FromSql($"SELECT * FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {funcionarioId} FOR UPDATE").ToListAsync(ct)).FirstOrDefault();
-        if (pessoa is not null && jaRastreado)
-        {
-            await db.Entry(pessoa).ReloadAsync(ct); // o EF devolveria os valores de antes da trava
-        }
-
-        return pessoa;
-    }
-
-    /// <summary>O desligamento vigente (<c>AGENDADO</c> ou <c>EFETIVADO</c>) da pessoa, travado; o banco garante um só.</summary>
-    private async Task<DesligamentoAgendado?> TravarVigenteAsync(int funcionarioId, CancellationToken ct)
-    {
-        var jaRastreado = db.ChangeTracker.Entries<DesligamentoAgendado>().Any(e => e.Entity.FuncionarioId == funcionarioId);
-        var linha = (await db.DesligamentosAgendados
-            .FromSql($"SELECT * FROM DESLIGAMENTOS_AGENDADOS WHERE ID_FUNCIONARIO = {funcionarioId} AND VIGENTE = 1 ORDER BY ID_DESLIGAMENTO_AGENDADO FOR UPDATE")
-            .ToListAsync(ct)).FirstOrDefault();
-        if (linha is not null && jaRastreado)
-        {
-            await db.Entry(linha).ReloadAsync(ct);
-        }
-
-        return linha;
-    }
-
-    private async Task<DesligamentoAgendado?> TravarPorIdAsync(int desligamentoId, CancellationToken ct)
-    {
-        var jaRastreado = db.ChangeTracker.Entries<DesligamentoAgendado>().Any(e => e.Entity.Id == desligamentoId);
-        var linha = (await db.DesligamentosAgendados
-            .FromSql($"SELECT * FROM DESLIGAMENTOS_AGENDADOS WHERE ID_DESLIGAMENTO_AGENDADO = {desligamentoId} FOR UPDATE")
-            .ToListAsync(ct)).FirstOrDefault();
-        if (linha is not null && jaRastreado)
-        {
-            await db.Entry(linha).ReloadAsync(ct);
-        }
-
-        return linha;
-    }
 }

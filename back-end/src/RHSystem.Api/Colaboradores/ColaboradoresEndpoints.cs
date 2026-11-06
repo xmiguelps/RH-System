@@ -34,6 +34,7 @@ public static class ColaboradoresEndpoints
         servicos.AddScoped<EditarFuncionarioCasoDeUso>();
         servicos.AddScoped<InativarFuncionarioCasoDeUso>();
         servicos.AddScoped<CancelarDesligamentoCasoDeUso>();
+        servicos.AddScoped<ReadmitirFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterFichaDoFuncionarioCasoDeUso>();
         servicos.AddScoped<ObterIndicadoresDoFuncionarioCasoDeUso>();
         return servicos;
@@ -97,6 +98,18 @@ public static class ColaboradoresEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        grupo.MapPost("/funcionarios/{funcionarioId:int}/readmissao", Readmitir)
+            .WithName("readmitirFuncionario")
+            .Produces<FuncionarioFichaRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status409Conflict,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -120,6 +133,9 @@ public static class ColaboradoresEndpoints
         await casoDeUso.ExecutarAsync(funcionarioId, ct);
         return Results.NoContent();
     }
+
+    private static async Task<FuncionarioFichaRh> Readmitir(int funcionarioId, FuncionarioReadmitirComando comando, ReadmitirFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(funcionarioId, comando, ct);
 
     private static async Task<FuncionarioFichaRh> ObterFicha(int funcionarioId, ObterFichaDoFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, ct);
