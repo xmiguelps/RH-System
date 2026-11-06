@@ -100,6 +100,7 @@ O teste de divergência compara o contrato com o documento nativo da API, então
 - Respostas de erro saem como `application/problem+json`. A rota do documento é `/openapi/v1.json`.
 - O .NET aceita número escrito como texto por padrão e então escreve `["integer","string"]`; a API configura `JsonNumberHandling.Strict`, e o documento sai `integer`. Um parâmetro de corpo anulável saía como "null ou objeto" e sem `required`; os endpoints declaram o corpo obrigatório, como o contrato.
 - Quando uma rota nova entra, o `operationId` dela entra em `ContratoDivergenciaTests.OperationIdsNoEscopo` **no mesmo passo**.
+- **Parâmetro de construtor de `record` sem valor padrão sai em `required`, mesmo anulável.** Medido na Task 11: o contrato declara `cargo` e `setor` do item da equipe como anuláveis e **não** obrigatórios, e a API os marcava `required` até os dois ganharem `= null` no construtor (o JSON enviado é o mesmo). Campo opcional do contrato: padrão no parâmetro (ou propriedade `init` com padrão).
 - **Propriedade com conversor de JSON próprio perde o `type` no documento.** Medido: com o conversor de `DateTime` do contrato (`JsonDoContrato`), `acessoExpiraEmUtc` saiu sem tipo (`[]`, e o contrato diz `[string]`). Por isso `EsquemasDoContrato` (um transformador de esquema ligado em `AdicionarDocumentacao`) devolve `string` + `date-time` ao instante e `string` + o padrão `HH:mm` ao horário do dia. Conversor novo, esquema novo no mesmo passo.
 - **Quem muda o JSON roda `ContratoDivergenciaTests`.** O conserto acima só apareceu porque a Task 5 rodou esse teste; a Task 4, que criou o conversor, não o rodava.
 
@@ -138,6 +139,34 @@ Resultado medido (a API subiu aplicando V001 a V004 num banco vazio):
 - **(b)** `POST /api/auth/entrar` com o administrador do seed devolveu `200`; `GET /api/rh/auditoria` listou exatamente 2 eventos: `ENTROU` (ator: o administrador, `PESSOA`) e `CRIOU` (ator: `Sistema`, `SISTEMA`).
 - **(c)** `GET /api/eu/contadores-do-menu` devolveu `{"avisosNaoLidos":0,"formulariosPendentes":0,"documentosPendentes":0}`; para o administrador (RH), `/api/rh/contadores-do-menu` devolveu `{"pedidosDeAjusteDePonto":0}` e `/api/gestor/contadores-do-menu`, `403`.
 - **(d)** o Mailpit abre (`HTTP 200` na interface) e a caixa está vazia (0 mensagens).
+
+### Cadastro, ficha e acesso (fatia 1b)
+
+O RH cadastra, edita, desliga e readmite colaboradores (`/api/rh/funcionarios`), o gestor lê a própria equipe (`/api/gestor/equipe`) e a pessoa define e troca a senha (`/api/auth/senha/*`, `/api/eu/senha`). **Não houve verificação manual** (Docker, `curl` e Mailpit) desta fatia: o dono decidiu não fazer teste de fumaça. O fluxo é provado na API por `FluxoDeAcessoDePontaAPontaTests` (cadastro com convite, e-mail pela fila, link, senha, entrada, "esqueci minha senha", desligamento com o último dia no passado e readmissão com convite), com o e-mail em memória e o token lido do link da mensagem.
+
+**Configurações novas** (as da tabela acima continuam valendo):
+
+| Chave | Para quê | Padrão |
+|---|---|---|
+| `Senha:ConviteDias` | validade do link de convite | 7 |
+| `Senha:RedefinicaoMinutos` | validade do link de "esqueci minha senha" | 60 |
+| `Senha:IntervaloMinimoEntreRedefinicoesSegundos` | dentro deste intervalo do último pedido da mesma pessoa, o seguinte devolve o mesmo 202 e não enfileira nada (zero desliga) | 60 |
+| `Autenticacao:LimiteSenhaPorMinuto` | tentativas por minuto, por IP e rota, nas três rotas públicas de senha (`429` acima) | 5 |
+| `Autenticacao:LimiteSenhaAtualPorMinuto` | erros da senha atual por minuto, por pessoa, na troca de senha (`429` acima; no mínimo 1) | 5 |
+| `Retencao:TokensDeSenhaDias` | por quantos dias um link de senha que já não serve (usado, invalidado ou vencido) fica em `USUARIOS_TOKENS_SENHA`; o último convite de cada pessoa e o link ainda válido nunca saem | 30 |
+
+**O que cada fonte padrão ainda não sabe.** Cada uma é uma peça que a fatia dona registra por DI (`AddScoped`) **depois** da que está registrada hoje; sem ela, a API diz a verdade em vez de inventar:
+
+- `IFonteDeFatosDoDia` (fatia 3, com as férias da 7 e o horário da 1c): só conhece o fim de semana. `situacaoHoje` e `contagensHoje` valem `AINDA_NAO_COMECOU` num dia útil e `SEM_EXPEDIENTE` no fim de semana; nada de ponto, atestado, feriado, férias nem hora-limite.
+- `IFonteDeIndicadorDaFicha` (banco de horas: fatia 3; advertências: 4; treinamentos: 6; férias: 7) e `IFonteDoProximoPagamento` (7): não há nenhuma; os indicadores saem `null` (nunca zero inventado).
+- `IInclusaoNoOnboarding` (fatia 6) e `IEnvioDoFormularioDeAdmissao` (fatia 5): as versões "indisponível" recusam a caixa marcada com o erro do contrato (422 `SEM_TREINAMENTO_DE_ONBOARDING`; 400 em `formularioAdmissaoId`) e nada fica gravado.
+- `ICondicaoParaEfetivarDesligamento` (fatia 3: "o banco de horas daquele dia já fechou"): não há nenhuma e a efetivação vale. O desligamento se efetiva no dia seguinte ao último dia de trabalho (00:00 de -03:00), pela tarefa `EFETIVAR_DESLIGAMENTO`; se esse momento já passou, na hora.
+
+**Dívida registrada: a porta `IPedidosParadosNoGestor` está vazia.** A etapa de um pedido (ponto, férias) é fixada na criação, então "passar ao RH" os pedidos que esperavam por um gestor é uma ação explícita: a 1b a chama ao **efetivar o desligamento** de quem é gestor e na **readmissão** que o tira do setor. O composto padrão não tem nenhuma fatia por trás (as fatias 3 e 7 implementam `IPedidosParadosNoGestorDaFatia` sobre as tabelas delas), então, até lá, **os pedidos parados num gestor desligado, trocado ou readmitido ficam onde estão**. Está também no `contrato/STATUS.md` (rotas de desligamento e readmissão).
+
+**Limitação aceita da troca de senha (claim `rth`).** O token de acesso leva a claim `rth` (o hash do refresh token emitido junto) para a troca manter a sessão atual e revogar as outras. Token emitido antes da claim, ou sem ela, faz a troca revogar **todas** as sessões. E, se outra aba renovou o refresh antes, o token de acesso desta aba ainda leva o `rth` antigo: a troca então revoga o refresh vigente e a sessão dessa aba cai na próxima renovação (em até 15 minutos). É rara, está documentada e testada (`TrocarSenhaTests`).
+
+**Ambiente (para o deploy).** O isolamento `READ COMMITTED` das filas e das operações do vínculo (desligar, cancelar, efetivar e readmitir) pede binlog em formato `ROW` no servidor (com `STATEMENT` o MySQL recusa gravar sob `READ COMMITTED`; é o que se sabe do MySQL, não foi medido aqui: conferir no servidor do Azure); o provedor de e-mail e a lista de proxies confiáveis do Azure são definidos no deploy.
 
 ## Front-end
 
