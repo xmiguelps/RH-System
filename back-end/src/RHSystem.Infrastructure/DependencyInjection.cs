@@ -13,6 +13,7 @@ using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
+using RHSystem.Application.Gestores;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
@@ -24,6 +25,7 @@ using RHSystem.Infrastructure.Emails;
 using RHSystem.Infrastructure.Empresa;
 using RHSystem.Infrastructure.Escopo;
 using RHSystem.Infrastructure.Esquema;
+using RHSystem.Infrastructure.Gestores;
 using RHSystem.Infrastructure.Persistencia;
 
 namespace RHSystem.Infrastructure;
@@ -125,6 +127,10 @@ public static class DependencyInjection
         // Cadastros de apoio (tela 29): cargos e benefícios do catálogo (fatia 1c).
         services.AddScoped<ICargosRepositorio, CargosRepositorio>();
         services.AddScoped<IBeneficiosRepositorio, BeneficiosRepositorio>();
+
+        // Gestores e "gestor ausente" (fatia 1c): a regra de quem decide primeiro um pedido novo é a interface que as fatias 3 e 7 chamam.
+        services.AddScoped<IGestoresRepositorio, GestoresRepositorio>();
+        services.AddScoped<IGestorAusente, GestorAusente>();
 
         // A configuração da empresa: uma classe serve ao cadastro (IEmpresaRepositorio) e às fatias 3 e 7 (IConfiguracaoDaEmpresa, sem cache).
         services.AddScoped<EmpresaRepositorio>();

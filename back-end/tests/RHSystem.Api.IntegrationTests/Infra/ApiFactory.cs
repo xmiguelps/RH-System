@@ -10,6 +10,7 @@ using RHSystem.Api.IntegrationTests.Agendamento;
 using RHSystem.Api.IntegrationTests.Emails;
 using RHSystem.Application.Agendamento;
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
@@ -97,13 +98,40 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
     }
 
     /// <summary>Um cliente com o token que o emissor de verdade emitiu para a pessoa do elenco (sem passar pelo login).</summary>
-    public HttpClient ClienteComo(PessoaDeTeste pessoa)
+    public HttpClient ClienteComo(PessoaDeTeste pessoa) => ClienteComo(this, pessoa);
+
+    /// <summary>O mesmo cliente, de uma API derivada desta (como a de <see cref="ComPedidosParados"/>): a chave e o emissor do token são os mesmos, então o token do elenco vale nela.</summary>
+    public HttpClient ClienteComo(WebApplicationFactory<Program> fabrica, PessoaDeTeste pessoa)
     {
         var elenco = _elenco ?? throw new InvalidOperationException("Chame SemearElencoAsync antes de ClienteComo.");
-        var cliente = CreateClient();
+        var cliente = fabrica.CreateClient();
         cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", elenco.TokensPorUsuario[pessoa.UsuarioId]);
         return cliente;
     }
+
+    /// <summary>
+    /// Um cliente com um token emitido AGORA, no instante em que o relógio falso está. Os tokens do elenco saem em 2026-10-07 e valem 15 minutos: um teste que anda o relógio (a volta do gestor ausente,
+    /// dias à frente) receberia 401 com eles; este vale no novo instante.
+    /// </summary>
+    public async Task<HttpClient> ClienteComTokenNovoAsync(PessoaDeTeste pessoa)
+    {
+        await using var db = ContextoDeTeste.Novo(Conexao);
+        var usuario = await db.Usuarios.Include(u => u.Funcionario).ThenInclude(f => f.NivelDeAcesso).AsNoTracking().SingleAsync(u => u.Id == pessoa.UsuarioId);
+        var cliente = CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Services.GetRequiredService<IEmissorDeTokens>().EmitirAcesso(usuario).Token);
+        return cliente;
+    }
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que a porta dos pedidos parados é a <paramref name="porta"/> (o <see cref="PedidosParadosEspiao"/>), no lugar do composto padrão da 1a. Use <see cref="ClienteComo(WebApplicationFactory{Program}, PessoaDeTeste)"/>
+    /// para falar com ela.
+    /// </summary>
+    public WebApplicationFactory<Program> ComPedidosParados(IPedidosParadosNoGestor porta) =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IPedidosParadosNoGestor>();
+            servicos.AddSingleton(porta);
+        }));
 
     public HttpClient ClienteAnonimo() => CreateClient();
 

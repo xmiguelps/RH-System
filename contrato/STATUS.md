@@ -58,6 +58,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `POST /api/rh/beneficios` | criarBeneficioDoCatalogo | em andamento | |
 | `PUT /api/rh/beneficios/{beneficioId}` | editarBeneficioDoCatalogo | em andamento | |
 | `DELETE /api/rh/beneficios/{beneficioId}` | excluirBeneficioDoCatalogo | em andamento | só se nenhum colaborador recebeu o benefício (ativo, inativo ou pedido pendente); senão 409 `CADASTRO_EM_USO` |
+| `GET /api/rh/gestores` | listarGestores | em andamento | |
+| `POST /api/rh/gestores` | cadastrarGestor | em andamento | só quem tem o nível `RH`; a linha nasce sem setor |
+| `PUT /api/rh/gestores/{gestorId}/ausencia` | configurarAusenciaDoGestor | em andamento | parcial: `pedidosAprovadosAgora` vale 0 e 0 até as fatias 3 e 7 registrarem a implementação delas da porta `IPedidosParadosNoGestor` (o composto padrão é vazio) |
 | `GET /api/eu/empresa` | obterEmpresa | em andamento | qualquer perfil logado (sem 403); a tabela nasce vazia: sem configuração responde 404 `EMPRESA_NAO_CONFIGURADA` |
 | `PUT /api/rh/empresa` | salvarEmpresa | em andamento | a primeira chamada cria a linha única e as outras a substituem; os horários são `HH:mm` |
 

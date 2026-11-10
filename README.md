@@ -170,6 +170,10 @@ O RH cadastra, edita, desliga e readmite colaboradores (`/api/rh/funcionarios`),
 
 **Ambiente (para o deploy).** O isolamento `READ COMMITTED` das filas e das operações do vínculo (desligar, cancelar, efetivar e readmitir) pede binlog em formato `ROW` no servidor (com `STATEMENT` o MySQL recusa gravar sob `READ COMMITTED`; é o que se sabe do MySQL, não foi medido aqui: conferir no servidor do Azure); o provedor de e-mail e a lista de proxies confiáveis do Azure são definidos no deploy.
 
+### Cadastros de apoio, empresa e documentos (fatia 1c)
+
+**"Gestor ausente" (`PUT /api/rh/gestores/{gestorId}/ausencia`).** Marcar grava a marca em `GESTORES` e chama `IPedidosParadosNoGestor.AprovarEtapaDoGestorAsync` **na mesma transação**: se a porta falha, a marcação é desfeita e a resposta é 500. A resposta repete em `pedidosAprovadosAgora` o `PedidosAprovados` que a porta devolveu, então vale `{ ajustesDePonto: 0, ferias: 0 }` enquanto a porta for o composto vazio da 1a; as fatias 3 e 7 passam a preencher os números ao registrarem a implementação delas (`IPedidosParadosNoGestorDaFatia`). Desmarcar não chama a porta (só os pedidos novos voltam ao normal). Não há tarefa agendada: passada a data de volta, `ausente` continua `true` e `ausenteHoje` vira `false`; a marca vale até o dia anterior à volta, no dia de Brasília. `IGestorAusente`, que as fatias 3 e 7 chamam ao criar um pedido, só responde pelos pedidos novos.
+
 ## Front-end
 
 O front-end (React 19, TypeScript, Vite) está em `front-end/`, feito por Lucas num repositório à parte e trazido para cá (fatias 0 a 6 prontas; a fatia 7 começou e não está completa). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.

@@ -7,6 +7,9 @@ public sealed record MensagemDoApoio(string Codigo, string Detalhe)
 {
     /// <summary>A resposta 409 com este código e este texto.</summary>
     public ConflitoException ComoConflito() => new(Detalhe, Codigo);
+
+    /// <summary>A resposta 422 com este código e este texto.</summary>
+    public ErroDeNegocioException ComoErroDeNegocio() => new(Codigo, Detalhe);
 }
 
 /// <summary>
