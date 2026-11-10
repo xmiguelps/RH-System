@@ -34,9 +34,11 @@ public class GestorAusenteTests(MySqlFixture mysql)
         var api = await ApiAsync();
         var gestorDeSetor = await GestoresDeTeste.GestorDeSetorAsync(api, "Quem1", equipe: 1);
         var rhCadastrado = await GestoresDeTeste.RhCadastradoAsync(api, "Quem1");
+        var rhNoSetorDeGestorPresente = await GestoresDeTeste.RhCadastradoAsync(api, "Quem1 no setor", setorDaPessoa: gestorDeSetor.SetorId); // do RH, e o setor dele tem gestor presente
 
         Assert.Equal(ParaORhSemGestor, await EtapaAsync(api, gestorDeSetor.FuncionarioId)); // o gestor do setor decide com o RH, não com ele mesmo
         Assert.Equal(ParaORhSemGestor, await EtapaAsync(api, rhCadastrado.FuncionarioId));
+        Assert.Equal(ParaORhSemGestor, await EtapaAsync(api, rhNoSetorDeGestorPresente.FuncionarioId)); // quem é gestor não segue o gestor do setor onde está
     }
 
     [Fact]

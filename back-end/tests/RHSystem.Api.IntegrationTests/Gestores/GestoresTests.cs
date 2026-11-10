@@ -109,6 +109,21 @@ public class GestoresTests(MySqlFixture mysql)
         Assert.Equal((semCargo.FuncionarioId, JsonValueKind.Null, JsonValueKind.Null), (pessoaSemCargo.GetProperty("id").GetInt32(), pessoaSemCargo.GetProperty("cargo").ValueKind, pessoaSemCargo.GetProperty("setor").ValueKind));
     }
 
+    [Fact]
+    public async Task Gestor_de_dois_setores_mostra_o_de_menor_id_e_a_equipe_desse_setor()
+    {
+        var api = await ApiAsync();
+        var gestor = await GestoresDeTeste.GestorDeSetorAsync(api, "Doissetores4b", equipe: 1); // o primeiro setor (menor id) tem 1 membro
+        var segundoSetor = await ApoioDeTeste.CriarSetorAsync(api.Conexao, "Doissetores4b Segundo");
+        await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Doissetores4b membro do segundo A", Perfil.Funcionario, segundoSetor);
+        await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Doissetores4b membro do segundo B", Perfil.Funcionario, segundoSetor);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE SETORES SET ID_GESTOR = {gestor.GestorId} WHERE ID_SETOR = {segundoSetor}"); // o banco permite; a regra "um setor por gestor" é da Task 5
+
+        var linha = Linha(await ListaAsync(api), gestor.GestorId);
+
+        Assert.Equal((gestor.SetorId!.Value, 1), (linha.GetProperty("setor").GetProperty("id").GetInt32(), linha.GetProperty("quantidadeEquipe").GetInt32()));
+    }
+
     // ---------------------------------------------------------------- cadastrar
 
     [Fact]
