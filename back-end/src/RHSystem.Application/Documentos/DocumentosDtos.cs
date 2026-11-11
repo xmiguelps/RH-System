@@ -20,7 +20,12 @@ public sealed record DocumentoColaborador(
     SituacaoDoDocumento Situacao,
     string? NomeArquivoOriginal,
     DateTime? PedidoEmUtc,
-    DateTime? EnviadoEmUtc);
+    DateTime? EnviadoEmUtc)
+{
+    /// <summary>O documento como o contrato o mostra: sem o caminho do arquivo.</summary>
+    public static DocumentoColaborador De(DocumentoDoColaborador d) =>
+        new(d.Id, d.Tipo, d.Descricao, d.DataValidade, d.Situacao, d.NomeArquivoOriginal, d.PedidoEmUtc, d.EnviadoEmUtc);
+}
 
 /// <summary>Lista curta, sem paginação, dos mais recentes para os mais antigos.</summary>
 public sealed record DocumentoColaboradorListaResposta(IReadOnlyList<DocumentoColaborador> Itens);

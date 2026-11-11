@@ -33,4 +33,26 @@ public sealed class DocumentosRepositorio(AppDbContext db) : IDocumentosReposito
         db.Documentos.Add(documento);
         await db.SaveChangesAsync(ct);
     }
+
+    public async Task<DocumentoDoColaborador?> ObterParaEnvioAsync(int funcionarioId, int documentoId, CancellationToken ct) =>
+        await db.Documentos
+            .Include(d => d.Funcionario)
+            .FirstOrDefaultAsync(d => d.Id == documentoId && d.FuncionarioId == funcionarioId, ct);
+
+    public async Task<bool> SalvarEnvioAsync(CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Outro envio mudou a situação antes: o UPDATE (WHERE STATUS_DOCUMENTO = 'PENDENTE') não achou a linha e o evento não foi gravado (SaveChanges é uma transação só).
+            return false;
+        }
+    }
+
+    public async Task<int> ContarPendentesAsync(int funcionarioId, CancellationToken ct) =>
+        await db.Documentos.AsNoTracking().CountAsync(d => d.FuncionarioId == funcionarioId && d.Situacao == SituacaoDoDocumento.Pendente, ct);
 }

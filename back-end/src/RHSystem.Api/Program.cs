@@ -60,6 +60,7 @@ app.MapBeneficios();
 app.MapSetores();
 app.MapGestores();
 app.MapDocumentosDoRh();
+app.MapMeusDocumentos();
 app.MapEmpresa();
 app.MapAuditoria();
 app.MapContadoresDoMenu();

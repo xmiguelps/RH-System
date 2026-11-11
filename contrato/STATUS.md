@@ -29,9 +29,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/auditoria` | listarEventosDeAuditoria | em andamento | |
 | `GET /api/rh/auditoria/exportacao` | exportarAuditoria | em andamento | |
 | `GET /api/rh/auditoria/{eventoId}` | obterEventoDeAuditoria | em andamento | |
-| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
-| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
-| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7) |
 | `POST /api/auth/senha/esqueci` | solicitarRedefinicaoDeSenha | em andamento | sempre 202; um pedido por pessoa a cada 60 s (decisão 6 do plano da 1b) |
 | `POST /api/auth/senha/validar-link` | validarLinkDeSenha | em andamento | |
 | `POST /api/auth/senha/definir` | definirSenhaPeloLink | em andamento | sem login automático |
@@ -67,6 +67,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/funcionarios/{funcionarioId}/documentos` | listarDocumentosDoFuncionario | em andamento | |
 | `POST /api/rh/funcionarios/{funcionarioId}/documentos` | adicionarDocumentoDoFuncionario | em andamento | o arquivo vai para o Azurite em desenvolvimento; em produção depende do Storage Account (Task 9, do dono); "pedir para enviar" não manda e-mail |
 | `GET /api/rh/funcionarios/{funcionarioId}/documentos/{documentoId}/download` | baixarDocumentoDoFuncionario | em andamento | o link vem do Azurite em desenvolvimento; em produção depende do Storage Account (Task 9, do dono) |
+| `GET /api/eu/documentos` | listarMeusDocumentos | em andamento | qualquer perfil logado (sem 403): só os documentos da própria pessoa |
+| `POST /api/eu/documentos/{documentoId}/arquivo` | enviarMeuDocumento | em andamento | só documento `PENDENTE` da própria pessoa (de outra: 404; já enviado: 422 `DOCUMENTO_NAO_PEDIDO`); o arquivo vai para o Azurite em desenvolvimento e, em produção, depende do Storage Account (Task 9, do dono) |
+| `GET /api/eu/documentos/{documentoId}/download` | baixarMeuDocumento | em andamento | o link vem do Azurite em desenvolvimento; em produção depende do Storage Account (Task 9, do dono); baixar o próprio documento não grava evento |
 | `GET /api/eu/empresa` | obterEmpresa | em andamento | qualquer perfil logado (sem 403); a tabela nasce vazia: sem configuração responde 404 `EMPRESA_NAO_CONFIGURADA` |
 | `PUT /api/rh/empresa` | salvarEmpresa | em andamento | a primeira chamada cria a linha única e as outras a substituem; os horários são `HH:mm` |
 

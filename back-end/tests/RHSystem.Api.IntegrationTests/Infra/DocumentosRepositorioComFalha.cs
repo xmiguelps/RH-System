@@ -6,7 +6,7 @@ using RHSystem.Domain.Documentos;
 namespace RHSystem.Api.IntegrationTests.Infra;
 
 /// <summary>
-/// O <see cref="IDocumentosRepositorio"/> de verdade com UMA falha forçada: <see cref="AdicionarAsync"/> grava a linha e o evento (dentro da transação do caso de uso) e DEPOIS lança, como um banco que cai no
+/// O <see cref="IDocumentosRepositorio"/> de verdade com UMA falha forçada: <see cref="AdicionarAsync"/> e <see cref="SalvarEnvioAsync"/> gravam a linha e o evento (dentro da transação do caso de uso) e DEPOIS lançam, como um banco que cai no
 /// meio. O teste prova que a transação desfaz a linha e o evento e que o caso de uso apaga o blob (<see cref="ApiFactory.ComFalhaNoBancoAoSalvarDocumento"/>).
 /// </summary>
 public sealed class DocumentosRepositorioComFalha(IDocumentosRepositorio real) : IDocumentosRepositorio
@@ -19,9 +19,19 @@ public sealed class DocumentosRepositorioComFalha(IDocumentosRepositorio real) :
 
     public Task<DocumentoDoColaborador?> ObterDaPessoaAsync(int funcionarioId, int documentoId, CancellationToken ct) => real.ObterDaPessoaAsync(funcionarioId, documentoId, ct);
 
+    public Task<DocumentoDoColaborador?> ObterParaEnvioAsync(int funcionarioId, int documentoId, CancellationToken ct) => real.ObterParaEnvioAsync(funcionarioId, documentoId, ct);
+
+    public Task<int> ContarPendentesAsync(int funcionarioId, CancellationToken ct) => real.ContarPendentesAsync(funcionarioId, ct);
+
     public async Task AdicionarAsync(DocumentoDoColaborador documento, CancellationToken ct)
     {
         await real.AdicionarAsync(documento, ct);
+        throw new DbUpdateException(TextoDaFalha);
+    }
+
+    public async Task<bool> SalvarEnvioAsync(CancellationToken ct)
+    {
+        await real.SalvarEnvioAsync(ct);
         throw new DbUpdateException(TextoDaFalha);
     }
 }

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.Extensions.Logging;
 using RHSystem.Application.Arquivos;
 using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
@@ -20,10 +19,10 @@ namespace RHSystem.Application.Documentos;
 public sealed class DocumentosDoColaboradorCasoDeUso(
     IDocumentosRepositorio documentos,
     IArmazenamentoDeArquivos armazenamento,
+    EnvioDeArquivoDeDocumento envio,
     IUnidadeDeTrabalho unidade,
     IAuditor auditor,
-    IRelogio relogio,
-    ILogger<DocumentosDoColaboradorCasoDeUso> log)
+    IRelogio relogio)
 {
     private sealed record Campos(ModoDeDocumento Modo, TipoDeDocumento Tipo, DateOnly? DataValidade, TipoDeArquivo? TipoDoArquivo);
 
@@ -46,36 +45,26 @@ public sealed class DocumentosDoColaboradorCasoDeUso(
                 {
                     var pedido = DocumentoDoColaborador.Pedir(pessoa, campos.Tipo, novo.Descricao, campos.DataValidade, relogio.AgoraUtc);
                     await documentos.AdicionarAsync(pedido, ct);
-                    return Mapear(pedido);
+                    return DocumentoColaborador.De(pedido);
                 },
                 ct);
         }
 
         var arquivo = novo.Arquivo!;
         var tipoDoArquivo = campos.TipoDoArquivo!;
-        var caminho = CaminhosDeArquivo.Novo(LimitesDeDocumento.PastaNoArmazenamento, tipoDoArquivo.Extensao);
         var nomeGuardado = NomeParaDownload.Limpar(arquivo.NomeOriginal, tipoDoArquivo.Extensao);
-        try
-        {
-            await using (var conteudo = arquivo.Abrir())
-            {
-                await armazenamento.GravarAsync(caminho, conteudo, tipoDoArquivo.TipoDeConteudo, ct); // fora de qualquer transação
-            }
-
-            return await unidade.ExecutarEmTransacaoAsync(
+        return await envio.GravarEEfetivarAsync(
+            arquivo,
+            tipoDoArquivo,
+            caminho => unidade.ExecutarEmTransacaoAsync(
                 async () =>
                 {
                     var documento = DocumentoDoColaborador.Anexar(pessoa, campos.Tipo, novo.Descricao, campos.DataValidade, caminho, nomeGuardado, relogio.AgoraUtc);
                     await documentos.AdicionarAsync(documento, ct);
-                    return Mapear(documento);
+                    return DocumentoColaborador.De(documento);
                 },
-                ct);
-        }
-        catch
-        {
-            await TentarApagarAsync(caminho);
-            throw;
-        }
+                ct),
+            ct);
     }
 
     public async Task<LinkTemporario> BaixarAsync(int funcionarioId, int documentoId, CancellationToken ct)
@@ -101,9 +90,6 @@ public sealed class DocumentosDoColaboradorCasoDeUso(
         return await armazenamento.CriarLinkTemporarioAsync(caminho, documento.NomeArquivoOriginal ?? string.Empty, ct);
     }
 
-    private static DocumentoColaborador Mapear(DocumentoDoColaborador d) =>
-        new(d.Id, d.Tipo, d.Descricao, d.DataValidade, d.Situacao, d.NomeArquivoOriginal, d.PedidoEmUtc, d.EnviadoEmUtc);
-
     /// <summary>Todos os erros de campo e de arquivo de uma vez (400, com o nome do campo do contrato), antes de qualquer efeito.</summary>
     private static async Task<Campos> ValidarAsync(NovoDocumentoDoRh novo, CancellationToken ct)
     {
@@ -123,54 +109,11 @@ public sealed class DocumentosDoColaboradorCasoDeUso(
         }
         else if (modo == ModoDeDocumento.AnexarAgora)
         {
-            tipoDoArquivo = await ValidarArquivoAsync(erros, novo, ct);
+            tipoDoArquivo = await ValidacaoDeArquivoDeDocumento.ValidarAsync(erros, novo.Arquivo, novo.ArquivosRecebidos, "O arquivo é obrigatório neste modo.", ct);
         }
 
         erros.LancarSeHouver();
         return new Campos(modo!.Value, tipo!.Value, validade, tipoDoArquivo);
-    }
-
-    private static async Task<TipoDeArquivo?> ValidarArquivoAsync(ColetorDeErros erros, NovoDocumentoDoRh novo, CancellationToken ct)
-    {
-        if (novo.ArquivosRecebidos > 1)
-        {
-            erros.Adicionar("arquivo", "Envie um arquivo só.");
-            return null;
-        }
-
-        if (novo.Arquivo is not { } arquivo)
-        {
-            erros.Adicionar("arquivo", "O arquivo é obrigatório neste modo.");
-            return null;
-        }
-
-        if (arquivo.Tamanho <= 0)
-        {
-            erros.Adicionar("arquivo", "O arquivo está vazio.");
-            return null;
-        }
-
-        if (arquivo.Tamanho > LimitesDeDocumento.TamanhoMaximoBytes)
-        {
-            erros.Adicionar("arquivo", "O arquivo pode ter até 10 MB.");
-            return null;
-        }
-
-        // O tipo vem do CONTEÚDO, nunca do nome nem do Content-Type que o cliente mandou.
-        var inicio = new byte[8];
-        int lidos;
-        await using (var conteudo = arquivo.Abrir())
-        {
-            lidos = await conteudo.ReadAtLeastAsync(inicio, inicio.Length, throwOnEndOfStream: false, ct);
-        }
-
-        var tipo = IdentificadorDeTipoDeArquivo.Identificar(inicio.AsSpan(0, lidos));
-        if (tipo is null)
-        {
-            erros.Adicionar("arquivo", "Envie um arquivo PDF, JPG ou PNG.");
-        }
-
-        return tipo;
     }
 
     private static TEnum? LerEnum<TEnum>(ColetorDeErros erros, string? texto, string campo)
@@ -206,18 +149,5 @@ public sealed class DocumentosDoColaboradorCasoDeUso(
 
         erros.Adicionar("dataValidade", "A data de validade precisa estar no formato AAAA-MM-DD (por exemplo 2027-10-01).");
         return null;
-    }
-
-    private async Task TentarApagarAsync(string caminho)
-    {
-        try
-        {
-            await armazenamento.ApagarAsync(caminho, CancellationToken.None);
-        }
-        catch (Exception erro)
-        {
-            // O erro ORIGINAL é o que sai; a sobra fica para a LIMPAR_ARQUIVOS_ORFAOS. Só o tipo da exceção vai para o log.
-            log.LogWarning("Não foi possível apagar o arquivo de um envio que falhou ({Tipo}); a limpeza de sobras o apaga depois.", erro.GetType().Name);
-        }
     }
 }

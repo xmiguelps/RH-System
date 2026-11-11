@@ -7,7 +7,7 @@ namespace RHSystem.Api.Painel;
 /// <summary>
 /// As bolinhas do menu, uma rota por perfil (<c>contrato/fontes/70-fatia-7-gestao.yaml</c>): <c>/api/eu</c> (qualquer perfil), <c>/api/gestor</c> e <c>/api/rh</c>.
 /// Leves: o front as chama a cada navegação. Cada contador vale 0 até a fatia dona registrar a sua <c>IFonteDeContadorDoMenu</c>
-/// (documentos: 1c; avisos: 4; formulários: 5; ponto: 3; férias: 7). Os <c>operationId</c> e os códigos de resposta são os do contrato.
+/// (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7). Os <c>operationId</c> e os códigos de resposta são os do contrato.
 /// </summary>
 public static class ContadoresDoMenuEndpoints
 {

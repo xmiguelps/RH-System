@@ -16,6 +16,7 @@ using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Application.Gestores;
+using RHSystem.Application.Painel;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
@@ -152,6 +153,7 @@ public static class DependencyInjection
         // Documentos do colaborador (fatia 1c): o repositório e a fonte que diz à limpeza de sobras quais caminhos de "documentos/" têm linha no banco.
         services.AddScoped<IDocumentosRepositorio, DocumentosRepositorio>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosDocumentos>();
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDeDocumentosPendentes>(); // a bolinha "documentosPendentes" do menu
 
         // A configuração da empresa: uma classe serve ao cadastro (IEmpresaRepositorio) e às fatias 3 e 7 (IConfiguracaoDaEmpresa, sem cache).
         services.AddScoped<EmpresaRepositorio>();

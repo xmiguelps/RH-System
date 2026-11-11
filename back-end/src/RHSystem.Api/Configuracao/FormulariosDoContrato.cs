@@ -16,6 +16,7 @@ namespace RHSystem.Api.Configuracao;
 public static class FormulariosDoContrato
 {
     public const string AdicionarDocumento = "adicionarDocumentoDoFuncionario";
+    public const string EnviarMeuDocumento = "enviarMeuDocumento";
 
     public static OpenApiOptions UsarFormulariosDoContrato(this OpenApiOptions opcoes) =>
         opcoes.AddOperationTransformer((operacao, _, _) =>
@@ -35,6 +36,10 @@ public static class FormulariosDoContrato
                 ("descricao", new OpenApiSchema { Type = JsonSchemaType.String, MaxLength = 255 }),
                 ("dataValidade", new OpenApiSchema { Type = JsonSchemaType.String, Format = "date" }),
                 ("arquivo", Binario()));
+        }
+        else if (operacao.OperationId == EnviarMeuDocumento)
+        {
+            operacao.RequestBody = Multipart(obrigatorios: ["arquivo"], ("arquivo", Binario()));
         }
     }
 
