@@ -49,6 +49,7 @@ public class EspelhoDoPontoTests(MySqlFixture mysql)
             await PontoDeTeste.BaterEmAsync(conexao, diego, new DateOnly(2026, 10, 2), (TipoDeMarcacao.Entrada, "2026-10-02T11:03:00Z"), (TipoDeMarcacao.Saida, "2026-10-02T15:00:00Z"), (TipoDeMarcacao.Entrada, "2026-10-02T16:02:00Z"));
             var gestorCarlos = (int)await Sql.ContarAsync(conexao, $"SELECT ID_GESTOR FROM GESTORES WHERE ID_FUNCIONARIO = {e.Gestor.FuncionarioId}");
             _pedidoDoDia2 = await PontoDeTeste.NovoPedidoPendenteAsync(conexao, diego, new DateOnly(2026, 10, 2), gestorCarlos);
+            await PontoDeTeste.NovoPedidoRejeitadoAsync(conexao, diego, new DateOnly(2026, 10, 1), gestorCarlos); // um pedido já recusado não é "em análise": o dia 1 continua NORMAL e o resumo conta só o do dia 2
             await PontoDeTeste.BaterEmAsync(conexao, diego, new DateOnly(2026, 10, 5), (TipoDeMarcacao.Entrada, "2026-10-05T11:14:00Z"), (TipoDeMarcacao.Saida, "2026-10-05T15:05:00Z"), (TipoDeMarcacao.Entrada, "2026-10-05T16:05:00Z"), (TipoDeMarcacao.Saida, "2026-10-05T21:00:00Z"));
             await PontoDeTeste.BaterEmAsync(conexao, diego, new DateOnly(2026, 10, 6), (TipoDeMarcacao.Entrada, "2026-10-06T10:58:00Z"), (TipoDeMarcacao.Saida, "2026-10-06T15:00:00Z"), (TipoDeMarcacao.Entrada, "2026-10-06T16:00:00Z"));
             await PontoDeTeste.BaterCorrigidaPeloRhAsync(conexao, diego, new DateOnly(2026, 10, 6), TipoDeMarcacao.Saida, "2026-10-06T20:58:00Z", "2026-10-07T12:20:00Z");
@@ -61,6 +62,7 @@ public class EspelhoDoPontoTests(MySqlFixture mysql)
 
             // Paulo (GestorSemSetor): atestado de 2 horas no dia 02/09 e uma entrada sem saída em 05/10.
             await PontoDeTeste.NovoAtestadoAsync(conexao, e.GestorSemSetor.FuncionarioId, "2026-09-02", "2026-09-02", "VALIDADO", e.Rh.FuncionarioId, "09:00", "11:00");
+            await PontoDeTeste.NovoAtestadoAsync(conexao, e.GestorSemSetor.FuncionarioId, "2026-09-01", "2026-09-01", "VALIDADO", e.Rh.FuncionarioId); // de dia inteiro, no primeiro dia do mês pedido
             await PontoDeTeste.BaterEmAsync(conexao, e.GestorSemSetor.FuncionarioId, new DateOnly(2026, 10, 5), (TipoDeMarcacao.Entrada, "2026-10-05T11:00:00Z"));
             _semeado = true;
         }
@@ -190,6 +192,29 @@ public class EspelhoDoPontoTests(MySqlFixture mysql)
         var dia = Dia(espelho, "2026-09-02");
         Assert.Equal(("SEM_REGISTRO", 408, -408), (dia.GetProperty("situacao").GetString(), dia.GetProperty("cargaMinutos").GetInt32(), Inteiro(dia, "saldoMinutos")));
         Assert.Equal(528, Dia(espelho, "2026-09-03").GetProperty("cargaMinutos").GetInt32()); // o dia seguinte não tem atestado
+    }
+
+    [Fact]
+    public async Task Atestado_de_dia_inteiro_validado_no_primeiro_dia_do_mes_cobre_o_dia()
+    {
+        var api = await ApiAsync();
+
+        var espelho = await CorpoAsync(await RhAsync(api, api.Elenco.GestorSemSetor.FuncionarioId, "?ano=2026&mes=9"));
+
+        var dia = Dia(espelho, "2026-09-01");
+        Assert.Equal(("FALTA_COMPENSADA", 0), (dia.GetProperty("situacao").GetString(), dia.GetProperty("cargaMinutos").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Hoje_sem_batida_e_SEM_REGISTRO_mas_ainda_nao_e_falta_no_resumo()
+    {
+        var api = await ApiAsync();
+
+        var espelho = await CorpoAsync(await EuAsync(api, api.Elenco.GestorSemSetor, "?ano=2026&mes=10"));
+
+        // Paulo não bateu em 01, 02 e 06 (faltas), a entrada de 05 ficou sem saída (INCOMPLETO) e hoje (07) ainda pode bater.
+        Assert.Equal("SEM_REGISTRO", Dia(espelho, "2026-10-07").GetProperty("situacao").GetString());
+        Assert.Equal(3, espelho.GetProperty("resumo").GetProperty("faltas").GetInt32());
     }
 
     [Fact]

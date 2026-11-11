@@ -8,6 +8,9 @@ namespace RHSystem.Application.Ponto;
 /// <summary>Do cálculo do mês para os tipos do contrato (a própria pessoa tem o botão "Pedir ajuste" em cada dia; o gestor e o RH, não).</summary>
 internal static class MapeamentoDoEspelho
 {
+    public static PontoEspelhoDia Dia(DiaDoEspelho d) =>
+        new(d.Data, d.DiaDaSemana, d.EhHoje, d.Situacao, d.NomeFeriado, d.Periodos, d.HorasMinutos, d.CargaMinutos, d.SaldoMinutos, d.AtrasoMinutos, d.PedidoEmAnaliseId);
+
     public static PontoEspelho ParaGestorOuRh(EspelhoDoMes e) =>
         new(
             new FuncionarioResumo(e.Pessoa.Id, e.Pessoa.Nome, e.Pessoa.Ativo, e.Pessoa.Cargo, e.Pessoa.Setor),

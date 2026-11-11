@@ -63,6 +63,32 @@ public sealed class MontadorDoEspelho(IConsultaDoPonto consulta, ICalendarioDoPo
         return new EspelhoDoMes(pessoa, anoDoMes, mesDoMes, jornada, resumo, dias);
     }
 
+    /// <summary>Um dia só do espelho de uma pessoa (o que <c>corrigirMarcacoesDoDia</c> devolve): as mesmas regras do mês, com os fatos do dia lidos na hora.</summary>
+    public async Task<DiaDoEspelho> MontarDiaAsync(PessoaDoEspelho pessoa, DateOnly dia, CancellationToken ct)
+    {
+        var hoje = FusoBrasil.Hoje(relogio.AgoraUtc);
+        var configuracao = await empresa.ObterAsync(ct);
+        var jornada = MontadorDoCartaoDeHoje.Jornada(pessoa.CargaSemanalHoras, configuracao);
+        var doCalendario = await calendario.DiaAsync(dia, ct);
+        var batidas = (await consulta.BatidasAsync([pessoa.Id], dia, dia, ct)).Select(b => b.Batida).ToList();
+        var deFerias = (await ferias.NoPeriodoAsync(dia, dia, ct)).Any(f => f.FuncionarioId == pessoa.Id);
+        var atestados = await consulta.AtestadosValidadosAsync([pessoa.Id], dia, dia, ct);
+        var pedido = (await consulta.PedidosPendentesAsync([pessoa.Id], ct)).Where(p => p.Dia == dia).Select(p => (int?)p.PedidoId).FirstOrDefault();
+
+        return ConstrutorDoDiaDoEspelho.Construir(new DadosDoDiaDoEspelho(
+            dia,
+            hoje,
+            batidas,
+            doCalendario.NomeDoFeriado,
+            deFerias,
+            atestados.Any(a => a.HoraInicio is null && a.Inicio <= dia && dia <= a.Fim),
+            MinutosCobertosPorAtestadoDeHoras(atestados, dia),
+            pedido,
+            jornada.CargaDiariaMinutos ?? 0,
+            configuracao?.HorarioEntrada,
+            configuracao?.ToleranciaAtrasoMinutos ?? 0));
+    }
+
     /// <summary>Os minutos do dia cobertos por atestados VALIDADOS de algumas horas (fim menos início; o limite pela carga é do dia).</summary>
     internal static int MinutosCobertosPorAtestadoDeHoras(IReadOnlyList<AtestadoValidadoDoPonto> atestados, DateOnly dia) =>
         atestados.Where(a => a.HoraInicio is not null && a.HoraFim is not null && a.Inicio == dia).Sum(a => (int)(a.HoraFim!.Value.ToTimeSpan() - a.HoraInicio!.Value.ToTimeSpan()).TotalMinutes);

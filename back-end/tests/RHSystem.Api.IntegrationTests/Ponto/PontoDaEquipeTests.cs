@@ -51,6 +51,8 @@ public class PontoDaEquipeTests(MySqlFixture mysql)
             await PontoDeTeste.NovoPedidoPendenteAsync(conexao, e.MembroA.FuncionarioId, new DateOnly(2026, 10, 5), carlos); // etapa do gestor
             await PontoDeTeste.NovoPedidoPendenteAsync(conexao, e.MembroB.FuncionarioId, new DateOnly(2026, 10, 5)); // etapa do RH (sem gestor): não conta para ele
             await PontoDeTeste.NovoPedidoPendenteAsync(conexao, e.DeOutroSetor.FuncionarioId, new DateOnly(2026, 10, 5), marina); // etapa de OUTRO gestor
+            await PontoDeTeste.NovoPedidoPendenteAsync(conexao, e.MembroB.FuncionarioId, new DateOnly(2026, 10, 1), carlos, gestorJaAprovou: true); // o gestor já aprovou: está no RH e não conta como "para analisar"
+            await PontoDeTeste.NovoPedidoPendenteAsync(conexao, e.MembroB.FuncionarioId, new DateOnly(2026, 10, 2), marina); // pessoa da equipe do Carlos com o ID_GESTOR de outra pessoa (o gestor antigo): não conta para o Carlos
             _semeado = true;
         }
         finally
@@ -171,6 +173,26 @@ public class PontoDaEquipeTests(MySqlFixture mysql)
 
         Assert.Equal(("AJUSTE_EM_ANALISE", JsonValueKind.Null), (Linha(dia, "Diego Farias").GetProperty("situacaoDoDia").GetString(), Linha(dia, "Diego Farias").GetProperty("horasAteAgoraMinutos").ValueKind));
         Assert.Equal(1, dia.GetProperty("resumo").GetProperty("pedidosParaAnalisar").GetInt32());
+    }
+
+    [Fact]
+    public async Task Quem_foi_admitido_no_proprio_dia_consultado_aparece_nele_e_quem_entra_depois_fica_de_fora()
+    {
+        var api = await ApiAsync();
+        var julia = api.Elenco.MembroB.FuncionarioId;
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-10-06' WHERE ID_FUNCIONARIO = {julia}");
+        try
+        {
+            var noDiaDaAdmissao = await CorpoAsync(await PontoAsync(api, api.Elenco.Gestor, "?data=2026-10-06"));
+            var antesDaAdmissao = await CorpoAsync(await PontoAsync(api, api.Elenco.Gestor, "?data=2026-10-05"));
+
+            Assert.Contains(noDiaDaAdmissao.GetProperty("itens").EnumerateArray(), i => i.GetProperty("funcionario").GetProperty("nome").GetString() == "Júlia Nunes");
+            Assert.DoesNotContain(antesDaAdmissao.GetProperty("itens").EnumerateArray(), i => i.GetProperty("funcionario").GetProperty("nome").GetString() == "Júlia Nunes");
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-01-02' WHERE ID_FUNCIONARIO = {julia}");
+        }
     }
 
     [Fact]

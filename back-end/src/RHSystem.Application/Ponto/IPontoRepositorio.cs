@@ -40,4 +40,10 @@ public interface IPontoRepositorio
     /// (<c>ProblemaDeApiException</c>, com os textos desta rota).
     /// </summary>
     Task<int> GravarBatidaAsync(int funcionarioId, DateOnly dia, DateTime instanteUtc, TipoDeMarcacao tipo, CancellationToken ct);
+
+    /// <summary>
+    /// A correção direta do RH: apaga as <paramref name="removidas"/>, corrige as existentes que mudaram e inclui as novas (todas <c>CORRIGIDA_RH</c>, com a data da correção), criando o dia se faltar. As remoções vão primeiro (uma nova no horário de uma
+    /// apagada não bate na chave única). A recusa do banco sai traduzida: batida no mesmo segundo (409) e batida ligada a um pedido (409 <c>PONTO_MARCACAO_EM_USO</c>).
+    /// </summary>
+    Task CorrigirDiaAsync(int funcionarioId, DateOnly dia, IReadOnlyList<RHSystem.Application.Ponto.Regras.BatidaDepoisDeAplicar> batidas, IReadOnlyList<int> removidas, DateTime agoraUtc, CancellationToken ct);
 }

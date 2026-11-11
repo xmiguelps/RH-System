@@ -85,15 +85,23 @@ internal static class PontoDeTeste
     }
 
     /// <summary>Um pedido de ajuste <c>PENDENTE</c> do dia, com uma batida de saída pedida; <paramref name="gestorId"/> é <c>GESTORES.ID_GESTOR</c> (etapa do gestor) ou nulo (etapa do RH).</summary>
-    public static async Task<int> NovoPedidoPendenteAsync(string conexao, int funcionarioId, DateOnly dia, int? gestorId = null)
+    public static async Task<int> NovoPedidoPendenteAsync(string conexao, int funcionarioId, DateOnly dia, int? gestorId = null, int? marcacaoId = null, bool gestorJaAprovou = false)
     {
         await using var db = ContextoDeTeste.Novo(conexao);
         var ponto = await PontoDoDiaAsync(db, funcionarioId, dia);
         var instante = new DateTime(dia.Year, dia.Month, dia.Day, 22, 0, 0, DateTimeKind.Utc);
-        var pedido = PedidoDeAjuste.Criar(ponto.Id, funcionarioId, "Esqueci de bater a saída", instante.AddDays(1), gestorId, [ItemDoPedidoDeAjuste.Novo(ponto.Id, null, instante, TipoDeMarcacao.Saida)]);
+        var pedido = PedidoDeAjuste.Criar(ponto.Id, funcionarioId, "Esqueci de bater a saída", instante.AddDays(1), gestorId, [ItemDoPedidoDeAjuste.Novo(ponto.Id, marcacaoId, instante, TipoDeMarcacao.Saida)], etapaDoGestorAprovadaPorAusencia: gestorJaAprovou);
         db.PedidosDeAjuste.Add(pedido);
         await db.SaveChangesAsync();
         return pedido.Id;
+    }
+
+    /// <summary>Um pedido de ajuste já REJEITADO (o gestor recusou na primeira etapa): não está em análise e não pode contar como pendente em nenhuma tela.</summary>
+    public static async Task<int> NovoPedidoRejeitadoAsync(string conexao, int funcionarioId, DateOnly dia, int gestorId)
+    {
+        var pedidoId = await NovoPedidoPendenteAsync(conexao, funcionarioId, dia, gestorId);
+        await Sql.ExecutarAsync(conexao, $"UPDATE PONTOS_MANUTENCOES SET STATUS_SOLICITACAO = 'REJEITADA', RESULTADO_GESTOR = 'RECUSOU', DATA_ETAPA_GESTOR = '{dia.AddDays(5):yyyy-MM-dd} 10:00:00', DATA_ANALISE = '{dia.AddDays(5):yyyy-MM-dd} 10:00:00' WHERE ID_MANUTENCAO_PONTO = {pedidoId}");
+        return pedidoId;
     }
 
     /// <summary>Um lançamento do banco de horas (<c>QUANTIDADE</c> em horas com 2 casas, em texto com ponto).</summary>

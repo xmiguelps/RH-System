@@ -46,8 +46,17 @@ public class PedidoDeAjuste
 
     public IReadOnlyList<ItemDoPedidoDeAjuste> Itens => _itens;
 
-    public static PedidoDeAjuste Criar(int pontoId, int funcionarioId, string justificativa, DateTime agoraUtc, int? gestorId, IEnumerable<ItemDoPedidoDeAjuste> itens)
+    /// <summary>
+    /// Um pedido novo, <c>PENDENTE</c>. <paramref name="gestorId"/> é a linha de <c>GESTORES</c> da etapa do gestor (<c>null</c>: o pedido nasce sem ela e só o RH decide). Com <paramref name="etapaDoGestorAprovadaPorAusencia"/> o gestor está
+    /// ausente: a etapa dele já nasce aprovada sozinha (<c>APROVOU</c>, automática, na hora da criação) e o pedido segue para o RH.
+    /// </summary>
+    public static PedidoDeAjuste Criar(int pontoId, int funcionarioId, string justificativa, DateTime agoraUtc, int? gestorId, IEnumerable<ItemDoPedidoDeAjuste> itens, bool etapaDoGestorAprovadaPorAusencia = false)
     {
+        if (etapaDoGestorAprovadaPorAusencia && gestorId is null)
+        {
+            throw new ArgumentException("A aprovação por ausência precisa do gestor ausente.", nameof(gestorId));
+        }
+
         var pedido = new PedidoDeAjuste
         {
             PontoId = pontoId,
@@ -57,6 +66,13 @@ public class PedidoDeAjuste
             Status = StatusDoPedidoDeAjuste.Pendente,
             GestorId = gestorId,
         };
+        if (etapaDoGestorAprovadaPorAusencia)
+        {
+            pedido.ResultadoDoGestor = ResultadoDaEtapaDoGestor.Aprovou;
+            pedido.EtapaDoGestorEmUtc = MarcacaoDePonto.AoSegundo(agoraUtc);
+            pedido.EtapaDoGestorAutomatica = true;
+        }
+
         pedido._itens.AddRange(itens);
         return pedido;
     }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Ponto;
 using RHSystem.Application.Ponto.Mensagens;
+using RHSystem.Application.Ponto.Regras;
 using RHSystem.Domain.Ponto;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Persistencia;
@@ -52,6 +53,49 @@ public sealed class PontoRepositorio(AppDbContext db) : IPontoRepositorio
             return batida.Id;
         }
         catch (DbUpdateException erro) when (TradutorDeRecusaDoPonto.Traduzir(erro, ContextoDaRota.RegistrarMarcacao) is { } problema)
+        {
+            throw problema;
+        }
+    }
+    public async Task CorrigirDiaAsync(int funcionarioId, DateOnly dia, IReadOnlyList<BatidaDepoisDeAplicar> batidas, IReadOnlyList<int> removidas, DateTime agoraUtc, CancellationToken ct)
+    {
+        try
+        {
+            var ponto = await db.PontosDosDias.FirstOrDefaultAsync(p => p.FuncionarioId == funcionarioId && p.Dia == dia, ct);
+            if (ponto is null)
+            {
+                if (batidas.Count == 0)
+                {
+                    return;
+                }
+
+                ponto = PontoDoDia.Novo(funcionarioId, dia);
+                db.PontosDosDias.Add(ponto);
+                await db.SaveChangesAsync(ct);
+            }
+
+            var existentes = await db.Marcacoes.Where(m => m.PontoId == ponto.Id).ToDictionaryAsync(m => m.Id, ct);
+            if (removidas.Count > 0)
+            {
+                db.Marcacoes.RemoveRange(removidas.Select(id => existentes[id]));
+                await db.SaveChangesAsync(ct);
+            }
+
+            foreach (var batida in batidas.Where(b => b.Mudou))
+            {
+                if (batida.Id is { } id)
+                {
+                    existentes[id].CorrigirPeloRh(batida.InstanteUtc, batida.Tipo, agoraUtc);
+                }
+                else
+                {
+                    db.Marcacoes.Add(MarcacaoDePonto.NovaCorrigidaPeloRh(ponto.Id, batida.InstanteUtc, batida.Tipo, agoraUtc));
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException erro) when (TradutorDeRecusaDoPonto.Traduzir(erro, ContextoDaRota.CorrigirDia) is { } problema)
         {
             throw problema;
         }
