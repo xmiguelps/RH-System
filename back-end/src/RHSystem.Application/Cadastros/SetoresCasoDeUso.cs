@@ -104,6 +104,7 @@ public sealed class SetoresCasoDeUso(ISetoresRepositorio setores, IGestorDoFunci
                 await gestorDoFuncionario.RefazerDosMembrosAsync(setor.Id, ct); // lê o gestor do setor NO BANCO: por isso depois de salvar o setor, na mesma transação
                 if (gestorAntigo is not null)
                 {
+                    await DevolverOGestorDoSetorDeOrigemAsync(gestorAntigo.Funcionario, setor.Id, ct);
                     await pedidosParados.PassarParaORhAsync(gestorAntigo.Id, ct); // os pedidos dele passam ao RH, ao tirar e ao trocar; sem gestor antigo, não há de quem passar
                 }
 
@@ -112,6 +113,24 @@ public sealed class SetoresCasoDeUso(ISetoresRepositorio setores, IGestorDoFunci
             ct);
 
         return await ItemAsync(setorId, ct);
+    }
+
+    /// <summary>
+    /// O ex-gestor que é membro de OUTRO setor (a decisão 1 deixa o gestor no setor de origem) volta a ter o gestor desse setor: enquanto gerenciava este, a regra da 1b o deixou com <c>ID_GESTOR</c> nulo, e
+    /// <c>RefazerDosMembrosAsync</c> só refaz os membros do setor editado. Sem gestor no setor de origem, ou com o gestor inativo (o 422 de lá não é problema desta edição), o <c>ID_GESTOR</c> fica como está.
+    /// </summary>
+    private async Task DevolverOGestorDoSetorDeOrigemAsync(Funcionario exGestor, int setorEditadoId, CancellationToken ct)
+    {
+        if (exGestor.SetorId is not { } origem || origem == setorEditadoId)
+        {
+            return; // sem setor, ou membro do próprio setor editado (já refeito por RefazerDosMembrosAsync)
+        }
+
+        var resolucao = await gestorDoFuncionario.ResolverAsync(origem, exGestor.Id, ct);
+        if (resolucao.GestorId is { } gestorDaOrigem && !resolucao.GestorInativo)
+        {
+            await setores.DefinirGestorDoColaboradorAsync(exGestor.Id, gestorDaOrigem, ct);
+        }
     }
 
     /// <summary>Os campos e a pessoa do gestor (400 junto: nome, descrição e "a pessoa não existe"). Devolve a pessoa rastreada, ou <c>null</c> quando o setor fica sem gestor.</summary>

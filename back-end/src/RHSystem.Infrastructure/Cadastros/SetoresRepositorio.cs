@@ -71,6 +71,12 @@ public sealed class SetoresRepositorio(AppDbContext db) : ISetoresRepositorio
 
     public async Task SalvarGestorEOsNiveisAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
 
+    public async Task DefinirGestorDoColaboradorAsync(int funcionarioId, int gestorId, CancellationToken ct) =>
+        // AUDITORIA-OK: o gestor do colaborador é derivado do setor; o evento é o da troca de gestor do setor (fatia 1c)
+        await db.Funcionarios
+            .Where(f => f.Id == funcionarioId && f.Ativo)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.GestorId, (int?)gestorId), ct);
+
     public async Task SalvarAsync(CancellationToken ct)
     {
         try

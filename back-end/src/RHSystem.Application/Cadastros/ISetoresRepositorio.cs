@@ -39,6 +39,11 @@ public interface ISetoresRepositorio
     /// <summary>Grava a linha nova de <c>GESTORES</c> e as mudanças de nível, sem tradução de erro (a única chave única da tabela é a da pessoa).</summary>
     Task SalvarGestorEOsNiveisAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Define o <c>ID_GESTOR</c> do colaborador ATIVO (um UPDATE só, no contexto da transação do chamador), sem evento de auditoria próprio: o gestor do colaborador é derivado do setor e o evento é o da troca de gestor do setor.
+    /// </summary>
+    Task DefinirGestorDoColaboradorAsync(int funcionarioId, int gestorId, CancellationToken ct);
+
     /// <summary>Grava o setor. Nome repetido que passou pela verificação (corrida) volta como <see cref="ConflitoException"/> <c>NOME_JA_CADASTRADO</c>.</summary>
     Task SalvarAsync(CancellationToken ct);
 }

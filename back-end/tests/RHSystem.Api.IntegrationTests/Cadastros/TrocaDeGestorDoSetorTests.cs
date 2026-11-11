@@ -188,6 +188,31 @@ public class TrocaDeGestorDoSetorTests(MySqlFixture mysql)
         Assert.Equal(outro.Gestor.GestorId, await SetoresDeTeste.GestorDoSetorAsync(api, outro.SetorId)); // o outro setor continua com o gestor dele
     }
 
+    [Fact]
+    public async Task Ex_gestor_que_e_membro_de_outro_setor_volta_a_ter_o_gestor_do_setor_dele_ao_ser_trocado_ou_tirado()
+    {
+        var api = await ApiAsync();
+        var trocaSetor = await SetoresDeTeste.ComEquipeAsync(api, "ExGestor10a");
+        var tiraSetor = await SetoresDeTeste.ComEquipeAsync(api, "ExGestor10b");
+        var origem = await SetoresDeTeste.ComEquipeAsync(api, "ExGestor10 Origem", ativos: 2);
+        var (trocado, tirado) = (origem.Ativos[0], origem.Ativos[1]);
+        Assert.Equal(200, (int)(await EditarAsync(api, null, trocaSetor.SetorId, "ExGestor10a Setor", trocado)).StatusCode); // viram gestores de outros setores sem sair do setor de origem (decisão 1)
+        Assert.Equal(200, (int)(await EditarAsync(api, null, tiraSetor.SetorId, "ExGestor10b Setor", tirado)).StatusCode);
+        Assert.Null(await SetoresDeTeste.IdGestorDaPessoaAsync(api, trocado)); // enquanto gerenciam outro setor, a regra da 1b os deixa sem gestor
+        Assert.Null(await SetoresDeTeste.IdGestorDaPessoaAsync(api, tirado));
+        var eventosAntes = (await EventosAsync(api, "FUNCIONARIOS", trocado), await EventosAsync(api, "FUNCIONARIOS", tirado));
+
+        Assert.Equal(200, (int)(await EditarAsync(api, null, trocaSetor.SetorId, "ExGestor10a Setor", await PessoaAsync(api, "ExGestor10a Novo"))).StatusCode); // um é trocado por outra pessoa
+        Assert.Equal(200, (int)(await EditarAsync(api, null, tiraSetor.SetorId, "ExGestor10b Setor", null)).StatusCode); // o outro é tirado
+
+        Assert.Equal(origem.Gestor.GestorId, await SetoresDeTeste.IdGestorDaPessoaAsync(api, trocado)); // voltam a ter o gestor do setor DELES
+        Assert.Equal(origem.Gestor.GestorId, await SetoresDeTeste.IdGestorDaPessoaAsync(api, tirado));
+        Assert.Equal((origem.SetorId, origem.SetorId), (await SetoresDeTeste.SetorDaPessoaAsync(api, trocado), await SetoresDeTeste.SetorDaPessoaAsync(api, tirado)));
+        Assert.Equal(("Funcionario", "Funcionario"), (await SetoresDeTeste.NivelAsync(api, trocado), await SetoresDeTeste.NivelAsync(api, tirado)));
+        Assert.Equal(eventosAntes.Item1 + 1, await EventosAsync(api, "FUNCIONARIOS", trocado)); // só o do rebaixamento de nível: o ID_GESTOR derivado não gera evento próprio
+        Assert.Equal(eventosAntes.Item2 + 1, await EventosAsync(api, "FUNCIONARIOS", tirado));
+    }
+
     // ---------------------------------------------------------------- a porta dos pedidos parados
 
     [Fact]
