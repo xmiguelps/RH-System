@@ -18,6 +18,7 @@ using RHSystem.Application.Escopo;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
+using RHSystem.Application.Ponto;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
@@ -35,6 +36,7 @@ using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Gestores;
 using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
+using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Infrastructure;
 
@@ -203,9 +205,11 @@ public static class DependencyInjection
         // registrarem (AddScoped); sem nenhuma, não faz nada (dívida registrada em contrato/STATUS.md).
         services.AddScoped<IPedidosParadosNoGestor, PedidosParadosNoGestorComposto>();
 
-        // Situação de hoje: a fonte padrão só conhece o fim de semana (nada de ponto, atestado, férias nem horário ainda). A fatia 3 registra a fonte dela DEPOIS desta (o último
-        // registro vale) e a ficha e a lista de colaboradores passam a mostrar a situação de verdade sem mudar aqui.
-        services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaSemRegistros>();
+        // Situação de hoje: a fonte da 1b (FonteDeFatosDoDiaSemRegistros, só o fim de semana) ficou para os testes de unidade; o ponto (fatia 3) registra a dele, que conhece feriado, férias, atestado, batida e o horário da empresa.
+        // O calendário e as férias do ponto também servem ao espelho e à consolidação do banco de horas.
+        services.AddScoped<ICalendarioDoPonto, CalendarioDoPonto>();
+        services.AddScoped<IFeriasDoPonto, FeriasDoPonto>();
+        services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();
         services.AddScoped<ISituacaoDeHoje, SituacaoDeHojeServico>();
 
         services.AddSingleton<ISenhaHasher, SenhaHasher>();

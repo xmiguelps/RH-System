@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Infrastructure.Colaboradores;
+using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Api.IntegrationTests.Colaboradores;
 
@@ -104,13 +105,13 @@ public class SituacaoDeHojeServicoTests(MySqlFixture mysql)
     }
 
     [Fact]
-    public async Task O_conteiner_entrega_a_fonte_padrao_e_o_servico_por_escopo()
+    public async Task O_conteiner_entrega_a_fonte_do_ponto_e_o_servico_por_escopo()
     {
         var api = await ApiCompartilhada.ObterAsync(mysql);
         using var escopo1 = api.Services.CreateScope();
         using var escopo2 = api.Services.CreateScope();
 
-        Assert.IsType<FonteDeFatosDoDiaSemRegistros>(escopo1.ServiceProvider.GetRequiredService<IFonteDeFatosDoDia>());
+        Assert.IsType<FonteDeFatosDoDiaDoPonto>(escopo1.ServiceProvider.GetRequiredService<IFonteDeFatosDoDia>()); // a fatia 3 substituiu a fonte da 1b, que só conhecia o fim de semana
         Assert.IsType<SituacaoDeHojeServico>(escopo1.ServiceProvider.GetRequiredService<ISituacaoDeHoje>());
         Assert.Same(escopo1.ServiceProvider.GetRequiredService<ISituacaoDeHoje>(), escopo1.ServiceProvider.GetRequiredService<ISituacaoDeHoje>());
         Assert.NotSame(escopo1.ServiceProvider.GetRequiredService<ISituacaoDeHoje>(), escopo2.ServiceProvider.GetRequiredService<ISituacaoDeHoje>());
