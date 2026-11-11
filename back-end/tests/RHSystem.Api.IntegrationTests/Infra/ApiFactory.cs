@@ -14,6 +14,8 @@ using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
+using RHSystem.Infrastructure.Colaboradores;
+using RHSystem.Infrastructure.Persistencia;
 
 namespace RHSystem.Api.IntegrationTests.Infra;
 
@@ -110,19 +112,6 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Um cliente com um token emitido AGORA, no instante em que o relógio falso está. Os tokens do elenco saem em 2026-10-07 e valem 15 minutos: um teste que anda o relógio (a volta do gestor ausente,
-    /// dias à frente) receberia 401 com eles; este vale no novo instante.
-    /// </summary>
-    public async Task<HttpClient> ClienteComTokenNovoAsync(PessoaDeTeste pessoa)
-    {
-        await using var db = ContextoDeTeste.Novo(Conexao);
-        var usuario = await db.Usuarios.Include(u => u.Funcionario).ThenInclude(f => f.NivelDeAcesso).AsNoTracking().SingleAsync(u => u.Id == pessoa.UsuarioId);
-        var cliente = CreateClient();
-        cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Services.GetRequiredService<IEmissorDeTokens>().EmitirAcesso(usuario).Token);
-        return cliente;
-    }
-
-    /// <summary>
     /// Uma segunda API sobre o MESMO banco em que a porta dos pedidos parados é a <paramref name="porta"/> (o <see cref="PedidosParadosEspiao"/>), no lugar do composto padrão da 1a. Use <see cref="ClienteComo(WebApplicationFactory{Program}, PessoaDeTeste)"/>
     /// para falar com ela.
     /// </summary>
@@ -131,6 +120,26 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         {
             servicos.RemoveAll<IPedidosParadosNoGestor>();
             servicos.AddSingleton(porta);
+        }));
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que o <see cref="IGestorDoFuncionario"/> é o <see cref="GestorDoFuncionarioEspiao"/> (que delega à implementação real da 1b e anota as chamadas em
+    /// <paramref name="chamadas"/>) e, se <paramref name="pedidos"/> vier, a porta dos pedidos parados também é a falsa.
+    /// </summary>
+    public WebApplicationFactory<Program> ComGestorDoFuncionarioEspiao(ChamadasDoGestorDoFuncionario chamadas, IPedidosParadosNoGestor? pedidos = null) =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IGestorDoFuncionario>();
+            servicos.AddScoped<IGestorDoFuncionario>(sp =>
+            {
+                var contexto = sp.GetRequiredService<AppDbContext>();
+                return new GestorDoFuncionarioEspiao(new GestorDoFuncionario(contexto), contexto, chamadas);
+            });
+            if (pedidos is not null)
+            {
+                servicos.RemoveAll<IPedidosParadosNoGestor>();
+                servicos.AddSingleton(pedidos);
+            }
         }));
 
     public HttpClient ClienteAnonimo() => CreateClient();

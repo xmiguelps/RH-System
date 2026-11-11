@@ -127,6 +127,7 @@ public static class DependencyInjection
         // Cadastros de apoio (tela 29): cargos e benefícios do catálogo (fatia 1c).
         services.AddScoped<ICargosRepositorio, CargosRepositorio>();
         services.AddScoped<IBeneficiosRepositorio, BeneficiosRepositorio>();
+        services.AddScoped<ISetoresRepositorio, SetoresRepositorio>();
 
         // Gestores e "gestor ausente" (fatia 1c): a regra de quem decide primeiro um pedido novo é a interface que as fatias 3 e 7 chamam.
         services.AddScoped<IGestoresRepositorio, GestoresRepositorio>();

@@ -25,14 +25,14 @@ public class AusenciaDoGestorTests(MySqlFixture mysql)
     private static string Rota(int gestorId) => $"/api/rh/gestores/{gestorId}/ausencia";
 
     private static async Task<HttpResponseMessage> ComoRhAsync(ApiDeAcesso api, int gestorId, bool ausente, string? ausenteAte) =>
-        await (await api.Api.ClienteComTokenNovoAsync(api.Elenco.Rh)).PutAsJsonAsync(Rota(gestorId), new { ausente, ausenteAte }); // token novo: alguns testes andam o relógio
+        await (await api.ClienteDoRhAgoraAsync()).PutAsJsonAsync(Rota(gestorId), new { ausente, ausenteAte }); // token novo: alguns testes andam o relógio
 
     private static Task<HttpResponseMessage> ComEspiaoAsync(ApiDeAcesso api, WebApplicationFactory<Program> fabrica, int gestorId, bool ausente, string? ausenteAte) =>
         api.Api.ClienteComo(fabrica, api.Elenco.Rh).PutAsJsonAsync(Rota(gestorId), new { ausente, ausenteAte });
 
     private static async Task<JsonElement> ListarLinhaAsync(ApiDeAcesso api, int gestorId)
     {
-        var itens = await ItensAsync(await (await api.Api.ClienteComTokenNovoAsync(api.Elenco.Rh)).GetAsync("/api/rh/gestores"));
+        var itens = await ItensAsync(await (await api.ClienteDoRhAgoraAsync()).GetAsync("/api/rh/gestores"));
         return Assert.Single(itens, i => i.GetProperty("gestorId").GetInt32() == gestorId);
     }
 

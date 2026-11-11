@@ -130,7 +130,7 @@ public class GestorAusenteTests(MySqlFixture mysql)
 
         async Task<bool> NaListaAsync()
         {
-            var itens = await Cadastros.CadastrosDeTeste.ItensAsync(await (await api.Api.ClienteComTokenNovoAsync(api.Elenco.Rh)).GetAsync("/api/rh/gestores")); // token novo: o relógio anda
+            var itens = await Cadastros.CadastrosDeTeste.ItensAsync(await (await api.ClienteDoRhAgoraAsync()).GetAsync("/api/rh/gestores")); // token novo: o relógio anda
             return Assert.Single(itens, i => i.GetProperty("gestorId").GetInt32() == gestor.GestorId).GetProperty("ausenteHoje").GetBoolean();
         }
 

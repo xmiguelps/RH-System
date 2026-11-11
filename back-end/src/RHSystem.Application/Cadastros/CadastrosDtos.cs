@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comum.Consultas;
 
 namespace RHSystem.Application.Cadastros;
@@ -24,3 +26,19 @@ public sealed record BeneficioCatalogoComando(string Nome, string? Descricao, bo
 /// <summary>A página de benefícios do catálogo.</summary>
 public sealed record BeneficioCatalogoListaResposta(IReadOnlyList<BeneficioCatalogoItem> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas)
     : RespostaPaginada<BeneficioCatalogoItem>(Itens, Pagina, TamanhoPagina, Total, TotalPaginas);
+
+/// <summary>
+/// Um setor na lista. <c>Gestor</c> é o gestor (mesmo inativo) ou <c>null</c>; <c>QuantidadePessoas</c> conta as pessoas ativas com a admissão já começada, inclusive o gestor se ele for do setor.
+/// <c>Descricao</c> e <c>Gestor</c> são obrigatórios e aceitam <c>null</c> no contrato, então não têm padrão.
+/// </summary>
+public sealed record SetorItem(int Id, string Nome, string? Descricao, GestorReferencia? Gestor, int QuantidadePessoas);
+
+/// <summary>
+/// O corpo de criar e de editar um setor: os três campos são obrigatórios; <c>descricao</c> e <c>gestorFuncionarioId</c> podem ser <c>null</c> (sem gestor). Como a edição SUBSTITUI, o campo que falta valeria "apagar
+/// a descrição" ou "tirar o gestor" (que passa os pedidos dele ao RH), então os dois levam <see cref="JsonRequiredAttribute"/>: sem eles o corpo é 400. O nome faltando já vira 400 em <c>nome</c> no caso de uso.
+/// </summary>
+public sealed record SetorComando(string Nome, [property: JsonRequired] string? Descricao, [property: JsonRequired] int? GestorFuncionarioId);
+
+/// <summary>A página de setores.</summary>
+public sealed record SetorListaResposta(IReadOnlyList<SetorItem> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas)
+    : RespostaPaginada<SetorItem>(Itens, Pagina, TamanhoPagina, Total, TotalPaginas);
