@@ -41,6 +41,21 @@ public class ConstrutorDoDiaDoEspelhoTests
         Assert.Equal((SituacaoDoDiaNoPonto.AjusteEmAnalise, (int?)null, 528, (int?)null, (int?)null, (int?)301, false), (dia.Situacao, dia.HorasMinutos, dia.CargaMinutos, dia.SaldoMinutos, dia.AtrasoMinutos, dia.PedidoEmAnaliseId, dia.PodePedirAjuste));
     }
 
+    [Theory]
+    [InlineData(5, DiaDaSemanaDoPonto.Segunda)]
+    [InlineData(6, DiaDaSemanaDoPonto.Terca)]
+    [InlineData(7, DiaDaSemanaDoPonto.Quarta)]
+    [InlineData(8, DiaDaSemanaDoPonto.Quinta)]
+    [InlineData(9, DiaDaSemanaDoPonto.Sexta)]
+    [InlineData(10, DiaDaSemanaDoPonto.Sabado)]
+    [InlineData(11, DiaDaSemanaDoPonto.Domingo)]
+    public void O_dia_da_semana_e_o_da_data_nos_sete_dias(int dia, DiaDaSemanaDoPonto esperado)
+    {
+        var construido = ConstrutorDoDiaDoEspelho.Construir(Dados(new DateOnly(2026, 10, dia)));
+
+        Assert.Equal(esperado, construido.DiaDaSemana);
+    }
+
     [Fact]
     public void Sabado_sem_batida_e_folga_sem_carga_sem_horas_e_sem_botao()
     {

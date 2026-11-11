@@ -278,7 +278,17 @@ public class BaterPontoTests(MySqlFixture mysql)
         var problema = await CorpoAsync(resposta);
         Assert.Equal(("(sem código)", "Operação recusada.", "A operação foi recusada por uma regra do banco de dados.", "A data do ponto e anterior a admissao."),
             (Codigo(problema), problema.GetProperty("title").GetString(), problema.GetProperty("detail").GetString(), problema.GetProperty("regraDoBanco").GetString()));
-        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM PONTOS WHERE ID_FUNCIONARIO = {pessoa.FuncionarioId}"));
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM PONTOS WHERE ID_FUNCIONARIO = {pessoa.FuncionarioId} AND DATA = '2026-10-07'"));
+    }
+
+    [Fact]
+    public async Task No_dia_da_admissao_a_batida_e_aceita()
+    {
+        var api = await ApiAsync(new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc)); // Rafael Torres entra em 2026-10-13
+
+        var resposta = await BaterAsync(api, api.Elenco.EmAdmissao, "ENTRADA");
+
+        Assert.Equal(201, (int)resposta.StatusCode);
     }
 
     [Fact]
