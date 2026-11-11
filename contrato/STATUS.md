@@ -8,8 +8,8 @@ Colunas: `fatia` (0 a 8) e `situação`: `planejada` (só no contrato), `em anda
 |---|---|---|
 | 0 | Login, sessão e saúde | planejada |
 | 1 | Colaboradores e base transversal | em andamento |
-| 2 | Importação por Excel | planejada |
-| 3 | Ponto | planejada |
+| 2 | Importação por Excel | em andamento |
+| 3 | Ponto | em andamento |
 | 4 | Comunicação e documentos | planejada |
 | 5 | Formulários | planejada |
 | 6 | TAD (treinamentos) | planejada |
