@@ -72,6 +72,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/eu/documentos/{documentoId}/download` | baixarMeuDocumento | em andamento | o link vem do Azurite em desenvolvimento; em produção depende do Storage Account (Task 9, do dono); baixar o próprio documento não grava evento |
 | `GET /api/eu/empresa` | obterEmpresa | em andamento | qualquer perfil logado (sem 403); a tabela nasce vazia: sem configuração responde 404 `EMPRESA_NAO_CONFIGURADA` |
 | `PUT /api/rh/empresa` | salvarEmpresa | em andamento | a primeira chamada cria a linha única e as outras a substituem; os horários são `HH:mm` |
+| `GET /api/rh/importacoes/modelo` | baixarModeloDeImportacao | em andamento | só RH; o arquivo `.xlsx` é gerado na hora com os cargos, setores e benefícios de hoje (aba "Valores válidos"); CPF e telefone saem em formato texto |
+| `POST /api/rh/importacoes` | validarPlanilhaDeImportacao | em andamento | só RH; `multipart/form-data` (campo `arquivo`, `.xlsx` até 5 MiB e 500 linhas); devolve a prévia (201, sem `Location`) com erros por linha e coluna; nada é cadastrado; o arquivo e a prévia ficam 1 hora |
+| `POST /api/rh/importacoes/{importacaoId}/confirmar` | confirmarImportacao | em andamento | só RH; tudo ou nada numa transação (reivindica a importação, cadastra pelo mesmo cadastro da tela 02, um evento `Importou`); 409 se já confirmada, 422 se venceu, tem erro ou uma linha foi recusada (com `linha`); as caixas de onboarding e de formulário de admissão usam as versões "indisponível" até as fatias 5 e 6 |
 
 ## Pendências conhecidas
 

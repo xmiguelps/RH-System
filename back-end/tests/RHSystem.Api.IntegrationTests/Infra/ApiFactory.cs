@@ -14,6 +14,7 @@ using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
+using RHSystem.Application.Importacoes;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Colaboradores;
@@ -149,6 +150,29 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
             var original = servicos.Last(d => d.ServiceType == typeof(IDocumentosRepositorio));
             servicos.RemoveAll<IDocumentosRepositorio>();
             servicos.AddScoped<IDocumentosRepositorio>(sp => new DocumentosRepositorioComFalha((IDocumentosRepositorio)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!)));
+        }));
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que gravar uma importação falha DEPOIS de a linha ir para o banco (<see cref="ImportacoesRepositorioComFalha"/>): a transação desfaz a linha e o evento e o caso de uso apaga o blob.
+    /// </summary>
+    public WebApplicationFactory<Program> ComFalhaNoBancoAoSalvarImportacao() =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            var original = servicos.Last(d => d.ServiceType == typeof(IImportacoesRepositorio));
+            servicos.RemoveAll<IImportacoesRepositorio>();
+            servicos.AddScoped<IImportacoesRepositorio>(sp => new ImportacoesRepositorioComFalha((IImportacoesRepositorio)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!)));
+        }));
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que o cadastro grava todas as pessoas e DEPOIS recusa a linha <paramref name="indice"/> com a <paramref name="regraDoBanco"/> (<see cref="CadastroDeFuncionariosComFalha"/>): a
+    /// transação do caso de uso desfaz tudo.
+    /// </summary>
+    public WebApplicationFactory<Program> ComFalhaNoCadastroDaLinha(int indice, string? regraDoBanco, bool porDuplicidade = false, IReadOnlyList<ProblemaDeCadastro>? revalidacao = null) =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            var original = servicos.Last(d => d.ServiceType == typeof(ICadastroDeFuncionarios));
+            servicos.RemoveAll<ICadastroDeFuncionarios>();
+            servicos.AddScoped<ICadastroDeFuncionarios>(sp => new CadastroDeFuncionariosComFalha((ICadastroDeFuncionarios)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!), indice, regraDoBanco, porDuplicidade, revalidacao));
         }));
 
     /// <summary>

@@ -16,6 +16,7 @@ using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Application.Gestores;
+using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
@@ -32,6 +33,7 @@ using RHSystem.Infrastructure.Empresa;
 using RHSystem.Infrastructure.Escopo;
 using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Gestores;
+using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
 
 namespace RHSystem.Infrastructure;
@@ -82,7 +84,9 @@ public static class DependencyInjection
             (sp, opcoes) => opcoes
                 .UseMySql(conexao, new MySqlServerVersion(versaoDoServidor))
                 .AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>())
-                .ConfigureWarnings(avisos => avisos.Log((CoreEventId.SaveChangesFailed, LogLevel.Debug))));
+                // O texto do comando ("Executed DbCommand") sai em Information e o provedor MySQL escreve os valores de Contains(lista) (CPF e e-mail do cadastro, da importação) DENTRO do SQL: por isso desce para Debug, por CÓDIGO, e não
+                // por uma chave do appsettings que um operador pode mudar. Só quem liga o nível Debug desta categoria vê o SQL. O CommandError (nível Error, falha de verdade) continua saindo com o SQL.
+                .ConfigureWarnings(avisos => avisos.Log((CoreEventId.SaveChangesFailed, LogLevel.Debug), (RelationalEventId.CommandExecuted, LogLevel.Debug))));
         services.AddDbContextFactory<AppDbContext>(_ => { }, ServiceLifetime.Scoped);
         services.AddScoped<IAuditor, Auditor>();
         services.AddScoped<IConsultaDeAuditoria, ConsultaDeAuditoria>();
@@ -117,6 +121,7 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, LimparTokensDeSenhaTarefa>();
         services.AddScoped<ITarefaAgendada, EfetivarDesligamentoTarefa>();
         services.AddScoped<ITarefaAgendada, LimparArquivosOrfaosTarefa>();
+        services.AddScoped<ITarefaAgendada, LimparImportacoesVencidasTarefa>(); // por hora: a prévia e o arquivo de uma importação vencida têm dado pessoal
         services.AddHostedService<AgendadorHostedService>();
 
         // Arquivos (Blob Storage; Azurite em desenvolvimento): o armazenamento e a listagem são o MESMO objeto. Sem Armazenamento:ConexaoBlob o app sobe e a primeira operação com arquivo falha com erro claro no log.
@@ -128,6 +133,14 @@ public static class DependencyInjection
         services.AddSingleton<ArmazenamentoBlob>();
         services.AddSingleton<IArmazenamentoDeArquivos>(sp => sp.GetRequiredService<ArmazenamentoBlob>());
         services.AddSingleton<IListagemDeArquivos>(sp => sp.GetRequiredService<ArmazenamentoBlob>());
+
+        // Importação por Excel (fatia 2): ler a planilha e gerar o modelo não guardam estado (singletons); o catálogo lê o banco (escopo).
+        services.AddSingleton<ILeitorDePlanilha, LeitorDePlanilhaOpenXml>();
+        services.AddSingleton<IGeradorDoModelo, GeradorDoModeloOpenXml>();
+        services.AddScoped<IConsultaDoCatalogoDaImportacao, ConsultaDoCatalogoDaImportacao>();
+        // A prévia da importação: o repositório e a fonte que diz à limpeza de sobras quais caminhos de "importacoes/" têm linha no banco.
+        services.AddScoped<IImportacoesRepositorio, ImportacoesRepositorio>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDasImportacoes>();
 
         // Convite e redefinição de senha: o serviço que emite o link (o token só no e-mail; o banco guarda o hash) e os dois e-mails da lista fechada.
         var senha = new OpcoesDeSenha();

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 using RHSystem.Api.Autorizacao;
+using RHSystem.Api.Comum;
 using RHSystem.Api.Configuracao;
 using RHSystem.Application.Arquivos;
 using RHSystem.Application.Documentos;
@@ -98,8 +98,8 @@ public static class DocumentosEndpoints
 
     private static async Task<IResult> Adicionar(int funcionarioId, HttpRequest requisicao, DocumentosDoColaboradorCasoDeUso casoDeUso, CancellationToken ct)
     {
-        var formulario = await LerFormularioAsync(requisicao, ct);
-        var arquivo = ArquivoDoFormulario(formulario);
+        var formulario = await LeituraDeFormulario.LerAsync(requisicao, ct);
+        var arquivo = LeituraDeFormulario.Arquivo(formulario);
         var novo = new NovoDocumentoDoRh(
             Texto(formulario, "modo"),
             Texto(formulario, "tipo"),
@@ -116,8 +116,8 @@ public static class DocumentosEndpoints
 
     private static async Task<DocumentoColaborador> EnviarMeu(int documentoId, HttpRequest requisicao, MeusDocumentosCasoDeUso casoDeUso, CancellationToken ct)
     {
-        var formulario = await LerFormularioAsync(requisicao, ct);
-        return await casoDeUso.EnviarArquivoAsync(documentoId, ArquivoDoFormulario(formulario), formulario.Files.Count, ct); // conta as partes de arquivo de QUALQUER campo
+        var formulario = await LeituraDeFormulario.LerAsync(requisicao, ct);
+        return await casoDeUso.EnviarArquivoAsync(documentoId, LeituraDeFormulario.Arquivo(formulario), formulario.Files.Count, ct); // conta as partes de arquivo de QUALQUER campo
     }
 
     private static async Task<LinkTemporario> BaixarMeu(int documentoId, MeusDocumentosCasoDeUso casoDeUso, CancellationToken ct) =>
@@ -125,33 +125,6 @@ public static class DocumentosEndpoints
 
     private static async Task<LinkTemporario> Baixar(int funcionarioId, int documentoId, DocumentosDoColaboradorCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.BaixarAsync(funcionarioId, documentoId, ct);
-
-    /// <summary>O formulário multipart da requisição. Outro tipo de corpo (JSON, urlencoded, vazio) é 415; multipart que não dá para ler é 400.</summary>
-    private static async Task<IFormCollection> LerFormularioAsync(HttpRequest requisicao, CancellationToken ct)
-    {
-        if (!MediaTypeHeaderValue.TryParse(requisicao.ContentType, out var tipo) || !tipo.MediaType.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new BadHttpRequestException("O corpo precisa ser multipart/form-data.", StatusCodes.Status415UnsupportedMediaType);
-        }
-
-        try
-        {
-            return await requisicao.ReadFormAsync(ct);
-        }
-        catch (InvalidDataException)
-        {
-            throw new BadHttpRequestException("O corpo multipart está malformado.", StatusCodes.Status400BadRequest);
-        }
-        catch (IOException erro) when (erro.GetType() == typeof(IOException) && erro.Message.StartsWith("Unexpected end of Stream", StringComparison.Ordinal))
-        {
-            // O leitor multipart do ASP.NET lança esta IOException (e só esta, medido) quando o corpo diz ser multipart e não tem as partes: dado inválido, não falha do servidor. Qualquer outra falha
-            // de E/S (disco cheio ao guardar o arquivo, conexão derrubada) continua sendo erro de verdade.
-            throw new BadHttpRequestException("O corpo multipart está malformado.", StatusCodes.Status400BadRequest);
-        }
-    }
-
-    private static ArquivoRecebido? ArquivoDoFormulario(IFormCollection formulario) =>
-        formulario.Files.GetFile("arquivo") is { } recebido ? new ArquivoRecebido(recebido.FileName, recebido.Length, recebido.OpenReadStream) : null;
 
     private static string? Texto(IFormCollection formulario, string campo) => formulario.TryGetValue(campo, out var valor) ? valor.ToString() : null;
 }
