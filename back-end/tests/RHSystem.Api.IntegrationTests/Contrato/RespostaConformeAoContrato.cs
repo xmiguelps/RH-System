@@ -26,9 +26,9 @@ internal static class RespostaConformeAoContrato
             conteudo.TryGetPropertyValue(tipoDeMidia, out var midia),
             $"{operationId} ({status}): o contrato declara [{string.Join(", ", conteudo.Select(c => c.Key))}] e a API enviou \"{tipoDeMidia}\".");
 
-        if (midia?["schema"] is not { } schema)
+        if (midia?["schema"] is not { } schema || !tipoDeMidia.Contains("json", StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            return; // o arquivo (CSV, PDF) não é JSON: o tipo de mídia declarado já foi conferido acima
         }
 
         var problemas = ValidadorDeRespostaDoContrato.Validar(schema, JsonSerializer.Deserialize<JsonElement>(corpo));
