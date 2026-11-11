@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Web;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -98,6 +99,7 @@ public class ArmazenamentoBlobTests(AzuriteFixture azurite) : IClassFixture<Azur
         var caminho = CaminhosDeArquivo.Novo("documentos", ".pdf");
         await GravarAsync(armazenamento, caminho, ArquivosDeTeste.Pdf());
 
+        var antes = DateTime.UtcNow;
         var link = await armazenamento.CriarLinkTemporarioAsync(caminho, "contrato.pdf", Ct);
 
         Assert.DoesNotContain(ChaveDaConta, link.Url);
@@ -108,6 +110,12 @@ public class ArmazenamentoBlobTests(AzuriteFixture azurite) : IClassFixture<Azur
         Assert.Equal("r", consulta["sp"]); // permissão só de leitura
         Assert.False(string.IsNullOrEmpty(consulta["sig"]));
         Assert.Equal("b", consulta["sr"]); // vale para este blob, não para o contêiner
+        var comeca = DateTime.Parse(consulta["st"]!, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
+        Assert.InRange(comeca, antes.AddMinutes(-1).AddSeconds(-5), DateTime.UtcNow.AddMinutes(-1).AddSeconds(5)); // começa 1 minuto antes, por causa de diferença de relógio
+
+        // Sem acesso anônimo: o mesmo endereço, sem a assinatura, não entrega o arquivo.
+        using var anonimo = await Http.GetAsync(link.Url.Split('?')[0]);
+        Assert.NotEqual(HttpStatusCode.OK, anonimo.StatusCode);
 
         // Só leitura: o mesmo link não deixa gravar nem apagar.
         using var gravar = new HttpRequestMessage(HttpMethod.Put, link.Url) { Content = new ByteArrayContent([1, 2, 3]) };
