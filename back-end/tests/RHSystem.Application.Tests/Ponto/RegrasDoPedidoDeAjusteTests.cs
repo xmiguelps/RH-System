@@ -229,4 +229,25 @@ public class RegrasDoPedidoDeAjusteTests
         Assert.Null(resultado.Erro);
         Assert.Equal([false, true], resultado.Dia.Select(b => b.Mudou));
     }
+
+    [Fact]
+    public void O_resumo_junta_a_correcao_e_a_batida_nova_na_ordem_do_horario_e_nao_na_ordem_dos_itens()
+    {
+        var itens = new[] { Existente(5, TipoDeMarcacao.Saida, "2026-10-05T21:00:00Z"), Novo(TipoDeMarcacao.Entrada, "2026-10-05T11:00:00Z") };
+
+        Assert.Equal("Incluir a entrada às 08:00; Corrigir a saída para 18:00", ResumoDaCorrecao.Montar(itens));
+    }
+
+    [Fact]
+    public void O_dia_aplicado_sai_ordenado_pelo_horario_mesmo_com_a_batida_nova_antes_das_que_ja_existiam()
+    {
+        var entrada = Batida(TipoDeMarcacao.Entrada, "2026-10-02T15:00:00Z");
+        var saida = Batida(TipoDeMarcacao.Saida, "2026-10-02T20:00:00Z");
+
+        var resultado = AplicacaoDosItens.Aplicar([entrada, saida], [Novo(TipoDeMarcacao.Entrada, "2026-10-02T11:00:00Z"), Novo(TipoDeMarcacao.Saida, "2026-10-02T12:00:00Z")]);
+
+        Assert.Null(resultado.Erro);
+        Assert.Equal(["2026-10-02T11:00:00Z", "2026-10-02T12:00:00Z", "2026-10-02T15:00:00Z", "2026-10-02T20:00:00Z"], resultado.Dia.Select(b => b.InstanteUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.Equal([true, true, false, false], resultado.Dia.Select(b => b.Mudou));
+    }
 }
