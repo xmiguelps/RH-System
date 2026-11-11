@@ -84,7 +84,9 @@ public static class DependencyInjection
             (sp, opcoes) => opcoes
                 .UseMySql(conexao, new MySqlServerVersion(versaoDoServidor))
                 .AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>())
-                .ConfigureWarnings(avisos => avisos.Log((CoreEventId.SaveChangesFailed, LogLevel.Debug))));
+                // O texto do comando ("Executed DbCommand") sai em Information e o provedor MySQL escreve os valores de Contains(lista) (CPF e e-mail do cadastro, da importação) DENTRO do SQL: por isso desce para Debug, por CÓDIGO, e não
+                // por uma chave do appsettings que um operador pode mudar. Só quem liga o nível Debug desta categoria vê o SQL. O CommandError (nível Error, falha de verdade) continua saindo com o SQL.
+                .ConfigureWarnings(avisos => avisos.Log((CoreEventId.SaveChangesFailed, LogLevel.Debug), (RelationalEventId.CommandExecuted, LogLevel.Debug))));
         services.AddDbContextFactory<AppDbContext>(_ => { }, ServiceLifetime.Scoped);
         services.AddScoped<IAuditor, Auditor>();
         services.AddScoped<IConsultaDeAuditoria, ConsultaDeAuditoria>();

@@ -103,11 +103,11 @@ public class ModeloDeImportacaoTests(MySqlFixture mysql)
         // enxerga a diferença. A garantia é do ORDER BY, que só aparece no SQL.
         var api = await ApiAsync();
         var logs = new ColetorDeLogs();
-        // O texto dos comandos do EF só sai de Information para baixo, e o appsettings o deixa em Warning (o SQL leva CPF e e-mail inline); aqui, só neste teste, ele volta a sair.
+        // O texto dos comandos do EF só sai em Debug (o SQL pode levar CPF e e-mail inline); aqui, só neste teste, a categoria volta a ser lida.
         await using var fabrica = api.Api.WithWebHostBuilder(b => b.ConfigureLogging(l =>
         {
             l.AddProvider(logs);
-            l.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
+            l.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Debug);
         }));
         var cliente = fabrica.CreateClient();
         cliente.DefaultRequestHeaders.Authorization = ComoRh(api).DefaultRequestHeaders.Authorization;

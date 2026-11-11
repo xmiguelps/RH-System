@@ -586,13 +586,23 @@ public class PreviaDaImportacaoTests(MySqlFixture mysql)
         Assert.Equal(antes, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM FUNCIONARIOS"));
     }
 
-    [Fact]
-    public async Task Os_valores_da_previa_nao_aparecem_no_log()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Os_valores_da_previa_nao_aparecem_no_log(bool comOLogDeComandosDoEfLigado)
     {
+        // Com a categoria de comandos do EF ligada à força em Information (o que um operador faria para investigar lentidão), o CPF e o e-mail das linhas não podem estar no log: o texto do comando é demovido para Debug por código.
         var api = await ApiAsync();
         var apoio = await ApoioAsync(api);
         var logs = new ColetorDeLogs();
-        await using var fabrica = api.Api.WithWebHostBuilder(b => b.ConfigureLogging(l => l.AddProvider(logs)));
+        await using var fabrica = api.Api.WithWebHostBuilder(b => b.ConfigureLogging(l =>
+        {
+            l.AddProvider(logs);
+            if (comOLogDeComandosDoEfLigado)
+            {
+                l.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
+            }
+        }));
         var cliente = api.Api.ClienteComo(fabrica, api.Elenco.Rh);
         var nome = $"Zeferino Xavante {apoio.Sufixo}";
         var email = $"zeferino.{apoio.Sufixo}@previa.teste.com";

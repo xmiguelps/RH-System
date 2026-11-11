@@ -30,14 +30,20 @@ public sealed class LimparImportacoesVencidasTarefa(
     public async Task RecuperarAsync(CancellationToken ct)
     {
         var agora = relogio.AgoraUtc;
-        var hora = agora.ToString("yyyy-MM-dd'T'HH", CultureInfo.InvariantCulture);
-        await agendador.AgendarAsync(new NovaTarefa(Tipo, ChaveDeIdempotencia.Montar(Tipo, ("hora", hora)), agora), ct);
+        await AgendarDaHoraAsync(InicioDaHora(agora), agora, ct);
     }
 
     public async Task ExecutarAsync(TarefaParaExecutar tarefa, CancellationToken ct)
     {
+        var agora = relogio.AgoraUtc;
+
+        // Encadeia a da hora seguinte, para ela só rodar a partir do começo da hora. A recuperação roda a cada 60 minutos contados do FIM da anterior, então o espaçamento deriva e pode pular uma hora (11:59 e depois 13:00): sem este
+        // encadeamento a prévia que vence às 12:05 ficaria até as 13:00. A chave é estável, então repetir não duplica.
+        var proxima = InicioDaHora(agora).AddHours(1);
+        await AgendarDaHoraAsync(proxima, proxima, ct);
+
         var naoApagados = 0;
-        foreach (var vencida in await importacoes.ListarVencidasAsync(relogio.AgoraUtc, TamanhoDoLote, ct))
+        foreach (var vencida in await importacoes.ListarVencidasAsync(agora, TamanhoDoLote, ct))
         {
             var arquivoApagado = true;
             if (vencida.CaminhoArquivo is { } caminho)
@@ -67,4 +73,9 @@ public sealed class LimparImportacoesVencidasTarefa(
             throw new InvalidOperationException($"{naoApagados} arquivo(s) de importação não puderam ser apagados; ficam para a próxima execução.");
         }
     }
+
+    private static DateTime InicioDaHora(DateTime agoraUtc) => new(agoraUtc.Year, agoraUtc.Month, agoraUtc.Day, agoraUtc.Hour, 0, 0, DateTimeKind.Utc);
+
+    private async Task AgendarDaHoraAsync(DateTime inicioDaHora, DateTime executarApos, CancellationToken ct) =>
+        await agendador.AgendarAsync(new NovaTarefa(Tipo, ChaveDeIdempotencia.Montar(Tipo, ("hora", inicioDaHora.ToString("yyyy-MM-dd'T'HH", CultureInfo.InvariantCulture))), executarApos), ct);
 }

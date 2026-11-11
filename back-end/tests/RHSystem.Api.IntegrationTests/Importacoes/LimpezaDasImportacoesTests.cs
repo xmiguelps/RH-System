@@ -217,7 +217,8 @@ public class LimpezaDasImportacoesTests(MySqlFixture mysql)
     [Fact]
     public async Task A_recuperacao_agenda_uma_tarefa_por_hora_com_chave_estavel()
     {
-        var api = await ApiAsync();
+        // Banco só deste teste: as execuções dos outros testes da classe também agendam a hora seguinte e sujariam a fila do tipo.
+        var api = await ApiDeAcesso.ObterAsync(mysql, nameof(LimpezaDasImportacoesTests) + "-recuperacao");
         async Task<List<string>> ChavesAsync()
         {
             await using var db = ContextoDeTeste.Novo(api.Conexao);
@@ -248,6 +249,21 @@ public class LimpezaDasImportacoesTests(MySqlFixture mysql)
         Assert.Equal([$"{Tipo}:hora=2026-10-07T12"], primeira);
         Assert.Equal(primeira, mesmaHora);
         Assert.Equal([$"{Tipo}:hora=2026-10-07T12", $"{Tipo}:hora=2026-10-07T13"], proximaHora);
+    }
+
+    [Fact]
+    public async Task A_execucao_agenda_a_da_proxima_hora_para_nao_deixar_uma_hora_sem_tarefa()
+    {
+        // A recuperação roda a cada 60 minutos CONTADOS DO FIM da anterior, então o espaçamento deriva e pode pular uma hora (11:59 e depois 13:00): cada execução encadeia a da hora seguinte, para a prévia que vence
+        // às 12:05 não esperar até as 13:00.
+        var api = await ApiAsync();
+
+        await ExecutarAsync(api); // 12:42
+        await ExecutarAsync(api); // de novo: a mesma chave, nada a mais
+
+        await using var db = ContextoDeTeste.Novo(api.Conexao);
+        var proxima = await db.TarefasAgendadas.AsNoTracking().SingleAsync(t => t.Tipo == Tipo && t.ChaveDeIdempotencia == $"{Tipo}:hora=2026-10-07T13");
+        Assert.Equal(new DateTime(2026, 10, 7, 13, 0, 0), DateTime.SpecifyKind(proxima.ExecutarApos, DateTimeKind.Unspecified)); // às 13:00, não já
     }
 
     [Fact]
