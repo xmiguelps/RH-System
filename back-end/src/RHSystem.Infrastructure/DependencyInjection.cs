@@ -19,6 +19,7 @@ using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
 using RHSystem.Application.Ponto;
+using RHSystem.Application.Ponto.Atestados;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
@@ -212,6 +213,20 @@ public static class DependencyInjection
         services.AddScoped<IPontoRepositorio, PontoRepositorio>();
         services.AddScoped<ISaldoDoBancoDeHoras, SaldoDoBancoDeHoras>();
         services.AddScoped<IConsultaDoPonto, ConsultaDoPonto>();
+        services.AddScoped<IPedidosDeAjusteRepositorio, PedidosDeAjusteRepositorio>();
+        services.AddScoped<IConsultaDePedidosDeAjuste, ConsultaDePedidosDeAjuste>();
+        services.AddSingleton<IRenderizadorDeEmail, ResultadoAjustePontoRenderizador>();
+        // As bolinhas do menu do gestor (a mesma conta serve às duas): os pedidos de ajuste que aguardam a etapa dele.
+        services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PedidosDeAjusteDePontoDoGestor));
+        services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDePedidosParaORh>();
+        // A porta do recálculo do banco de horas: a consolidação (tarefa agendada) registra a implementação de verdade depois desta.
+        services.AddScoped<IRecalculoDoBancoDeHoras, RecalculoDoBancoDeHorasNulo>();
+        // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
+        services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
+        services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
+        services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosAtestados>();
         services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();
         services.AddScoped<ISituacaoDeHoje, SituacaoDeHojeServico>();
 

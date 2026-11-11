@@ -13,7 +13,7 @@ namespace RHSystem.Api.Configuracao;
 /// </summary>
 public static class EsquemasDoContrato
 {
-    private const string PadraoDoHorario = "^([01][0-9]|2[0-3]):[0-5][0-9]$";
+    public const string PadraoDoHorario = "^([01][0-9]|2[0-3]):[0-5][0-9]$";
 
     public static OpenApiOptions UsarEsquemasDoContrato(this OpenApiOptions opcoes) =>
         opcoes.AddSchemaTransformer((esquema, contexto, _) =>
