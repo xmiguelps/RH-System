@@ -51,6 +51,9 @@ public class Importacao
 
     public int? IncluidosNoFormularioAdmissao { get; private set; }
 
+    /// <summary>A prévia vale até <see cref="ExpiraEm"/> EXCLUSIVE: no instante exato do vencimento ela já venceu (a reivindicação do banco usa <c>EXPIRA_EM &gt; agora</c>).</summary>
+    public bool Vencida(DateTime agoraUtc) => agoraUtc >= ExpiraEm;
+
     public static Importacao Criar(
         int funcionarioRhId,
         string nomeArquivo,

@@ -64,10 +64,14 @@ public static class ValidacaoDeArquivoDeDocumento
 /// </summary>
 public sealed class EnvioDeArquivoDeDocumento(IArmazenamentoDeArquivos armazenamento, ILogger<EnvioDeArquivoDeDocumento> log)
 {
-    /// <summary>Grava o arquivo no caminho novo e chama <paramref name="efetivar"/> com ele (a transação curta é do chamador). Qualquer falha, de um ou de outro, apaga o blob e relança.</summary>
-    public async Task<T> GravarEEfetivarAsync<T>(ArquivoRecebido arquivo, TipoDeArquivo tipo, Func<string, Task<T>> efetivar, CancellationToken ct)
+    /// <summary>Grava o arquivo no caminho novo, na pasta de documentos, e chama <paramref name="efetivar"/> com ele (a transação curta é do chamador). Qualquer falha, de um ou de outro, apaga o blob e relança.</summary>
+    public Task<T> GravarEEfetivarAsync<T>(ArquivoRecebido arquivo, TipoDeArquivo tipo, Func<string, Task<T>> efetivar, CancellationToken ct) =>
+        GravarEEfetivarAsync(arquivo, LimitesDeDocumento.PastaNoArmazenamento, tipo, efetivar, ct);
+
+    /// <summary>A mesma receita para qualquer pasta do armazenamento (a importação por planilha guarda em <c>importacoes/</c>).</summary>
+    public async Task<T> GravarEEfetivarAsync<T>(ArquivoRecebido arquivo, string pasta, TipoDeArquivo tipo, Func<string, Task<T>> efetivar, CancellationToken ct)
     {
-        var caminho = CaminhosDeArquivo.Novo(LimitesDeDocumento.PastaNoArmazenamento, tipo.Extensao);
+        var caminho = CaminhosDeArquivo.Novo(pasta, tipo.Extensao);
         try
         {
             await using (var conteudo = arquivo.Abrir())

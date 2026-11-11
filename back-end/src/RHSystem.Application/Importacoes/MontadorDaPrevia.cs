@@ -22,7 +22,7 @@ public sealed class MontadorDaPrevia(ICadastroDeFuncionarios cadastro)
                 var coluna = ConversorDaPlanilha.ColunaDoCampo(problema.Campo);
                 if (!conversoes[i].Erros.Any(e => e.Coluna == coluna))
                 {
-                    erros.Add(new ImportacaoLinhaErro(coluna, Mensagem(problema, coluna, linhas)));
+                    erros.Add(new ImportacaoLinhaErro(coluna, Mensagem(problema, linhas.Select(l => l.NumeroLinha).ToList())));
                 }
             }
 
@@ -38,9 +38,9 @@ public sealed class MontadorDaPrevia(ICadastroDeFuncionarios cadastro)
     /// CPF e e-mail repetidos dizem em que linha do EXCEL está a outra ocorrência (o cadastro conta linhas de 1 a partir do lote), e o cadastro existente não diz o nome de quem é: a prévia fica guardada e só deve levar o que
     /// o RH digitou. Qualquer outro problema sai com a mensagem do cadastro.
     /// </summary>
-    private static string Mensagem(ProblemaDeCadastro problema, ColunaDaImportacao coluna, IReadOnlyList<(int NumeroLinha, ImportacaoLinhaValores Valores)> linhas)
+    public static string Mensagem(ProblemaDeCadastro problema, IReadOnlyList<int> numerosDasLinhas)
     {
-        var dado = coluna switch
+        var dado = ConversorDaPlanilha.ColunaDoCampo(problema.Campo) switch
         {
             ColunaDaImportacao.Cpf => "CPF",
             ColunaDaImportacao.EmailCorporativo => "e-mail",
@@ -53,7 +53,7 @@ public sealed class MontadorDaPrevia(ICadastroDeFuncionarios cadastro)
 
         if (problema.OutroIndice is { } outro)
         {
-            return $"Este {dado} aparece também na linha {linhas[outro].NumeroLinha}.";
+            return $"Este {dado} aparece também na linha {numerosDasLinhas[outro]}.";
         }
 
         if (problema.Existente is { } existente)

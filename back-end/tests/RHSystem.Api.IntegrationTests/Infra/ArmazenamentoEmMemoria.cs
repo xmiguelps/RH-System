@@ -38,6 +38,9 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
     /// <summary>Roda no INÍCIO de <see cref="GravarAsync"/>, com o caminho: o teste segura a gravação aqui para provar o que ainda não aconteceu.</summary>
     public Func<string, Task>? AoGravar { get; set; }
 
+    /// <summary>Roda no INÍCIO de <see cref="ApagarAsync"/>, depois de anotar o pedido, com o caminho: o teste lança aqui para fazer falhar só ALGUMAS exclusões (<see cref="FalharNaExclusao"/> falha todas).</summary>
+    public Func<string, Task>? AoApagar { get; set; }
+
     /// <summary>Quantas vezes <see cref="GravarAsync"/> rodou com uma transação aberta (<see cref="UnidadeDeTrabalhoEspia"/>). O envio de arquivo grava SEM transação: as Tasks 7 e 8 provam que é 0.</summary>
     public int GravacoesComTransacaoAberta => Volatile.Read(ref _gravacoesComTransacaoAberta);
 
@@ -148,7 +151,7 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
         return Task.FromResult(new LinkTemporario($"https://arquivos.exemplo.test/{caminho}?nome={Uri.EscapeDataString(nome)}", relogio.AgoraUtc.AddMinutes(5)));
     }
 
-    public Task ApagarAsync(string caminho, CancellationToken ct)
+    public async Task ApagarAsync(string caminho, CancellationToken ct)
     {
         if (!CaminhosDeArquivo.EhValido(caminho))
         {
@@ -158,6 +161,11 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
         lock (_trava)
         {
             _exclusoesPedidas.Add(caminho);
+        }
+
+        if (AoApagar is { } gancho)
+        {
+            await gancho(caminho);
         }
 
         if (FalharNaExclusao is { } erro)
@@ -172,8 +180,6 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
                 _apagados.Add(caminho);
             }
         }
-
-        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<ArquivoGuardado> ListarAsync(string prefixo, [EnumeratorCancellation] CancellationToken ct)

@@ -119,6 +119,7 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, LimparTokensDeSenhaTarefa>();
         services.AddScoped<ITarefaAgendada, EfetivarDesligamentoTarefa>();
         services.AddScoped<ITarefaAgendada, LimparArquivosOrfaosTarefa>();
+        services.AddScoped<ITarefaAgendada, LimparImportacoesVencidasTarefa>(); // por hora: a prévia e o arquivo de uma importação vencida têm dado pessoal
         services.AddHostedService<AgendadorHostedService>();
 
         // Arquivos (Blob Storage; Azurite em desenvolvimento): o armazenamento e a listagem são o MESMO objeto. Sem Armazenamento:ConexaoBlob o app sobe e a primeira operação com arquivo falha com erro claro no log.
@@ -135,6 +136,9 @@ public static class DependencyInjection
         services.AddSingleton<ILeitorDePlanilha, LeitorDePlanilhaOpenXml>();
         services.AddSingleton<IGeradorDoModelo, GeradorDoModeloOpenXml>();
         services.AddScoped<IConsultaDoCatalogoDaImportacao, ConsultaDoCatalogoDaImportacao>();
+        // A prévia da importação: o repositório e a fonte que diz à limpeza de sobras quais caminhos de "importacoes/" têm linha no banco.
+        services.AddScoped<IImportacoesRepositorio, ImportacoesRepositorio>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDasImportacoes>();
 
         // Convite e redefinição de senha: o serviço que emite o link (o token só no e-mail; o banco guarda o hash) e os dois e-mails da lista fechada.
         var senha = new OpcoesDeSenha();

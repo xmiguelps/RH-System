@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using RHSystem.Application.Colaboradores;
 using RHSystem.Domain.Importacoes;
 
 namespace RHSystem.Application.Importacoes;
@@ -59,3 +61,21 @@ public sealed record ImportacaoPrevia(
     bool PodeConfirmar,
     DateTime ExpiraEmUtc,
     IReadOnlyList<ImportacaoLinha> Linhas);
+
+/// <summary>
+/// O corpo de <c>confirmarImportacao</c> (<c>ImportacaoConfirmarComando</c>): as caixas "Depois de salvar" do cadastro, valendo para TODAS as pessoas. <c>enviarConvite</c> é obrigatório no contrato (o <c>System.Text.Json</c> não impõe o
+/// <c>required</c>; sem <see cref="JsonRequiredAttribute"/> o convite sairia em silêncio com o valor falso).
+/// </summary>
+public sealed record ImportacaoConfirmarComando([property: JsonRequired] bool EnviarConvite, bool IncluirNoOnboarding = false, int? FormularioAdmissaoId = null);
+
+/// <summary>O resultado da importação confirmada (<c>ImportacaoResultado</c> do contrato); <see cref="Funcionarios"/> na ordem da planilha.</summary>
+public sealed record ImportacaoResultado(
+    int ImportacaoId,
+    SituacaoDaImportacao Situacao,
+    string NomeArquivo,
+    int TotalCriados,
+    int ConvitesEnviados,
+    int IncluidosNoOnboarding,
+    int IncluidosNoFormularioDeAdmissao,
+    DateTime ConfirmadaEmUtc,
+    IReadOnlyList<FuncionarioResumo> Funcionarios);
