@@ -143,6 +143,22 @@ public class TarefasDeFeriadosTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Nacional_e_estadual_que_ja_existem_na_data_com_outro_nome_nao_sao_repetidos_pela_importacao()
+    {
+        var api = await ApiAsync();
+        await ConfigurarEmpresaAsync(api.Conexao, "SP", "São Paulo");
+        await SemearAsync(api, "Ano Novo", "2048-01-01", "NACIONAL", null, null);
+        await SemearAsync(api, "Nove de Julho", "2048-07-09", "ESTADUAL", "SP", null);
+
+        await ImportarAsync(api, 2048);
+
+        var feriados = await FeriadosAsync(api, 2048);
+        Assert.Equal(["Ano Novo"], feriados.Where(f => f.Data == new DateOnly(2048, 1, 1)).Select(f => f.Nome)); // a Confraternização Universal não entra: o dia já é feriado nacional
+        Assert.Equal(["Nove de Julho"], feriados.Where(f => f.Data == new DateOnly(2048, 7, 9)).Select(f => f.Nome));
+        Assert.Equal(9, feriados.Count(f => f.Tipo == "NACIONAL" && f.Data != new DateOnly(2048, 1, 1))); // os outros nove nacionais entram
+    }
+
+    [Fact]
     public async Task Municipal_com_a_mesma_data_e_o_mesmo_nome_de_um_nacional_nao_derruba_a_importacao_e_os_outros_entram()
     {
         var api = await ApiAsync();
@@ -247,6 +263,8 @@ public class TarefasDeFeriadosTests(MySqlFixture mysql)
 
         await using (var escopo = api.Api.Services.CreateAsyncScope())
         {
+            // O banco de horas já está fechado: sem as 60 consolidações atrasadas ocupando o lote de 10 tarefas por ciclo, que não é o assunto deste teste.
+            await escopo.ServiceProvider.GetRequiredService<IAgendador>().RegistrarComoConcluidaAsync("CONSOLIDAR_BANCO_HORAS", "CONSOLIDAR_BANCO_HORAS:dia=2030-12-31", new DateOnly(2030, 12, 31), Ct);
             var executor = escopo.ServiceProvider.GetRequiredService<IExecutorDeTarefas>();
             await executor.RecuperarAsync(Ct);
             for (var ciclo = 0; ciclo < 5; ciclo++)

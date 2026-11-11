@@ -257,8 +257,8 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
 
         var recuperados = await RecuperarAsync(api);
 
-        // Doze tipos (as cinco limpezas, a que efetiva desligamento, as duas dos feriados da fatia 3 e quatro de teste; a LIMPAR_IMPORTACOES_VENCIDAS da fatia 2 é a quinta limpeza, e esta é por hora); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
-        Assert.Equal(11, recuperados);
+        // Treze tipos (as cinco limpezas, a que efetiva desligamento, as duas dos feriados e a do banco de horas da fatia 3 e quatro de teste; a LIMPAR_IMPORTACOES_VENCIDAS da fatia 2 é a quinta limpeza, e esta é por hora); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
+        Assert.Equal(12, recuperados);
         Assert.Contains(TarefaQueNaoRecuperaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
@@ -270,6 +270,7 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
         Assert.Contains("LIMPAR_IMPORTACOES_VENCIDAS", tipos); // a da fatia 2 (Task 6) é por hora, e a recuperação agenda a da hora de agora
         Assert.Contains("IMPORTAR_FERIADOS", tipos); // as dos feriados (fatia 3) agendam o ano de hoje e o seguinte
         Assert.Contains("REPETIR_FERIADO", tipos);
+        Assert.Contains("CONSOLIDAR_BANCO_HORAS", tipos); // a consolidação agenda os dias que faltam e o de hoje
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, tipos); // e a que vem depois da que lança também criou as suas (05/10 e 06/10)
     }
 }

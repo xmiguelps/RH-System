@@ -128,6 +128,7 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, LimparImportacoesVencidasTarefa>(); // por hora: a prévia e o arquivo de uma importação vencida têm dado pessoal
         services.AddScoped<ITarefaAgendada, ImportarFeriadosTarefa>(); // por ano: os nacionais calculados e os estaduais da UF da empresa
         services.AddScoped<ITarefaAgendada, RepetirFeriadoTarefa>(); // por ano: o "repetir todos os anos" do municipal
+        services.AddScoped<ITarefaAgendada, ConsolidarBancoDeHorasTarefa>(); // por dia: o banco de horas, a partir das 12:00 do dia seguinte
         services.AddHostedService<AgendadorHostedService>();
 
         // Arquivos (Blob Storage; Azurite em desenvolvimento): o armazenamento e a listagem são o MESMO objeto. Sem Armazenamento:ConexaoBlob o app sobe e a primeira operação com arquivo falha com erro claro no log.
@@ -224,7 +225,9 @@ public static class DependencyInjection
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
         services.AddScoped<IFonteDeContadorDoMenu, FonteDePedidosParaORh>();
         // A porta do recálculo do banco de horas: a consolidação (tarefa agendada) registra a implementação de verdade depois desta.
-        services.AddScoped<IRecalculoDoBancoDeHoras, RecalculoDoBancoDeHorasNulo>();
+        services.AddScoped<IRecalculoDoBancoDeHoras, RecalculoDoBancoDeHoras>();
+        services.AddScoped<IUltimoDiaConsolidado, UltimoDiaConsolidado>();
+        services.AddScoped<ICondicaoParaEfetivarDesligamento, CondicaoDoBancoDeHorasParaDesligamento>(); // o desligamento espera o último dia da pessoa estar consolidado
         // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
         services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();

@@ -139,6 +139,22 @@ public class FeriadosTests(MySqlFixture mysql)
         }
     }
 
+    [Fact]
+    public async Task No_mesmo_dia_vem_primeiro_o_nacional_depois_o_estadual_o_municipal_e_o_da_empresa_e_dentro_do_tipo_pelo_nome()
+    {
+        var api = await ApiAsync();
+        await ConfigurarEmpresaAsync(api.Conexao, "SP", "São Paulo");
+        var empresaZ = await SemearAsync(api, "Empresa", "2041-05-05", "EMPRESA");
+        var municipal = await SemearAsync(api, "Beta municipal", "2041-05-05", "MUNICIPAL", "SP", "São Paulo");
+        var nacionalZeta = await SemearAsync(api, "Zeta nacional", "2041-05-05");
+        var estadual = await SemearAsync(api, "Gama estadual", "2041-05-05", "ESTADUAL", "SP");
+        var nacionalAlfa = await SemearAsync(api, "Alfa nacional", "2041-05-05");
+
+        var ids = Ids(await CorpoAsync(await ListarAsync(api, "ano=2041&mes=5")));
+
+        Assert.Equal([nacionalAlfa, nacionalZeta, estadual, municipal, empresaZ], ids);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("mes=4")]
@@ -229,6 +245,17 @@ public class FeriadosTests(MySqlFixture mysql)
         Assert.All(new[] { vazio, espacos, longo }, r => Assert.True(CorpoAsync(r).GetAwaiter().GetResult().GetProperty("errors").TryGetProperty("nome", out _)));
         Assert.Equal(antes, await ContarAsync(api, "SELECT COUNT(*) FROM FERIADOS"));
         Assert.Equal(201, (int)(await CriarAsync(api, new { nome = new string('x', 100), data = "2036-01-10" })).StatusCode); // 100 vale
+    }
+
+    [Fact]
+    public async Task Nome_de_um_caractere_vale()
+    {
+        var api = await ApiAsync();
+        await ConfigurarEmpresaAsync(api.Conexao);
+
+        var resposta = await CriarAsync(api, new { nome = "X", data = "2036-03-01" });
+
+        Assert.Equal(201, (int)resposta.StatusCode);
     }
 
     [Fact]
