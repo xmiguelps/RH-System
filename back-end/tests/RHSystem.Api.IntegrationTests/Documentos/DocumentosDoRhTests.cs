@@ -253,6 +253,33 @@ public class DocumentosDoRhTests(MySqlFixture mysql)
     }
 
     [Theory]
+    [InlineData("anexar-sem-arquivo", "O arquivo é obrigatório neste modo.")]
+    [InlineData("pedir-com-arquivo", "Neste modo não se envia arquivo: a pessoa o envia pelo portal.")]
+    [InlineData("dois-arquivos", "Envie um arquivo só.")]
+    [InlineData("zero-bytes", "O arquivo está vazio.")]
+    [InlineData("grande-demais", "O arquivo pode ter até 10 MB.")]
+    [InlineData("tipo-nao-aceito", "Envie um arquivo PDF, JPG ou PNG.")]
+    public async Task Cada_erro_de_arquivo_diz_o_que_fazer_em_portugues(string cenario, string mensagem)
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, $"Mensagem10b {cenario}");
+        var pdf = ArquivosDeTeste.Pdf();
+        var formulario = cenario switch
+        {
+            "anexar-sem-arquivo" => FormulariosDeTeste.Documento("ANEXAR_AGORA", "CPF"),
+            "pedir-com-arquivo" => FormulariosDeTeste.Documento("PEDIR_PARA_ENVIAR", "CPF", null, null, new FormulariosDeTeste.Parte("arquivo", "a.pdf", pdf)),
+            "dois-arquivos" => FormulariosDeTeste.Documento("ANEXAR_AGORA", "CPF", null, null, new FormulariosDeTeste.Parte("arquivo", "a.pdf", pdf), new FormulariosDeTeste.Parte("arquivo", "b.pdf", pdf)),
+            "zero-bytes" => FormulariosDeTeste.Anexo("CPF", "vazio.pdf", []),
+            "grande-demais" => FormulariosDeTeste.Anexo("CPF", "enorme.pdf", ArquivosDeTeste.Pdf((10 * 1024 * 1024) + 1)),
+            _ => FormulariosDeTeste.Anexo("CPF", "mentira.pdf", ArquivosDeTeste.Exe()),
+        };
+
+        var erros = await ErrosAsync(await PostarAsync(api, pessoa, formulario));
+
+        Assert.Equal([mensagem], erros.GetProperty("arquivo").EnumerateArray().Select(m => m.GetString()));
+    }
+
+    [Theory]
     [InlineData("TALVEZ", "CPF", null, null, "modo")]
     [InlineData("pedir_para_enviar", "CPF", null, null, "modo")] // só o nome do contrato vale
     [InlineData(null, "CPF", null, null, "modo")]
@@ -263,6 +290,7 @@ public class DocumentosDoRhTests(MySqlFixture mysql)
     [InlineData("PEDIR_PARA_ENVIAR", "CPF", null, "2027-13-01", "dataValidade")]
     [InlineData("PEDIR_PARA_ENVIAR", "CPF", null, "01/10/2027", "dataValidade")]
     [InlineData("PEDIR_PARA_ENVIAR", "CPF", null, "2027-02-30", "dataValidade")]
+    [InlineData("PEDIR_PARA_ENVIAR", "CPF", null, "2027-1-5", "dataValidade")] // só yyyy-MM-dd, com os zeros
     public async Task Erros_de_campo_voltam_400_com_o_nome_do_campo(string? modo, string? tipo, string? descricao, string? dataValidade, string campo)
     {
         var api = await ApiAsync();
@@ -300,6 +328,21 @@ public class DocumentosDoRhTests(MySqlFixture mysql)
 
         Assert.Equal(415, (int)resposta.StatusCode);
         Assert.Equal(0, await LinhasDaPessoaAsync(api, pessoa));
+    }
+
+    [Fact]
+    public async Task Nome_do_arquivo_que_veio_com_caminho_e_limpo_antes_de_guardar_e_devolver()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "Nome13a Pessoa");
+        api.Api.Armazenamento.Limpar();
+
+        var resposta = await PostarAsync(api, pessoa, FormulariosDeTeste.Anexo("OUTRO", "C:/fakepath/../segredos/contrato final.pdf", ArquivosDeTeste.Pdf())); // um caminho de diretório no nome (barra normal: a invertida é escape no cabeçalho do multipart)
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        var corpo = await CorpoAsync(resposta);
+        Assert.Equal("contrato final.pdf", corpo.GetProperty("nomeArquivoOriginal").GetString());
+        Assert.Equal("contrato final.pdf", await Sql.EscalarAsync(api.Conexao, $"SELECT NOME_ARQUIVO_ORIGINAL FROM FUNCIONARIOS_DOCUMENTOS WHERE ID_FUNCIONARIO_DOCUMENTO = {corpo.GetProperty("id").GetInt32()}"));
     }
 
     [Fact]
