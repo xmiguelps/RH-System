@@ -29,6 +29,8 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.14" />
     <!-- Azure.Storage.Blobs: estável mais recente no nuget.org em 2026-11-10 (a 12.31.0 ainda é beta). -->
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.30.1" />
+    <!-- DocumentFormat.OpenXml: lê e gera o .xlsx da importação (fatia 2). A 3.4.1 é a estável publicada em 2026-03-18, licença MIT (nuspec conferido em 2026-11-11); o ClosedXML foi descartado porque depende de SixLabors.Fonts, de licença própria. -->
+    <PackageVersion Include="DocumentFormat.OpenXml" Version="3.4.1" />
     <PackageVersion Include="MailKit" Version="4.18.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.14" />
