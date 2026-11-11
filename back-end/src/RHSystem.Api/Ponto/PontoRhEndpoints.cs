@@ -1,5 +1,6 @@
 using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
+using RHSystem.Application.Arquivos;
 using RHSystem.Application.Ponto;
 
 namespace RHSystem.Api.Ponto;
@@ -29,6 +30,11 @@ public static class PontoRhEndpoints
             .Produces<PontoBancoDeHorasExtrato>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
+        grupo.MapGet("/funcionarios/{funcionarioId:int}/ponto/espelho/download", BaixarEspelhoEmPdf)
+            .WithName("baixarEspelhoDePontoPdf")
+            .Produces<LinkTemporario>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
         grupo.MapGet("/ponto/folha/exportacao", ExportarParaFolha)
             .WithName("exportarPontoParaFolha")
             .Produces<string>(StatusCodes.Status200OK, "text/csv")
@@ -51,6 +57,9 @@ public static class PontoRhEndpoints
 
     private static async Task<PontoEspelhoDia> CorrigirDia(int funcionarioId, DateOnly dia, PontoDiaCorrigir corpo, CorrigirMarcacoesDoDiaCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, dia, corpo, ct);
+
+    private static async Task<LinkTemporario> BaixarEspelhoEmPdf(int funcionarioId, [AsParameters] FiltrosDoEspelho filtros, BaixarEspelhoEmPdfCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ParaRhAsync(funcionarioId, filtros.Ano, filtros.Mes, ct);
 
     private static async Task<IResult> ExportarParaFolha([AsParameters] FiltrosDaFolha f, ExportarPontoParaFolhaCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
     {

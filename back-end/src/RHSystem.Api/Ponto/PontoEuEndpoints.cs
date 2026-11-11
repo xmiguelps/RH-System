@@ -31,6 +31,7 @@ public static class PontoEuEndpoints
         servicos.AddScoped<ObterPontoDaEquipeCasoDeUso>();
         servicos.AddScoped<ObterExtratoDoBancoDeHorasCasoDeUso>();
         servicos.AddScoped<ExportarPontoParaFolhaCasoDeUso>();
+        servicos.AddScoped<BaixarEspelhoEmPdfCasoDeUso>();
         return servicos;
     }
 

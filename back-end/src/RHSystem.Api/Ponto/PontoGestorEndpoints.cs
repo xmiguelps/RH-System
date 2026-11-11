@@ -1,5 +1,6 @@
 using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
+using RHSystem.Application.Arquivos;
 using RHSystem.Application.Ponto;
 
 namespace RHSystem.Api.Ponto;
@@ -29,6 +30,11 @@ public static class PontoGestorEndpoints
             .Produces<PontoEspelho>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
+        grupo.MapGet("/equipe/{funcionarioId:int}/ponto/espelho/download", BaixarEspelhoEmPdf)
+            .WithName("baixarEspelhoDePontoPdfDaEquipe")
+            .Produces<LinkTemporario>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -37,4 +43,7 @@ public static class PontoGestorEndpoints
 
     private static async Task<PontoEspelho> ObterEspelho(int funcionarioId, [AsParameters] FiltrosDoEspelho filtros, ObterEspelhoDaEquipeCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, filtros.Ano, filtros.Mes, ct);
+
+    private static async Task<LinkTemporario> BaixarEspelhoEmPdf(int funcionarioId, [AsParameters] FiltrosDoEspelho filtros, BaixarEspelhoEmPdfCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.DaEquipeAsync(funcionarioId, filtros.Ano, filtros.Mes, ct);
 }

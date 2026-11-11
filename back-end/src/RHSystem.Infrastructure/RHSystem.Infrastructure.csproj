@@ -18,6 +18,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="PDFsharp-MigraDoc" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
@@ -25,6 +26,7 @@
   <ItemGroup>
     <!-- Os scripts do banco (de Banco de Dados/Scripts) viajam dentro do assembly. O nome logico e o que o ScriptsEmbutidos le. -->
     <EmbeddedResource Include="..\..\..\Banco de Dados\Scripts\*.sql" LogicalName="Scripts/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Ponto\Fontes\*.ttf" LogicalName="Fontes/%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

@@ -98,6 +98,8 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "obterMeuBancoDeHoras",
         "obterBancoDeHorasDeFuncionario",
         "exportarPontoParaFolha",
+        "baixarEspelhoDePontoPdf",
+        "baixarEspelhoDePontoPdfDaEquipe",
         "listarBeneficiosDoCatalogo",
         "criarBeneficioDoCatalogo",
         "editarBeneficioDoCatalogo",

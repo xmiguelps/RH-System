@@ -229,6 +229,8 @@ public static class DependencyInjection
         services.AddScoped<IUltimoDiaConsolidado, UltimoDiaConsolidado>();
         services.AddScoped<IConsultaDoBancoDeHoras, ConsultaDoBancoDeHoras>();
         services.AddScoped<IConsultaDaFolha, ConsultaDaFolha>();
+        services.AddSingleton<IGeradorDePdfDoEspelho, GeradorDePdfDoEspelho>(); // o espelho em PDF: fonte embutida, montado na memória
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosEspelhos>(); // espelhos/: de uso único, nada o referencia
         services.AddScoped<IFonteDeIndicadorDaFicha, FonteDoBancoDeHorasNaFicha>(); // o indicador "banco de horas" da ficha deixa de ser nulo
         services.AddScoped<ICondicaoParaEfetivarDesligamento, CondicaoDoBancoDeHorasParaDesligamento>(); // o desligamento espera o último dia da pessoa estar consolidado
         // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
