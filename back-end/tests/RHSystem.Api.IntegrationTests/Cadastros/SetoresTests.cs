@@ -173,8 +173,9 @@ public class SetoresTests(MySqlFixture mysql)
 
         Assert.Equal(409, (int)(await EditarAsync(api, outro, "nome8 LOGISTICA")).StatusCode);
         Assert.Equal(200, (int)(await EditarAsync(api, outro, "Nome8 Outro", "o próprio nome não conflita")).StatusCode);
-        // O 409 do nome vem antes do 422 do gestor.
+        // O 409 do nome vem antes do 422 do gestor, na criação e na edição (na edição, sem a verificação o 422 do nível RH apareceria primeiro).
         Assert.Equal("NOME_JA_CADASTRADO", (await ProblemaAsync(await CriarAsync(api, "Nome8 Logística", null, rh))).Codigo);
+        Assert.Equal("NOME_JA_CADASTRADO", (await ProblemaAsync(await EditarAsync(api, outro, "nome8 LOGISTICA", null, rh))).Codigo);
 
         var respostas = await EmSimultaneoAsync(20, _ => CriarAsync(api, "Nome8 Simultâneo"));
 
