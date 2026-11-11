@@ -8,6 +8,7 @@ using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Emails;
 using RHSystem.Domain.Empresa;
 using RHSystem.Domain.Importacoes;
+using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Infrastructure.Persistencia;
 
@@ -54,6 +55,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ConfiguracaoDaEmpresa> ConfiguracoesDaEmpresa => Set<ConfiguracaoDaEmpresa>();
 
     public DbSet<DocumentoDoColaborador> Documentos => Set<DocumentoDoColaborador>();
+
+    public DbSet<PontoDoDia> PontosDosDias => Set<PontoDoDia>();
+
+    public DbSet<MarcacaoDePonto> Marcacoes => Set<MarcacaoDePonto>();
+
+    public DbSet<PedidoDeAjuste> PedidosDeAjuste => Set<PedidoDeAjuste>();
+
+    public DbSet<LancamentoDoBancoDeHoras> LancamentosDoBancoDeHoras => Set<LancamentoDoBancoDeHoras>();
+
+    public DbSet<Feriado> Feriados => Set<Feriado>();
+
+    public DbSet<Atestado> Atestados => Set<Atestado>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
