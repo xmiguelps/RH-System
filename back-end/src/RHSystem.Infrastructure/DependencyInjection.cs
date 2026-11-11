@@ -20,6 +20,7 @@ using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
 using RHSystem.Application.Ponto;
 using RHSystem.Application.Ponto.Atestados;
+using RHSystem.Application.Ponto.Feriados;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
@@ -125,6 +126,8 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, EfetivarDesligamentoTarefa>();
         services.AddScoped<ITarefaAgendada, LimparArquivosOrfaosTarefa>();
         services.AddScoped<ITarefaAgendada, LimparImportacoesVencidasTarefa>(); // por hora: a prévia e o arquivo de uma importação vencida têm dado pessoal
+        services.AddScoped<ITarefaAgendada, ImportarFeriadosTarefa>(); // por ano: os nacionais calculados e os estaduais da UF da empresa
+        services.AddScoped<ITarefaAgendada, RepetirFeriadoTarefa>(); // por ano: o "repetir todos os anos" do municipal
         services.AddHostedService<AgendadorHostedService>();
 
         // Arquivos (Blob Storage; Azurite em desenvolvimento): o armazenamento e a listagem são o MESMO objeto. Sem Armazenamento:ConexaoBlob o app sobe e a primeira operação com arquivo falha com erro claro no log.
@@ -225,6 +228,7 @@ public static class DependencyInjection
         // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
         services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
+        services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosAtestados>();
         services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();

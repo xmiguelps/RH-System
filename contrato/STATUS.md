@@ -101,6 +101,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/ponto/atestados/{atestadoId}/download` | baixarAtestado | em andamento | só RH; o evento `ATESTADOS`/`BAIXOU` é gravado ANTES do link; o link vem do Azurite em desenvolvimento |
 | `POST /api/rh/ponto/atestados/{atestadoId}/validar` | validarAtestado | em andamento | só RH; `ENVIADO` vira `VALIDADO` (o dia fica `FALTA_COMPENSADA`); decisão final por UPDATE condicional: 409 `ATESTADO_JA_DECIDIDO` (duas abas, uma só vale); o RH valida o próprio atestado; manda recalcular cada dia já passado pela porta do banco de horas (a consolidação real entra na 3c); sem e-mail |
 | `POST /api/rh/ponto/atestados/{atestadoId}/recusar` | recusarAtestado | em andamento | só RH; `motivo` de 1 a 500 caracteres (aparado); o dia segue como falta e nada é recalculado; mesmos 404 e 409 de validar; o motivo não vai para a auditoria |
+| `GET /api/rh/ponto/feriados` | listarFeriados | em andamento | só RH; `ano` obrigatório (2000 a 2100), `mes` opcional (sem ele, o ano todo); os feriados que valem para a empresa (nacionais, estaduais da UF, municipais do município e os da empresa), só ativos, a menos de `incluirInativos`; por data, sem paginação; sem a empresa configurada não dá erro (só nacionais e da empresa); `podeEditar` só no municipal |
+| `POST /api/rh/ponto/feriados` | criarFeriado | em andamento | só RH; sempre `MUNICIPAL` com a UF e o município da empresa; nome de 1 a 100 (aparado); 409 `FERIADO_DUPLICADO` na mesma data e nome (a chave do banco não diferencia caixa nem acento); 422 `EMPRESA_NAO_CONFIGURADA`; o evento `FERIADOS`/`CRIOU` é do interceptor |
+| `PUT /api/rh/ponto/feriados/{feriadoId}` | editarFeriado | em andamento | só RH; só `MUNICIPAL` (422 `FERIADO_NAO_EDITAVEL` nos outros); `ativo: false` desativa sem apagar; mesmos 400 e 409 da criação; não pede a empresa; o log traz só o que mudou |
 
 ## Pendências conhecidas
 
