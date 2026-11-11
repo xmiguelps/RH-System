@@ -15,6 +15,9 @@ public interface ISaldoDoBancoDeHoras
 {
     /// <summary>Cada linha (<c>QUANTIDADE</c>, em horas com 2 casas) é convertida para minutos e SÓ DEPOIS somada; <c>FN_CALCULAR_SALDO_BANCO_HORAS</c> soma horas e erra até alguns minutos.</summary>
     Task<SaldoDoBanco> ObterAsync(int funcionarioId, CancellationToken ct);
+
+    /// <summary>O saldo em minutos de várias pessoas de uma vez (a tela da equipe); quem não tem nenhuma linha tem 0.</summary>
+    Task<IReadOnlyDictionary<int, int>> ObterSaldosAsync(IReadOnlyCollection<int> funcionarioIds, CancellationToken ct);
 }
 
 /// <summary>

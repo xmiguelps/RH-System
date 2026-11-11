@@ -211,6 +211,7 @@ public static class DependencyInjection
         services.AddScoped<IFeriasDoPonto, FeriasDoPonto>();
         services.AddScoped<IPontoRepositorio, PontoRepositorio>();
         services.AddScoped<ISaldoDoBancoDeHoras, SaldoDoBancoDeHoras>();
+        services.AddScoped<IConsultaDoPonto, ConsultaDoPonto>();
         services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();
         services.AddScoped<ISituacaoDeHoje, SituacaoDeHojeServico>();
 

@@ -11,6 +11,20 @@ public static class CalculoDoDia
         periodos.Where(p => p.Fechado).Sum(p => (int)(AoMinuto(p.Saida!.InstanteUtc) - AoMinuto(p.Entrada!.InstanteUtc)).TotalMinutes);
 
     /// <summary>
+    /// As horas do dia ATÉ AGORA (a tela da equipe): os períodos fechados e, <b>hoje</b>, o período aberto (a ENTRADA sem saída que é a última do dia) contado até o instante, também sem segundos. Em dia passado só os períodos fechados.
+    /// </summary>
+    public static int HorasAteAgoraEmMinutos(IReadOnlyList<PeriodoDoDia> periodos, DateTime agoraUtc, bool hoje)
+    {
+        var total = HorasEmMinutos(periodos);
+        if (hoje && periodos.Count > 0 && periodos[^1] is { Entrada: { } entrada, Saida: null })
+        {
+            total += Math.Max(0, (int)(AoMinuto(agoraUtc) - AoMinuto(entrada.InstanteUtc)).TotalMinutes);
+        }
+
+        return total;
+    }
+
+    /// <summary>
     /// O atraso: a primeira entrada (no horário local, sem segundos) menos o horário padrão da empresa, <b>só se passa da tolerância</b>, e então conta inteiro desde o horário (08:14 com horário 08:00 e tolerância 10 são 14 minutos;
     /// 08:10 não é atraso). <c>null</c> sem batida, sem horário padrão ou dentro da tolerância.
     /// </summary>

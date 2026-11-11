@@ -26,6 +26,35 @@ public class CalculoDoDiaTests
     }
 
     [Fact]
+    public void Hoje_o_periodo_aberto_conta_ate_agora_sem_segundos_e_o_exemplo_do_contrato_da_92()
+    {
+        // Entrada 08:10 e agora 09:42:40: 92 minutos (o relógio de 09:42 vale; os 40 s não).
+        var periodos = new[] { Periodo(Dia.AddHours(8).AddMinutes(10), null) };
+
+        Assert.Equal(92, CalculoDoDia.HorasAteAgoraEmMinutos(periodos, Dia.AddHours(9).AddMinutes(42).AddSeconds(40), hoje: true));
+    }
+
+    [Fact]
+    public void Hoje_soma_os_periodos_fechados_e_o_aberto_e_em_dia_passado_so_os_fechados()
+    {
+        var periodos = new[] { Periodo(Dia.AddHours(8), Dia.AddHours(12)), Periodo(Dia.AddHours(13), null) };
+        var agora = Dia.AddHours(15);
+
+        Assert.Equal(240 + 120, CalculoDoDia.HorasAteAgoraEmMinutos(periodos, agora, hoje: true));
+        Assert.Equal(240, CalculoDoDia.HorasAteAgoraEmMinutos(periodos, agora, hoje: false));
+    }
+
+    [Fact]
+    public void So_o_ultimo_periodo_aberto_conta_ate_agora_e_a_entrada_repetida_nao_conta()
+    {
+        // ENTRADA, ENTRADA: a primeira ficou sem saída no meio do dia (sequência quebrada) e não é "a pessoa está dentro".
+        var emMeio = new[] { Periodo(Dia.AddHours(8), null), Periodo(Dia.AddHours(9), Dia.AddHours(10)) };
+
+        Assert.Equal(60, CalculoDoDia.HorasAteAgoraEmMinutos(emMeio, Dia.AddHours(15), hoje: true));
+        Assert.Equal(0, CalculoDoDia.HorasAteAgoraEmMinutos([], Dia.AddHours(15), hoje: true));
+    }
+
+    [Fact]
     public void Os_segundos_de_cada_batida_sao_descartados_antes_da_conta()
     {
         // 09:00:50 até 09:10:10 são 9 min 20 s de relógio, mas a pessoa vê 09:00 e 09:10: valem 10 minutos.

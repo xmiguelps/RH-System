@@ -68,6 +68,8 @@ app.MapMeusDocumentos();
 app.MapEmpresa();
 app.MapImportacoes();
 app.MapPontoEu();
+app.MapPontoGestor();
+app.MapPontoRh();
 app.MapAuditoria();
 app.MapContadoresDoMenu();
 app.MapSaude();

@@ -11,14 +11,25 @@ namespace RHSystem.Infrastructure.Ponto;
 /// </summary>
 public sealed class SaldoDoBancoDeHoras(AppDbContext db) : ISaldoDoBancoDeHoras
 {
-    public async Task<SaldoDoBanco> ObterAsync(int funcionarioId, CancellationToken ct)
+    public async Task<SaldoDoBanco> ObterAsync(int funcionarioId, CancellationToken ct) =>
+        new((await ObterSaldosAsync([funcionarioId], ct))[funcionarioId], null);
+
+    public async Task<IReadOnlyDictionary<int, int>> ObterSaldosAsync(IReadOnlyCollection<int> funcionarioIds, CancellationToken ct)
     {
+        var ids = funcionarioIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, int>();
+        }
+
         var linhas = await db.LancamentosDoBancoDeHoras.AsNoTracking()
-            .Where(l => l.FuncionarioId == funcionarioId)
-            .Select(l => new { l.Tipo, l.Quantidade })
+            .Where(l => ids.Contains(l.FuncionarioId))
+            .Select(l => new { l.FuncionarioId, l.Tipo, l.Quantidade })
             .ToListAsync(ct);
 
-        var saldo = linhas.Sum(l => l.Quantidade is { } horas ? (l.Tipo == TipoDeLancamentoDoBanco.Debito ? -1 : 1) * LancamentoDoBancoDeHoras.HorasParaMinutos(horas) : 0);
-        return new SaldoDoBanco(saldo, null);
+        var porPessoa = linhas
+            .GroupBy(l => l.FuncionarioId)
+            .ToDictionary(g => g.Key, g => g.Sum(l => l.Quantidade is { } horas ? (l.Tipo == TipoDeLancamentoDoBanco.Debito ? -1 : 1) * LancamentoDoBancoDeHoras.HorasParaMinutos(horas) : 0));
+        return ids.ToDictionary(id => id, id => porPessoa.GetValueOrDefault(id));
     }
 }

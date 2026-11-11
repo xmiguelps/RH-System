@@ -31,7 +31,7 @@ public sealed class MontadorDoCartaoDeHoje(IPontoRepositorio repositorio, ISaldo
             diaDoPonto,
             agora,
             Jornada(carga, configuracao),
-            Periodos(batidas),
+            PeriodosDoDia.De(batidas),
             new PontoProximaMarcacao(proxima.Tipo, proxima.Rotulo, proxima.TextoDoBotao),
             new PontoBancoHoras(banco.SaldoMinutos, banco.AtualizadoAte));
     }
@@ -47,18 +47,6 @@ public sealed class MontadorDoCartaoDeHoje(IPontoRepositorio repositorio, ISaldo
             empresa?.HorarioEntrada.ToString("HH:mm", CultureInfo.InvariantCulture),
             empresa?.HorarioSaida.ToString("HH:mm", CultureInfo.InvariantCulture),
             empresa?.ToleranciaAtrasoMinutos);
-    }
-
-    internal static IReadOnlyList<PontoPeriodo> Periodos(IReadOnlyList<BatidaLida> batidas)
-    {
-        var marcacoes = ComoMarcacoes(batidas);
-        var ordemPorId = marcacoes.OrderBy(m => m.InstanteUtc).ThenBy(m => m.Id).Select((m, i) => (m.Id, Ordem: i + 1)).ToDictionary(x => x.Id, x => x.Ordem);
-        var porId = batidas.ToDictionary(b => b.Id);
-
-        PontoMarcacao? Marcacao(MarcacaoDoDia? batida) =>
-            batida is null ? null : new PontoMarcacao(batida.Id, ordemPorId[batida.Id], batida.Tipo, SequenciaDoDia.Rotulo(ordemPorId[batida.Id], batida.Tipo), batida.InstanteUtc, porId[batida.Id].Origem, porId[batida.Id].CorrigidaEmUtc);
-
-        return [.. SequenciaDoDia.Periodos(marcacoes).Select(p => new PontoPeriodo(Marcacao(p.Entrada), Marcacao(p.Saida)))];
     }
 
     private static IReadOnlyList<MarcacaoDoDia> ComoMarcacoes(IReadOnlyList<BatidaLida> batidas) => [.. batidas.Select(b => new MarcacaoDoDia(b.Id, b.InstanteUtc, b.Tipo))];
