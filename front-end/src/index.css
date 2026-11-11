@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+@theme static {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* superfícies e linhas */
+  --color-pagina: #fffffa;
+  --color-superficie: #ffffff;
+  --color-superficie-suave: #f2f8f7;
+  --color-superficie-destaque: #e6f4f3;
+  --color-borda: #d9e4e2;
+  --color-borda-campo: #c9d8d6;
+  --color-divisor: #e4ecea;
+  --color-tracejado: #9bbdba;
+
+  /* texto */
+  --color-texto: #0e3236;
+  --color-texto-suave: #4e6466;
+  --color-texto-fraco: #757575;
+
+  /* marca e menu lateral */
+  --color-primaria: #0d5c63;
+  --color-primaria-media: #247b7b;
+  --color-primaria-clara: #78cdd7;
+  --color-primaria-ativa: #25757d;
+  --color-primaria-suave: #1c666c;
+  --color-menu-texto: #f3fbfa;
+  --color-menu-rotulo: #a6d9de;
+  --color-menu-apoio: #b8e3e7;
+  --color-menu-linha: #2c7277;
+  --color-menu-borda: #68999b;
+
+  /* estados: fundo e texto (selos, avisos, botões de perigo) */
+  --color-sucesso-fundo: #e6f4f3;
+  --color-sucesso-texto: #0d5c63;
+  --color-info-fundo: #d6f0f3;
+  --color-info-texto: #145a61;
+  --color-alerta-fundo: #fcefd9;
+  --color-alerta-texto: #8a4f06;
+  --color-alerta-forte: #6e3f05;
+  --color-alerta-ponto: #d9822b;
+  --color-erro-fundo: #fbe7e4;
+  --color-erro-texto: #a8322a;
+  --color-neutro-fundo: #eef2f1;
+  --color-neutro-texto: #3d5557;
+
+  /* gráficos e avatar */
+  --color-barra-ferias: #44a1a0;
+  --color-barra-folga: #cfe9ea;
+  --color-avatar-fundo: #d6edec;
+  --color-scrim: rgb(14 50 54 / 0.42);
+
+  /* raios */
+  --radius-botao: 8px;
+  --radius-campo: 10px;
+  --radius-cartao: 14px;
+  --radius-janela: 22px;
+  --radius-destaque: 24px;
+
+  /* tamanhos de letra (o nome não repete o dos tokens de cor, para o Tailwind não confundir `text-*`) */
+  --text-t1: 36px;
+  --text-ficha: 28px;
+  --text-numero: 32px;
+  --text-t2: 22px;
+  --text-t3: 20px;
+  --text-corpo: 15px;
+  --text-tabela: 14px;
+  --text-pequeno: 13px;
+  --text-mini: 12px;
+  --text-relogio: 85px;
+
+  /* medidas de layout */
+  --spacing-menu: 232px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-pagina);
+  color: var(--color-texto);
+}

@@ -29,7 +29,7 @@ cp .env.example .env        # no PowerShell: Copy-Item .env.example .env
 docker compose up -d --wait
 ```
 
-Sobe o MySQL 8.4 em `localhost:3306` (troque `MYSQL_PORTA` no `.env` se a porta estiver ocupada), com o banco **vazio** `rh_system`. Quem cria as tabelas é a API, ao iniciar. O servidor usa `utf8mb4`, o fuso `-03:00` e `log_bin_trust_function_creators=1`, os mesmos valores dos testes e do Azure.
+Sobe o MySQL 8.4 e o **Mailpit** (captador de e-mail de desenvolvimento). **Ver os e-mails de desenvolvimento: `http://localhost:8025`** (SMTP na porta 1025; troque `MAILPIT_SMTP_PORTA` e `MAILPIT_UI_PORTA` no `.env` se estiverem ocupadas). Nada sai para a internet. O MySQL fica em `localhost:3306` (troque `MYSQL_PORTA` no `.env` se a porta estiver ocupada), com o banco **vazio** `rh_system`. Quem cria as tabelas é a API, ao iniciar. O servidor usa `utf8mb4`, o fuso `-03:00` e `log_bin_trust_function_creators=1`, os mesmos valores dos testes e do Azure.
 
 ## Back-end
 
@@ -66,6 +66,17 @@ dotnet user-secrets set "Seed:AdminSenha" "<uma-senha>" --project back-end/src/R
 | `ProxyReverso:Habilitado`, `ProxyReverso:ProxiesConfiaveis` | confiar em `X-Forwarded-For` de proxies da lista (IPs ou CIDR) | `false` |
 | `Documentacao:Habilitada` | publica o documento OpenAPI e a interface | `false` |
 | `Seed:AdminNome`, `Seed:AdminEmail`, `Seed:AdminSenha` | administrador inicial | vazios (sem seed) |
+| `Email:EnvioAtivo` | liga o serviço em segundo plano que envia a fila de e-mails | `false` (`true` em `Development`): sem provedor configurado a fila só acumula e nada vira `FALHOU` por engano |
+| `Email:IntervaloSegundos`, `Email:LoteMaximoPorCiclo` | um ciclo de envio a cada N segundos, com até M mensagens | 10 e 20 (500 convites saem em 25 ciclos) |
+| `Email:MaximoDeTentativas`, `Email:ReservaMinutos` | desiste (`FALHOU`) na tentativa N; a mensagem reservada por um processador que caiu volta a valer depois de M minutos | 5 e 5 (esperas de 1, 5, 30 e 120 min entre as tentativas) |
+| `Email:Remetente`, `Email:NomeDoRemetente` | de quem o e-mail sai | vazio e `RH System` (`Remetente` é obrigatório com o envio ligado) |
+| `Email:Smtp:Servidor`, `Email:Smtp:Porta`, `Email:Smtp:Seguranca` | o servidor SMTP (`Nenhuma`, `StartTls` ou `Ssl`) | vazio, 587, `StartTls` (`localhost`, 1025, `Nenhuma` em `Development`, o Mailpit) |
+| `Email:Smtp:Usuario`, `Email:Smtp:Senha` | credencial do provedor | vazios; **a senha só por user-secrets ou configuração do App Service** |
+| `App:UrlDoFront` | base dos links dos e-mails (cada renderizador monta o seu link). **Obrigatória, como URL http ou https, com `Email:EnvioAtivo=true`: a API não sobe sem ela** (sem ela cada convite e cada redefinição falhariam em silêncio na fila) | vazio (`http://localhost:5173` em `Development`) |
+| `Agendador:Ativo` | liga o serviço em segundo plano do agendador (recuperação na subida e a cada hora, um ciclo a cada N segundos) | `true` (`false` nos testes, que chamam o ciclo direto) |
+| `Agendador:IntervaloSegundos`, `Agendador:RecuperacaoMinutos`, `Agendador:LoteMaximoPorCiclo` | um ciclo a cada N segundos, a recuperação a cada M minutos, até L tarefas por ciclo | 30, 60 e 10 |
+| `Agendador:ReservaMinutos`, `Agendador:MaximoDeTentativas` | a tarefa reservada por um executor que caiu volta a valer depois de N minutos; desiste (`FALHOU`) na tentativa M | 10 e 5 (esperas de 1, 5, 30 e 60 min entre as tentativas) |
+| `Retencao:TarefasDias`, `Retencao:EmailsDias` | por quantos dias o que já terminou fica em `TAREFAS_AGENDADAS` e em `FILA_EMAILS` (o endereço é dado pessoal) antes de a limpeza apagar | 30 e 90 |
 
 **Atrás de um proxy (produção):** ligue `ProxyReverso:Habilitado` **e** informe `ProxyReverso:ProxiesConfiaveis` (IPs ou redes CIDR do proxy da plataforma; a lista certa do Azure é definida no deploy, Task 14). Sem a lista só o `127.0.0.1` é confiável, o `X-Forwarded-For` é ignorado e todas as pessoas dividem o mesmo limite de tentativas de login: a API avisa no log (`Warning`) quando isso acontece.
 
@@ -89,7 +100,119 @@ O teste de divergência compara o contrato com o documento nativo da API, então
 - Respostas de erro saem como `application/problem+json`. A rota do documento é `/openapi/v1.json`.
 - O .NET aceita número escrito como texto por padrão e então escreve `["integer","string"]`; a API configura `JsonNumberHandling.Strict`, e o documento sai `integer`. Um parâmetro de corpo anulável saía como "null ou objeto" e sem `required`; os endpoints declaram o corpo obrigatório, como o contrato.
 - Quando uma rota nova entra, o `operationId` dela entra em `ContratoDivergenciaTests.OperationIdsNoEscopo` **no mesmo passo**.
+- **Parâmetro de construtor de `record` sem valor padrão sai em `required`, mesmo anulável.** Medido na Task 11: o contrato declara `cargo` e `setor` do item da equipe como anuláveis e **não** obrigatórios, e a API os marcava `required` até os dois ganharem `= null` no construtor (o JSON enviado é o mesmo). Campo opcional do contrato: padrão no parâmetro (ou propriedade `init` com padrão).
+- **Propriedade com conversor de JSON próprio perde o `type` no documento.** Medido: com o conversor de `DateTime` do contrato (`JsonDoContrato`), `acessoExpiraEmUtc` saiu sem tipo (`[]`, e o contrato diz `[string]`). Por isso `EsquemasDoContrato` (um transformador de esquema ligado em `AdicionarDocumentacao`) devolve `string` + `date-time` ao instante e `string` + o padrão `HH:mm` ao horário do dia. Conversor novo, esquema novo no mesmo passo.
+- **Quem muda o JSON roda `ContratoDivergenciaTests`.** O conserto acima só apareceu porque a Task 5 rodou esse teste; a Task 4, que criou o conversor, não o rodava.
+
+### Decisões do back-end (medidas)
+
+- **Reserva da fila de e-mails e do agendador: `FromSql` com `SELECT ... FOR UPDATE SKIP LOCKED`, dentro de `ExecutarEmTransacaoAsync`** (sonda `SkipLockedPeloFromSqlTests`, que fica como teste de regressão). Medido no MySQL 8.4 do contêiner: roda e devolve as n primeiras linhas na ordem; com a transação da primeira conexão aberta, um `SELECT ... NOWAIT` na segunda falha com o erro **3572** (controle positivo: a primeira conexão de fato trava as linhas); duas conexões com a MESMA consulta recebem linhas diferentes, sem esperar; e um `1062` dentro da transação não a aborta (o `INSERT` seguinte e o `COMMIT` funcionam). O `EnfileirarAsync` depende do último: chave repetida vira `false`, não perde o resto da transação.
+- **A reserva das filas roda em `READ COMMITTED`, não no isolamento padrão.** Medido (testes `DeadlockNaReservaDeEmailsTests` e `DeadlockNaReservaDeTarefasTests`: 4 processadores ao mesmo tempo, 120 itens por rodada, 15 rodadas): com a transação no padrão do MySQL (`REPEATABLE READ`), a reserva (`SELECT ... FOR UPDATE SKIP LOCKED` seguido do `UPDATE` que move a linha de `PENDENTE` para `EM_ENVIO`/`EM_EXECUCAO`) deu **54 a 77 deadlocks** (erro 1213) na fila de e-mails e **73 a 79** no agendador, em todas as rodadas de teste; nenhum item saía duas vezes (a transação desfaz e o ciclo seguinte repete), mas o ciclo falhava. Com `READ COMMITTED` só nessa transação (`IUnidadeDeTrabalho.ExecutarEmTransacaoAsync(..., IsolationLevel.ReadCommitted, ...)`, que vale só para ela), **0 deadlocks** nas três rodadas de cada um. A explicação provável é o bloqueio de intervalo do `REPEATABLE READ` no índice `(SITUACAO, PROXIMA_TENTATIVA_EM)`; não li o `SHOW ENGINE INNODB STATUS`, então o que está medido é o efeito do isolamento, não o tipo de bloqueio. Pelo manual do MySQL (não medi), `READ COMMITTED` com log binário exige `binlog_format=ROW`: o contêiner `mysql:8.4` dos testes e do compose o aceitou (as sondas rodaram); o MySQL do Azure não foi conferido.
+- **O EF registrava o VALOR de uma chave repetida no log (medido; corrigido).** Chave de idempotência repetida (erro 1062, "Duplicate entry '<valor>'") vale como sucesso e é engolida pelo código, mas o EF registra a falha de gravação (`CoreEventId.SaveChangesFailed`) em nível `Error`, com a exceção, e a mensagem traz o valor da chave: o teste `ChaveRepetidaNoLogTests` (coletor no log da API inteira, com controle positivo) falhou na fila de e-mails, no lote e no agendador. Quando a chave tiver dado pessoal (na 1b, CPF ou e-mail; no lembrete anônimo, a pessoa), o log o guardaria. Esse evento desce para `Debug` no `AddDbContext`. Medido pelo controle de mutação: só o `SaveChangesFailed` leva o valor; "Failed executing DbCommand" (`RelationalEventId.CommandError`) **não** o levou nesses testes e continua em `Error`, com o SQL. Não medi o texto do `CommandError` para outros tipos de erro do banco.
+- **Remetente recusado pelo SMTP é falha temporária.** `550 5.7.1` no `MAIL FROM` (domínio não verificado, remetente não autorizado) vale para toda mensagem; dá-lo como permanente apagava a carga (e o token do convite) de tudo o que o ciclo tentasse. Caixa do destinatário recusada e conteúdo recusado seguem permanentes. A fila repete 5 vezes (1, 5, 30 e 120 minutos); passado esse tempo, a mensagem falha de vez. Não medi contra um provedor real.
+- **Pacote com falha conhecida puxado pelo MailKit.** O MailKit/MimeKit pedem `System.Security.Cryptography.Pkcs 10.0.0`, que tem duas falhas de CPU ao interpretar CMS/S-MIME de origem externa (GHSA-846f-f764-76mx, alta; GHSA-2fmv-rv2c-59x7, moderada; corrigidas na 10.0.13). Aqui só se ENVIA e-mail comum, então a exposição é pequena, mas a versão corrigida (10.0.14) está fixada por referência direta em `Infrastructure` e em `Directory.Packages.props`. Versões escolhidas em 2026-11-04: MailKit 4.18.1 (27/09/2026; a 4.18.2 tinha 12 dias) e Mailpit v1.31.6 (15/10/2026).
+- **Regra de reserva da autorização** (rota sem política e sem `AllowAnonymous` exige login). Medido com a reserva escrita como `RequireAuthenticatedUser` puro: o anônimo recebia **401** em `/nao-existe`, `/api/nao-existe`, `/api/rh/nao-existe` e em `/openapi/v1.json` e `/scalar/v1` com `Documentacao:Habilitada=false`, e as respostas de rejeição do roteamento (405 de método errado e 415 de tipo de mídia errado) também viravam 401. Hoje a reserva exige login **só de rota real** (`RouteEndpoint`): o que não casou com rota e as rejeições do roteamento seguem como antes (404, 405, 415, todos `application/problem+json`). Rota real sem política segue 401 para o anônimo. Os testes `SondaDaPoliticaDeReservaTests` e `FamiliasDeRotaTests` fixam os dois lados. Não medi o `MapFallback` (a saída que o plano previa); escolhi esta porque mantém o 405 e o 415 da fatia 0.
+- **Perfil no token.** `/api/rh`, `/api/gestor` e `/api/eu` olham o claim `perfil` como texto exato (`RH`, `Gestor`, `Funcionario`): token válido sem o claim, com `rh` minúsculo ou com um número recebe 403, inclusive em `/api/auth/eu`.
+
+### Agendador e Always On
+
+O que roda depois, sem ninguém pedir, é uma **tarefa agendada** (`TAREFAS_AGENDADAS`): uma linha com tipo, chave de idempotência e a hora a partir da qual pode rodar. Um serviço em segundo plano (`AgendadorHostedService`) faz, a cada `Agendador:IntervaloSegundos`, um ciclo: reserva até `LoteMaximoPorCiclo` tarefas vencidas com `SELECT ... FOR UPDATE SKIP LOCKED` (a técnica medida na sonda `SkipLockedPeloFromSqlTests`), executa cada uma em escopo próprio (sem `HttpContext`, então o ator da auditoria é o **Sistema**) e a marca `CONCLUIDA`; se lançar exceção, ela volta a `PENDENTE` com espera de 1, 5, 30 e 60 minutos e, na 5ª tentativa, vira `FALHOU`.
+
+- **Cada tarefa é idempotente e recupera o que ficou para trás.** O processo pode cair entre agir e marcar `CONCLUIDA`, então a tarefa confere o estado real antes de agir. Na subida e a cada `RecuperacaoMinutos` o serviço chama `RecuperarAsync` de cada tipo, que cria (pelo `IAgendador`, sem duplicar) o que a parada deixou de fazer.
+- **Duas limpezas já existem:** `LIMPAR_TAREFAS` apaga `CONCLUIDA` e `CANCELADA` com mais de `Retencao:TarefasDias` (nunca `PENDENTE`, `EM_EXECUCAO` nem `FALHOU`) e `LIMPAR_EMAILS` apaga `ENVIADO`, `FALHOU`, `DEVOLVIDO` e `CANCELADO` com mais de `Retencao:EmailsDias` (nunca `PENDENTE` nem `EM_ENVIO`). Cada fatia acrescenta as suas (`AddScoped<ITarefaAgendada, ...>`).
+- **Exige Always On.** Com o App Service dormindo (plano sem Always On) **nada roda**; ao acordar, a recuperação refaz o que passou, mas um desligamento agendado, por exemplo, só se efetiva depois disso. Always On é recurso do plano pago do App Service: a Task 14 da fatia 0 (Step 2) é o passo em que o dono escolhe o plano.
+
+### Verificação ponta a ponta da fundação (Task 12, 2026-11-04)
+
+Conferência manual com o Docker, em **banco novo**, para o seed do administrador e o evento `CRIOU` do `Sistema` nascerem com a auditoria já ligada. O plano mandava `docker compose down -v`, que apaga o volume do MySQL local de quem desenvolve; em vez disso a conferência rodou num **projeto compose separado**, com volume próprio e portas diferentes, e só esse volume foi removido no fim:
+
+```
+MYSQL_PORTA=3307 MAILPIT_SMTP_PORTA=1026 MAILPIT_UI_PORTA=8026 docker compose -p rh-verif up -d --wait
+# API em http://localhost:5055 com ConnectionStrings__Padrao (Port=3307), Email__Smtp__Porta=1026, Jwt__Chave e Seed__AdminEmail/Seed__AdminSenha
+# efêmeros (variáveis de ambiente do processo; o corpo do login ficou num arquivo fora do repositório, apagado ao fim)
+MYSQL_PORTA=3307 MAILPIT_SMTP_PORTA=1026 MAILPIT_UI_PORTA=8026 docker compose -p rh-verif down -v
+```
+
+Resultado medido (a API subiu aplicando V001 a V004 num banco vazio):
+
+- **(a)** no log: `Agendador iniciado: 2 tipo(s) recuperado(s); um ciclo a cada 30 s e recuperação a cada 60 min.`, sem nenhuma linha de aviso ou erro; as duas limpezas (`LIMPAR_TAREFAS` e `LIMPAR_EMAILS`) rodaram sozinhas (no log, o `DELETE` de cada uma e, depois dele, o `UPDATE` que grava `CONCLUIDA_EM`; não consultei a tabela para ler a situação).
+- **(b)** `POST /api/auth/entrar` com o administrador do seed devolveu `200`; `GET /api/rh/auditoria` listou exatamente 2 eventos: `ENTROU` (ator: o administrador, `PESSOA`) e `CRIOU` (ator: `Sistema`, `SISTEMA`).
+- **(c)** `GET /api/eu/contadores-do-menu` devolveu `{"avisosNaoLidos":0,"formulariosPendentes":0,"documentosPendentes":0}`; para o administrador (RH), `/api/rh/contadores-do-menu` devolveu `{"pedidosDeAjusteDePonto":0}` e `/api/gestor/contadores-do-menu`, `403`.
+- **(d)** o Mailpit abre (`HTTP 200` na interface) e a caixa está vazia (0 mensagens).
+
+### Cadastro, ficha e acesso (fatia 1b)
+
+O RH cadastra, edita, desliga e readmite colaboradores (`/api/rh/funcionarios`), o gestor lê a própria equipe (`/api/gestor/equipe`) e a pessoa define e troca a senha (`/api/auth/senha/*`, `/api/eu/senha`). **Não houve verificação manual** (Docker, `curl` e Mailpit) desta fatia: o dono decidiu não fazer teste de fumaça. O fluxo é provado na API por `FluxoDeAcessoDePontaAPontaTests` (cadastro com convite, e-mail pela fila, link, senha, entrada, "esqueci minha senha", desligamento com o último dia no passado e readmissão com convite), com o e-mail em memória e o token lido do link da mensagem.
+
+**Configurações novas** (as da tabela acima continuam valendo):
+
+| Chave | Para quê | Padrão |
+|---|---|---|
+| `Senha:ConviteDias` | validade do link de convite | 7 |
+| `Senha:RedefinicaoMinutos` | validade do link de "esqueci minha senha" | 60 |
+| `Senha:IntervaloMinimoEntreRedefinicoesSegundos` | dentro deste intervalo do último pedido da mesma pessoa, o seguinte devolve o mesmo 202 e não enfileira nada (zero desliga) | 60 |
+| `Autenticacao:LimiteSenhaPorMinuto` | tentativas por minuto, por IP e rota, nas três rotas públicas de senha (`429` acima) | 5 |
+| `Autenticacao:LimiteSenhaAtualPorMinuto` | erros da senha atual por minuto, por pessoa, na troca de senha (`429` acima; no mínimo 1) | 5 |
+| `Retencao:TokensDeSenhaDias` | por quantos dias um link de senha que já não serve (usado, invalidado ou vencido) fica em `USUARIOS_TOKENS_SENHA`; o último convite de cada pessoa e o link ainda válido nunca saem | 30 |
+
+**O que cada fonte padrão ainda não sabe.** Cada uma é uma peça que a fatia dona registra por DI (`AddScoped`) **depois** da que está registrada hoje; sem ela, a API diz a verdade em vez de inventar:
+
+- `IFonteDeFatosDoDia` (fatia 3, com as férias da 7 e o horário da 1c): só conhece o fim de semana. `situacaoHoje` e `contagensHoje` valem `AINDA_NAO_COMECOU` num dia útil e `SEM_EXPEDIENTE` no fim de semana; nada de ponto, atestado, feriado, férias nem hora-limite.
+- `IFonteDeIndicadorDaFicha` (banco de horas: fatia 3; advertências: 4; treinamentos: 6; férias: 7) e `IFonteDoProximoPagamento` (7): não há nenhuma; os indicadores saem `null` (nunca zero inventado).
+- `IInclusaoNoOnboarding` (fatia 6) e `IEnvioDoFormularioDeAdmissao` (fatia 5): as versões "indisponível" recusam a caixa marcada com o erro do contrato (422 `SEM_TREINAMENTO_DE_ONBOARDING`; 400 em `formularioAdmissaoId`) e nada fica gravado.
+- `ICondicaoParaEfetivarDesligamento` (fatia 3: "o banco de horas daquele dia já fechou"): não há nenhuma e a efetivação vale. O desligamento se efetiva no dia seguinte ao último dia de trabalho (00:00 de -03:00), pela tarefa `EFETIVAR_DESLIGAMENTO`; se esse momento já passou, na hora.
+
+**Dívida registrada: a porta `IPedidosParadosNoGestor` está vazia.** A etapa de um pedido (ponto, férias) é fixada na criação, então "passar ao RH" os pedidos que esperavam por um gestor é uma ação explícita: a 1b a chama ao **efetivar o desligamento** de quem é gestor e na **readmissão** que o tira do setor. O composto padrão não tem nenhuma fatia por trás (as fatias 3 e 7 implementam `IPedidosParadosNoGestorDaFatia` sobre as tabelas delas), então, até lá, **os pedidos parados num gestor desligado, trocado ou readmitido ficam onde estão**. Está também no `contrato/STATUS.md` (rotas de desligamento e readmissão).
+
+**Limitação aceita da troca de senha (claim `rth`).** O token de acesso leva a claim `rth` (o hash do refresh token emitido junto) para a troca manter a sessão atual e revogar as outras. Token emitido antes da claim, ou sem ela, faz a troca revogar **todas** as sessões. E, se outra aba renovou o refresh antes, o token de acesso desta aba ainda leva o `rth` antigo: a troca então revoga o refresh vigente e a sessão dessa aba cai na próxima renovação (em até 15 minutos). É rara, está documentada e testada (`TrocarSenhaTests`).
+
+**Outros comportamentos que a revisão geral da 1b fixou.** Trocar o e-mail corporativo na edição **invalida os links de convite e de redefinição em aberto** (eles foram para o endereço antigo; o RH reenvia o convite ao novo). Editar os benefícios de um colaborador grava o evento "Benefícios de {nome}" com os nomes antes e depois; o **cadastro e a importação ainda não gravam esse evento** (o registro automático é suspenso na importação, e um evento por pessoa contrariaria o evento único de importação: a fatia 2 resolve). Os campos do endereço respeitam os tamanhos do contrato (logradouro 150; número 10; complemento, bairro e cidade 100).
+
+**Ambiente (para o deploy).** O isolamento `READ COMMITTED` das filas e das operações do vínculo (desligar, cancelar, efetivar e readmitir) pede binlog em formato `ROW` no servidor (com `STATEMENT` o MySQL recusa gravar sob `READ COMMITTED`; é o que se sabe do MySQL, não foi medido aqui: conferir no servidor do Azure); o provedor de e-mail e a lista de proxies confiáveis do Azure são definidos no deploy.
+
+### Cadastros de apoio, empresa e documentos (fatia 1c)
+
+**"Gestor ausente" (`PUT /api/rh/gestores/{gestorId}/ausencia`).** Marcar grava a marca em `GESTORES` e chama `IPedidosParadosNoGestor.AprovarEtapaDoGestorAsync` **na mesma transação**: se a porta falha, a marcação é desfeita e a resposta é 500. A resposta repete em `pedidosAprovadosAgora` o `PedidosAprovados` que a porta devolveu, então vale `{ ajustesDePonto: 0, ferias: 0 }` enquanto a porta for o composto vazio da 1a; as fatias 3 e 7 passam a preencher os números ao registrarem a implementação delas (`IPedidosParadosNoGestorDaFatia`). Desmarcar não chama a porta (só os pedidos novos voltam ao normal). Não há tarefa agendada: passada a data de volta, `ausente` continua `true` e `ausenteHoje` vira `false`; a marca vale até o dia anterior à volta, no dia de Brasília. `IGestorAusente`, que as fatias 3 e 7 chamam ao criar um pedido, só responde pelos pedidos novos.
+
+**Setores e a troca de gestor (`/api/rh/setores`).** Trocar ou tirar o gestor roda numa transação só: promove o novo a `Gestor` (cria a linha em `GESTORES` se faltar), rebaixa o antigo a `Funcionario` (a linha dele fica), grava o setor, chama `IGestorDoFuncionario.RefazerDosMembrosAsync` (1b) e `IPedidosParadosNoGestor.PassarParaORhAsync` (1a); qualquer falha desfaz tudo. Os pedidos parados do gestor antigo só passam ao RH quando as fatias 3 e 7 registrarem a implementação delas da porta (o composto padrão é vazio). O contrato diz que um gestor responde por um setor só: a regra é da API (o banco não a impõe) e uma corrida entre duas edições que escolhem o mesmo gestor para setores diferentes não é impedida.
+
+**Arquivos (Blob Storage).** O envio de documento é o primeiro uso de arquivos. `IArmazenamentoDeArquivos` (gravar sem sobrescrever, link temporário de leitura por SAS que baixa como anexo, apagar) é a peça que as fatias seguintes reaproveitam; o tipo do arquivo vem do conteúdo (`IdentificadorDeTipoDeArquivo`), nunca do nome. Em desenvolvimento o armazenamento é o **Azurite**, no `docker compose`: `docker compose up -d --wait azurite` sobe o emulador em `http://127.0.0.1:10000` (conta `devstoreaccount1`, a chave pública do emulador, que `UseDevelopmentStorage=true` já descreve) e os arquivos somem com `docker compose down -v`. A imagem tem versão fixada (3.37.0, conferida em 2026-11-10; nunca `latest`) e roda com `--skipApiVersionCheck`: o SDK `Azure.Storage.Blobs` 12.30.1 fala a versão de API 2026-10-06, que esse Azurite (o mais novo até agora) ainda recusa; tirar o flag quando um Azurite novo a aceitar. Só `ArmazenamentoBlobTests` fala com o Azurite (em contêiner pelo `AzuriteFixture`); o resto dos testes usa o armazenamento em memória.
+
+| Chave (`Armazenamento:`) | Para quê | Padrão |
+|---|---|---|
+| `ConexaoBlob` | a connection string do Storage Account (traz a chave da conta). **Só por user-secrets ou pela configuração do App Service; nunca no repositório, no log nem na resposta.** Em Development: `UseDevelopmentStorage=true` | vazia |
+| `Container` | o contêiner de blobs (privado, criado se não existir) | `arquivos` |
+| `LinkValidoMinutos` | quanto tempo vale o link de download | 5 |
+| `SomenteHttps` | o link só funciona por HTTPS (`false` em Development: o Azurite fala HTTP) | `true` |
+| `SobrasMinimoHoras` | a limpeza `LIMPAR_ARQUIVOS_ORFAOS` só apaga arquivo mais velho que isto (protege o envio que já gravou o blob e ainda não inseriu a linha) | 24 |
+
+Sem `ConexaoBlob` a API **sobe** e a primeira rota que usa arquivo responde 500, com o erro claro no log (nunca com a connection string). A limpeza só toca o prefixo que tem uma `IFonteDeReferenciasDeArquivo` registrada pela fatia dona dos arquivos; se a fonte falha, nada do prefixo é apagado e a tarefa lança para o agendador tentar de novo.
+
+**Documentos do colaborador (`/api/rh/funcionarios/{funcionarioId}/documentos`).** O envio segue a receita do arquivo: o caso de uso lê a pessoa (404) e valida tudo (400, todos os erros juntos, antes de qualquer efeito); grava no armazenamento SEM transação aberta; abre uma transação curta que insere a linha e o evento `Criou`; e, se o blob ou a transação falhar, apaga o blob (o erro original é o que sai; se a limpeza também falhar, a sobra fica para a `LIMPAR_ARQUIVOS_ORFAOS`, que só apaga o que tem mais de 24 horas e nenhuma linha referencia). O tipo vem dos primeiros bytes (PDF, JPG ou PNG, até 10 MiB: 10 MB são 10 MiB); o nome que a pessoa deu é limpo (`NomeParaDownload`) e nunca vai para o log de auditoria, que mostra só que o arquivo mudou. O download devolve um link temporário e grava o evento `Baixou` ANTES de criá-lo (se o registro falhar, não há link). **O formulário é lido de `HttpRequest`, não por `[FromForm]`**, e o corpo `multipart/form-data` do contrato é escrito à mão no OpenAPI (`FormulariosDoContrato`): com `[FromForm]` ou `Accepts` o roteamento recusaria o tipo de mídia (415) antes da autorização, e a matriz de perfis exige 401 e 403 primeiro. Corpo que não é multipart responde 415 e multipart quebrado responde 400. O teto de 16 MiB da requisição vai em `RequestSizeLimit` na rota; **o servidor de teste (`TestServer`) não aplica esse limite**, então ele só vale (e só foi conferido por inspeção) no Kestrel.
+
+**Meus documentos (`/api/eu/documentos`).** Qualquer pessoa logada (Funcionario, Gestor, RH; sem 403) lista, envia e baixa SÓ os documentos dela: o id da pessoa é o do token e documento de outra pessoa dá o mesmo 404 do inexistente. Enviar só vale para documento `PENDENTE` (que o RH pediu) e segue a mesma receita do arquivo, na ordem 404, 400 (arquivo), 422 `DOCUMENTO_NAO_PEDIDO`; a validação e o "gravar o blob, efetivar, apagar o blob se falhar" são um código só (`ValidacaoDeArquivoDeDocumento` e `EnvioDeArquivoDeDocumento`), usado também pelo RH. **Dois envios ao mesmo tempo:** a `Situacao` é o token de concorrência do `UPDATE`; o segundo a salvar não acha a linha pendente, vira 422 `DOCUMENTO_NAO_PEDIDO` e apaga o blob dele (sobra um arquivo só, o do vencedor). Baixar o próprio documento não grava evento (só o RH baixando o de outra pessoa é auditado). A bolinha `documentosPendentes` de `GET /api/eu/contadores-do-menu` vem de `FonteDeDocumentosPendentes`: uma consulta `COUNT` dos `PENDENTE` da própria pessoa (as rotas do gestor e do RH não têm o campo).
+
+**Pergunta aberta ao dono (decisão 1 do plano da 1c).** Ao escolher como gestor de um setor uma pessoa **de outro setor**, a API (a) deixa o setor dela como está, (b) recusa, ou (c) muda o setor dela. Está **implementada a (a)**: ele gerencia o setor sem fazer parte dele (`quantidadePessoas` do setor não o conta) e o `ID_GESTOR` dele é refeito como o de qualquer gestor do setor. Enquanto gerencia o setor ele fica sem `ID_GESTOR` (regra da 1b: o gestor do setor não tem gestor) e, ao ser trocado ou tirado, volta a ter o gestor do setor de origem dele. Só (b) ou (c) pedem contrato novo (um erro novo, ou um efeito novo descrito).
 
 ## Front-end
 
-Será descrito aqui quando o front existir (plano em `docs/plano-front-end/`).
+O front-end (React 19, TypeScript, Vite) está em `front-end/`, feito por Lucas num repositório à parte e trazido para cá (fatias 0 a 6 prontas; a fatia 7 começou e não está completa). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.
+
+### Rodar o front para ver as telas
+
+Precisa de **Node** na faixa de `package.json` (`^22.22.2` ou `^24.15.0`; confira com `node -v`). Da raiz do repositório:
+
+```
+cd front-end
+npm ci
+npm run dev
+```
+
+Abra **http://localhost:5173**. O `npm run dev` primeiro gera os tipos e os dados simulados a partir de `contrato/openapi.yaml` (`predev`) e depois sobe o Vite.
+
+- **Os dados são simulados (MSW), e a API não precisa estar de pé.** O front intercepta as chamadas `/api/...` no navegador e responde com os exemplos do contrato. É o padrão em `npm run dev`; não precisa de arquivo `.env`.
+- **O login simulado ignora o que você digita** (use um e-mail com formato válido e qualquer senha) e **entra sempre como Ana Souza, perfil RH**. Os dados de exemplo são os mesmos para qualquer id (a tela de cada pessoa mostra os mesmos dados). **Não há seletor de perfil hoje**: com os dados simulados, as telas de gestor e de funcionário não aparecem (o exemplo do login vem do contrato e a pasta `src/shared/mocks/gerado/` é gerada de novo a cada `npm run dev`, então não adianta editá-la).
+- **Falar com a API de verdade:** copie `front-end/.env.example` para `front-end/.env.local` e ponha `VITE_MOCKS=nao` (e `VITE_API_URL=http://localhost:5000`, a API rodando como em "Rodar a API"). **Hoje só existem na API o login, a sessão, a saúde e a auditoria** (ver `contrato/STATUS.md`): as outras telas dão erro nesse modo até as rotas ficarem prontas.
+- **Só os componentes:** `VITE_VITRINE=sim npm run dev` (no PowerShell: `$env:VITE_VITRINE="sim"; npm run dev`) habilita a rota `/eu/vitrine`, uma página de prova dos componentes.
+
+Outros comandos de `front-end/`: `npm test` (Vitest), `npm run lint`, `npm run build` (gera `dist/`), `npm run csp` (confere a política de segurança do site, precisa do Edge ou do Chrome instalado) e `npm run format:check`. **Hoje o `format:check` falha** em 6 arquivos de `src/features/ferias/` (a fatia 7 começada e sem formatar).

@@ -1,3 +1,4 @@
+using System.Data;
 using RHSystem.Domain.Autenticacao;
 
 namespace RHSystem.Application.Autenticacao;
@@ -8,6 +9,9 @@ public interface IUsuarioRepositorio
     Task<Usuario?> ObterPorEmailCorporativoAsync(string emailNormalizado, CancellationToken ct);
 
     Task<Usuario?> ObterPorIdAsync(int id, CancellationToken ct);
+
+    /// <summary>O login do colaborador (rastreado, com as mesmas dependências), ou <c>null</c> se ele ainda não tem login.</summary>
+    Task<Usuario?> ObterPorFuncionarioIdAsync(int funcionarioId, CancellationToken ct);
 }
 
 public interface IRefreshTokenRepositorio
@@ -20,6 +24,11 @@ public interface IRefreshTokenRepositorio
     Task<bool> TentarRevogarAsync(string tokenHash, DateTime agoraUtc, CancellationToken ct);
 
     Task RevogarTodosDoUsuarioAsync(int usuarioId, DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary>
+    /// Revoga os refresh tokens em aberto da pessoa, EXCETO o da sessão atual (<paramref name="hashDaSessaoAtual"/>, o <c>rth</c> do token de acesso); nulo revoga todos. Devolve quantos.
+    /// </summary>
+    Task<int> RevogarOutrosDoUsuarioAsync(int usuarioId, string? hashDaSessaoAtual, DateTime agoraUtc, CancellationToken ct);
 }
 
 public interface IUnidadeDeTrabalho
@@ -27,6 +36,13 @@ public interface IUnidadeDeTrabalho
     Task SalvarAsync(CancellationToken ct);
 
     Task<T> ExecutarEmTransacaoAsync<T>(Func<Task<T>> acao, CancellationToken ct);
+
+    /// <summary>
+    /// A mesma transação, com o nível de isolamento escolhido para ELA (vale só para esta transação; a conexão volta ao padrão). A reserva das filas (e-mails e agendador)
+    /// usa <see cref="IsolationLevel.ReadCommitted"/>: no padrão (REPEATABLE READ) o <c>SELECT ... FOR UPDATE SKIP LOCKED</c> segura bloqueios de intervalo no índice e o
+    /// <c>UPDATE</c> seguinte, que move a linha de <c>PENDENTE</c> para <c>EM_ENVIO</c> no mesmo índice, dá deadlock entre dois processadores (medido; ver README).
+    /// </summary>
+    Task<T> ExecutarEmTransacaoAsync<T>(Func<Task<T>> acao, IsolationLevel nivel, CancellationToken ct);
 }
 
 public interface ISenhaHasher
@@ -41,7 +57,11 @@ public interface IEmissorDeTokens
     /// <summary>Quanto tempo um refresh token vale (7 dias por padrão).</summary>
     TimeSpan ValidadeDoRefresh { get; }
 
-    AcessoEmitido EmitirAcesso(Usuario usuario);
+    /// <summary>
+    /// Com <paramref name="hashDoRefreshDaSessao"/>, o token leva a claim <c>rth</c> (o hash do refresh token emitido junto): é como a troca de senha sabe qual sessão manter. O hash de um segredo
+    /// aleatório de 32 bytes não revela nada. Sem ele (token emitido antes), a troca encerra todas as sessões.
+    /// </summary>
+    AcessoEmitido EmitirAcesso(Usuario usuario, string? hashDoRefreshDaSessao = null);
 
     RefreshGerado NovoRefresh();
 

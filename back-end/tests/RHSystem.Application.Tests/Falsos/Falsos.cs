@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging;
+using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Domain.Autenticacao;
 
@@ -35,8 +36,14 @@ public sealed class EmissorDeTokensFalso(IRelogio relogio) : IEmissorDeTokens
 
     public TimeSpan ValidadeDoRefresh => TimeSpan.FromDays(7);
 
-    public AcessoEmitido EmitirAcesso(Usuario usuario) =>
-        new($"jwt-do-usuario-{usuario.Id}", relogio.AgoraUtc.AddMinutes(15));
+    /// <summary>O hash do refresh que o chamador mandou levar na claim <c>rth</c> (nulo = token sem a claim).</summary>
+    public string? UltimoHashDaSessao { get; private set; }
+
+    public AcessoEmitido EmitirAcesso(Usuario usuario, string? hashDoRefreshDaSessao = null)
+    {
+        UltimoHashDaSessao = hashDoRefreshDaSessao;
+        return new($"jwt-do-usuario-{usuario.Id}", relogio.AgoraUtc.AddMinutes(15));
+    }
 
     public RefreshGerado NovoRefresh()
     {
@@ -75,6 +82,8 @@ public sealed class UnidadeDeTrabalhoFalsa : IUnidadeDeTrabalho
             EmTransacao = false;
         }
     }
+
+    public Task<T> ExecutarEmTransacaoAsync<T>(Func<Task<T>> acao, System.Data.IsolationLevel nivel, CancellationToken ct) => ExecutarEmTransacaoAsync(acao, ct);
 }
 
 public sealed class UsuarioRepositorioEmMemoria : IUsuarioRepositorio
@@ -86,6 +95,9 @@ public sealed class UsuarioRepositorioEmMemoria : IUsuarioRepositorio
 
     public Task<Usuario?> ObterPorIdAsync(int id, CancellationToken ct) =>
         Task.FromResult(Todos.Find(u => u.Id == id));
+
+    public Task<Usuario?> ObterPorFuncionarioIdAsync(int funcionarioId, CancellationToken ct) =>
+        Task.FromResult(Todos.Find(u => u.FuncionarioId == funcionarioId));
 }
 
 public sealed class RefreshTokenRepositorioEmMemoria(UnidadeDeTrabalhoFalsa unidade) : IRefreshTokenRepositorio
@@ -136,6 +148,23 @@ public sealed class RefreshTokenRepositorioEmMemoria(UnidadeDeTrabalhoFalsa unid
         }
     }
 
+    public List<(int UsuarioId, string? HashDaSessaoAtual)> RevogacoesDeOutros { get; } = [];
+
+    public Task<int> RevogarOutrosDoUsuarioAsync(int usuarioId, string? hashDaSessaoAtual, DateTime agoraUtc, CancellationToken ct)
+    {
+        RevogacoesDeOutros.Add((usuarioId, hashDaSessaoAtual));
+        lock (_trava)
+        {
+            var alvos = Todos.Where(t => t.UsuarioId == usuarioId && t.RevogadoEm is null && (hashDaSessaoAtual is null || t.TokenHash != hashDaSessaoAtual)).ToList();
+            foreach (var token in alvos)
+            {
+                token.Revogar(agoraUtc);
+            }
+
+            return Task.FromResult(alvos.Count);
+        }
+    }
+
     public Task RevogarTodosDoUsuarioAsync(int usuarioId, DateTime agoraUtc, CancellationToken ct)
     {
         lock (_trava)
@@ -161,6 +190,52 @@ public sealed class LogColetor<T> : ILogger<T>
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
         Registros.Add((logLevel, formatter(state, exception)));
+}
+
+/// <summary>
+/// Um <see cref="IAuditor"/> que só anota o que lhe pedem: qual método, com qual ator e evento, e em que pé estava a unidade de trabalho na hora
+/// (quantos <c>SalvarAsync</c> já tinham rodado e se havia transação). <see cref="Falhar"/> faz o registro lançar, depois de anotado.
+/// </summary>
+public sealed class AuditorFalso(UnidadeDeTrabalhoFalsa unidade) : IAuditor
+{
+    public sealed record Chamada(string Metodo, AtorDoEvento? Ator, EventoDeAuditoriaNovo Evento, TimeSpan? Janela, int SalvarChamadasNaHora, bool EmTransacaoNaHora);
+
+    public List<Chamada> Chamadas { get; } = [];
+
+    public bool Falhar { get; set; }
+
+    public void Registrar(EventoDeAuditoriaNovo evento) => Anotar(nameof(Registrar), null, evento, null);
+
+    public void RegistrarComo(AtorDoEvento ator, EventoDeAuditoriaNovo evento) => Anotar(nameof(RegistrarComo), ator, evento, null);
+
+    public Task RegistrarEGravarAsync(EventoDeAuditoriaNovo evento, CancellationToken ct)
+    {
+        Anotar(nameof(RegistrarEGravarAsync), null, evento, null);
+        return Task.CompletedTask;
+    }
+
+    public Task RegistrarEGravarComoAsync(AtorDoEvento ator, EventoDeAuditoriaNovo evento, CancellationToken ct)
+    {
+        Anotar(nameof(RegistrarEGravarComoAsync), ator, evento, null);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> RegistrarEGravarComLimiteAsync(AtorDoEvento ator, EventoDeAuditoriaNovo evento, TimeSpan janela, CancellationToken ct)
+    {
+        Anotar(nameof(RegistrarEGravarComLimiteAsync), ator, evento, janela);
+        return Task.FromResult(true);
+    }
+
+    public IDisposable SuspenderRegistroAutomatico() => throw new NotSupportedException("O login não suspende o registro automático.");
+
+    private void Anotar(string metodo, AtorDoEvento? ator, EventoDeAuditoriaNovo evento, TimeSpan? janela)
+    {
+        Chamadas.Add(new Chamada(metodo, ator, evento, janela, unidade.SalvarChamadas, unidade.EmTransacao));
+        if (Falhar)
+        {
+            throw new InvalidOperationException("auditoria fora do ar (falha de teste)");
+        }
+    }
 }
 
 /// <summary>Monta funcionários e usuários do Domain, que não têm construtores públicos para Id, Cargo e Setor (o EF os preenche).</summary>
@@ -200,6 +275,7 @@ public sealed class Cenario
         Relogio = new RelogioFalso(new DateTime(2026, 10, 7, 12, 42, 0, 700, DateTimeKind.Utc));
         Emissor = new EmissorDeTokensFalso(Relogio);
         Tokens = new RefreshTokenRepositorioEmMemoria(Unidade);
+        Auditor = new AuditorFalso(Unidade);
     }
 
     public RelogioFalso Relogio { get; }
@@ -214,9 +290,11 @@ public sealed class Cenario
 
     public RefreshTokenRepositorioEmMemoria Tokens { get; }
 
+    public AuditorFalso Auditor { get; }
+
     public LogColetor<EntrarCasoDeUso> LogDaEntrada { get; } = new();
 
-    public EntrarCasoDeUso Entrar() => new(Usuarios, Tokens, Unidade, Hasher, Emissor, Relogio, LogDaEntrada);
+    public EntrarCasoDeUso Entrar() => new(Usuarios, Tokens, Unidade, Hasher, Emissor, Relogio, Auditor, LogDaEntrada);
 
     public RenovarTokenCasoDeUso Renovar() => new(Usuarios, Tokens, Unidade, Emissor, Relogio);
 
@@ -229,7 +307,9 @@ public sealed class Cenario
         bool usuarioAtivo = true,
         bool funcionarioAtivo = true,
         string? cargo = null,
-        string? setor = null)
+        string? setor = null,
+        bool senhaProvisoria = false,
+        string? hashProvisorio = null)
     {
         var funcionario = Funcionario.Criar("Ana Souza", email, new DateOnly(2026, 1, 2), new NivelDeAcesso(nivel ?? "qualquer"));
         Dominio.Definir(funcionario, nameof(Funcionario.Id), _proximoId++);
@@ -253,7 +333,7 @@ public sealed class Cenario
             funcionario.Inativar();
         }
 
-        var usuario = Usuario.Criar(funcionario, Hasher.Gerar(SenhaCerta));
+        var usuario = Usuario.Criar(funcionario, hashProvisorio ?? Hasher.Gerar(SenhaCerta), senhaProvisoria);
         Dominio.Definir(usuario, nameof(Usuario.Id), _proximoId++);
         if (!usuarioAtivo)
         {

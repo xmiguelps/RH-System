@@ -174,4 +174,29 @@ public class InicializacaoTests(MySqlFixture mysql)
         Assert.Contains("RH", Mensagens(erro));
         Assert.Contains("nível", Mensagens(erro), StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task Envio_de_email_ligado_sem_App_UrlDoFront_nao_sobe_e_com_o_envio_desligado_sobe()
+    {
+        var conexao = await mysql.NovoBancoAsync();
+
+        // O ApiFactory desliga o envio: nada sai e a URL pode faltar.
+        using (var desligado = new ApiFactory(conexao).WithWebHostBuilder(b => b.UseSetting("App:UrlDoFront", string.Empty)))
+        {
+            desligado.CreateClient();
+        }
+
+        // Ligado e sem a URL, cada convite e cada redefinição falhariam em silêncio (a fila marca FALHOU e o RH vê "enviado"): a API não sobe, e a mensagem diz qual chave falta.
+        using var ligado = new ApiFactory(conexao).WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Email:EnvioAtivo", "true");
+            b.UseSetting("Email:Remetente", "rh@empresa.com.br");
+            b.UseSetting("Email:Smtp:Servidor", "localhost");
+            b.UseSetting("App:UrlDoFront", string.Empty);
+        });
+        var erro = Assert.ThrowsAny<Exception>(() => ligado.CreateClient());
+
+        Assert.Contains("App:UrlDoFront", Mensagens(erro));
+    }
+
 }

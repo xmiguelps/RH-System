@@ -20,6 +20,20 @@ public class ComparadorDeContratoTests
         Doc($$"""{ "/x": { "get": { "operationId": "{{operationId}}", "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": {{schema}} } } } } } } }""");
 
     [Fact]
+    public void Enum_com_null_dentro_equivale_ao_oneOf_de_enum_e_null_do_contrato_e_a_nulabilidade_diferente_ainda_diverge()
+    {
+        // O gerador do .NET escreve o enum anulável com null DENTRO da lista; o contrato o escreve com oneOf [enum, null]: é a mesma coisa.
+        var contrato = DocComSchema("""{ "oneOf": [ { "type": "string", "enum": ["A", "B"] }, { "type": "null" } ] }""");
+        var api = DocComSchema("""{ "type": ["string", "null"], "enum": ["A", "B", null] }""");
+        var semNull = DocComSchema("""{ "type": "string", "enum": ["A", "B"] }""");
+        var outroValor = DocComSchema("""{ "type": ["string", "null"], "enum": ["A", "C", null] }""");
+
+        Assert.Empty(Comparar(contrato, api, "op"));
+        Assert.Contains(Comparar(contrato, semNull, "op"), d => d.Contains("null")); // o contrato aceita null e a API não
+        Assert.Contains(Comparar(contrato, outroValor, "op"), d => d.Contains("valores do enum"));
+    }
+
+    [Fact]
     public void Comparador_acusa_operacao_que_so_existe_de_um_lado()
     {
         var com = Doc("""{ "/a": { "get": { "operationId": "a", "responses": { "200": { "description": "ok" } } } } }""");

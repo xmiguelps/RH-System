@@ -14,7 +14,12 @@ public class UsuarioConfiguracao : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.FuncionarioId).HasColumnName("ID_FUNCIONARIO");
         builder.Property(u => u.SenhaHash).HasColumnName("SENHA");
         builder.Property(u => u.Ativo).HasColumnName("ATIVO");
-        builder.Property(u => u.UltimoLoginEm).HasColumnName("DATA_HORA_ULTIMO_LOGIN");
+
+        // DEFAULT FALSE no banco, não declarado: o EF sempre envia a marca que a entidade tem.
+        builder.Property(u => u.SenhaProvisoria).HasColumnName("SENHA_PROVISORIA");
+
+        // Coluna do grupo (DATETIME em -03:00): a aplicação guarda UTC e o conversor faz a conta.
+        builder.Property(u => u.UltimoLoginEm).HasColumnName("DATA_HORA_ULTIMO_LOGIN").HasConversion(ConversoresDeTempo.Brasil);
         builder.Ignore(u => u.PodeEntrar);
 
         builder.HasOne(u => u.Funcionario).WithMany().HasForeignKey(u => u.FuncionarioId);

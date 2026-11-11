@@ -427,7 +427,15 @@ public static class ComparadorDeContrato
         {
             foreach (var valor in valores)
             {
-                resultado.Valores.Add(valor?.ToString() ?? "null");
+                if (valor is null)
+                {
+                    // Um null DENTRO do enum (como o gerador do .NET escreve o enum anulável) quer dizer "aceita null", o mesmo que o contrato diz com `oneOf` de uma referência e `null`:
+                    // conta como tipo, não como um valor a mais do enum.
+                    resultado.Tipos.Add("null");
+                    continue;
+                }
+
+                resultado.Valores.Add(valor.ToString());
             }
 
             if (objeto["type"] is null)

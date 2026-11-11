@@ -1,0 +1,8 @@
+node_modules
+dist
+*.log
+.env
+.env.local
+.env.*.local
+src/shared/api/gerado
+src/shared/mocks/gerado

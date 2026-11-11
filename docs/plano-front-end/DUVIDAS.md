@@ -2,7 +2,6 @@
 
 > Aqui ficam as dúvidas que **o plano, o contrato e as notas de tela não resolvem**. Cada uma tem um **texto pronto para a pessoa colar** e mandar ao dono; o texto **não menciona Claude nem IA** (começa com `Mensagem para o dono:`) e **nunca vai no corpo de um PR** (o PR só lista o código e uma linha de cada dúvida: `01-regras.md`, C3). As regras estão em `01-regras.md`, **seção D**: registre na hora; mostre **na hora**, **de novo uma única vez** na próxima mensagem da pessoa, **quando não puder mais avançar** e **no final**; nunca mais que isso. Dúvida que não bloqueia: continue; bloqueio parcial: faça o resto. Algumas dúvidas **já são conhecidas** e estão na tabela "Dúvidas já conhecidas", mais abaixo, cada uma com o **seu código fixo**.
 >
-> O bloco marcado **EXEMPLO** (`D-000`, mais abaixo) mostra o formato e **é inventado**: apague-o ao começar.
 
 ## Decisões do dono
 
@@ -70,24 +69,157 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
 
 ## Dúvidas
 
-### D-000 · EXEMPLO (inventado): botão "Exportar em PDF" sem rota no contrato · aberta
+### D-benef · Benefícios já marcados no cadastro de colaborador · aberta
 
-- **Registrada em:** 2026-11-04 10:12 (F3·T2·S4)
-- **Bloqueia:** parcialmente (o que continua: o resto da tela e os filtros)
-- **Mostrada à pessoa:** na hora [x] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [ ]
+- **Registrada em:** 2026-11-03 14:20 (F1b·T2·S6)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [x] · de novo na próxima mensagem [x] · ao travar [ ] · no final [ ]
 - **Texto para colar para o dono:**
 
   ```
-  Mensagem para o dono: dúvida D-000 do front-end do RH-System (botão "Exportar em PDF" sem rota)
+  Mensagem para o dono: dúvida D-benef do front-end do RH-System (benefícios já marcados no cadastro de colaborador)
 
   Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
 
-  Onde: telas\fatia-3.md, tela NN (espelho de ponto do RH); contrato 0.2.0 (exemplo); não há operationId para isso em contrato\ROTAS.md.
-  O que achei: o PNG da tela NN mostra o botão "Exportar em PDF", mas a nota da tela não diz se ele fica e o contrato só tem a exportação em CSV (exportarPontoParaFolha).
-  O que sugiro: esconder o botão (o contrato não tem como atendê-lo). Se você quiser o PDF, é preciso uma rota nova no contrato.
-  Pergunta: o botão "Exportar em PDF" fica fora da tela (A) ou você vai acrescentar a rota ao contrato (B)?
-  Enquanto isso: construo o resto da tela sem o botão e sigo para a próxima tela.
+  Onde: fatia 1b, Task 2 (tela 02, "Adicionar colaborador"); PNG 02; contrato 0.2.2, criarFuncionario (beneficioIds, padrão []); telas\fatia-1.md, "Perguntas abertas", item 1.
+  O que achei: o desenho mostra três benefícios já marcados no cadastro (Vale-refeição, Plano de saúde e Seguro de vida). O contrato diz que a lista começa vazia, e nenhum documento diz que existem benefícios que já vêm marcados.
+  O que sugiro: deixar todos desmarcados (o que o contrato diz); quem cadastra marca os que valem. Se você quiser três já marcados, preciso saber quais e se são sempre os mesmos.
+  Pergunta: todos desmarcados (A) ou alguns já marcados (B, e diga quais)?
+  Enquanto isso: sigo com todos desmarcados.
   ```
 
 - **Resposta do dono:** (vazio)
 - **O que mudou por causa da resposta:** (vazio)
+
+### D-editar-inativo · "Editar dados" para quem está inativo · aberta
+
+- **Registrada em:** 2026-11-03 14:55 (F1b·T3·D5)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [x] · de novo na próxima mensagem [x] · ao travar [ ] · no final [ ]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-editar-inativo do front-end do RH-System ("Editar dados" para quem está inativo)
+
+  Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: fatia 1b, Task 3 (tela 03, ficha do colaborador); telas\fatia-1.md, seção "Tela 03", item "Botões do cabeçalho conforme situacao"; contrato 0.2.2, editarFuncionario.
+  O que achei: o contrato não proíbe editar os dados de quem está inativo, e o desenho só mostra o botão "Editar dados" de quem está ativo. Para quem está inativo, o contrato manda "Readmitir" no lugar de "Inativar".
+  O que sugiro: mostrar "Editar dados" também para quem está inativo (por exemplo, para corrigir um CPF ou um endereço antes de readmitir). Se não puder, o botão some quando a pessoa está inativa e nada mais muda.
+  Pergunta: quem está inativo pode ter os dados editados (A) ou só ser readmitido (B)?
+  Enquanto isso: sigo com "Editar dados" aparecendo também para inativo.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-F4-1 · Opção "Agendar para uma data" no modal Enviar holerite · aberta
+
+- **Registrada em:** 2026-11-04 02:30 (F4, passo 4)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F4-1 do front-end do RH-System (opção "Agendar para uma data" no envio de holerite)
+
+  Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: telas\fatia-4.md, tela 08 (modal "Enviar holerite"); rota enviarHolerite; contrato 0.2.2.
+  O que achei: o PNG 08 só tem "Publicar agora" e "Agendar para o dia do pagamento". O contrato também aceita agendar numa data (publicarEm), e a própria mensagem de erro da API (422 EMPRESA_NAO_CONFIGURADA) diz "ou escolha uma data".
+  O que sugiro: manter a terceira opção, "Agendar para uma data" (já construída, também no "Substituir" e no lote). Se você não quiser, ela some e a mensagem de erro deixa de citar a data.
+  Pergunta: posso manter a opção "Agendar para uma data", que o Figma não desenha mas o contrato permite?
+  Enquanto isso: a opção está construída e testada.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-F4-3 · Destino do link "Fale com o RH" · aberta
+
+- **Registrada em:** 2026-11-04 02:30 (F4, passos 3 e 5)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F4-3 do front-end do RH-System (destino do "Fale com o RH")
+
+  Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: telas\fatia-4.md, telas 36, 49 e 43; contrato 0.2.2 (nenhuma rota).
+  O que achei: os PNG mostram "Dúvida sobre um valor? Fale com o RH" e "Dúvidas sobre uma advertência? Fale com o RH" como links, mas o contrato não tem rota nem endereço para isso.
+  O que sugiro: deixar como texto simples, sem link, até você dizer o destino (por exemplo um e-mail do RH, que entraria na configuração da empresa).
+  Pergunta: o que acontece ao clicar em "Fale com o RH"?
+  Enquanto isso: o texto aparece sem link.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-F4-4 · De onde se abre o envio de holerites em lote · aberta
+
+- **Registrada em:** 2026-11-04 02:30 (F4, passo 4)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F4-4 do front-end do RH-System (onde fica o envio de holerites em lote)
+
+  Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: telas\fatia-4.md, "Enviar holerites em lote" (sem print); rota enviarHoleritesEmLote (x-provisorio); contrato 0.2.2.
+  O que achei: o contrato tem o envio em lote, mas o Figma não desenha o lote nem diz de onde ele se abre.
+  O que sugiro: um botão "Enviar holerites em lote" ao lado de "Adicionar colaborador" na lista de colaboradores (tela 01), que abre um modal: mês, ano, tipo, quando publicar, os PDFs e, para cada um, a pessoa.
+  Pergunta: posso abrir o envio em lote por esse botão na lista de colaboradores?
+  Enquanto isso: está construído assim e testado.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D5-2 · "Encerrou em ..." na lista de formulários · aberta
+
+- **Registrada em:** 2026-11-04 (F5, bloco 1)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D5-2 do front-end do RH-System ("Encerrou em" na lista de formulários)
+
+  Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: telas\fatia-5.md, tela 16 (lista de formulários do RH); rota listarFormulariosRh; contrato 0.2.2.
+  O que achei: o PNG 16 diz "Encerrou em 30/09". No exemplo do contrato o prazo é 30/09 e o encerramento automático (encerradoEmUtc) foi em 2026-10-01T03:00Z, que em Brasília é 01/10. O contrato não diz qual das duas datas a lista mostra.
+  O que sugiro: mostrar o dia em que o sistema encerrou (01/10), que vale também para quem encerra à mão antes do prazo. Se preferir o último dia do prazo, a lista passa a usar o prazo quando ele existir.
+  Pergunta: a lista mostra o dia em que o sistema encerrou (A) ou o último dia do prazo (B)?
+  Enquanto isso: mostro o dia de encerradoEmUtc (A). Muda um dia na tela.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D6-4 · Incluir no onboarding uma pessoa já cadastrada, a partir da ficha · aberta
+
+- **Registrada em:** 2026-11-04 (F6, bloco 7)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D6-4 do front-end do RH-System (incluir no onboarding uma pessoa já cadastrada)
+
+  Olá! Estou fazendo o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: fatia 6 (treinamentos), ficha do colaborador (tela 03, fatia 1); rota incluirFuncionarioNoOnboarding; contrato 0.2.2.
+  O que achei: o contrato tem uma rota para incluir no treinamento de onboarding uma pessoa que já está cadastrada (por exemplo, a partir da ficha), mas o Figma não desenha nenhum botão para isso. Hoje a inclusão só acontece pela caixa "Incluir no treinamento de onboarding" ao cadastrar, importar ou readmitir.
+  O que sugiro: não criar o botão; quem já está cadastrado e ficou de fora do onboarding não teria como entrar depois. Se você quiser, o botão "Incluir no onboarding" entra na ficha, só para o RH.
+  Pergunta: o RH deve poder incluir no onboarding uma pessoa já cadastrada, a partir da ficha? (A) não, só pela caixa do cadastro, da importação e da readmissão; (B) sim, com um botão na ficha.
+  Enquanto isso: sigo sem o botão.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+

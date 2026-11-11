@@ -6,20 +6,53 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MySqlConnector;
+using RHSystem.Api.IntegrationTests.Agendamento;
+using RHSystem.Api.IntegrationTests.Emails;
+using RHSystem.Application.Agendamento;
+using RHSystem.Application.Arquivos;
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Documentos;
+using RHSystem.Application.Emails;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
+using RHSystem.Infrastructure.Colaboradores;
+using RHSystem.Infrastructure.Persistencia;
 
 namespace RHSystem.Api.IntegrationTests.Infra;
 
-/// <summary>Um relógio que anda com o tempo real e pode ser avançado pelo teste (por exemplo, para vencer um token).</summary>
+/// <summary>
+/// Um relógio que anda com o tempo real e pode ser avançado pelo teste (por exemplo, para vencer um token) ou fixado num instante (o dia dos
+/// exemplos do contrato). Depois de <see cref="Fixar"/> ele não anda sozinho; <see cref="Avancar"/> continua somando.
+/// </summary>
 public sealed class RelogioDeTeste : IRelogio
 {
     private long _deslocamentoEmTicks;
+    private long _fixoEmTicks; // 0 = anda com o tempo real
 
-    public DateTime AgoraUtc => DateTime.UtcNow.AddTicks(Interlocked.Read(ref _deslocamentoEmTicks));
+    public DateTime AgoraUtc
+    {
+        get
+        {
+            var fixo = Interlocked.Read(ref _fixoEmTicks);
+            var baseUtc = fixo == 0 ? DateTime.UtcNow : new DateTime(fixo, DateTimeKind.Utc);
+            return baseUtc.AddTicks(Interlocked.Read(ref _deslocamentoEmTicks));
+        }
+    }
 
     public void Avancar(TimeSpan tempo) => Interlocked.Add(ref _deslocamentoEmTicks, tempo.Ticks);
+
+    /// <summary>Para o relógio no instante dado (Kind Utc); zera o avanço.</summary>
+    public void Fixar(DateTime utc)
+    {
+        if (utc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("O instante precisa ter Kind = Utc.", nameof(utc));
+        }
+
+        Interlocked.Exchange(ref _deslocamentoEmTicks, 0);
+        Interlocked.Exchange(ref _fixoEmTicks, utc.Ticks);
+    }
 }
 
 /// <summary>
@@ -43,7 +76,102 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
 
     public RelogioDeTeste Relogio { get; } = new();
 
+    private readonly object _travaDoArmazenamento = new();
+    private ArmazenamentoEmMemoria? _armazenamento;
+
+    /// <summary>O armazenamento de arquivos desta API (em memória, no lugar do Blob): guarda os bytes e conta o que os testes de arquivo precisam provar. As APIs derivadas (<c>WithWebHostBuilder</c>) usam o mesmo.</summary>
+    public ArmazenamentoEmMemoria Armazenamento
+    {
+        get
+        {
+            lock (_travaDoArmazenamento)
+            {
+                return _armazenamento ??= new ArmazenamentoEmMemoria(Relogio);
+            }
+        }
+    }
+
+    /// <summary>O envio de e-mail dos testes: em memória (o serviço em segundo plano fica desligado e os testes chamam <c>ProcessarCicloAsync</c> direto).</summary>
+    public EnviadorDeEmailEmMemoria Enviador { get; } = new();
+
+    /// <summary>O que as tarefas de teste do agendador anotam (o serviço em segundo plano fica desligado: os testes chamam o ciclo direto).</summary>
+    public RegistroDeTarefasDeTeste Tarefas { get; } = new();
+
     public string Conexao { get; } = conexao;
+
+    private readonly SemaphoreSlim _travaDoElenco = new(1, 1);
+    private ElencoDeTeste? _elenco;
+
+    /// <summary>Semeia o elenco de <c>contrato/ELENCO.md</c> (uma vez por banco) e fixa o relógio falso em 2026-10-07T12:42:00Z.</summary>
+    public async Task<ElencoDeTeste> SemearElencoAsync()
+    {
+        await _travaDoElenco.WaitAsync();
+        try
+        {
+            return _elenco ??= await ElencoDeTeste.SemearAsync(this);
+        }
+        finally
+        {
+            _travaDoElenco.Release();
+        }
+    }
+
+    /// <summary>Um cliente com o token que o emissor de verdade emitiu para a pessoa do elenco (sem passar pelo login).</summary>
+    public HttpClient ClienteComo(PessoaDeTeste pessoa) => ClienteComo(this, pessoa);
+
+    /// <summary>O mesmo cliente, de uma API derivada desta (como a de <see cref="ComPedidosParados"/>): a chave e o emissor do token são os mesmos, então o token do elenco vale nela.</summary>
+    public HttpClient ClienteComo(WebApplicationFactory<Program> fabrica, PessoaDeTeste pessoa)
+    {
+        var elenco = _elenco ?? throw new InvalidOperationException("Chame SemearElencoAsync antes de ClienteComo.");
+        var cliente = fabrica.CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", elenco.TokensPorUsuario[pessoa.UsuarioId]);
+        return cliente;
+    }
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que a porta dos pedidos parados é a <paramref name="porta"/> (o <see cref="PedidosParadosEspiao"/>), no lugar do composto padrão da 1a. Use <see cref="ClienteComo(WebApplicationFactory{Program}, PessoaDeTeste)"/>
+    /// para falar com ela.
+    /// </summary>
+    public WebApplicationFactory<Program> ComPedidosParados(IPedidosParadosNoGestor porta) =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IPedidosParadosNoGestor>();
+            servicos.AddSingleton(porta);
+        }));
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que gravar um documento falha DEPOIS de a linha e o evento irem para o banco (<see cref="DocumentosRepositorioComFalha"/>), como um banco que cai no meio da
+    /// transação: a transação desfaz tudo e o caso de uso apaga o blob.
+    /// </summary>
+    public WebApplicationFactory<Program> ComFalhaNoBancoAoSalvarDocumento() =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            var original = servicos.Last(d => d.ServiceType == typeof(IDocumentosRepositorio));
+            servicos.RemoveAll<IDocumentosRepositorio>();
+            servicos.AddScoped<IDocumentosRepositorio>(sp => new DocumentosRepositorioComFalha((IDocumentosRepositorio)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!)));
+        }));
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que o <see cref="IGestorDoFuncionario"/> é o <see cref="GestorDoFuncionarioEspiao"/> (que delega à implementação real da 1b e anota as chamadas em
+    /// <paramref name="chamadas"/>) e, se <paramref name="pedidos"/> vier, a porta dos pedidos parados também é a falsa.
+    /// </summary>
+    public WebApplicationFactory<Program> ComGestorDoFuncionarioEspiao(ChamadasDoGestorDoFuncionario chamadas, IPedidosParadosNoGestor? pedidos = null) =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IGestorDoFuncionario>();
+            servicos.AddScoped<IGestorDoFuncionario>(sp =>
+            {
+                var contexto = sp.GetRequiredService<AppDbContext>();
+                return new GestorDoFuncionarioEspiao(new GestorDoFuncionario(contexto), contexto, chamadas);
+            });
+            if (pedidos is not null)
+            {
+                servicos.RemoveAll<IPedidosParadosNoGestor>();
+                servicos.AddSingleton(pedidos);
+            }
+        }));
+
+    public HttpClient ClienteAnonimo() => CreateClient();
 
     public static async Task<ApiFactory> CriarAsync(MySqlFixture mysql)
     {
@@ -62,12 +190,34 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         builder.UseSetting("Documentacao:Habilitada", "true");
         builder.UseSetting("Testes:RotasDeTeste", "true");
         builder.UseSetting("Autenticacao:LimiteLoginPorMinuto", "1000"); // só o teste do limite usa 5
+        builder.UseSetting("Autenticacao:LimiteSenhaPorMinuto", "1000"); // idem: só LimiteDeSenhaTests usa 5
+        builder.UseSetting("Autenticacao:LimiteSenhaAtualPorMinuto", "1000");
         builder.UseSetting("Database:AplicarScriptsAoIniciar", "false"); // o banco já vem com os scripts
+        builder.UseSetting("Agendador:Ativo", "false"); // sem o servico em segundo plano do agendador: os testes chamam o ciclo direto
+        builder.UseSetting("Email:EnvioAtivo", "false"); // sem o serviço em segundo plano: os testes chamam o ciclo de envio direto
         builder.UseSetting("Cors:OrigensPermitidas:0", OrigemPermitida);
+        builder.UseSetting("App:UrlDoFront", "https://app.exemplo.com.br"); // os e-mails de convite e de redefinição montam o link com ela
         builder.ConfigureServices(servicos =>
         {
             servicos.RemoveAll<IRelogio>();
             servicos.AddSingleton<IRelogio>(Relogio);
+            // Arquivos: só ArmazenamentoBlobTests fala com o Azurite. Aqui o armazenamento é o em memória, e a unidade de trabalho é decorada para contar as gravações feitas com transação aberta.
+            servicos.RemoveAll<IArmazenamentoDeArquivos>();
+            servicos.RemoveAll<IListagemDeArquivos>();
+            servicos.AddSingleton<IArmazenamentoDeArquivos>(Armazenamento);
+            servicos.AddSingleton<IListagemDeArquivos>(Armazenamento);
+            servicos.RemoveAll<IUnidadeDeTrabalho>();
+            servicos.AddScoped<IUnidadeDeTrabalho>(sp => new UnidadeDeTrabalhoEspia(ActivatorUtilities.CreateInstance<UnidadeDeTrabalho>(sp)));
+            servicos.RemoveAll<IEnviadorDeEmail>();
+            servicos.AddSingleton<IEnviadorDeEmail>(Enviador);
+            servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_ENVIO", "Aviso de teste enviado"));
+            servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_SIGILOSO", "Lembrete anonimo de teste enviado"));
+            servicos.AddSingleton(Tarefas);
+            // A que lança na recuperacao vem ANTES das outras: o teste prova que as que vem depois dela ainda recuperam.
+            servicos.AddScoped<ITarefaAgendada, TarefaQueNaoRecuperaDeTeste>();
+            servicos.AddScoped<ITarefaAgendada, TarefaDeTeste>();
+            servicos.AddScoped<ITarefaAgendada, TarefaRecuperavelDeTeste>();
+            servicos.AddScoped<ITarefaAgendada, TarefaAuditadaDeTeste>();
             servicos.AddSingleton<IStartupFilter, IpDeOrigemParaTeste>();
         });
     }

@@ -46,8 +46,8 @@ public sealed class RenovarTokenCasoDeUso(
                     return null;
                 }
 
-                var acesso = emissor.EmitirAcesso(usuario);
                 var novo = emissor.NovoRefresh();
+                var acesso = emissor.EmitirAcesso(usuario, novo.Hash);
                 await tokens.AdicionarAsync(RefreshToken.Criar(usuario.Id, novo.Hash, agora, emissor.ValidadeDoRefresh), ct);
                 await unidade.SalvarAsync(ct);
                 return Mapeamento.Sessao(usuario, perfil.Value, acesso, novo);

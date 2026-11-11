@@ -8,6 +8,7 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers.Azurite" />
     <PackageReference Include="Testcontainers.MySql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="YamlDotNet" />
@@ -19,6 +20,10 @@
     <ProjectReference Include="..\..\src\RHSystem.Infrastructure\RHSystem.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\RHSystem.Application\RHSystem.Application.csproj" />
     <ProjectReference Include="..\..\src\RHSystem.Domain\RHSystem.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Persistencia\tabelas-sem-mapeamento.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

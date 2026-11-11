@@ -1,6 +1,13 @@
-using System.Text.Json.Serialization;
+using RHSystem.Api.Acesso;
+using RHSystem.Api.Auditoria;
 using RHSystem.Api.Autenticacao;
+using RHSystem.Api.Autorizacao;
+using RHSystem.Api.Cadastros;
+using RHSystem.Api.Colaboradores;
 using RHSystem.Api.Configuracao;
+using RHSystem.Api.Documentos;
+using RHSystem.Api.Empresa;
+using RHSystem.Api.Painel;
 using RHSystem.Api.Saude;
 using RHSystem.Infrastructure;
 
@@ -8,7 +15,20 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AdicionarInfraestrutura(builder.Configuration);
 builder.Services.AdicionarCasosDeUsoDeAutenticacao();
+builder.Services.AdicionarCasosDeUsoDeAuditoria();
+builder.Services.AdicionarCasosDeUsoDeAcesso();
+builder.Services.AdicionarCasosDeUsoDeUsuariosDoSistema();
+builder.Services.AdicionarCasosDeUsoDeColaboradores();
+builder.Services.AdicionarCasosDeUsoDeEquipe();
+builder.Services.AdicionarCasosDeUsoDeCargos();
+builder.Services.AdicionarCasosDeUsoDeBeneficios();
+builder.Services.AdicionarCasosDeUsoDeSetores();
+builder.Services.AdicionarCasosDeUsoDeGestores();
+builder.Services.AdicionarCasosDeUsoDeDocumentos();
+builder.Services.AdicionarCasosDeUsoDeEmpresa();
+builder.Services.AdicionarCasosDeUsoDePainel();
 builder.Services.AdicionarAutenticacaoJwt(builder.Configuration);
+builder.Services.AdicionarAutorizacaoPorPerfil();
 builder.Services.AdicionarTratamentoDeErros();
 builder.Services.AdicionarProxyReverso(builder.Configuration);
 builder.Services.AdicionarCors(builder.Configuration);
@@ -16,12 +36,8 @@ builder.Services.AdicionarLimiteDeTentativas(builder.Configuration);
 builder.Services.AdicionarSaude();
 builder.Services.AdicionarDocumentacao(builder.Configuration);
 
-// Enums saem como texto ("RH", "Gestor"), não como número; números só como número (o contrato diz integer).
-builder.Services.ConfigureHttpJsonOptions(opcoes =>
-{
-    opcoes.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    opcoes.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
-});
+// O JSON do contrato (CONVENCOES.md, seção 3): enums como texto, números só como número, instante em UTC com Z, data e hora do dia.
+builder.Services.ConfigureHttpJsonOptions(opcoes => JsonDoContrato.Configurar(opcoes.SerializerOptions));
 
 var app = builder.Build();
 
@@ -35,6 +51,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAutenticacao();
+app.MapSenha();
+app.MapUsuariosDoSistema();
+app.MapColaboradores();
+app.MapEquipe();
+app.MapCargos();
+app.MapBeneficios();
+app.MapSetores();
+app.MapGestores();
+app.MapDocumentosDoRh();
+app.MapMeusDocumentos();
+app.MapEmpresa();
+app.MapAuditoria();
+app.MapContadoresDoMenu();
 app.MapSaude();
 app.UsarDocumentacao();
 if (builder.Configuration.GetValue<bool>("Testes:RotasDeTeste"))

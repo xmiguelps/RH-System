@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
@@ -46,7 +47,7 @@ public static class AutenticacaoEndpoints
 
         grupo.MapGet("/eu", Eu)
             .WithName("obterUsuarioLogado")
-            .RequireAuthorization()
+            .RequireAuthorization(Politicas.Eu)
             .Produces<UsuarioResposta>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
