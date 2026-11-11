@@ -209,6 +209,8 @@ public static class DependencyInjection
         // O calendário e as férias do ponto também servem ao espelho e à consolidação do banco de horas.
         services.AddScoped<ICalendarioDoPonto, CalendarioDoPonto>();
         services.AddScoped<IFeriasDoPonto, FeriasDoPonto>();
+        services.AddScoped<IPontoRepositorio, PontoRepositorio>();
+        services.AddScoped<ISaldoDoBancoDeHoras, SaldoDoBancoDeHoras>();
         services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();
         services.AddScoped<ISituacaoDeHoje, SituacaoDeHojeServico>();
 

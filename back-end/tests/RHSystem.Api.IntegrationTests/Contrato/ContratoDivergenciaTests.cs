@@ -66,6 +66,8 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "baixarModeloDeImportacao",
         "validarPlanilhaDeImportacao",
         "confirmarImportacao",
+        "obterPontoHoje",
+        "registrarMarcacaoDePonto",
         "listarBeneficiosDoCatalogo",
         "criarBeneficioDoCatalogo",
         "editarBeneficioDoCatalogo",

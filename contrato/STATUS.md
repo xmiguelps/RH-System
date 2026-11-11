@@ -75,6 +75,8 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/importacoes/modelo` | baixarModeloDeImportacao | em andamento | só RH; o arquivo `.xlsx` é gerado na hora com os cargos, setores e benefícios de hoje (aba "Valores válidos"); CPF e telefone saem em formato texto |
 | `POST /api/rh/importacoes` | validarPlanilhaDeImportacao | em andamento | só RH; `multipart/form-data` (campo `arquivo`, `.xlsx` até 5 MiB e 500 linhas); devolve a prévia (201, sem `Location`) com erros por linha e coluna; nada é cadastrado; o arquivo e a prévia ficam 1 hora |
 | `POST /api/rh/importacoes/{importacaoId}/confirmar` | confirmarImportacao | em andamento | só RH; tudo ou nada numa transação (reivindica a importação, cadastra pelo mesmo cadastro da tela 02, um evento `Importou`); 409 se já confirmada, 422 se venceu, tem erro ou uma linha foi recusada (com `linha`); as caixas de onboarding e de formulário de admissão usam as versões "indisponível" até as fatias 5 e 6 |
+| `GET /api/eu/ponto/hoje` | obterPontoHoje | em andamento | qualquer perfil logado (sem 403): o cartão da própria pessoa; `dataDoPonto` é ontem só quando a ENTRADA de ontem está aberta há menos de 12 h e ainda não há batida hoje; `bancoHoras.atualizadoAte` é `null` até a consolidação (fatia 3c) |
+| `POST /api/eu/ponto/marcacoes` | registrarMarcacaoDePonto | em andamento | hora do servidor; transação com a pessoa travada (duplo clique e duas abas: uma só entra); 409 `PONTO_BATIDA_DUPLICADA` (mesmo segundo) e `PONTO_SEQUENCIA_MUDOU`; 422 `FUNCIONARIO_INATIVO` e, sem código, dia anterior à admissão (ambos com `regraDoBanco`); auditoria `PONTO`/`REGISTROU` sem a hora; após fechar a jornada da madrugada o cartão devolvido é o do dia novo |
 
 ## Pendências conhecidas
 
