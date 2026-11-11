@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using MySqlConnector;
 using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Application.Ponto;
 using RHSystem.Domain.Ponto;
+using RHSystem.Infrastructure.Persistencia;
 using static RHSystem.Api.IntegrationTests.Ponto.PontoDeTeste;
 
 namespace RHSystem.Api.IntegrationTests.Ponto;
@@ -232,6 +235,68 @@ public class RecalculoDoBancoDeHorasTests(MySqlFixture mysql)
 
         Assert.Empty(await LinhasDosDiasAsync(api, diego, hoje, new DateOnly(2026, 10, 8), new DateOnly(2025, 12, 31)));
         Assert.Empty(await LinhasDosDiasAsync(api, api.Elenco.Inativo.FuncionarioId, new DateOnly(2026, 10, 2)));
+    }
+
+    [Fact]
+    public async Task O_dia_da_admissao_ja_e_lancado()
+    {
+        var api = await ApiAsync();
+        var marina = api.Elenco.GestorDoFinanceiro;
+        var dia = new DateOnly(2026, 9, 16);
+        var original = Convert.ToDateTime(await Sql.EscalarAsync(api.Conexao, $"SELECT DATA_ADMISSAO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {marina.FuncionarioId}"), System.Globalization.CultureInfo.InvariantCulture);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '{dia:yyyy-MM-dd}' WHERE ID_FUNCIONARIO = {marina.FuncionarioId}");
+        try
+        {
+            await BaterPeriodosAsync(api, marina.FuncionarioId, dia, (8, 0, 12, 0), (13, 0, 18, 50));
+
+            await RecalcularAsync(api, marina.FuncionarioId, dia);
+
+            Assert.Equal([("CREDITO", 1.03m)], (await LinhasDosDiasAsync(api, marina.FuncionarioId, dia)).Select(l => (l.Tipo, l.Horas)));
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '{original:yyyy-MM-dd}' WHERE ID_FUNCIONARIO = {marina.FuncionarioId}");
+        }
+    }
+
+    [Fact]
+    public async Task Se_outra_gravacao_do_mesmo_dia_chega_no_meio_o_recalculo_rele_e_atualiza_a_linha_dela()
+    {
+        var api = await ApiAsync();
+        var pessoa = api.Elenco.MembroA.FuncionarioId;
+        var dia = new DateOnly(2026, 9, 17); // quinta-feira
+        await BaterPeriodosAsync(api, pessoa, dia, (8, 0, 12, 0), (13, 0, 18, 50)); // +62
+        var intruso = new InseridorDeLinhaNaCorrida(api.Conexao, pessoa, dia);
+        var fabrica = api.Api.WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos => servicos.AddDbContext<AppDbContext>(opcoes => opcoes.AddInterceptors(intruso))));
+
+        await using (var escopo = fabrica.Services.CreateAsyncScope())
+        {
+            await escopo.ServiceProvider.GetRequiredService<IRecalculoDoBancoDeHoras>().RecalcularDiaAsync(pessoa, dia, Ct);
+        }
+
+        Assert.True(intruso.Disparou);
+        Assert.Equal([("CREDITO", 1.03m, (string?)"Hora extra")], (await LinhasDosDiasAsync(api, pessoa, dia)).Select(l => (l.Tipo, l.Horas, l.Observacao))); // a linha da outra gravação (débito de 9,99) foi reescrita
+    }
+
+    /// <summary>Na primeira gravação de uma linha nova do banco de horas, insere por OUTRA conexão a linha do mesmo dia: a chave única recusa a gravação e o recálculo tem de reler.</summary>
+    private sealed class InseridorDeLinhaNaCorrida(string conexao, int funcionarioId, DateOnly dia) : SaveChangesInterceptor
+    {
+        public bool Disparou { get; private set; }
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (!Disparou && eventData.Context!.ChangeTracker.Entries<LancamentoDoBancoDeHoras>().Any(e => e.State == EntityState.Added))
+            {
+                Disparou = true;
+                await using var outra = new MySqlConnection(conexao);
+                await outra.OpenAsync(cancellationToken);
+                await using var comando = outra.CreateCommand();
+                comando.CommandText = $"INSERT INTO BANCOS_HORAS (ID_FUNCIONARIO, DATA_LANCAMENTO, TIPO_LANCAMENTO, QUANTIDADE, OBSERVACAO, DIA_REFERENCIA) VALUES ({funcionarioId}, '{dia:yyyy-MM-dd}', 'DEBITO', 9.99, 'da outra gravacao', '{dia:yyyy-MM-dd}')";
+                await comando.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            return await base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
     }
 
     [Fact]

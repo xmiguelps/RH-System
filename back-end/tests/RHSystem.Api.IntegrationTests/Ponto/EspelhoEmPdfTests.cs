@@ -64,7 +64,9 @@ public class EspelhoEmPdfTests(MySqlFixture mysql)
         var api = await ApiAsync();
         var julia = api.Elenco.MembroB;
         var dia = new DateOnly(2026, 10, 5);
-        await BaterEmAsync(api.Conexao, julia.FuncionarioId, dia, (TipoDeMarcacao.Entrada, Utc(dia, 11)), (TipoDeMarcacao.Saida, Utc(dia, 15)), (TipoDeMarcacao.Entrada, Utc(dia, 16)), (TipoDeMarcacao.Saida, Utc(dia, 20, 48)));
+        await BaterEmAsync(api.Conexao, julia.FuncionarioId, dia, (TipoDeMarcacao.Entrada, Utc(dia, 11)), (TipoDeMarcacao.Saida, Utc(dia, 15)), (TipoDeMarcacao.Entrada, Utc(dia, 16)), (TipoDeMarcacao.Saida, Utc(dia, 20, 48))); // 528: saldo zero
+        var comAtraso = new DateOnly(2026, 10, 6);
+        await BaterEmAsync(api.Conexao, julia.FuncionarioId, comAtraso, (TipoDeMarcacao.Entrada, Utc(comAtraso, 11, 15)), (TipoDeMarcacao.Saida, Utc(comAtraso, 15)), (TipoDeMarcacao.Entrada, Utc(comAtraso, 16)), (TipoDeMarcacao.Saida, Utc(comAtraso, 21, 50))); // 225 + 350 = 575: +0:47 e 15 min de atraso
 
         var resposta = await ComoRhAsync(api, julia.FuncionarioId);
         var link = await CorpoAsync(resposta);
@@ -79,7 +81,10 @@ public class EspelhoEmPdfTests(MySqlFixture mysql)
         var bytes = api.Api.Armazenamento.Conteudo(caminho)!;
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
         var texto = TextoDoPdf(bytes);
-        foreach (var esperado in new[] { "Espelhodeponto", "JúliaNunes", "Outubrode2026", "SãoPaulo", "05/10", "08:00", "12:00", "13:00", "17:48" })
+        foreach (var esperado in new[]
+        {
+            "Espelhodeponto", "Geradoem07/10/202609:42(horáriodeBrasília)", "Colaborador:JúliaNunes", "Setor:Comercial", "Cargo:CargodoPDF", "Outubrode2026", "SãoPaulo", "05/10Seg", "08:00–12:00", "13:00–17:48", "8:48", "0:00", "+0:47", "15min", "Atraso", "Normal", "03/10Sáb", "04/10Dom", "Folga", "Semregistro",
+        })
         {
             Assert.Contains(esperado, texto, StringComparison.Ordinal);
         }
@@ -93,9 +98,11 @@ public class EspelhoEmPdfTests(MySqlFixture mysql)
 
         var atual = await ComoRhAsync(api, api.Elenco.MembroA.FuncionarioId, string.Empty);
         var anoRuim = await ComoRhAsync(api, api.Elenco.MembroA.FuncionarioId, "ano=1999&mes=5");
+        var antesDo404 = await ComoRhAsync(api, int.MaxValue, "ano=2026&mes=13"); // o mês ruim vem antes do 404
+        var antesDo404DoGestor = await ComoGestorAsync(api, api.Elenco.DeOutroSetor.FuncionarioId, "ano=2026&mes=13");
         var mesRuim = await ComoRhAsync(api, api.Elenco.MembroA.FuncionarioId, "ano=2026&mes=13");
 
-        Assert.Equal((200, 400, 400), ((int)atual.StatusCode, (int)anoRuim.StatusCode, (int)mesRuim.StatusCode));
+        Assert.Equal((200, 400, 400, 400, 400), ((int)atual.StatusCode, (int)anoRuim.StatusCode, (int)mesRuim.StatusCode, (int)antesDo404.StatusCode, (int)antesDo404DoGestor.StatusCode));
         Assert.Contains("Outubrode2026", TextoDoPdf(api.Api.Armazenamento.Conteudo(CaminhoDoLink(await CorpoAsync(atual)))!), StringComparison.Ordinal);
         Assert.Equal(1, api.Api.Armazenamento.Quantidade); // só o do mês atual
     }
@@ -193,7 +200,15 @@ public class EspelhoEmPdfTests(MySqlFixture mysql)
             Assert.NotEqual(regular!.FaceName, negrito!.FaceName);
             Assert.Equal([0x00, 0x01, 0x00, 0x00], resolvedor.GetFont(regular.FaceName)!.Take(4)); // um TTF de verdade, do assembly
             Assert.True(resolvedor.GetFont(negrito.FaceName)!.Length > 100_000);
+            Assert.Equal(TamanhoDoRecurso("Fontes/NotoSans-Regular.ttf"), resolvedor.GetFont(regular.FaceName)!.Length); // cada face tem os bytes da sua fonte
+            Assert.Equal(TamanhoDoRecurso("Fontes/NotoSans-Bold.ttf"), resolvedor.GetFont(negrito.FaceName)!.Length);
         }
+    }
+
+    private static long TamanhoDoRecurso(string nome)
+    {
+        using var fluxo = typeof(FonteDoPdf).Assembly.GetManifestResourceStream(nome)!;
+        return fluxo.Length;
     }
 
     [Fact]

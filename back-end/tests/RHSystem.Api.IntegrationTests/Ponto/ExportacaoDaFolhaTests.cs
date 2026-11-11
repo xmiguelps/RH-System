@@ -82,7 +82,10 @@ public class ExportacaoDaFolhaTests(MySqlFixture mysql)
         await BaterEmAsync(api.Conexao, diego.FuncionarioId, dia1, (TipoDeMarcacao.Entrada, Utc(dia1, 11)), (TipoDeMarcacao.Saida, Utc(dia1, 15)), (TipoDeMarcacao.Entrada, Utc(dia1, 16)), (TipoDeMarcacao.Saida, Utc(dia1, 20, 48))); // 08:00 a 12:00 e 13:00 a 17:48: 528
         await BaterEmAsync(api.Conexao, diego.FuncionarioId, dia2, (TipoDeMarcacao.Entrada, Utc(dia2, 11, 15)), (TipoDeMarcacao.Saida, Utc(dia2, 15)), (TipoDeMarcacao.Entrada, Utc(dia2, 16)), (TipoDeMarcacao.Saida, Utc(dia2, 20, 48))); // entrou 08:15: atraso; 225 + 288 = 513
         await NovoAtestadoAsync(api.Conexao, diego.FuncionarioId, "2026-09-03", "2026-09-03", "VALIDADO", api.Elenco.Rh.FuncionarioId); // dia inteiro: falta compensada
+        var incompleto = new DateOnly(2026, 9, 4);
+        await BaterEmAsync(api.Conexao, diego.FuncionarioId, incompleto, (TipoDeMarcacao.Entrada, Utc(incompleto, 11))); // só a entrada: não é dia trabalhado (sem período fechado) nem falta (tem batida)
         await LinhaDoBancoAsync(api, diego.FuncionarioId, "2026-08-31", "DEBITO", "9.00"); // fora do mês
+        await LinhaDoBancoAsync(api, diego.FuncionarioId, "2026-09-01", "CREDITO", "0.50"); // o primeiro dia do mês conta: 30
         await LinhaDoBancoAsync(api, diego.FuncionarioId, "2026-09-10", "CREDITO", "2.00"); // 120
         await LinhaDoBancoAsync(api, diego.FuncionarioId, "2026-09-11", "DEBITO", "0.50"); // 30
         await LinhaDoBancoAsync(api, diego.FuncionarioId, "2026-09-30", "CREDITO", "0.07"); // 4 (4,2 minutos)
@@ -91,8 +94,8 @@ public class ExportacaoDaFolhaTests(MySqlFixture mysql)
         var (_, linhas) = await LerAsync(await ExportarAsync(api, "ano=2026&mes=9"));
         var linha = LinhaDe(linhas, diego.Nome);
 
-        // 22 dias úteis em setembro, 7/9 é feriado: 21 com expediente, 1 deles com atestado (sem carga): 20 x 528 = 10560 previstos; 2 trabalhados, 1 compensado: 18 faltas.
-        Assert.Equal(["2", "1041", "10560", "1", "18", "1", "124", "30"], linha[4..]);
+        // 22 dias úteis em setembro, 7/9 é feriado: 21 com expediente, 1 deles com atestado (sem carga): 20 x 528 = 10560 previstos; 2 trabalhados e 1 só com a entrada: 17 sem registro; o compensado é contado à parte.
+        Assert.Equal(["2", "1041", "10560", "1", "17", "1", "154", "30"], linha[4..]);
     }
 
     [Fact]
@@ -102,6 +105,9 @@ public class ExportacaoDaFolhaTests(MySqlFixture mysql)
         var noMeio = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Saiu No Meio", $"{Guid.NewGuid():N}@folha.com.br", new DateOnly(2026, 1, 5), true, "Funcionario");
         var antes = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Saiu Antes", $"{Guid.NewGuid():N}@folha.com.br", new DateOnly(2026, 1, 5), true, "Funcionario");
         var entrouNoMeio = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Entrou No Meio", $"{Guid.NewGuid():N}@folha.com.br", new DateOnly(2026, 9, 15), true, "Funcionario");
+        var entrouNoUltimoDia = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Entrou No Ultimo Dia", $"{Guid.NewGuid():N}@folha.com.br", new DateOnly(2026, 9, 30), true, "Funcionario");
+        var saiuNoPrimeiroDia = await SementeDoCadastro.ColaboradorAsync(api.Conexao, "Saiu No Primeiro Dia", $"{Guid.NewGuid():N}@folha.com.br", new DateOnly(2026, 1, 5), true, "Funcionario");
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE, DATA_DESLIGAMENTO = '2026-09-01' WHERE ID_FUNCIONARIO = {saiuNoPrimeiroDia}");
         await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE, DATA_DESLIGAMENTO = '2026-09-15' WHERE ID_FUNCIONARIO = {noMeio}");
         await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE, DATA_DESLIGAMENTO = '2026-08-31' WHERE ID_FUNCIONARIO = {antes}");
 
@@ -110,11 +116,13 @@ public class ExportacaoDaFolhaTests(MySqlFixture mysql)
 
         Assert.Contains("Saiu No Meio", nomes);
         Assert.Contains("Entrou No Meio", nomes);
+        Assert.Contains("Entrou No Ultimo Dia", nomes); // admitido no último dia do mês: esteve ativo nele
+        Assert.Contains("Saiu No Primeiro Dia", nomes); // desligado no primeiro dia do mês: ainda trabalhou nele
         Assert.DoesNotContain("Saiu Antes", nomes);
         Assert.DoesNotContain(api.Elenco.EmAdmissao.Nome, nomes); // começa só em 13/10
         Assert.Contains(api.Elenco.Inativo.Nome, nomes); // desligado em 30/09: trabalhou no mês
         Assert.DoesNotContain(api.Elenco.Inativo.Nome, (await LerAsync(await ExportarAsync(api, "ano=2026&mes=10"))).Linhas.Skip(1).Select(l => l[1])); // e em outubro já não está
-        Assert.True(entrouNoMeio > 0);
+        Assert.True(entrouNoMeio > 0 && entrouNoUltimoDia > 0);
     }
 
     [Fact]
@@ -147,6 +155,16 @@ public class ExportacaoDaFolhaTests(MySqlFixture mysql)
     }
 
     // ---------------------------------------------------------------- erros, perfis, auditoria e contrato
+
+    [Theory]
+    [InlineData("ano=2000&mes=1")]
+    [InlineData("ano=2100&mes=12")]
+    public async Task Os_limites_da_faixa_valem(string consulta)
+    {
+        var api = await ApiAsync();
+
+        Assert.Equal(200, (int)(await ExportarAsync(api, consulta)).StatusCode);
+    }
 
     [Theory]
     [InlineData("")]

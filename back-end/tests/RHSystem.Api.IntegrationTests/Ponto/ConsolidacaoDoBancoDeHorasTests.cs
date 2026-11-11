@@ -94,6 +94,26 @@ public class ConsolidacaoDoBancoDeHorasTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Quem_foi_admitido_no_proprio_dia_ja_entra_na_consolidacao_daquele_dia()
+    {
+        var api = await ApiAsync();
+        var gestor = api.Elenco.Gestor.FuncionarioId;
+        var dia = new DateOnly(2026, 9, 23);
+        var original = Convert.ToDateTime(await Sql.EscalarAsync(api.Conexao, $"SELECT DATA_ADMISSAO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {gestor}"), System.Globalization.CultureInfo.InvariantCulture);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '{dia:yyyy-MM-dd}' WHERE ID_FUNCIONARIO = {gestor}");
+        try
+        {
+            await ExecutarAsync(api, dia);
+
+            Assert.Equal([("DEBITO", 8.80m, (string?)"Falta")], await LinhasDoDiaAsync(api, gestor, dia)); // o primeiro dia sem batida já é falta
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '{original:yyyy-MM-dd}' WHERE ID_FUNCIONARIO = {gestor}");
+        }
+    }
+
+    [Fact]
     public async Task Quem_ja_estava_desligado_no_dia_nao_entra_e_o_ultimo_dia_de_trabalho_ainda_entra()
     {
         var api = await ApiAsync();

@@ -183,6 +183,19 @@ public class ExtratoDoBancoDeHorasTests(MySqlFixture mysql)
         Assert.True((await CorpoAsync(resposta)).GetProperty("errors").TryGetProperty(campo, out _));
     }
 
+    [Fact]
+    public async Task De_igual_a_ate_traz_so_aquele_dia()
+    {
+        var api = await ApiAsync();
+        var rh = api.Elenco.Rh;
+        await SemearOExemploDoContratoAsync(api, rh.FuncionarioId);
+
+        var resposta = await MeuAsync(api, rh, "de=2026-10-05&ate=2026-10-05");
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal("2026-10-05", Assert.Single(Dias(await CorpoAsync(resposta))));
+    }
+
     [Theory]
     [InlineData("de=2026-02-30")]
     [InlineData("ate=ontem")]
