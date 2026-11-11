@@ -239,7 +239,11 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
         Assert.Equal([new DateOnly(2026, 10, 7), new DateOnly(2026, 10, 8), new DateOnly(2026, 10, 9)], recuperadas.Select(l => l.DiaReferencia!.Value).Order().ToList());
         Assert.Equal(3, recuperadas.Count); // sem duplicar
 
-        await CicloAsync(api);
+        // Um ciclo reserva no máximo LoteMaximoPorCiclo (10) tarefas, e três dias parados de cinco tipos diários (as quatro limpezas e a de teste) são quinze: a fila esvazia em mais de um ciclo.
+        for (var ciclo = 0; ciclo < 10 && await CicloAsync(api) > 0; ciclo++)
+        {
+        }
+
         Assert.Equal(
             [new DateOnly(2026, 10, 7), new DateOnly(2026, 10, 8), new DateOnly(2026, 10, 9)],
             api.Tarefas.Execucoes.Select(e => e.DiaReferencia!.Value).Order().ToList()); // as três rodaram
@@ -253,8 +257,8 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
 
         var recuperados = await RecuperarAsync(api);
 
-        // Oito tipos (as três limpezas, a que efetiva desligamento e quatro de teste); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
-        Assert.Equal(7, recuperados);
+        // Nove tipos (as quatro limpezas, a que efetiva desligamento e quatro de teste); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
+        Assert.Equal(8, recuperados);
         Assert.Contains(TarefaQueNaoRecuperaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
@@ -262,6 +266,7 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
         Assert.Contains("LIMPAR_TAREFAS", tipos); // as limpezas (registradas antes) recuperaram
         Assert.Contains("LIMPAR_EMAILS", tipos);
         Assert.Contains("LIMPAR_TOKENS_DE_SENHA", tipos);
+        Assert.Contains("LIMPAR_ARQUIVOS_ORFAOS", tipos); // a da fatia 1c (Task 6) também é uma limpeza diária recuperável
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, tipos); // e a que vem depois da que lança também criou as suas (05/10 e 06/10)
     }
 }
