@@ -17,6 +17,7 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
     private readonly Dictionary<string, Item> _itens = [];
     private readonly List<string> _gravados = [];
     private readonly List<string> _apagados = [];
+    private readonly List<string> _exclusoesPedidas = [];
     private int _gravacoesComTransacaoAberta;
 
     /// <summary>Os caminhos gravados com sucesso, na ordem.</summary>
@@ -24,6 +25,9 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
 
     /// <summary>Os caminhos apagados de verdade (apagar o que não existia não entra), na ordem.</summary>
     public IReadOnlyList<string> Apagados => Copia(_apagados);
+
+    /// <summary>Todo caminho que alguém pediu para apagar, na ordem, mesmo o que não existia ou cuja exclusão falhou (<see cref="FalharNaExclusao"/>): prova que a limpeza foi TENTADA.</summary>
+    public IReadOnlyList<string> ExclusoesPedidas => Copia(_exclusoesPedidas);
 
     /// <summary>Se preenchida, <see cref="GravarAsync"/> lança isto (depois de contar e de rodar o <see cref="AoGravar"/>) e não guarda nada.</summary>
     public Exception? FalharNaGravacao { get; set; }
@@ -88,6 +92,7 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
             _itens.Clear();
             _gravados.Clear();
             _apagados.Clear();
+            _exclusoesPedidas.Clear();
         }
 
         FalharNaGravacao = null;
@@ -148,6 +153,11 @@ public sealed class ArmazenamentoEmMemoria(IRelogio relogio) : IArmazenamentoDeA
         if (!CaminhosDeArquivo.EhValido(caminho))
         {
             throw new ArgumentException("Caminho de arquivo inválido.", nameof(caminho));
+        }
+
+        lock (_trava)
+        {
+            _exclusoesPedidas.Add(caminho);
         }
 
         if (FalharNaExclusao is { } erro)

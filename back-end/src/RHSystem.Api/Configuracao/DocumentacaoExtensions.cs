@@ -15,7 +15,7 @@ public static class DocumentacaoExtensions
     {
         if (configuracao.GetValue<bool>(Chave))
         {
-            servicos.AddOpenApi(opcoes => opcoes.UsarEsquemasDoContrato().UsarNomesDeParametrosDoContrato().UsarEnumsDeParametrosDoContrato());
+            servicos.AddOpenApi(opcoes => opcoes.UsarEsquemasDoContrato().UsarNomesDeParametrosDoContrato().UsarEnumsDeParametrosDoContrato().UsarFormulariosDoContrato());
         }
 
         return servicos;

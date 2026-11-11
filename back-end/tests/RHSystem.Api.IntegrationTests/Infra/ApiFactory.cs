@@ -12,6 +12,7 @@ using RHSystem.Application.Agendamento;
 using RHSystem.Application.Arquivos;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Autenticacao;
@@ -136,6 +137,18 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         {
             servicos.RemoveAll<IPedidosParadosNoGestor>();
             servicos.AddSingleton(porta);
+        }));
+
+    /// <summary>
+    /// Uma segunda API sobre o MESMO banco em que gravar um documento falha DEPOIS de a linha e o evento irem para o banco (<see cref="DocumentosRepositorioComFalha"/>), como um banco que cai no meio da
+    /// transação: a transação desfaz tudo e o caso de uso apaga o blob.
+    /// </summary>
+    public WebApplicationFactory<Program> ComFalhaNoBancoAoSalvarDocumento() =>
+        WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            var original = servicos.Last(d => d.ServiceType == typeof(IDocumentosRepositorio));
+            servicos.RemoveAll<IDocumentosRepositorio>();
+            servicos.AddScoped<IDocumentosRepositorio>(sp => new DocumentosRepositorioComFalha((IDocumentosRepositorio)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!)));
         }));
 
     /// <summary>

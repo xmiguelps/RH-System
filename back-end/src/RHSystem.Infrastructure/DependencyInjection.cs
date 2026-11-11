@@ -11,6 +11,7 @@ using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Cadastros;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
@@ -24,6 +25,7 @@ using RHSystem.Infrastructure.Auditoria;
 using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Cadastros;
 using RHSystem.Infrastructure.Colaboradores;
+using RHSystem.Infrastructure.Documentos;
 using RHSystem.Infrastructure.Emails;
 using RHSystem.Infrastructure.Empresa;
 using RHSystem.Infrastructure.Escopo;
@@ -146,6 +148,10 @@ public static class DependencyInjection
         // Gestores e "gestor ausente" (fatia 1c): a regra de quem decide primeiro um pedido novo é a interface que as fatias 3 e 7 chamam.
         services.AddScoped<IGestoresRepositorio, GestoresRepositorio>();
         services.AddScoped<IGestorAusente, GestorAusente>();
+
+        // Documentos do colaborador (fatia 1c): o repositório e a fonte que diz à limpeza de sobras quais caminhos de "documentos/" têm linha no banco.
+        services.AddScoped<IDocumentosRepositorio, DocumentosRepositorio>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosDocumentos>();
 
         // A configuração da empresa: uma classe serve ao cadastro (IEmpresaRepositorio) e às fatias 3 e 7 (IConfiguracaoDaEmpresa, sem cache).
         services.AddScoped<EmpresaRepositorio>();
