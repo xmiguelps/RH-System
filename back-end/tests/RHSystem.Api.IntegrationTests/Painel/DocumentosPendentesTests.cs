@@ -55,6 +55,21 @@ public class DocumentosPendentesTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Bolinha_conta_pelo_funcionario_do_token_e_nao_pelo_id_do_usuario()
+    {
+        var api = await ApiAsync();
+        await api.NovaPessoaAsync("Ids6 sem login um"); // pessoas sem login empurram o id de funcionário à frente do id de usuário
+        await api.NovaPessoaAsync("Ids6 sem login dois");
+        var eu = await PessoasDeTeste.ComLoginAsync(api, "Ids6 pessoa");
+        Assert.NotEqual(eu.FuncionarioId, eu.UsuarioId); // sem isto os dois ids coincidem e o teste não prova nada
+        await PendenteAsync(api, eu, "CPF");
+        await PendenteAsync(api, eu, "IDENTIDADE");
+        await PendenteAsync(api, eu, "OUTRO"); // três: nenhuma outra pessoa desta classe tem três, então um id trocado não acerta por acaso
+
+        Assert.Equal(3, await BolinhaAsync(await PessoasDeTeste.ClienteAsync(api, eu)));
+    }
+
+    [Fact]
     public async Task Pedido_do_RH_aparece_na_lista_e_na_bolinha_da_pessoa_e_nao_na_de_outra()
     {
         var api = await ApiAsync();

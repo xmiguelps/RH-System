@@ -138,13 +138,13 @@ public class MeusDocumentosTests(MySqlFixture mysql)
     }
 
     [Theory]
-    [InlineData("sem-arquivo")]
-    [InlineData("gif")]
-    [InlineData("exe-chamado-pdf")]
-    [InlineData("10-MiB-mais-1")]
-    [InlineData("dois-arquivos")]
-    [InlineData("zero-bytes")]
-    public async Task Erros_de_arquivo_voltam_400_em_arquivo(string cenario)
+    [InlineData("sem-arquivo", "O arquivo é obrigatório.")]
+    [InlineData("gif", "Envie um arquivo PDF, JPG ou PNG.")]
+    [InlineData("exe-chamado-pdf", "Envie um arquivo PDF, JPG ou PNG.")]
+    [InlineData("10-MiB-mais-1", "O arquivo pode ter até 10 MB.")]
+    [InlineData("dois-arquivos", "Envie um arquivo só.")]
+    [InlineData("zero-bytes", "O arquivo está vazio.")]
+    public async Task Erros_de_arquivo_voltam_400_em_arquivo_dizendo_o_que_fazer(string cenario, string mensagem)
     {
         var api = await ApiAsync();
         var eu = await PessoasDeTeste.ComLoginAsync(api, $"Erros5 {cenario}");
@@ -163,9 +163,47 @@ public class MeusDocumentosTests(MySqlFixture mysql)
 
         var resposta = await (await PessoasDeTeste.ClienteAsync(api, eu)).PostAsync(Envio(pendente), formulario);
 
-        Assert.True((await ErrosAsync(resposta)).TryGetProperty("arquivo", out _));
+        var erros = await ErrosAsync(resposta);
+        Assert.Equal([mensagem], erros.GetProperty("arquivo").EnumerateArray().Select(m => m.GetString()));
         Assert.Empty(api.Api.Armazenamento.Gravados);
         Assert.Equal("PENDENTE", await SituacaoNoBancoAsync(api, pendente)); // o pedido continua de pé
+    }
+
+    [Fact]
+    public async Task O_nome_guardado_perde_a_pasta_que_o_navegador_ou_o_atacante_mandou()
+    {
+        var api = await ApiAsync();
+        var eu = await PessoasDeTeste.ComLoginAsync(api, "Nome5c pessoa");
+        var pendente = await PendenteAsync(api, eu);
+        api.Api.Armazenamento.Limpar();
+
+        var resposta = await (await PessoasDeTeste.ClienteAsync(api, eu)).PostAsync(Envio(pendente), FormulariosDeTeste.Envio("../../pasta/secreta/meu rg.pdf", ArquivosDeTeste.Pdf()));
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal("meu rg.pdf", (await CorpoAsync(resposta)).GetProperty("nomeArquivoOriginal").GetString());
+        Assert.Equal("meu rg.pdf", await Sql.EscalarAsync(api.Conexao, $"SELECT NOME_ARQUIVO_ORIGINAL FROM FUNCIONARIOS_DOCUMENTOS WHERE ID_FUNCIONARIO_DOCUMENTO = {pendente}"));
+    }
+
+    [Fact]
+    public async Task O_id_que_vale_e_o_do_funcionario_do_token_e_nao_o_do_usuario_nas_tres_rotas()
+    {
+        var api = await ApiAsync();
+        await api.NovaPessoaAsync("Ids5d sem login um"); // pessoas sem login empurram o id de funcionário à frente do id de usuário
+        await api.NovaPessoaAsync("Ids5d sem login dois");
+        var eu = await PessoasDeTeste.ComLoginAsync(api, "Ids5d pessoa");
+        Assert.NotEqual(eu.FuncionarioId, eu.UsuarioId); // sem isto os dois ids coincidem e o teste não prova nada
+        var pendente = await PendenteAsync(api, eu);
+        var enviado = await EnviadoAsync(api, eu);
+        var cliente = await PessoasDeTeste.ClienteAsync(api, eu);
+        api.Api.Armazenamento.Limpar();
+
+        var lista = await ItensAsync(await cliente.GetAsync(Lista));
+        var link = await cliente.GetAsync(Download(enviado));
+        var envio = await cliente.PostAsync(Envio(pendente), FormulariosDeTeste.Envio("ids.pdf", ArquivosDeTeste.Pdf()));
+
+        Assert.Equal(new[] { pendente, enviado }.Order(), lista.Select(i => i.GetProperty("id").GetInt32()).Order());
+        Assert.Equal(200, (int)link.StatusCode);
+        Assert.Equal(200, (int)envio.StatusCode);
     }
 
     [Fact]
@@ -281,6 +319,7 @@ public class MeusDocumentosTests(MySqlFixture mysql)
 
         var evento = Assert.Single(await EventosAsync(api, pendente));
         Assert.Equal((AuditoriaArea.Documentos, AuditoriaAcao.Alterou, eu.FuncionarioId), (evento.Area, evento.Acao, evento.FuncionarioAtorId)); // quem agiu foi a própria pessoa
+        Assert.Equal($"Documento Comprovante de residência de {eu.Nome}", evento.RegistroAfetado); // o log diz de quem é o documento
         var situacao = Assert.Single(evento.Mudancas, m => m.Campo == "Situação");
         Assert.Equal(("pendente", "enviado"), (situacao.ValorAntes?.ToLowerInvariant(), situacao.ValorDepois?.ToLowerInvariant())); // o texto do enum, sem diferenciar maiúsculas (o formato é do interceptor)
         var arquivo = Assert.Single(evento.Mudancas, m => m.Campo == "Arquivo");
