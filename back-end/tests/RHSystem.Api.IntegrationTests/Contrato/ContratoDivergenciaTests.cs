@@ -95,6 +95,8 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "listarFeriados",
         "criarFeriado",
         "editarFeriado",
+        "obterMeuBancoDeHoras",
+        "obterBancoDeHorasDeFuncionario",
         "listarBeneficiosDoCatalogo",
         "criarBeneficioDoCatalogo",
         "editarBeneficioDoCatalogo",

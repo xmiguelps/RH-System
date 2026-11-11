@@ -21,6 +21,11 @@ public static class PontoRhEndpoints
             .Produces<PontoEspelho>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
+        grupo.MapGet("/funcionarios/{funcionarioId:int}/ponto/banco-de-horas", ObterBancoDeHoras)
+            .WithName("obterBancoDeHorasDeFuncionario")
+            .Produces<PontoBancoDeHorasExtrato>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
         grupo.MapPut("/funcionarios/{funcionarioId:int}/ponto/dias/{dia}", CorrigirDia)
             .WithName("corrigirMarcacoesDoDia")
             .Produces<PontoEspelhoDia>(StatusCodes.Status200OK)
@@ -38,6 +43,9 @@ public static class PontoRhEndpoints
 
     private static async Task<PontoEspelhoDia> CorrigirDia(int funcionarioId, DateOnly dia, PontoDiaCorrigir corpo, CorrigirMarcacoesDoDiaCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, dia, corpo, ct);
+
+    private static async Task<PontoBancoDeHorasExtrato> ObterBancoDeHoras(int funcionarioId, [AsParameters] FiltrosDoExtrato f, ObterExtratoDoBancoDeHorasCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.DeFuncionarioAsync(funcionarioId, f.Pagina, f.TamanhoPagina, f.De, f.Ate, f.Tipo, ct);
 
     private static async Task<PontoEspelho> ObterEspelho(int funcionarioId, [AsParameters] FiltrosDoEspelho filtros, ObterEspelhoParaRhCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(funcionarioId, filtros.Ano, filtros.Mes, ct);

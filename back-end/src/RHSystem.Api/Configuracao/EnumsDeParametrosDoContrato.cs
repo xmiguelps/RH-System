@@ -47,6 +47,8 @@ public static class EnumsDeParametrosDoContrato
         [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),
+        [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
+        [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };
 
     /// <summary>Tem de vir DEPOIS de <see cref="NomesDeParametrosDoContrato"/>: a chave usa o nome já em camelCase.</summary>
