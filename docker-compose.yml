@@ -41,5 +41,25 @@ services:
       retries: 12
       start_period: 5s
 
+  # Azurite: o emulador do Azure Blob Storage de desenvolvimento (fatia 1c, documentos). Os arquivos aparecem em http://127.0.0.1:10000 e somem com "docker compose down -v".
+  # A conta é a de desenvolvimento (devstoreaccount1, chave pública e conhecida do emulador): a connection string "UseDevelopmentStorage=true" já a descreve, então nada de chave vai para o repositório.
+  # Versão estável fixada (conferida em 2026-11-10 na lista de tags do mcr.microsoft.com, 3.37.0); nunca "latest". Os testes usam a mesma imagem (AzuriteFixture).
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    # --skipApiVersionCheck: o SDK (Azure.Storage.Blobs 12.30.1) fala a versão de API 2026-10-06, que o Azurite 3.37.0 (o mais novo em 2026-11-10) ainda recusa. O flag só vale para o emulador; tirar quando uma versão nova do Azurite aceitar.
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
+    ports:
+      - "${AZURITE_BLOB_PORTA:-10000}:10000"
+    volumes:
+      - azurite_dados:/data
+    healthcheck:
+      # A imagem é Alpine com Node: o nc do BusyBox basta para saber que a porta do blob está aceitando conexão.
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 10000"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
 volumes:
   mysql_dados:
+  azurite_dados:

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RHSystem.Application.Acesso;
 using RHSystem.Application.Agendamento;
+using RHSystem.Application.Arquivos;
 using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Cadastros;
@@ -17,6 +18,8 @@ using RHSystem.Application.Gestores;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
+using RHSystem.Infrastructure.Arquivos;
+using RHSystem.Infrastructure.Arquivos.Tarefas;
 using RHSystem.Infrastructure.Auditoria;
 using RHSystem.Infrastructure.Autenticacao;
 using RHSystem.Infrastructure.Cadastros;
@@ -110,7 +113,18 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, LimparEmailsAntigosTarefa>();
         services.AddScoped<ITarefaAgendada, LimparTokensDeSenhaTarefa>();
         services.AddScoped<ITarefaAgendada, EfetivarDesligamentoTarefa>();
+        services.AddScoped<ITarefaAgendada, LimparArquivosOrfaosTarefa>();
         services.AddHostedService<AgendadorHostedService>();
+
+        // Arquivos (Blob Storage; Azurite em desenvolvimento): o armazenamento e a listagem são o MESMO objeto. Sem Armazenamento:ConexaoBlob o app sobe e a primeira operação com arquivo falha com erro claro no log.
+        // Cada fatia que guarda caminho de arquivo registra uma IFonteDeReferenciasDeArquivo (AddScoped): sem ela a limpeza LIMPAR_ARQUIVOS_ORFAOS nunca toca o prefixo.
+        var armazenamento = new OpcoesDeArmazenamento();
+        configuration.GetSection(OpcoesDeArmazenamento.Secao).Bind(armazenamento);
+        armazenamento.Validar();
+        services.AddSingleton(armazenamento);
+        services.AddSingleton<ArmazenamentoBlob>();
+        services.AddSingleton<IArmazenamentoDeArquivos>(sp => sp.GetRequiredService<ArmazenamentoBlob>());
+        services.AddSingleton<IListagemDeArquivos>(sp => sp.GetRequiredService<ArmazenamentoBlob>());
 
         // Convite e redefinição de senha: o serviço que emite o link (o token só no e-mail; o banco guarda o hash) e os dois e-mails da lista fechada.
         var senha = new OpcoesDeSenha();

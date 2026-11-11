@@ -9,6 +9,7 @@ using MySqlConnector;
 using RHSystem.Api.IntegrationTests.Agendamento;
 using RHSystem.Api.IntegrationTests.Emails;
 using RHSystem.Application.Agendamento;
+using RHSystem.Application.Arquivos;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Emails;
@@ -73,6 +74,21 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
     public const string EmailSemNivel = "sem.nivel@empresa.com.br";
 
     public RelogioDeTeste Relogio { get; } = new();
+
+    private readonly object _travaDoArmazenamento = new();
+    private ArmazenamentoEmMemoria? _armazenamento;
+
+    /// <summary>O armazenamento de arquivos desta API (em memória, no lugar do Blob): guarda os bytes e conta o que os testes de arquivo precisam provar. As APIs derivadas (<c>WithWebHostBuilder</c>) usam o mesmo.</summary>
+    public ArmazenamentoEmMemoria Armazenamento
+    {
+        get
+        {
+            lock (_travaDoArmazenamento)
+            {
+                return _armazenamento ??= new ArmazenamentoEmMemoria(Relogio);
+            }
+        }
+    }
 
     /// <summary>O envio de e-mail dos testes: em memória (o serviço em segundo plano fica desligado e os testes chamam <c>ProcessarCicloAsync</c> direto).</summary>
     public EnviadorDeEmailEmMemoria Enviador { get; } = new();
@@ -172,6 +188,13 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         {
             servicos.RemoveAll<IRelogio>();
             servicos.AddSingleton<IRelogio>(Relogio);
+            // Arquivos: só ArmazenamentoBlobTests fala com o Azurite. Aqui o armazenamento é o em memória, e a unidade de trabalho é decorada para contar as gravações feitas com transação aberta.
+            servicos.RemoveAll<IArmazenamentoDeArquivos>();
+            servicos.RemoveAll<IListagemDeArquivos>();
+            servicos.AddSingleton<IArmazenamentoDeArquivos>(Armazenamento);
+            servicos.AddSingleton<IListagemDeArquivos>(Armazenamento);
+            servicos.RemoveAll<IUnidadeDeTrabalho>();
+            servicos.AddScoped<IUnidadeDeTrabalho>(sp => new UnidadeDeTrabalhoEspia(ActivatorUtilities.CreateInstance<UnidadeDeTrabalho>(sp)));
             servicos.RemoveAll<IEnviadorDeEmail>();
             servicos.AddSingleton<IEnviadorDeEmail>(Enviador);
             servicos.AddSingleton<IRenderizadorDeEmail>(new RenderizadorDeTeste("TESTE_ENVIO", "Aviso de teste enviado"));

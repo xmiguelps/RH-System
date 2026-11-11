@@ -176,6 +176,18 @@ O RH cadastra, edita, desliga e readmite colaboradores (`/api/rh/funcionarios`),
 
 **Setores e a troca de gestor (`/api/rh/setores`).** Trocar ou tirar o gestor roda numa transação só: promove o novo a `Gestor` (cria a linha em `GESTORES` se faltar), rebaixa o antigo a `Funcionario` (a linha dele fica), grava o setor, chama `IGestorDoFuncionario.RefazerDosMembrosAsync` (1b) e `IPedidosParadosNoGestor.PassarParaORhAsync` (1a); qualquer falha desfaz tudo. Os pedidos parados do gestor antigo só passam ao RH quando as fatias 3 e 7 registrarem a implementação delas da porta (o composto padrão é vazio). O contrato diz que um gestor responde por um setor só: a regra é da API (o banco não a impõe) e uma corrida entre duas edições que escolhem o mesmo gestor para setores diferentes não é impedida.
 
+**Arquivos (Blob Storage).** O envio de documento é o primeiro uso de arquivos. `IArmazenamentoDeArquivos` (gravar sem sobrescrever, link temporário de leitura por SAS que baixa como anexo, apagar) é a peça que as fatias seguintes reaproveitam; o tipo do arquivo vem do conteúdo (`IdentificadorDeTipoDeArquivo`), nunca do nome. Em desenvolvimento o armazenamento é o **Azurite**, no `docker compose`: `docker compose up -d --wait azurite` sobe o emulador em `http://127.0.0.1:10000` (conta `devstoreaccount1`, a chave pública do emulador, que `UseDevelopmentStorage=true` já descreve) e os arquivos somem com `docker compose down -v`. A imagem tem versão fixada (3.37.0, conferida em 2026-11-10; nunca `latest`) e roda com `--skipApiVersionCheck`: o SDK `Azure.Storage.Blobs` 12.30.1 fala a versão de API 2026-10-06, que esse Azurite (o mais novo até agora) ainda recusa; tirar o flag quando um Azurite novo a aceitar. Só `ArmazenamentoBlobTests` fala com o Azurite (em contêiner pelo `AzuriteFixture`); o resto dos testes usa o armazenamento em memória.
+
+| Chave (`Armazenamento:`) | Para quê | Padrão |
+|---|---|---|
+| `ConexaoBlob` | a connection string do Storage Account (traz a chave da conta). **Só por user-secrets ou pela configuração do App Service; nunca no repositório, no log nem na resposta.** Em Development: `UseDevelopmentStorage=true` | vazia |
+| `Container` | o contêiner de blobs (privado, criado se não existir) | `arquivos` |
+| `LinkValidoMinutos` | quanto tempo vale o link de download | 5 |
+| `SomenteHttps` | o link só funciona por HTTPS (`false` em Development: o Azurite fala HTTP) | `true` |
+| `SobrasMinimoHoras` | a limpeza `LIMPAR_ARQUIVOS_ORFAOS` só apaga arquivo mais velho que isto (protege o envio que já gravou o blob e ainda não inseriu a linha) | 24 |
+
+Sem `ConexaoBlob` a API **sobe** e a primeira rota que usa arquivo responde 500, com o erro claro no log (nunca com a connection string). A limpeza só toca o prefixo que tem uma `IFonteDeReferenciasDeArquivo` registrada pela fatia dona dos arquivos; se a fonte falha, nada do prefixo é apagado e a tarefa lança para o agendador tentar de novo.
+
 **Pergunta aberta ao dono (decisão 1 do plano da 1c).** Ao escolher como gestor de um setor uma pessoa **de outro setor**, a API (a) deixa o setor dela como está, (b) recusa, ou (c) muda o setor dela. Está **implementada a (a)**: ele gerencia o setor sem fazer parte dele (`quantidadePessoas` do setor não o conta) e o `ID_GESTOR` dele é refeito como o de qualquer gestor do setor. Só (b) ou (c) pedem contrato novo (um erro novo, ou um efeito novo descrito).
 
 ## Front-end
