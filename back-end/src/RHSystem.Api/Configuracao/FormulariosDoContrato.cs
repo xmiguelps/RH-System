@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Documentos;
+using RHSystem.Application.Importacoes;
 using RHSystem.Domain.Documentos;
 
 namespace RHSystem.Api.Configuracao;
@@ -17,6 +18,7 @@ public static class FormulariosDoContrato
 {
     public const string AdicionarDocumento = "adicionarDocumentoDoFuncionario";
     public const string EnviarMeuDocumento = "enviarMeuDocumento";
+    public const string BaixarModeloDeImportacao = "baixarModeloDeImportacao";
 
     public static OpenApiOptions UsarFormulariosDoContrato(this OpenApiOptions opcoes) =>
         opcoes.AddOperationTransformer((operacao, _, _) =>
@@ -41,7 +43,34 @@ public static class FormulariosDoContrato
         {
             operacao.RequestBody = Multipart(obrigatorios: ["arquivo"], ("arquivo", Binario()));
         }
+        else if (operacao.OperationId == BaixarModeloDeImportacao)
+        {
+            operacao.Responses ??= [];
+            operacao.Responses["200"] = ArquivoXlsx();
+        }
     }
+
+    /// <summary>
+    /// A resposta 200 de <c>baixarModeloDeImportacao</c>: o arquivo. O gerador de OpenAPI não descreve o corpo de um <c>Results.File</c> (sem mídia, sem schema), e o contrato fixa a mídia do Excel, o schema
+    /// <c>string</c> com <c>format: binary</c> e o cabeçalho <c>Content-Disposition</c> do anexo.
+    /// </summary>
+    private static OpenApiResponse ArquivoXlsx() =>
+        new()
+        {
+            Description = "O arquivo do modelo.",
+            Headers = new Dictionary<string, IOpenApiHeader>
+            {
+                ["Content-Disposition"] = new OpenApiHeader
+                {
+                    Description = "Anexo: `attachment; filename=\"modelo-importacao-colaboradores.xlsx\"`.",
+                    Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                },
+            },
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                [ModeloDeImportacaoCasoDeUso.TipoDeConteudo] = new OpenApiMediaType { Schema = Binario() },
+            },
+        };
 
     private static OpenApiRequestBody Multipart(string[] obrigatorios, params (string Nome, OpenApiSchema Esquema)[] campos) =>
         new()

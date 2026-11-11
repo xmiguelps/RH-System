@@ -169,6 +169,51 @@ public static class PlanilhasDeTeste
     private static double Serial(DateOnly data, bool date1904) =>
         (data.ToDateTime(TimeOnly.MinValue) - (date1904 ? new DateTime(1904, 1, 1) : new DateTime(1899, 12, 30))).TotalDays;
 
+    /// <summary>As linhas de uma aba lidas com o SDK (o que o Excel mostraria): textos por linha, <c>null</c> nas células vazias.</summary>
+    public static IReadOnlyList<string?[]> LerAba(byte[] xlsx, string nomeDaAba)
+    {
+        using var documento = SpreadsheetDocument.Open(new MemoryStream(xlsx), false);
+        var pasta = documento.WorkbookPart!;
+        var aba = pasta.Workbook!.Descendants<Sheet>().Single(s => s.Name?.Value == nomeDaAba);
+        var parte = (WorksheetPart)pasta.GetPartById(aba.Id!.Value!);
+        var textos = pasta.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>().Select(i => i.InnerText).ToList() ?? [];
+        return parte.Worksheet!.Descendants<Row>().Select(linha =>
+        {
+            var celulas = new List<string?>();
+            foreach (var celula in linha.Elements<Cell>())
+            {
+                var coluna = IndiceDaColuna(celula.CellReference!.Value!);
+                while (celulas.Count <= coluna)
+                {
+                    celulas.Add(null);
+                }
+
+                celulas[coluna] = celula.DataType?.Value == CellValues.SharedString
+                    ? textos[int.Parse(celula.CellValue!.Text, CultureInfo.InvariantCulture)]
+                    : celula.DataType?.Value == CellValues.InlineString ? celula.InlineString?.InnerText : celula.CellValue?.Text;
+            }
+
+            return celulas.ToArray();
+        }).ToList();
+    }
+
+    public static IReadOnlyList<string> NomesDasAbas(byte[] xlsx)
+    {
+        using var documento = SpreadsheetDocument.Open(new MemoryStream(xlsx), false);
+        return documento.WorkbookPart!.Workbook!.Descendants<Sheet>().Select(s => s.Name!.Value!).ToList();
+    }
+
+    private static int IndiceDaColuna(string referencia)
+    {
+        var coluna = 0;
+        foreach (var letra in referencia.TakeWhile(char.IsLetter))
+        {
+            coluna = (coluna * 26) + (char.ToUpperInvariant(letra) - 'A' + 1);
+        }
+
+        return coluna - 1;
+    }
+
     // ---------------------------------------------------------------- à mão (arquivos que só um atacante ou outra ferramenta fariam)
 
     /// <summary>O XML de uma aba com células de texto em linha (<c>inlineStr</c>); cada item de <paramref name="linhas"/> é uma linha, na ordem das colunas A, B, C...</summary>

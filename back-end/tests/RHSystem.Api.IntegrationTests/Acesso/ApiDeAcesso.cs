@@ -222,6 +222,22 @@ internal static class Sql
         return valor is DBNull ? null : valor;
     }
 
+    /// <summary>A primeira coluna de todas as linhas do <paramref name="sql"/>, como texto, na ordem em que o banco as devolve.</summary>
+    public static async Task<List<string>> ColunaAsync(string conexao, string sql)
+    {
+        await using var c = new MySqlConnection(conexao);
+        await c.OpenAsync();
+        await using var comando = new MySqlCommand(sql, c);
+        await using var leitor = await comando.ExecuteReaderAsync();
+        var valores = new List<string>();
+        while (await leitor.ReadAsync())
+        {
+            valores.Add(Convert.ToString(leitor.GetValue(0), CultureInfo.InvariantCulture) ?? string.Empty);
+        }
+
+        return valores;
+    }
+
     /// <summary>O texto de todas as colunas de todas as linhas da tabela (menos as de <paramref name="excluir"/>), para varrer atrás de algo que não pode estar lá.</summary>
     public static async Task<string> TextoDaTabelaAsync(string conexao, string tabela, params string[] excluir)
     {
