@@ -22,6 +22,7 @@ using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Application.Formularios.Construtor;
 using RHSystem.Application.Formularios.Destinatarios;
+using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
@@ -263,6 +264,7 @@ public static class DependencyInjection
         services.AddScoped<IAgendamentoDoFormulario, AgendamentoDoFormulario>();
         services.AddScoped<IConsultaDeMeusFormularios, ConsultaDeMeusFormularios>();
         services.AddScoped<IFormulariosRespostasRepositorio, FormulariosRespostasRepositorio>();
+        services.AddScoped<IConsultaDeAcompanhamento, ConsultaDeAcompanhamento>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosFormularios>(); // sem ela as sobras e, pior, os arquivos de resposta de formularios/ nunca seriam tratados pela limpeza de sobras
         services.AddScoped<EnvioDeArquivosDeFormulario>();
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeFormularios>(); // a bolinha "formulariosPendentes" do menu

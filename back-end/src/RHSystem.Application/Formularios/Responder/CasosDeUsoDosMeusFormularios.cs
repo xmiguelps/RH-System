@@ -24,9 +24,9 @@ public sealed class ListarMeusFormulariosCasoDeUso(IConsultaDeMeusFormularios co
         ParametrosDeLista? paginacao = null;
         TipoDeFormulario? tipoLido = null;
         SituacaoMinhaDoFormulario? situacaoLida = null;
-        Tentar(erros, () => paginacao = new ParametrosDeLista(pagina, tamanhoPagina, busca).Validado());
-        Tentar(erros, () => tipoLido = EnumsDeConsulta.Ler<TipoDeFormulario>(tipo, "tipo"));
-        Tentar(erros, () => situacaoLida = EnumsDeConsulta.Ler<SituacaoMinhaDoFormulario>(situacao, "situacao"));
+        LeituraDeFiltros.Tentar(erros, () => paginacao = new ParametrosDeLista(pagina, tamanhoPagina, busca).Validado());
+        LeituraDeFiltros.Tentar(erros, () => tipoLido = EnumsDeConsulta.Ler<TipoDeFormulario>(tipo, "tipo"));
+        LeituraDeFiltros.Tentar(erros, () => situacaoLida = EnumsDeConsulta.Ler<SituacaoMinhaDoFormulario>(situacao, "situacao"));
         erros.LancarSeHouver();
 
         var agora = relogio.AgoraUtc;
@@ -38,24 +38,6 @@ public sealed class ListarMeusFormulariosCasoDeUso(IConsultaDeMeusFormularios co
         var daAba = base2.Where(i => situacaoLida is null ? i.Situacao != SituacaoMinhaDoFormulario.Respondido : i.Situacao == situacaoLida).ToList();
         var pagina2 = RegrasDosMeusFormularios.Ordenar(daAba).Skip(paginacao!.Pular).Take(paginacao.TamanhoPagina).ToList();
         return new FormularioMeusLista(pagina2, paginacao.Pagina, paginacao.TamanhoPagina, daAba.Count, (int)(((long)daAba.Count + paginacao.TamanhoPagina - 1) / paginacao.TamanhoPagina), RegrasDosMeusFormularios.Contar(base2));
-    }
-
-    private static void Tentar(ColetorDeErros erros, Action leitura)
-    {
-        try
-        {
-            leitura();
-        }
-        catch (ErroDeValidacaoException erro)
-        {
-            foreach (var (campo, mensagens) in erro.Erros)
-            {
-                foreach (var mensagem in mensagens)
-                {
-                    erros.Adicionar(campo, mensagem);
-                }
-            }
-        }
     }
 }
 

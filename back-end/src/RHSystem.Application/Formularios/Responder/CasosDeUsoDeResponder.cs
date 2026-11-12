@@ -241,8 +241,7 @@ public sealed class ObterMinhasRespostasCasoDeUso(IConsultaDeFormularios consult
         }
 
         var avaliado = avaliadoId is { } id ? (await meus.ResumosAsync([id], ct)).FirstOrDefault() : null;
-        var porPergunta = lidas.ToDictionary(l => l.PerguntaId);
-        return new RespostaFormularioMinhas(lido.Id, lido.Titulo, avaliado, lidas.Max(l => l.RespondidaEmUtc) ?? default, [.. lido.Perguntas.OrderBy(p => p.Ordem).Select(p => Montar(p, porPergunta.GetValueOrDefault(p.Id)))]);
+        return new RespostaFormularioMinhas(lido.Id, lido.Titulo, avaliado, lidas.Max(l => l.RespondidaEmUtc) ?? default, MontadorDeRespostasDadas.Montar(lido, lidas));
     }
 
     private static int? LerAvaliadoDaConsulta(ColetorDeErros erros, FormularioLido lido, int? informado)
@@ -264,21 +263,5 @@ public sealed class ObterMinhasRespostasCasoDeUso(IConsultaDeFormularios consult
         }
 
         return id;
-    }
-
-    private static RespostaFormularioDada Montar(PerguntaLida pergunta, RespostaLida? linha)
-    {
-        if (linha is null)
-        {
-            return new RespostaFormularioDada(pergunta.Id, pergunta.Ordem, pergunta.Texto, pergunta.Tipo, null, [], null, null);
-        }
-
-        return pergunta.Tipo switch
-        {
-            TipoDePergunta.RespostaCurta or TipoDePergunta.RespostaLonga => new RespostaFormularioDada(pergunta.Id, pergunta.Ordem, pergunta.Texto, pergunta.Tipo, linha.Resposta, [], null, null),
-            TipoDePergunta.MultiplaEscolha => new RespostaFormularioDada(pergunta.Id, pergunta.Ordem, pergunta.Texto, pergunta.Tipo, null, [.. pergunta.Alternativas.Where(a => a.Id == linha.AlternativaId).Select(a => new PerguntaAlternativa(a.Id, a.Ordem, a.Texto))], null, null),
-            TipoDePergunta.Escala => new RespostaFormularioDada(pergunta.Id, pergunta.Ordem, pergunta.Texto, pergunta.Tipo, null, [], int.TryParse(linha.Resposta, NumberStyles.None, CultureInfo.InvariantCulture, out var valor) ? valor : null, null),
-            _ => new RespostaFormularioDada(pergunta.Id, pergunta.Ordem, pergunta.Texto, pergunta.Tipo, null, [], null, linha.NomeArquivoOriginal is { } nome ? new RespostaFormularioArquivo(linha.Id, nome) : null),
-        };
     }
 }

@@ -51,10 +51,10 @@ public sealed class ListarFormulariosRhCasoDeUso(IConsultaDeFormularios consulta
         TipoDeFormulario? tipoLido = null;
         SituacaoDoFormulario? situacaoLida = null;
         DirecaoDeOrdenacao? direcaoLida = null;
-        Tentar(erros, () => paginacao = new ParametrosDeLista(pagina, tamanhoPagina, busca).Validado());
-        Tentar(erros, () => tipoLido = EnumsDeConsulta.Ler<TipoDeFormulario>(tipo, "tipo"));
-        Tentar(erros, () => situacaoLida = EnumsDeConsulta.Ler<SituacaoDoFormulario>(situacao, "situacao"));
-        Tentar(erros, () => direcaoLida = EnumsDeConsulta.Ler<DirecaoDeOrdenacao>(direcao, "direcao"));
+        LeituraDeFiltros.Tentar(erros, () => paginacao = new ParametrosDeLista(pagina, tamanhoPagina, busca).Validado());
+        LeituraDeFiltros.Tentar(erros, () => tipoLido = EnumsDeConsulta.Ler<TipoDeFormulario>(tipo, "tipo"));
+        LeituraDeFiltros.Tentar(erros, () => situacaoLida = EnumsDeConsulta.Ler<SituacaoDoFormulario>(situacao, "situacao"));
+        LeituraDeFiltros.Tentar(erros, () => direcaoLida = EnumsDeConsulta.Ler<DirecaoDeOrdenacao>(direcao, "direcao"));
         if (!string.IsNullOrEmpty(ordenarPor) && !ValoresDeOrdenarPor.Contains(ordenarPor, StringComparer.Ordinal))
         {
             erros.Adicionar("ordenarPor", $"Valor inválido. Use um destes: {string.Join(", ", ValoresDeOrdenarPor)}.");
@@ -92,24 +92,6 @@ public sealed class ListarFormulariosRhCasoDeUso(IConsultaDeFormularios consulta
         int? taxa = respondidos is { } r && esperados is > 0 and { } e ? (int)Math.Round(r * 100.0 / e, MidpointRounding.AwayFromZero) : null;
         var encerrado = l.EncerradoEmUtc ?? (situacao == SituacaoDoFormulario.Encerrado && l.Prazo is { } prazo ? InstantesDoFormulario.EncerramentoNominal(prazo) : null);
         return new FormularioRhItem(l.Id, l.Titulo, l.Tipo, l.Sentido, l.Anonimo, situacao, l.Alvo, QuemRespondeResumo.Texto(quem.Resumo), respondidos, esperados, taxa, l.Prazo, encerrado, l.CriadoEmUtc);
-    }
-
-    private static void Tentar(ColetorDeErros erros, Action leitura)
-    {
-        try
-        {
-            leitura();
-        }
-        catch (ErroDeValidacaoException erro)
-        {
-            foreach (var (campo, mensagens) in erro.Erros)
-            {
-                foreach (var mensagem in mensagens)
-                {
-                    erros.Adicionar(campo, mensagem);
-                }
-            }
-        }
     }
 }
 

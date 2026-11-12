@@ -7,6 +7,7 @@ using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Consultas;
+using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Ponto;
 using RHSystem.Domain.Auditoria;
@@ -65,6 +66,7 @@ public static class EnumsDeParametrosDoContrato
         [("listarFormulariosRh", "tipo")] = typeof(TipoDeFormulario),
         [("listarFormulariosRh", "situacao")] = typeof(SituacaoDoFormulario),
         [("listarFormulariosRh", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("listarRespondentesFormulario", "situacao")] = typeof(SituacaoDoRespondente),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };
