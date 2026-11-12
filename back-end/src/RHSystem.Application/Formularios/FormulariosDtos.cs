@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using RHSystem.Application.Comum;
 using RHSystem.Domain.Formularios;
 
 namespace RHSystem.Application.Formularios;
@@ -17,6 +18,7 @@ public sealed record FormularioDetalhesComando(string Titulo, [property: JsonReq
 /// <summary>Uma alternativa no corpo da pergunta (<c>PerguntaAlternativaComando</c>): com <c>Id</c> mantém a alternativa, sem <c>Id</c> é nova, a que sumiu da lista é apagada.</summary>
 public sealed record PerguntaAlternativaComando(string Texto)
 {
+    [JsonConverter(typeof(InteiroOpcionalSemNullConversor))]
     public int? Id { get; init; }
 }
 
@@ -25,6 +27,7 @@ public sealed record PerguntaComando(string Texto, [property: JsonRequired] Tipo
 {
     public IReadOnlyList<PerguntaAlternativaComando> Alternativas { get; init; } = [];
 
+    [JsonConverter(typeof(InteiroOpcionalSemNullConversor))]
     public int? Ordem { get; init; }
 }
 

@@ -34,9 +34,10 @@ internal static class MapeadorDoFormulario
             l.EncerradoEmUtc ?? (situacao == SituacaoDoFormulario.Encerrado && l.Prazo is { } prazo ? InstantesDoFormulario.EncerramentoNominal(prazo) : null),
             l.ProximaReaberturaEmUtc,
             porLink ? l.TokenDoLink : null);
-        var perguntas = l.Perguntas.Select(p => new PerguntaFormulario(p.Id, p.Ordem, p.Texto, p.Tipo, p.Obrigatoria, [.. p.Alternativas.Select(a => new PerguntaAlternativa(a.Id, a.Ordem, a.Texto))])).ToList();
-        return new FormularioDetalheRh(l.Id, l.Titulo, l.Descricao, l.Tipo, l.Sentido, l.Anonimo, situacao, l.Autor, l.CriadoEmUtc, l.Anonimo ? null : l.TemRespostas, perguntas, publicacao);
+        return new FormularioDetalheRh(l.Id, l.Titulo, l.Descricao, l.Tipo, l.Sentido, l.Anonimo, situacao, l.Autor, l.CriadoEmUtc, l.Anonimo ? null : l.TemRespostas, [.. l.Perguntas.Select(Pergunta)], publicacao);
     }
+
+    public static PerguntaFormulario Pergunta(PerguntaLida p) => new(p.Id, p.Ordem, p.Texto, p.Tipo, p.Obrigatoria, [.. p.Alternativas.Select(a => new PerguntaAlternativa(a.Id, a.Ordem, a.Texto))]);
 
     public static SituacaoDoFormulario SituacaoDe(FormularioLido l, DateTime agoraUtc) => RegraDaSituacaoDoFormulario.De(l.Ativo, l.PublicadoEmUtc, l.EncerradoEmUtc, l.Prazo, agoraUtc);
 }

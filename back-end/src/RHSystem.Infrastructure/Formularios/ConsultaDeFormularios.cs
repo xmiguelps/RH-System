@@ -110,6 +110,8 @@ public sealed class ConsultaDeFormularios(AppDbContext db) : IConsultaDeFormular
             pessoas);
     }
 
+    public async Task<bool> PerguntaTemRespostaAsync(int perguntaId, CancellationToken ct) => await db.FormulariosRespostas.AsNoTracking().AnyAsync(r => r.PerguntaId == perguntaId, ct);
+
     private async Task<IReadOnlyList<PerguntaLida>> PerguntasAsync(int formularioId, CancellationToken ct)
     {
         var linhas = await db.FormulariosPerguntas.AsNoTracking().Where(p => p.FormularioId == formularioId).OrderBy(p => p.Ordem).ThenBy(p => p.Id).ToListAsync(ct);
