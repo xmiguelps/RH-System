@@ -13,6 +13,7 @@ using RHSystem.Application.Cadastros;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comunicacao;
 using RHSystem.Application.Comunicacao.Avisos;
+using RHSystem.Application.Comunicacao.Holerites;
 using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
@@ -225,6 +226,7 @@ public static class DependencyInjection
         services.AddSingleton<IRenderizadorDeEmail, ResultadoAjustePontoRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, AvisoPublicadoRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, AvisoLembreteRenderizador>();
+        services.AddSingleton<IRenderizadorDeEmail, HoleritePublicadoRenderizador>();
         // As bolinhas do menu do gestor (a mesma conta serve às duas): os pedidos de ajuste que aguardam a etapa dele.
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PedidosDeAjusteDePontoDoGestor));
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
@@ -248,6 +250,11 @@ public static class DependencyInjection
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeAvisos>(); // a bolinha Avisos do menu
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
+        services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();
+        services.AddScoped<IConsultaDeHolerites, ConsultaDeHolerites>();
+        services.AddScoped<IAgendamentoDoHolerite, AgendamentoDoHolerite>();
+        services.AddScoped<ITarefaAgendada, PublicarHoleriteTarefa>(); // o e-mail do holerite, na hora em que ele fica visivel
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosHolerites>(); // sem ela as sobras de holerites/ nunca seriam limpas
         services.AddScoped<ITarefaAgendada, PublicarAvisoTarefa>(); // o e-mail e as linhas de leitura do aviso, na hora da publicacao
         services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosAtestados>();

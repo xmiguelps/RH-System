@@ -257,8 +257,8 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
 
         var recuperados = await RecuperarAsync(api);
 
-        // Quatorze tipos (as cinco limpezas, a que efetiva desligamento, as duas dos feriados e a do banco de horas da fatia 3, a de publicar aviso da fatia 4 e quatro de teste; a LIMPAR_IMPORTACOES_VENCIDAS da fatia 2 é a quinta limpeza, e esta é por hora); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
-        Assert.Equal(13, recuperados);
+        // Quinze tipos (as cinco limpezas, a que efetiva desligamento, as duas dos feriados e a do banco de horas da fatia 3, as de publicar aviso e publicar holerite da fatia 4 e quatro de teste; a LIMPAR_IMPORTACOES_VENCIDAS da fatia 2 é a quinta limpeza, e esta é por hora); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
+        Assert.Equal(14, recuperados);
         Assert.Contains(TarefaQueNaoRecuperaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);

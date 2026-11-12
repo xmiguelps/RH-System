@@ -46,3 +46,10 @@ public enum DesfechoDaContestacao
     Mantida,
     Acatada,
 }
+
+/// <summary>A situação do holerite, calculada da data de publicação e do relógio: <c>PUBLICADO</c> (a pessoa já vê) ou <c>AGENDADO</c> (a data é futura).</summary>
+public enum SituacaoDoHolerite
+{
+    Publicado,
+    Agendado,
+}

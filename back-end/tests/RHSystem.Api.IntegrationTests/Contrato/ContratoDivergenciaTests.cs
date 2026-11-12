@@ -107,6 +107,8 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "listarMeusAvisos",
         "obterMeuAviso",
         "marcarAvisoComoLido",
+        "enviarHolerite",
+        "substituirHolerite",
         "editarFeriado",
         "obterMeuBancoDeHoras",
         "obterBancoDeHorasDeFuncionario",

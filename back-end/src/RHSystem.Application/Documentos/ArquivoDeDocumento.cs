@@ -18,7 +18,14 @@ public static class ValidacaoDeArquivoDeDocumento
         ValidarAsync(erros, arquivo, arquivosRecebidos, mensagemSemArquivo, LimitesDeDocumento.TamanhoMaximoBytes, "O arquivo pode ter até 10 MB.", ct);
 
     /// <summary>A mesma conferência com o limite de tamanho de quem chama (o atestado aceita até 5 MiB): <paramref name="mensagemDoLimite"/> é o texto do 400 em <c>arquivo</c> quando passa de <paramref name="tamanhoMaximoBytes"/>.</summary>
-    public static async Task<TipoDeArquivo?> ValidarAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, long tamanhoMaximoBytes, string mensagemDoLimite, CancellationToken ct)
+    public static Task<TipoDeArquivo?> ValidarAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, long tamanhoMaximoBytes, string mensagemDoLimite, CancellationToken ct) =>
+        ValidarAsync(erros, arquivo, arquivosRecebidos, mensagemSemArquivo, tamanhoMaximoBytes, mensagemDoLimite, somentePdf: false, ct);
+
+    /// <summary>A mesma conferência para quem só aceita PDF (o holerite): JPG, PNG e o que não é nenhum dos tipos dão o 400 em <c>arquivo</c> com "Envie um arquivo PDF.".</summary>
+    public static Task<TipoDeArquivo?> ValidarPdfAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, long tamanhoMaximoBytes, string mensagemDoLimite, CancellationToken ct) =>
+        ValidarAsync(erros, arquivo, arquivosRecebidos, mensagemSemArquivo, tamanhoMaximoBytes, mensagemDoLimite, somentePdf: true, ct);
+
+    private static async Task<TipoDeArquivo?> ValidarAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, long tamanhoMaximoBytes, string mensagemDoLimite, bool somentePdf, CancellationToken ct)
     {
         if (arquivosRecebidos > 1)
         {
@@ -53,9 +60,15 @@ public static class ValidacaoDeArquivoDeDocumento
         }
 
         var tipo = IdentificadorDeTipoDeArquivo.Identificar(inicio.AsSpan(0, lidos));
+        if (somentePdf && tipo is not null && tipo.TipoDeConteudo != "application/pdf")
+        {
+            erros.Adicionar("arquivo", "Envie um arquivo PDF.");
+            return null;
+        }
+
         if (tipo is null)
         {
-            erros.Adicionar("arquivo", "Envie um arquivo PDF, JPG ou PNG.");
+            erros.Adicionar("arquivo", somentePdf ? "Envie um arquivo PDF." : "Envie um arquivo PDF, JPG ou PNG.");
         }
 
         return tipo;

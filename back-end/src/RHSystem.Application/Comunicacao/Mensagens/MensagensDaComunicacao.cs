@@ -78,7 +78,10 @@ public static class MensagensDaComunicacao
         new(409, Conflito, $"{HoleriteJaExisteNoLote(tipo, mes, ano)} Para corrigir, envie uma nova versão.", "HOLERITE_JA_EXISTE");
 
     /// <summary>O texto do mesmo erro no resultado do lote (<c>mensagemDoErro</c>), sem a sugestão de nova versão (o lote não cria versão).</summary>
-    public static string HoleriteJaExisteNoLote(TipoDeHolerite tipo, int mes, int ano) => $"Já existe um holerite {NomeDoTipo(tipo)} de {Meses[mes - 1]} de {ano} para esta pessoa.";
+    public static string HoleriteJaExisteNoLote(TipoDeHolerite tipo, int mes, int ano) => $"Já existe um holerite {TextoDaCompetencia(tipo, mes, ano)} para esta pessoa.";
+
+    /// <summary>A competência por extenso, depois da palavra "holerite": <c>mensal de outubro de 2026</c>, <c>do 13º salário de dezembro de 2026</c>, <c>de férias de março de 2027</c>.</summary>
+    public static string TextoDaCompetencia(TipoDeHolerite tipo, int mes, int ano) => $"{NomeDoTipo(tipo)} de {Meses[mes - 1]} de {ano}";
 
     // ---------------------------------------------------------------- advertências
 
