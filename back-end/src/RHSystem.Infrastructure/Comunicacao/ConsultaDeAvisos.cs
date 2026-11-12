@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Comum.Consultas;
+using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Domain.Comunicacao;
 using RHSystem.Infrastructure.Persistencia;
@@ -77,6 +78,38 @@ public sealed class ConsultaDeAvisos(AppDbContext db) : IConsultaDeAvisos
         var expiram = ativos.Where(a => a.ExpiracaoEmUtc != null && a.ExpiracaoEmUtc <= limite).OrderBy(a => a.ExpiracaoEmUtc).ThenBy(a => a.Id).ToList();
         var proximo = expiram.Count == 0 ? null : new AvisoProximoAExpirar(expiram[0].Id, expiram[0].Titulo, expiram[0].ExpiracaoEmUtc!.Value);
         return new ResumoDosAvisos(ativos.Count, agendados, expirados, rascunhos, media, expiram.Count, proximo);
+    }
+
+    public async Task<(IReadOnlyList<AvisoLeituraItem> Itens, int Total, int Viram, int AindaNaoViram)> ListarLeiturasAsync(int avisoId, FiltroDeLeitura? filtro, ParametrosDeLista parametros, CancellationToken ct)
+    {
+        var linhas = from l in db.LeiturasDeAviso.AsNoTracking()
+                     where l.AvisoId == avisoId
+                     join f in db.Funcionarios.AsNoTracking() on l.FuncionarioId equals f.Id
+                     where f.Ativo
+                     select new { l.Visualizado, l.VisualizadoEmUtc, f.Id, f.Nome, f.Ativo, Cargo = f.Cargo != null ? f.Cargo.Nome : null, Setor = f.Setor != null ? f.Setor.Nome : null };
+
+        var viram = await linhas.CountAsync(l => l.Visualizado, ct);
+        var total = await linhas.CountAsync(ct);
+        var pedidas = filtro switch
+        {
+            FiltroDeLeitura.Lido => linhas.Where(l => l.Visualizado),
+            FiltroDeLeitura.NaoLido => linhas.Where(l => !l.Visualizado),
+            _ => linhas,
+        };
+        var totalDaLista = filtro is null ? total : filtro == FiltroDeLeitura.Lido ? viram : total - viram;
+        var pagina = await pedidas.OrderBy(l => l.Nome).ThenBy(l => l.Id).Skip(parametros.Pular).Take(parametros.TamanhoPagina).ToListAsync(ct);
+        return ([.. pagina.Select(l => new AvisoLeituraItem(new FuncionarioResumo(l.Id, l.Nome, l.Ativo, l.Cargo, l.Setor), l.Visualizado, l.VisualizadoEmUtc))], totalDaLista, viram, total - viram);
+    }
+
+    public async Task<IReadOnlyList<DestinatarioDeAviso>> NaoLidosParaLembreteAsync(int avisoId, DateOnly hoje, CancellationToken ct)
+    {
+        var pessoas = await (from l in db.LeiturasDeAviso.AsNoTracking()
+                             where l.AvisoId == avisoId && !l.Visualizado
+                             join f in db.Funcionarios.AsNoTracking() on l.FuncionarioId equals f.Id
+                             where f.Ativo && f.EmailCorporativo != null && f.DataAdmissao <= hoje
+                             orderby f.Id
+                             select new { f.Id, f.Nome, f.EmailCorporativo }).ToListAsync(ct);
+        return [.. pessoas.Select(p => new DestinatarioDeAviso(p.Id, p.Nome, p.EmailCorporativo!))];
     }
 
     private async Task<IReadOnlyList<AvisoLido>> CompletarAsync(IReadOnlyList<Base> bases, CancellationToken ct)

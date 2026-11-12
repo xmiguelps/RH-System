@@ -117,6 +117,8 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `DELETE /api/rh/avisos/{avisoId}` | excluirAviso | em andamento | só RH; exclusão de verdade, só de rascunho ou agendado (422 `AVISO_NAO_PODE_SER_EXCLUIDO` nos demais): apaga leituras e aviso na mesma transação, cancela a tarefa e audita `EXCLUIU` |
 | `POST /api/rh/avisos/{avisoId}/publicar` | publicarAviso | em andamento | só RH; publica o rascunho agora ou na data prevista se futura (grava a data efetiva); 422 `AVISO_JA_PUBLICADO` no que já foi publicado (inclusive no segundo clique); 400 se a expiração ficaria antes da publicação |
 | `POST /api/rh/avisos/{avisoId}/encerrar` | encerrarAviso | em andamento | só RH; só o ativo (422 `AVISO_NAO_ESTA_ATIVO` nos demais); a expiração vira agora e as leituras ficam |
+| `GET /api/rh/avisos/{avisoId}/leituras` | listarLeiturasDoAviso | em andamento | só RH; `viram` e `aindaNaoViram` são os totais do aviso e não mudam com `situacao` (`LIDO` ou `NAO_LIDO`); a conta é por linha de leitura de pessoa ativa hoje; ordem por nome; 422 `AVISO_AINDA_NAO_PUBLICADO` em rascunho e agendado |
+| `POST /api/rh/avisos/{avisoId}/lembretes` | lembrarQuemNaoViuAviso | em andamento | só RH; 202 com a quantidade de pessoas ativas, admitidas, com e-mail e que ainda não abriram (0 se todos viram); só aviso ativo (422 `AVISO_NAO_ESTA_ATIVO`); sem limite por aviso, mas a chave do e-mail leva o minuto do clique (duplo clique não manda em dobro) |
 
 ## Pendências conhecidas
 

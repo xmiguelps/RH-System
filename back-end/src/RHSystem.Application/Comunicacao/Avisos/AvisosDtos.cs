@@ -1,3 +1,4 @@
+using RHSystem.Application.Colaboradores;
 using RHSystem.Domain.Comunicacao;
 
 namespace RHSystem.Application.Comunicacao.Avisos;
@@ -77,3 +78,22 @@ public sealed record AvisoLido(
 
 /// <summary>O que a consulta sabe do resumo: as contagens de cada aba, a média de leitura dos ativos (já em percentual inteiro) e o próximo a expirar.</summary>
 public sealed record ResumoDosAvisos(int Ativos, int Agendados, int Expirados, int Rascunhos, int? LeituraMediaPercentual, int ExpiramNosProximos7Dias, AvisoProximoAExpirar? ProximoAExpirar);
+
+/// <summary>Um filtro da lista "Quem viu": <c>LIDO</c> (já viram) ou <c>NAO_LIDO</c> (ainda não viram). Sem filtro, todos.</summary>
+public enum FiltroDeLeitura
+{
+    Lido,
+    NaoLido,
+}
+
+/// <summary>Uma pessoa na lista "Quem viu" (<c>AvisoLeituraItem</c>).</summary>
+public sealed record AvisoLeituraItem(FuncionarioResumo Funcionario, bool Lido, DateTime? LidoEmUtc);
+
+/// <summary>Os totais de leitura do aviso (que não mudam com o filtro) e uma página da lista de pessoas (<c>AvisoLeituras</c>: a paginação mais <c>viram</c>, <c>aindaNaoViram</c> e <c>itens</c>).</summary>
+public sealed record AvisoLeituras(IReadOnlyList<AvisoLeituraItem> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas, int Viram, int AindaNaoViram);
+
+/// <summary>O resultado do lembrete (<c>AvisoLembreteResultado</c>): quantas pessoas ficaram com um e-mail de lembrete na fila.</summary>
+public sealed record AvisoLembreteResultado(int QuantidadeDeEmails);
+
+/// <summary>Quem recebe o e-mail de um aviso: pessoa ativa, admitida e com e-mail corporativo.</summary>
+public sealed record DestinatarioDeAviso(int FuncionarioId, string Nome, string Email);

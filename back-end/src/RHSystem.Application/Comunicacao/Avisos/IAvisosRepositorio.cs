@@ -33,6 +33,14 @@ public interface IConsultaDeAvisos
     Task<AvisoLido?> ObterAsync(int avisoId, CancellationToken ct);
 
     Task<ResumoDosAvisos> ResumoAsync(DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary>
+    /// A lista "Quem viu": as linhas de leitura de pessoas ATIVAS hoje, por nome. <c>Viram</c> e <c>AindaNaoViram</c> são os totais do aviso e não mudam com o <paramref name="filtro"/>; <c>Total</c> é o da lista pedida (para a paginação).
+    /// </summary>
+    Task<(IReadOnlyList<AvisoLeituraItem> Itens, int Total, int Viram, int AindaNaoViram)> ListarLeiturasAsync(int avisoId, FiltroDeLeitura? filtro, ParametrosDeLista parametros, CancellationToken ct);
+
+    /// <summary>Quem ainda não abriu o aviso e pode receber e-mail: ativo, admitido até <paramref name="hoje"/> e com e-mail corporativo.</summary>
+    Task<IReadOnlyList<DestinatarioDeAviso>> NaoLidosParaLembreteAsync(int avisoId, DateOnly hoje, CancellationToken ct);
 }
 
 /// <summary>A tarefa que manda o e-mail na hora da publicação (<c>PUBLICAR_AVISO:aviso={id}:em={instante}</c>). A chave leva o instante porque uma chave de tarefa cancelada nunca volta: mudar a data agenda outra.</summary>

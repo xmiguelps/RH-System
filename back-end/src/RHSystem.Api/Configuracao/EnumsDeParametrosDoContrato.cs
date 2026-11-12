@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using RHSystem.Application.Acesso;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Ponto;
@@ -50,6 +51,7 @@ public static class EnumsDeParametrosDoContrato
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAvisos", "situacao")] = typeof(SituacaoDoAviso),
         [("listarAvisos", "tipo")] = typeof(TipoDeAviso),
+        [("listarLeiturasDoAviso", "situacao")] = typeof(FiltroDeLeitura),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };

@@ -9,6 +9,9 @@ namespace RHSystem.Api.Comunicacao;
 /// <summary>
 /// Os parâmetros da lista de avisos do RH. <c>Situacao</c> e <c>Tipo</c> chegam como texto: o caso de uso os lê pelo nome do contrato e devolve o 400 certo (<c>errors.situacao</c>, <c>errors.tipo</c>). A lista não tem <c>ordenarPor</c>: a ordem é a da aba.
 /// </summary>
+/// <summary>Os parâmetros da lista "Quem viu": a página e <c>situacao</c> (<c>LIDO</c> ou <c>NAO_LIDO</c>, em texto: o caso de uso o lê pelo nome do contrato e devolve o 400 em <c>errors.situacao</c>).</summary>
+public sealed record FiltrosDasLeiturasDoAviso(int Pagina = 1, int TamanhoPagina = 20, string? Situacao = null);
+
 public sealed record FiltrosDaListaDeAvisos(int Pagina = 1, int TamanhoPagina = 20, string? Busca = null, string? Situacao = null, string? Tipo = null);
 
 /// <summary>
@@ -29,6 +32,8 @@ public static class AvisosRhEndpoints
         servicos.AddScoped<ExcluirAvisoCasoDeUso>();
         servicos.AddScoped<PublicarAvisoCasoDeUso>();
         servicos.AddScoped<EncerrarAvisoCasoDeUso>();
+        servicos.AddScoped<ListarLeiturasDoAvisoCasoDeUso>();
+        servicos.AddScoped<LembrarQuemNaoViuAvisoCasoDeUso>();
         return servicos;
     }
 
@@ -88,8 +93,29 @@ public static class AvisosRhEndpoints
             .Produces<AvisoDetalheRh>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        rh.MapGet("/avisos/{avisoId:int}/leituras", ListarLeituras)
+            .WithName("listarLeiturasDoAviso")
+            .Produces<AvisoLeituras>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
+        rh.MapPost("/avisos/{avisoId:int}/lembretes", Lembrar)
+            .WithName("lembrarQuemNaoViuAviso")
+            .Produces<AvisoLembreteResultado>(StatusCodes.Status202Accepted)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
+
+    private static async Task<AvisoLeituras> ListarLeituras(int avisoId, [AsParameters] FiltrosDasLeiturasDoAviso f, ListarLeiturasDoAvisoCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(avisoId, f.Pagina, f.TamanhoPagina, f.Situacao, ct);
+
+    private static async Task<IResult> Lembrar(int avisoId, LembrarQuemNaoViuAvisoCasoDeUso casoDeUso, CancellationToken ct) => Results.Json(await casoDeUso.ExecutarAsync(avisoId, ct), statusCode: StatusCodes.Status202Accepted);
 
     private static async Task<RespostaPaginada<AvisoItemRh>> Listar([AsParameters] FiltrosDaListaDeAvisos f, ListarAvisosDoRhCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(f.Pagina, f.TamanhoPagina, f.Busca, f.Situacao, f.Tipo, ct);
