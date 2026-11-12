@@ -68,30 +68,7 @@ public sealed class ObterFormularioParaResponderCasoDeUso(IConsultaDeFormularios
     public async Task<FormularioParaResponder> ExecutarAsync(int formularioId, CancellationToken ct)
     {
         var agora = relogio.AgoraUtc;
-        var lido = (await consulta.ObterAsync(formularioId, ct)).OuNaoEncontrado();
-        var situacao = RegraDaSituacaoDoFormulario.De(lido.Ativo, lido.PublicadoEmUtc, lido.EncerradoEmUtc, lido.Prazo, agora);
-        if (situacao == SituacaoDoFormulario.Rascunho || lido.Alvo is not (AlvoDoFormulario.Pessoas or AlvoDoFormulario.Setores))
-        {
-            throw new NaoEncontradoException();
-        }
-
-        var eu = escopo.FuncionarioId;
-        var posicao = await meus.PosicaoAsync(formularioId, eu, FusoBrasil.Hoje(agora), ct);
-        if (posicao.MeusPares.Count == 0 && posicao.Feitos.Count == 0)
-        {
-            throw new NaoEncontradoException();
-        }
-
-        if (situacao == SituacaoDoFormulario.Agendado)
-        {
-            throw MensagensDosFormularios.FormularioAindaNaoAberto.ComoProblema();
-        }
-
-        if (situacao == SituacaoDoFormulario.Encerrado)
-        {
-            throw MensagensDosFormularios.FormularioEncerradoParaResponder.ComoProblema();
-        }
-
+        var (lido, posicao) = await AcessoAoFormularioParaResponder.ConferirAsync(consulta, meus, formularioId, escopo.FuncionarioId, agora, ct);
         var avaliados = lido.Tipo == TipoDeFormulario.Avaliacao ? await AvaliadosAsync(posicao, ct) : [];
         var minutos = MinutosEstimados.De(lido.Perguntas.Select(p => p.Tipo), lido.Tipo == TipoDeFormulario.Avaliacao ? Math.Max(avaliados.Count, 1) : 1);
         return new FormularioParaResponder(lido.Id, lido.Titulo, lido.Descricao, lido.Tipo, lido.Sentido, lido.Anonimo, lido.Tipo == TipoDeFormulario.Outro ? null : lido.Prazo, minutos, [.. lido.Perguntas.Select(MapeadorDoFormulario.Pergunta)], avaliados);

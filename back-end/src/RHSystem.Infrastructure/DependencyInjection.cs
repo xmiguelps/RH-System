@@ -262,6 +262,9 @@ public static class DependencyInjection
         services.AddScoped<IDestinatariosDoFormulario, DestinatariosDoFormulario>();
         services.AddScoped<IAgendamentoDoFormulario, AgendamentoDoFormulario>();
         services.AddScoped<IConsultaDeMeusFormularios, ConsultaDeMeusFormularios>();
+        services.AddScoped<IFormulariosRespostasRepositorio, FormulariosRespostasRepositorio>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosFormularios>(); // sem ela as sobras e, pior, os arquivos de resposta de formularios/ nunca seriam tratados pela limpeza de sobras
+        services.AddScoped<EnvioDeArquivosDeFormulario>();
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeFormularios>(); // a bolinha "formulariosPendentes" do menu
         services.AddScoped<ITarefaAgendada, PublicarFormularioTarefa>(); // o agendado vira publicado no dia, uma vez
         services.AddScoped<ITarefaAgendada, EncerrarFormularioTarefa>(); // o prazo encerra o formulario no instante nominal

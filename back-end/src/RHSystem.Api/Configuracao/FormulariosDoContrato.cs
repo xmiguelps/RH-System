@@ -25,6 +25,7 @@ public static class FormulariosDoContrato
     public const string EnviarHoleritesEmLote = "enviarHoleritesEmLote";
     public const string BaixarModeloDeImportacao = "baixarModeloDeImportacao";
     public const string ValidarPlanilhaDeImportacao = "validarPlanilhaDeImportacao";
+    public const string ResponderFormulario = "responderFormulario";
 
     public static OpenApiOptions UsarFormulariosDoContrato(this OpenApiOptions opcoes) =>
         opcoes.AddOperationTransformer((operacao, _, _) =>
@@ -108,6 +109,31 @@ public static class FormulariosDoContrato
         else if (operacao.OperationId == ValidarPlanilhaDeImportacao)
         {
             operacao.RequestBody = Multipart(obrigatorios: ["arquivo"], ("arquivo", Binario()));
+        }
+        else if (operacao.OperationId == ResponderFormulario)
+        {
+            operacao.RequestBody = Multipart(
+                obrigatorios: ["respostas"],
+                ("avaliadoId", new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "1" }),
+                ("respostas", new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Array,
+                    MinItems = 1,
+                    Items = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Required = new HashSet<string> { "perguntaId" },
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["perguntaId"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "1" },
+                            ["texto"] = new OpenApiSchema { Type = JsonSchemaType.String, MaxLength = 4000 },
+                            ["alternativaIds"] = new OpenApiSchema { Type = JsonSchemaType.Array, MinItems = 1, MaxItems = 1, Items = new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "1" } },
+                            ["valorEscala"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "1", Maximum = "5" },
+                            ["arquivoIndice"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "0" },
+                        },
+                    },
+                }),
+                ("arquivos", new OpenApiSchema { Type = JsonSchemaType.Array, Items = Binario() }));
         }
         else if (operacao.OperationId == BaixarModeloDeImportacao)
         {
