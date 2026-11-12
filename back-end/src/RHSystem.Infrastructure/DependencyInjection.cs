@@ -22,6 +22,7 @@ using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Application.Formularios.Construtor;
 using RHSystem.Application.Formularios.Destinatarios;
+using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
@@ -260,6 +261,8 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeFormularios, ConsultaDeFormularios>();
         services.AddScoped<IDestinatariosDoFormulario, DestinatariosDoFormulario>();
         services.AddScoped<IAgendamentoDoFormulario, AgendamentoDoFormulario>();
+        services.AddScoped<IConsultaDeMeusFormularios, ConsultaDeMeusFormularios>();
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeFormularios>(); // a bolinha "formulariosPendentes" do menu
         services.AddScoped<ITarefaAgendada, PublicarFormularioTarefa>(); // o agendado vira publicado no dia, uma vez
         services.AddScoped<ITarefaAgendada, EncerrarFormularioTarefa>(); // o prazo encerra o formulario no instante nominal
         services.AddScoped<IPerguntasDoFormularioRepositorio, PerguntasDoFormularioRepositorio>();
