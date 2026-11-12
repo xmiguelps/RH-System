@@ -339,6 +339,23 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
     }
 
     [Theory]
+    [InlineData("tipo")]
+    [InlineData("dataDoOcorrido")]
+    public async Task Registro_do_gestor_sem_um_campo_obrigatorio_do_corpo_e_400_e_nada_e_gravado(string ausente)
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var corpo = new Dictionary<string, object?> { ["dataDoOcorrido"] = "2026-10-05", ["tipo"] = "VERBAL", ["motivo"] = "Motivo", ["descricao"] = "Descrição" };
+        corpo.Remove(ausente);
+
+        var resposta = await PostAsync(await GestorAsync(api, setor), $"/api/gestor/equipe/{pessoa}/advertencias", corpo);
+
+        Assert.Equal(400, (int)resposta.StatusCode);
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM ADVERTENCIAS WHERE ID_FUNCIONARIO = {pessoa}"));
+    }
+
+    [Theory]
     [InlineData("dataDoOcorrido", "2026-10-08")]
     [InlineData("dataDoOcorrido", "0001-01-01")]
     [InlineData("motivo", "")]

@@ -25,10 +25,10 @@ public sealed class AvisosRepositorio(AppDbContext db) : IAvisosRepositorio
         return aviso.Id;
     }
 
-    public async Task<bool> AtualizarAsync(int avisoId, bool enviadoLido, string titulo, string conteudo, bool fixado, DateTime? publicacaoEmUtc, DateTime? expiracaoEmUtc, CancellationToken ct)
+    public async Task<bool> AtualizarAsync(int avisoId, bool enviadoLido, DateTime? publicacaoLidaEmUtc, string titulo, string conteudo, bool fixado, DateTime? publicacaoEmUtc, DateTime? expiracaoEmUtc, CancellationToken ct)
     {
         // AUDITORIA-OK: a edição é auditada à mão pelo caso de uso (evento Alterou, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF.
-        var linhas = await db.Avisos.Where(a => a.Id == avisoId && a.Enviado == enviadoLido).ExecuteUpdateAsync(
+        var linhas = await db.Avisos.Where(a => a.Id == avisoId && a.Enviado == enviadoLido && a.PublicacaoEmUtc == publicacaoLidaEmUtc).ExecuteUpdateAsync(
             s => s.SetProperty(a => a.Titulo, titulo)
                 .SetProperty(a => a.Conteudo, conteudo)
                 .SetProperty(a => a.Fixado, fixado)

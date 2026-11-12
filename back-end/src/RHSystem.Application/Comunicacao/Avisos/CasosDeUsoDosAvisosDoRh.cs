@@ -155,7 +155,7 @@ public sealed class EditarAvisoCasoDeUso(IAvisosRepositorio avisos, IConsultaDeA
             var gravou = await unidade.ExecutarEmTransacaoAsync(
                 async () =>
                 {
-                    if (!await avisos.AtualizarAsync(avisoId, lido.Enviado, campos!.Titulo, campos.Conteudo, corpo.Fixado, novaPublicacao, expiracao, ct))
+                    if (!await avisos.AtualizarAsync(avisoId, lido.Enviado, lido.PublicacaoEmUtc, campos!.Titulo, campos.Conteudo, corpo.Fixado, novaPublicacao, expiracao, ct))
                     {
                         return false;
                     }

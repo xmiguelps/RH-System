@@ -152,6 +152,43 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
     }
 
     [Theory]
+    [InlineData("decisao")]
+    [InlineData("resposta")]
+    public async Task Resposta_sem_um_campo_obrigatorio_e_400_e_a_advertencia_continua_contestada(string ausente)
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var id = await ContestadaAsync(api, pessoa);
+        var corpo = new Dictionary<string, object?> { ["decisao"] = "MANTER", ["resposta"] = "Mantemos." };
+        corpo.Remove(ausente);
+
+        var resposta = await ResponderAsync(api, id, corpo);
+
+        Assert.Equal(400, (int)resposta.StatusCode);
+        Assert.Equal("CONTESTADA", await TextoAsync(api, $"SELECT STATUS_ADVERTENCIA FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id}"));
+        Assert.Equal(0, EmailsDa(api, "ADVERTENCIA_RESPONDIDA", id));
+    }
+
+    [Theory]
+    [InlineData("tipo")]
+    [InlineData("aplicadaPor")]
+    [InlineData("dataDoOcorrido")]
+    public async Task Registro_sem_um_campo_obrigatorio_do_corpo_e_400_e_nada_e_gravado(string ausente)
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var corpo = new Dictionary<string, object?> { ["dataDoOcorrido"] = "2026-10-05", ["tipo"] = "VERBAL", ["aplicadaPor"] = "RH", ["motivo"] = "Motivo", ["descricao"] = "Descrição" };
+        corpo.Remove(ausente);
+
+        var resposta = await RegistrarAsync(api, pessoa, corpo);
+
+        Assert.Equal(400, (int)resposta.StatusCode);
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM ADVERTENCIAS WHERE ID_FUNCIONARIO = {pessoa}"));
+    }
+
+    [Theory]
     [InlineData("dataDoOcorrido", "0001-01-01")]
     [InlineData("motivo", "")]
     [InlineData("motivo", "   ")]

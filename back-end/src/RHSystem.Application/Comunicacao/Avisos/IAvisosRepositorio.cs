@@ -13,7 +13,7 @@ public interface IAvisosRepositorio
     Task<int> AdicionarAsync(Aviso aviso, CancellationToken ct);
 
     /// <summary>Muda o aviso se ele ainda está como foi lido (<paramref name="enviadoLido"/>): <c>false</c> se foi publicado, excluído ou mudou de estado nesse meio tempo.</summary>
-    Task<bool> AtualizarAsync(int avisoId, bool enviadoLido, string titulo, string conteudo, bool fixado, DateTime? publicacaoEmUtc, DateTime? expiracaoEmUtc, CancellationToken ct);
+    Task<bool> AtualizarAsync(int avisoId, bool enviadoLido, DateTime? publicacaoLidaEmUtc, string titulo, string conteudo, bool fixado, DateTime? publicacaoEmUtc, DateTime? expiracaoEmUtc, CancellationToken ct);
 
     /// <summary>Rascunho vira publicado com a data efetiva (<c>WHERE ENVIADO = FALSE</c>): o segundo clique devolve <c>false</c>.</summary>
     Task<bool> PublicarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct);

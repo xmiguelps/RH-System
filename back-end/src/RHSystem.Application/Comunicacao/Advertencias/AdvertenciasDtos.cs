@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Escopo;
 using RHSystem.Application.Ponto.Regras;
@@ -86,15 +87,16 @@ public sealed record AdvertenciaPorPessoa(FuncionarioResumo Funcionario, int Qua
 /// <summary>Os números da tela de advertências do setor (<c>AdvertenciaResumoGestor</c>): do ano, e todos pela regra única das não canceladas.</summary>
 public sealed record AdvertenciaResumoGestor(int Ano, int Registradas, AdvertenciaAguardandoCiencia AguardandoCiencia, int PessoasComAdvertencia, int TotalDaEquipe, IReadOnlyList<AdvertenciaPorPessoa> PorPessoa);
 
-/// <summary>O corpo do registro pelo RH (<c>AdvertenciaRegistroRhComando</c>).</summary>
-public sealed record AdvertenciaRegistroRhComando(DateOnly DataDoOcorrido, TipoDeAdvertencia Tipo, AplicadaPorNoRegistro AplicadaPor, string Motivo, string Descricao);
+/// <summary>O corpo do registro pelo RH (<c>AdvertenciaRegistroRhComando</c>). A data, o tipo e em nome de quem são OBRIGATÓRIOS no JSON (<c>JsonRequired</c>): sem isso o que falta virava o primeiro valor (verbal, gestor do colaborador, dia zero) e gravava.</summary>
+public sealed record AdvertenciaRegistroRhComando([property: JsonRequired] DateOnly DataDoOcorrido, [property: JsonRequired] TipoDeAdvertencia Tipo, [property: JsonRequired] AplicadaPorNoRegistro AplicadaPor, string Motivo, string Descricao);
 
-/// <summary>O corpo do registro pelo gestor (<c>AdvertenciaRegistroGestorComando</c>): quem aplica é sempre o gestor logado.</summary>
-public sealed record AdvertenciaRegistroGestorComando(DateOnly DataDoOcorrido, TipoDeAdvertencia Tipo, string Motivo, string Descricao);
+/// <summary>O corpo do registro pelo gestor (<c>AdvertenciaRegistroGestorComando</c>): quem aplica é sempre o gestor logado. A data e o tipo são obrigatórios no JSON.</summary>
+public sealed record AdvertenciaRegistroGestorComando([property: JsonRequired] DateOnly DataDoOcorrido, [property: JsonRequired] TipoDeAdvertencia Tipo, string Motivo, string Descricao);
 
 public sealed record AdvertenciaContestacaoComando(string Texto);
 
-public sealed record AdvertenciaRespostaComando(DecisaoDaResposta Decisao, string Resposta);
+/// <summary>A decisão é obrigatória no JSON: sem ela virava MANTER, e responder é irreversível (só uma contestada recebe resposta).</summary>
+public sealed record AdvertenciaRespostaComando([property: JsonRequired] DecisaoDaResposta Decisao, string Resposta);
 
 /// <summary>Uma advertência como veio do banco; o nome do gestor vem <c>null</c> quando foi o RH.</summary>
 public sealed record AdvertenciaLida(

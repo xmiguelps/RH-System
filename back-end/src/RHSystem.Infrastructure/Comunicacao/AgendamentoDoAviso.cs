@@ -24,8 +24,15 @@ public sealed class AgendamentoDoAviso(IAgendador agendador) : IAgendamentoDoAvi
             : null;
     }
 
-    public async Task AgendarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct) =>
-        _ = await agendador.AgendarAsync(new NovaTarefa(Tipo, Chave(avisoId, publicacaoEmUtc), publicacaoEmUtc, ReferenciaId: avisoId), ct);
+    /// <summary>Se a chave já existe é porque este aviso já teve uma tarefa para este instante: cancelada (a data foi e voltou), e então ela é REATIVADA; pendente ou concluída, nada a fazer.</summary>
+    public async Task AgendarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct)
+    {
+        var chave = Chave(avisoId, publicacaoEmUtc);
+        if (!await agendador.AgendarAsync(new NovaTarefa(Tipo, chave, publicacaoEmUtc, ReferenciaId: avisoId), ct))
+        {
+            _ = await agendador.ReativarAsync(chave, ct);
+        }
+    }
 
     public async Task CancelarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct) => _ = await agendador.CancelarAsync(Chave(avisoId, publicacaoEmUtc), ct);
 }

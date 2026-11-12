@@ -4,9 +4,13 @@ using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Auditoria;
 using RHSystem.Api.IntegrationTests.Contrato;
 using RHSystem.Api.IntegrationTests.Infra;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Domain.Auditoria;
+using RHSystem.Infrastructure.Comunicacao;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
 
 namespace RHSystem.Api.IntegrationTests.Comunicacao;
@@ -230,6 +234,83 @@ public class AvisosRhTests(MySqlFixture mysql)
         Assert.Equal("2026-10-10T12:00:00Z", (await CorpoAsync(mantem)).GetProperty("publicacaoEmUtc").GetString());
         Assert.Equal((1, 1), (await TarefasAsync(api, id, "CANCELADA", "2026-10-09T11:00:00Z"), await TarefasAsync(api, id, "PENDENTE", "2026-10-10T12:00:00Z")));
         Assert.Equal(1, await TarefasAsync(api, id, "PENDENTE"));
+    }
+
+    [Fact]
+    public async Task Editar_o_agendado_de_volta_para_uma_data_ja_usada_reativa_a_tarefa_cancelada_e_o_e_mail_ainda_sai()
+    {
+        var api = await ApiAsync();
+        var id = await CriarComSucessoAsync(api, Novo(Titulo("Agendado vai e volta"), publicarEmUtc: "2026-10-09T11:00:00Z"));
+
+        await EditarAsync(api, id, new { titulo = "Vai", conteudo = "Texto.", fixado = false, publicarEmUtc = "2026-10-10T12:00:00Z", expiraEm = (string?)null });
+        var volta = await EditarAsync(api, id, new { titulo = "Volta", conteudo = "Texto.", fixado = false, publicarEmUtc = "2026-10-09T11:00:00Z", expiraEm = (string?)null });
+
+        Assert.Equal(200, (int)volta.StatusCode);
+        Assert.Equal((1, 1), (await TarefasAsync(api, id, "PENDENTE", "2026-10-09T11:00:00Z"), await TarefasAsync(api, id, "CANCELADA", "2026-10-10T12:00:00Z")));
+        Assert.Equal(1, await TarefasAsync(api, id, "PENDENTE")); // uma só tarefa pendente: a da data de agora
+    }
+
+    /// <summary>A leitura em que outra aba (outro RH) muda a data do agendado logo depois de a edição ler o aviso: a edição já leu a data antiga.</summary>
+    private sealed class ConsultaQueOutraAbaMudaADataDepoisDeLer(IConsultaDeAvisos real, string conexao, int avisoId) : IConsultaDeAvisos
+    {
+        private bool _mudou;
+
+        public Task<(IReadOnlyList<AvisoLido> Itens, int Total)> ListarAsync(FiltroDeAvisosRh filtro, ParametrosDeLista parametros, DateTime agoraUtc, CancellationToken ct) => real.ListarAsync(filtro, parametros, agoraUtc, ct);
+
+        public async Task<AvisoLido?> ObterAsync(int id, CancellationToken ct)
+        {
+            var lido = await real.ObterAsync(id, ct);
+            if (!_mudou && id == avisoId)
+            {
+                _mudou = true;
+                await Sql.ExecutarAsync(conexao, $"UPDATE AVISOS SET DATA_PUBLICACAO = '2026-10-12 09:00:00' WHERE ID_AVISO = {avisoId}");
+            }
+
+            return lido;
+        }
+
+        public Task<ResumoDosAvisos> ResumoAsync(DateTime agoraUtc, CancellationToken ct) => real.ResumoAsync(agoraUtc, ct);
+
+        public Task<(IReadOnlyList<AvisoLeituraItem> Itens, int Total, int Viram, int AindaNaoViram)> ListarLeiturasAsync(int id, FiltroDeLeitura? filtro, ParametrosDeLista parametros, CancellationToken ct) => real.ListarLeiturasAsync(id, filtro, parametros, ct);
+
+        public Task<IReadOnlyList<DestinatarioDeAviso>> NaoLidosParaLembreteAsync(int id, DateOnly hoje, CancellationToken ct) => real.NaoLidosParaLembreteAsync(id, hoje, ct);
+    }
+
+    [Fact]
+    public async Task A_edicao_sem_data_nao_regrava_a_data_antiga_por_cima_da_que_outra_aba_acabou_de_mudar()
+    {
+        var api = await ApiAsync();
+        var id = await CriarComSucessoAsync(api, Novo(Titulo("Agendado em duas abas"), publicarEmUtc: "2026-10-09T11:00:00Z"));
+        var fabrica = api.Api.WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IConsultaDeAvisos>();
+            servicos.AddScoped<IConsultaDeAvisos>(sp => new ConsultaQueOutraAbaMudaADataDepoisDeLer(ActivatorUtilities.CreateInstance<ConsultaDeAvisos>(sp), api.Conexao, id));
+        }));
+        var cliente = fabrica.CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = (await api.ClienteDoRhAgoraAsync()).DefaultRequestHeaders.Authorization;
+
+        var resposta = await cliente.PutAsJsonAsync($"{Rota}/{id}", new { titulo = "Só o título mudou", conteudo = "Texto.", fixado = false, publicarEmUtc = (string?)null, expiraEm = (string?)null });
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal("Só o título mudou", await TextoAsync(api, $"SELECT TITULO FROM AVISOS WHERE ID_AVISO = {id}"));
+        Assert.Equal("2026-10-12 09:00:00", await TextoAsync(api, $"SELECT DATE_FORMAT(DATA_PUBLICACAO, '%Y-%m-%d %H:%i:%s') FROM AVISOS WHERE ID_AVISO = {id}")); // a data que a outra aba pôs continua
+    }
+
+    [Fact]
+    public async Task Excluir_e_publicar_ao_mesmo_tempo_nunca_dao_erro_de_servidor_e_so_um_efeito_vale()
+    {
+        var api = await ApiAsync();
+        var cliente = await api.ClienteDoRhAgoraAsync();
+
+        for (var rodada = 0; rodada < 8; rodada++)
+        {
+            var id = await CriarComSucessoAsync(api, Novo(Titulo("Excluir contra publicar"), publicar: false));
+
+            var respostas = await Task.WhenAll(cliente.DeleteAsync($"{Rota}/{id}"), cliente.PostAsJsonAsync($"{Rota}/{id}/publicar", new { }));
+
+            Assert.All(respostas, r => Assert.True((int)r.StatusCode < 500, $"rodada {rodada}: {(int)r.StatusCode}"));
+            Assert.Equal(1, respostas.Count(r => r.IsSuccessStatusCode)); // quem perde recebe o 4xx do contrato
+        }
     }
 
     [Fact]
