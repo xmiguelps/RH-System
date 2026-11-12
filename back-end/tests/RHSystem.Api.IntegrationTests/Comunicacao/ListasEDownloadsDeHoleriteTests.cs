@@ -482,6 +482,22 @@ public class ListasEDownloadsDeHoleriteTests(MySqlFixture mysql)
         Assert.Equal(200, (int)resposta.StatusCode);
     }
 
+    [Fact]
+    public async Task Holerite_sem_arquivo_guardado_nao_baixa_nem_para_o_RH_nem_para_a_pessoa_mas_continua_na_lista()
+    {
+        var api = await ApiAsync();
+        var pessoa = await NovaAsync(api);
+        await Sql.ExecutarAsync(api.Conexao, $"INSERT INTO HOLERITES (ID_FUNCIONARIO, MES, ANO, DATA_PUBLICACAO, TIPO_HOLERITE, VERSAO) VALUES ({pessoa.FuncionarioId}, 8, 2026, '2026-09-04 10:00:00', 'MENSAL', 1)");
+        var id = (int)await Sql.ContarAsync(api.Conexao, $"SELECT ID_HOLERITE FROM HOLERITES WHERE ID_FUNCIONARIO = {pessoa.FuncionarioId}");
+
+        var doRh = await ComoRhAsync(api, $"/api/rh/holerites/{id}/download");
+        var daPessoa = await ComoAsync(api, pessoa, $"{RotaDaPessoa}/{id}/download");
+
+        Assert.Equal((404, 404), ((int)doRh.StatusCode, (int)daPessoa.StatusCode));
+        Assert.Empty(await EventosAsync(api, id));
+        Assert.Equal([id], Ids(await ListaDoRhAsync(api, pessoa.FuncionarioId)));
+    }
+
     // ---------------------------------------------------------------- o download da própria pessoa
 
     [Fact]

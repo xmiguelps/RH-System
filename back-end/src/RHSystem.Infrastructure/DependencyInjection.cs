@@ -12,6 +12,8 @@ using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Cadastros;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comunicacao;
+using RHSystem.Application.Comunicacao.Advertencias;
+using RHSystem.Application.Comunicacao.Aniversarios;
 using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Comunicacao.Holerites;
 using RHSystem.Application.Documentos;
@@ -227,6 +229,8 @@ public static class DependencyInjection
         services.AddSingleton<IRenderizadorDeEmail, AvisoPublicadoRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, AvisoLembreteRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, HoleritePublicadoRenderizador>();
+        services.AddSingleton<IRenderizadorDeEmail, AdvertenciaRegistradaRenderizador>();
+        services.AddSingleton<IRenderizadorDeEmail, AdvertenciaRespondidaRenderizador>();
         // As bolinhas do menu do gestor (a mesma conta serve às duas): os pedidos de ajuste que aguardam a etapa dele.
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PedidosDeAjusteDePontoDoGestor));
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
@@ -253,6 +257,10 @@ public static class DependencyInjection
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();
         services.AddScoped<IConsultaDeHolerites, ConsultaDeHolerites>();
         services.AddScoped<IConsultaDeHoleritesDaPessoa, ConsultaDeHoleritesDaPessoa>();
+        services.AddScoped<IAdvertenciasRepositorio, AdvertenciasRepositorio>();
+        services.AddScoped<IConsultaDeAdvertencias, ConsultaDeAdvertencias>();
+        services.AddScoped<IConsultaDeAniversariantes, ConsultaDeAniversariantes>();
+        services.AddScoped<IFonteDeIndicadorDaFicha, FonteDoIndicadorDeAdvertencias>(); // o indicador "advertências" da ficha deixa de ser nulo
         services.AddScoped<IAgendamentoDoHolerite, AgendamentoDoHolerite>();
         services.AddScoped<ITarefaAgendada, PublicarHoleriteTarefa>(); // o e-mail do holerite, na hora em que ele fica visivel
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosHolerites>(); // sem ela as sobras de holerites/ nunca seriam limpas

@@ -20,7 +20,7 @@ public sealed class ListarHoleritesDoFuncionarioCasoDeUso(IConsultaDeHolerites c
     public async Task<HoleriteListaRh> ExecutarAsync(int funcionarioId, int pagina, int tamanhoPagina, int? ano, string? tipo, bool todasAsVersoes, CancellationToken ct)
     {
         var tipoLido = EnumsDeConsulta.Ler<TipoDeHolerite>(tipo, "tipo");
-        RegrasDasListasDeHolerite.ConferirAno(ano);
+        AnoDaLista.Conferir(ano);
         var parametros = new ParametrosDeLista(pagina, tamanhoPagina).Validado();
         _ = (await consulta.ObterPessoaAsync(funcionarioId, ct)).OuNaoEncontrado();
 
@@ -40,7 +40,7 @@ public sealed class ListarMeusHoleritesCasoDeUso(IEscopoDoUsuario escopo, IConsu
     public async Task<HoleriteListaEu> ExecutarAsync(int pagina, int tamanhoPagina, int? ano, string? tipo, CancellationToken ct)
     {
         var tipoLido = EnumsDeConsulta.Ler<TipoDeHolerite>(tipo, "tipo");
-        RegrasDasListasDeHolerite.ConferirAno(ano);
+        AnoDaLista.Conferir(ano);
         var parametros = new ParametrosDeLista(pagina, tamanhoPagina).Validado();
 
         var agora = relogio.AgoraUtc;

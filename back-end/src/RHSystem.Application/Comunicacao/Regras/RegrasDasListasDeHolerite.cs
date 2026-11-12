@@ -1,26 +1,13 @@
 using System.Globalization;
-using RHSystem.Application.Comum;
 using RHSystem.Application.Comunicacao.Holerites;
 using RHSystem.Application.Comunicacao.Mensagens;
 using RHSystem.Domain.Comunicacao;
 
 namespace RHSystem.Application.Comunicacao.Regras;
 
-/// <summary>As contas puras das listas e dos downloads de holerite: o filtro de ano, a situação pelo relógio, as contagens das abas e o nome do arquivo baixado.</summary>
+/// <summary>As contas puras das listas e dos downloads de holerite: a situação pelo relógio, as contagens das abas e o nome do arquivo baixado.</summary>
 public static class RegrasDasListasDeHolerite
 {
-    /// <summary>O filtro <c>ano</c> das duas listas: de 2000 a 2100, como o contrato. Sem ele (<c>null</c>) não há o que conferir.</summary>
-    /// <exception cref="ErroDeValidacaoException">Com o erro em <c>ano</c>.</exception>
-    public static void ConferirAno(int? ano)
-    {
-        if (ano is { } valor && (valor < LeitorDosCamposDoHolerite.PrimeiroAno || valor > LeitorDosCamposDoHolerite.UltimoAno))
-        {
-            var erros = new ColetorDeErros();
-            erros.Adicionar("ano", $"Informe um ano de {LeitorDosCamposDoHolerite.PrimeiroAno} a {LeitorDosCamposDoHolerite.UltimoAno}.");
-            erros.LancarSeHouver();
-        }
-    }
-
     /// <summary>
     /// Agendado é o que só fica visível depois de agora (a data chega no começo do dia agendado, e nesse instante já é publicado); publicado é o resto. Uma linha sem data de publicação (o trigger do banco sempre a preenche, então só uma escrita direta a deixaria
     /// assim) conta como publicada agora.
