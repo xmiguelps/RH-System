@@ -97,3 +97,21 @@ public sealed record AvisoLembreteResultado(int QuantidadeDeEmails);
 
 /// <summary>Quem recebe o e-mail de um aviso: pessoa ativa, admitida e com e-mail corporativo.</summary>
 public sealed record DestinatarioDeAviso(int FuncionarioId, string Nome, string Email);
+
+/// <summary>Um aviso vigente na lista de quem está logado (<c>AvisoItemEu</c>).</summary>
+public sealed record AvisoItemEu(int Id, TipoDeAviso Tipo, string Titulo, string Previa, bool Fixado, DateTime PublicadoEmUtc, DateTime? ExpiraEmUtc, string? AutorNome, bool Lido);
+
+/// <summary>Um aviso vigente com o conteúdo inteiro (<c>AvisoDetalheEu</c>).</summary>
+public sealed record AvisoDetalheEu(int Id, TipoDeAviso Tipo, string Titulo, string Previa, bool Fixado, DateTime PublicadoEmUtc, DateTime? ExpiraEmUtc, string? AutorNome, bool Lido, DateTime? LidoEmUtc, string Conteudo);
+
+/// <summary>As contagens da lista de quem está logado: <c>NaoLidos</c> (também o número do menu) e <c>Total</c>. Não dependem de busca nem do filtro.</summary>
+public sealed record AvisoContagensEu(int NaoLidos, int Total);
+
+/// <summary>Uma página de avisos vigentes e as contagens das abas (<c>AvisoListaEu</c>).</summary>
+public sealed record AvisoListaEu(IReadOnlyList<AvisoItemEu> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas, AvisoContagensEu Contagens);
+
+/// <summary>Os filtros da lista de quem está logado: só os não lidos e/ou os fixados antes.</summary>
+public sealed record FiltroDeMeusAvisos(bool ApenasNaoLidos, bool FixadosPrimeiro);
+
+/// <summary>Um aviso vigente lido do banco para a pessoa, com o lido dela (<c>LidoEmUtc</c> só quando já abriu).</summary>
+public sealed record AvisoDaPessoaLido(int Id, TipoDeAviso? Tipo, string Titulo, string Conteudo, bool Fixado, DateTime PublicadoEmUtc, DateTime? ExpiracaoEmUtc, string? AutorNome, bool Lido, DateTime? LidoEmUtc);

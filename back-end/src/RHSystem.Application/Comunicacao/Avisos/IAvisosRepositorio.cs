@@ -23,6 +23,12 @@ public interface IAvisosRepositorio
 
     /// <summary>Apaga as leituras e o aviso, só se ele ainda não está publicado (rascunho, ou agendado para depois de <paramref name="agoraUtc"/>).</summary>
     Task<bool> ExcluirAsync(int avisoId, DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary>
+    /// A pessoa abriu o aviso: a linha de leitura dela vira lida com a data de <paramref name="agoraUtc"/> (<c>WHERE VISUALIZADO = FALSE</c>: a segunda leitura não muda nada e a data da primeira fica). Sem linha (admitida depois), a linha é criada
+    /// já lida; a chave única repetida de uma corrida vale como sucesso.
+    /// </summary>
+    Task MarcarComoLidoAsync(int avisoId, int funcionarioId, DateTime agoraUtc, CancellationToken ct);
 }
 
 /// <summary>A leitura dos avisos para o RH. A lista e o resumo recebem o <c>agora</c> da aplicação (as situações são calculadas dele, nunca do relógio do banco).</summary>
@@ -49,4 +55,16 @@ public interface IAgendamentoDoAviso
     Task AgendarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct);
 
     Task CancelarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct);
+}
+
+/// <summary>A leitura dos avisos <b>vigentes</b> (ativos: publicados, já no ar e sem expirar) para quem está logado. O escopo é a própria pessoa: o lido é o dela.</summary>
+public interface IConsultaDeAvisosDaPessoa
+{
+    Task<(IReadOnlyList<AvisoDaPessoaLido> Itens, int Total, AvisoContagensEu Contagens)> ListarAsync(int funcionarioId, FiltroDeMeusAvisos filtro, ParametrosDeLista parametros, DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary><c>null</c> se o aviso não existe ou não está vigente (rascunho, agendado ou expirado).</summary>
+    Task<AvisoDaPessoaLido?> ObterAsync(int funcionarioId, int avisoId, DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary>Os avisos vigentes que a pessoa ainda não abriu: a bolinha do menu.</summary>
+    Task<int> ContarNaoLidosAsync(int funcionarioId, DateTime agoraUtc, CancellationToken ct);
 }

@@ -54,6 +54,31 @@ public sealed class AvisosRepositorio(AppDbContext db) : IAvisosRepositorio
         return linhas == 1;
     }
 
+    public async Task MarcarComoLidoAsync(int avisoId, int funcionarioId, DateTime agoraUtc, CancellationToken ct)
+    {
+        if (await MarcarLinhaExistenteAsync(avisoId, funcionarioId, agoraUtc, ct) || await db.LeiturasDeAviso.AnyAsync(l => l.AvisoId == avisoId && l.FuncionarioId == funcionarioId, ct))
+        {
+            return; // marcou agora, ou já estava lida (a data da primeira leitura fica)
+        }
+
+        // Sem linha (admitida depois do aviso): cria já lida. Se outra requisição (ou a tarefa de publicação) criou a linha no meio, a chave única repetida é a corrida: marca a que existe.
+        db.LeiturasDeAviso.Add(LeituraDeAviso.Criar(avisoId, funcionarioId, visualizado: true, agoraUtc));
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException erro) when (ErrosDoBanco.EhChaveRepetida(erro))
+        {
+            db.ChangeTracker.Clear();
+            await MarcarLinhaExistenteAsync(avisoId, funcionarioId, agoraUtc, ct);
+        }
+    }
+
+    private async Task<bool> MarcarLinhaExistenteAsync(int avisoId, int funcionarioId, DateTime agoraUtc, CancellationToken ct) =>
+        // AUDITORIA-OK: marcar a leitura é dado de controle da própria pessoa (alto volume, sem efeito sobre ninguém) e não gera evento de auditoria; o WHERE VISUALIZADO = FALSE mantém a data da primeira leitura.
+        await db.LeiturasDeAviso.Where(l => l.AvisoId == avisoId && l.FuncionarioId == funcionarioId && !l.Visualizado)
+            .ExecuteUpdateAsync(s => s.SetProperty(l => l.Visualizado, true).SetProperty(l => l.VisualizadoEmUtc, agoraUtc), ct) == 1;
+
     public async Task<bool> ExcluirAsync(int avisoId, DateTime agoraUtc, CancellationToken ct)
     {
         // AUDITORIA-OK: a exclusão é auditada à mão pelo caso de uso (evento Excluiu, na mesma transação), e o ExecuteDelete não passa pelo interceptor do EF. As leituras saem primeiro (a chave estrangeira não tem ON DELETE) e só se o aviso ainda não está publicado.

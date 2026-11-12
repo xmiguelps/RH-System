@@ -29,9 +29,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/auditoria` | listarEventosDeAuditoria | em andamento | |
 | `GET /api/rh/auditoria/exportacao` | exportarAuditoria | em andamento | |
 | `GET /api/rh/auditoria/{eventoId}` | obterEventoDeAuditoria | em andamento | |
-| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7) |
-| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7) |
-| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: 4; formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: ok (4); formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: ok (4); formulários: 5; ponto: 3; férias: 7) |
+| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: ok (4); formulários: 5; ponto: 3; férias: 7) |
 | `POST /api/auth/senha/esqueci` | solicitarRedefinicaoDeSenha | em andamento | sempre 202; um pedido por pessoa a cada 60 s (decisão 6 do plano da 1b) |
 | `POST /api/auth/senha/validar-link` | validarLinkDeSenha | em andamento | |
 | `POST /api/auth/senha/definir` | definirSenhaPeloLink | em andamento | sem login automático |
@@ -119,6 +119,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `POST /api/rh/avisos/{avisoId}/encerrar` | encerrarAviso | em andamento | só RH; só o ativo (422 `AVISO_NAO_ESTA_ATIVO` nos demais); a expiração vira agora e as leituras ficam |
 | `GET /api/rh/avisos/{avisoId}/leituras` | listarLeiturasDoAviso | em andamento | só RH; `viram` e `aindaNaoViram` são os totais do aviso e não mudam com `situacao` (`LIDO` ou `NAO_LIDO`); a conta é por linha de leitura de pessoa ativa hoje; ordem por nome; 422 `AVISO_AINDA_NAO_PUBLICADO` em rascunho e agendado |
 | `POST /api/rh/avisos/{avisoId}/lembretes` | lembrarQuemNaoViuAviso | em andamento | só RH; 202 com a quantidade de pessoas ativas, admitidas, com e-mail e que ainda não abriram (0 se todos viram); só aviso ativo (422 `AVISO_NAO_ESTA_ATIVO`); sem limite por aviso, mas a chave do e-mail leva o minuto do clique (duplo clique não manda em dobro) |
+| `GET /api/eu/avisos` | listarMeusAvisos | em andamento | qualquer perfil logado (sem 403); só os avisos vigentes (publicados, já no ar e sem expirar), do mais recente para o mais antigo (`fixadosPrimeiro` põe os fixados antes); `apenasNaoLidos` e `busca` (título e conteúdo); `contagens` (`naoLidos`, `total` e a bolinha do menu) não dependem de busca nem do filtro; quem foi admitido depois também vê |
+| `GET /api/eu/avisos/{avisoId}` | obterMeuAviso | em andamento | qualquer perfil logado; o aviso vigente inteiro; não marca como lido; 404 se não existe ou não está vigente |
+| `POST /api/eu/avisos/{avisoId}/leitura` | marcarAvisoComoLido | em andamento | qualquer perfil logado; 204; idempotente (a data da primeira leitura fica); cria a linha de quem foi admitido depois; 404 se não está vigente; sem evento de auditoria |
 
 ## Pendências conhecidas
 

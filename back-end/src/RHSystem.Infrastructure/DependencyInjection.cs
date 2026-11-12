@@ -243,6 +243,8 @@ public static class DependencyInjection
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();
         services.AddScoped<IConsultaDeAvisos, ConsultaDeAvisos>();
+        services.AddScoped<IConsultaDeAvisosDaPessoa, ConsultaDeAvisosDaPessoa>();
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeAvisos>(); // a bolinha Avisos do menu
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
         services.AddScoped<ITarefaAgendada, PublicarAvisoTarefa>(); // o e-mail e as linhas de leitura do aviso, na hora da publicacao
         services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
