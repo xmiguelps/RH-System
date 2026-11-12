@@ -33,6 +33,7 @@ public static class FormulariosRhEndpoints
         servicos.AddScoped<VerificarFormularioCasoDeUso>();
         servicos.AddScoped<PublicarFormularioCasoDeUso>();
         servicos.AddScoped<EncerrarFormularioCasoDeUso>();
+        servicos.AddScoped<AdicionarDestinatariosCasoDeUso>();
         return servicos;
     }
 
@@ -145,6 +146,18 @@ public static class FormulariosRhEndpoints
                 StatusCodes.Status422UnprocessableEntity,
                 StatusCodes.Status500InternalServerError);
 
+        rh.MapPost("/formularios/{formularioId:int}/destinatarios", AdicionarDestinatarios)
+            .WithName("adicionarDestinatariosFormulario")
+            .Produces<FormularioDestinatariosResultado>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status409Conflict,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -175,6 +188,8 @@ public static class FormulariosRhEndpoints
     private static async Task<FormularioDetalheRh> Publicar(int formularioId, FormularioPublicacaoComando corpo, PublicarFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
 
     private static async Task<FormularioDetalheRh> Encerrar(int formularioId, bool? confirmar, EncerrarFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, confirmar ?? false, ct);
+
+    private static async Task<FormularioDestinatariosResultado> AdicionarDestinatarios(int formularioId, FormularioDestinatariosComando corpo, AdicionarDestinatariosCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
 
     private static async Task<IResult> ExcluirPergunta(int formularioId, int perguntaId, ExcluirPerguntaCasoDeUso casoDeUso, CancellationToken ct)
     {

@@ -110,6 +110,32 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         return apagados == 1 ? [.. arquivosDasRespostas, .. curriculos] : null;
     }
 
+    public async Task<int?> IncluirDestinatariosAsync(FormularioLido lido, IReadOnlyList<int> funcionarioIds, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var ativoLido = lido.Ativo;
+        var anonimoLido = lido.Anonimo;
+        var encerradoLido = lido.EncerradoEmUtc;
+
+        // AUDITORIA-OK: não muda valor nenhum (TITULO = TITULO): segura a linha do formulário até o fim da transação (publicar e encerrar esperam) e confere que ele continua por pessoas; o evento Alterou é do caso de uso.
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && f.Ativo == ativoLido && f.Anonimo == anonimoLido && f.EncerradoEmUtc == encerradoLido && f.Alvo == AlvoDoFormulario.Pessoas)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Titulo, f => f.Titulo), ct);
+        if (linhas != 1)
+        {
+            return null;
+        }
+
+        var adicionados = 0;
+        foreach (var pessoa in funcionarioIds)
+        {
+            // AUDITORIA-OK: as linhas de destinatário não são auditadas (quem recebe o formulário não é dado de auditoria); o INSERT IGNORE ignora quem já estava (a chave única decide a corrida) e o evento Alterou é do caso de uso.
+            adicionados += await db.Database.ExecuteSqlInterpolatedAsync($"INSERT IGNORE INTO FORMULARIOS_DESTINATARIOS (ID_FORMULARIO, ID_FUNCIONARIO) VALUES ({id}, {pessoa})", ct);
+        }
+
+        return adicionados;
+    }
+
     private async Task<bool> GravarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct)
     {
         var id = lido.Id;

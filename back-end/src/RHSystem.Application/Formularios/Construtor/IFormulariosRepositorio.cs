@@ -149,4 +149,10 @@ public interface IFormulariosRepositorio
     /// depois de confirmar a transação, ou <c>null</c> se o formulário já não existia (outra aba o apagou).
     /// </summary>
     Task<IReadOnlyList<string>?> ExcluirAsync(int formularioId, CancellationToken ct);
+
+    /// <summary>
+    /// Inclui as pessoas como destinatárias do formulário POR PESSOAS (quem já estava é ignorado, mesmo numa corrida: a chave única decide) e devolve quantas entraram agora. Segura a linha do formulário e confere que ele continua como foi lido (<c>ATIVO</c>, anonimato, encerramento
+    /// e alvo <c>PESSOAS</c>); <c>null</c> se outra aba o mudou nesse meio tempo. Roda na transação de quem chama (o caso de uso da rota, ou o cadastro do colaborador).
+    /// </summary>
+    Task<int?> IncluirDestinatariosAsync(FormularioLido lido, IReadOnlyList<int> funcionarioIds, CancellationToken ct);
 }

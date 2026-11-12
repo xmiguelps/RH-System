@@ -15,16 +15,3 @@ public sealed class OnboardingIndisponivel : IInclusaoNoOnboarding
     public Task<int> IncluirAsync(IReadOnlyList<int> funcionarioIds, CancellationToken ct) =>
         throw new InvalidOperationException("Sem treinamento de onboarding: ConferirAsync já recusou, IncluirAsync nunca devia ser chamado.");
 }
-
-/// <summary>
-/// A versão padrão de "enviar o formulário de admissão": enquanto não há formulários (fatia 5) nenhum existe, e o contrato diz que formulário que não existe é 400 em
-/// <c>formularioAdmissaoId</c>. A fatia 5 registra a implementação dela DEPOIS desta.
-/// </summary>
-public sealed class FormularioDeAdmissaoIndisponivel : IEnvioDoFormularioDeAdmissao
-{
-    public Task ConferirAsync(int formularioId, CancellationToken ct) =>
-        throw new ErroDeValidacaoException("formularioAdmissaoId", "O formulário de admissão escolhido não existe ou não está publicado.");
-
-    public Task<int> AdicionarDestinatariosAsync(int formularioId, IReadOnlyList<int> funcionarioIds, CancellationToken ct) =>
-        throw new InvalidOperationException("Sem formulários: ConferirAsync já recusou, AdicionarDestinatariosAsync nunca devia ser chamado.");
-}

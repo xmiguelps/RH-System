@@ -37,6 +37,12 @@ public sealed record FormularioRecorrenciaComando([property: JsonRequired] int I
     public DateOnly? Ate { get; init; }
 }
 
+/// <summary>O corpo de <c>adicionarDestinatariosFormulario</c> (<c>FormularioDestinatariosComando</c>): de 1 a 200 pessoas.</summary>
+public sealed record FormularioDestinatariosComando([property: JsonRequired] IReadOnlyList<int> FuncionarioIds);
+
+/// <summary>O resultado de <c>adicionarDestinatariosFormulario</c> (<c>FormularioDestinatariosResultado</c>): quantas entraram agora e quantas já estavam.</summary>
+public sealed record FormularioDestinatariosResultado(int Adicionados, int JaEstavam);
+
 /// <summary>O corpo de <c>salvarPublicacaoFormulario</c> e <c>publicarFormulario</c> (<c>FormularioPublicacaoComando</c>): o alvo e as listas coerentes com ele, o dia agendado, o prazo, a recorrência e o lembrete automático (padrão ligado).</summary>
 public sealed record FormularioPublicacaoComando([property: JsonRequired] AlvoDoFormulario Alvo)
 {

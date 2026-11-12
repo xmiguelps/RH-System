@@ -192,7 +192,7 @@ public static class DependencyInjection
         // As caixas "Depois de salvar" do cadastro dependem das fatias 5 e 6: as versões padrão dizem a verdade (indisponível) e ficam registradas ANTES de qualquer outra, para as fatias donas
         // registrarem as delas depois (AddScoped: o último registro vale).
         services.AddScoped<IInclusaoNoOnboarding, OnboardingIndisponivel>();
-        services.AddScoped<IEnvioDoFormularioDeAdmissao, FormularioDeAdmissaoIndisponivel>();
+        services.AddScoped<IEnvioDoFormularioDeAdmissao, EnvioDoFormularioDeAdmissao>(); // a caixa "Enviar o formulario de admissao" do cadastro, da readmissao e da importacao
         services.AddScoped<IGestorDoFuncionario, GestorDoFuncionario>();
         services.AddScoped<ICadastroDeFuncionarios, CadastroDeFuncionarios>();
         services.AddScoped<IEdicaoDeFuncionarios, EdicaoDeFuncionarios>();
