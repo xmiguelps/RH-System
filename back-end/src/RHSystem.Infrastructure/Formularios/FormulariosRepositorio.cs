@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
 using RHSystem.Application.Formularios.Construtor;
+using RHSystem.Application.Formularios.Mensagens;
+using RHSystem.Application.Formularios.Regras;
 using RHSystem.Domain.Formularios;
 using RHSystem.Infrastructure.Persistencia;
 
@@ -47,7 +50,38 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         return linhas == 1;
     }
 
-    public async Task<bool> AtualizarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, CancellationToken ct)
+    public Task<bool> AtualizarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, CancellationToken ct) => GravarPublicacaoAsync(lido, novos, new EfeitoDaPublicacao(Ativar: false, GerarToken: false, ProximaReaberturaEmUtc: null), ct);
+
+    public Task<bool> PublicarAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct) => GravarPublicacaoAsync(lido, novos, efeito, ct);
+
+    public async Task<bool> AtivarAgendadoAsync(int formularioId, DateTime publicacaoLidaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct)
+    {
+        var id = formularioId;
+        var instante = publicacaoLidaEmUtc;
+        var proxima = proximaReaberturaEmUtc;
+
+        // AUDITORIA-OK: a publicação do agendado é auditada à mão pela tarefa (evento Publicou do Sistema, na mesma transação); a data de publicação não muda: continua o começo do dia agendado.
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && !f.Ativo && f.EncerradoEmUtc == null && f.PublicadoEmUtc == instante)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Ativo, true).SetProperty(f => f.ProximaReaberturaEmUtc, proxima), ct);
+        return linhas == 1;
+    }
+
+    public async Task<bool> EncerrarAsync(FormularioLido lido, DateTime encerradoEmUtc, bool cancelarReaberturas, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var anonimoLido = lido.Anonimo;
+        var prazoLido = lido.Prazo;
+        DateTime? encerramento = encerradoEmUtc;
+
+        // AUDITORIA-OK: o encerramento é auditado à mão pelo caso de uso ou pela tarefa (evento Alterou, na mesma transação); ATIVO falso e a data de encerramento saem no mesmo UPDATE (o CHECK do banco os amarra).
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && f.Ativo && f.EncerradoEmUtc == null && f.Anonimo == anonimoLido && f.Prazo == prazoLido)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Ativo, false).SetProperty(f => f.EncerradoEmUtc, encerramento).SetProperty(f => f.ProximaReaberturaEmUtc, f => cancelarReaberturas ? null : f.ProximaReaberturaEmUtc), ct);
+        return linhas == 1;
+    }
+
+    private async Task<bool> GravarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct)
     {
         var id = lido.Id;
         var ativoLido = lido.Ativo;
@@ -62,26 +96,44 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         var ate = novos.Recorrencia?.Ate;
         var lembrete = novos.LembreteAutomatico;
         var novoDia = novos.NovaPublicacaoEmUtc;
+        var ativar = efeito.Ativar;
+        var proxima = efeito.ProximaReaberturaEmUtc;
 
-        // AUDITORIA-OK: a publicação guardada é auditada à mão pelo caso de uso (evento Alterou, na mesma transação); o código do link some junto se o alvo deixou de ser LINK (o CHECK do banco os amarra).
-        var linhas = await db.Formularios
-            .Where(f => f.Id == id && f.Ativo == ativoLido && f.Anonimo == anonimoLido && f.EncerradoEmUtc == encerradoLido && f.PublicadoEmUtc == publicadoLido)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(f => f.Alvo, alvo)
-                    .SetProperty(f => f.Prazo, prazo)
-                    .SetProperty(f => f.RecorrenciaIntervalo, intervalo)
-                    .SetProperty(f => f.RecorrenciaUnidade, unidade)
-                    .SetProperty(f => f.RecorrenciaAte, ate)
-                    .SetProperty(f => f.LembreteAutomatico, lembrete)
-                    .SetProperty(f => f.PublicadoEmUtc, f => novoDia ?? f.PublicadoEmUtc)
-                    .SetProperty(f => f.TokenDoLink, f => porLink ? f.TokenDoLink : null),
-                ct);
-        if (linhas != 1)
+        var tentativasDoCodigo = efeito.GerarToken ? 3 : 1;
+        for (var i = 1; i <= tentativasDoCodigo; i++)
         {
-            return false;
+            var token = efeito.GerarToken ? TokenDoLink.Novo() : null;
+            try
+            {
+                // AUDITORIA-OK: a publicação é auditada à mão pelo caso de uso (evento Alterou ao guardar, Publicou ao publicar, na mesma transação); o código do link some junto se o alvo deixou de ser LINK (o CHECK do banco os amarra).
+                var linhas = await db.Formularios
+                    .Where(f => f.Id == id && f.Ativo == ativoLido && f.Anonimo == anonimoLido && f.EncerradoEmUtc == encerradoLido && f.PublicadoEmUtc == publicadoLido)
+                    .ExecuteUpdateAsync(
+                        s => s.SetProperty(f => f.Alvo, alvo)
+                            .SetProperty(f => f.Prazo, prazo)
+                            .SetProperty(f => f.RecorrenciaIntervalo, intervalo)
+                            .SetProperty(f => f.RecorrenciaUnidade, unidade)
+                            .SetProperty(f => f.RecorrenciaAte, ate)
+                            .SetProperty(f => f.LembreteAutomatico, lembrete)
+                            .SetProperty(f => f.PublicadoEmUtc, f => novoDia ?? f.PublicadoEmUtc)
+                            .SetProperty(f => f.Ativo, f => ativar || f.Ativo)
+                            .SetProperty(f => f.ProximaReaberturaEmUtc, proxima)
+                            .SetProperty(f => f.TokenDoLink, f => porLink ? (token ?? f.TokenDoLink) : null),
+                        ct);
+                if (linhas != 1)
+                {
+                    return false;
+                }
+
+                break;
+            }
+            catch (Exception erro) when (i < tentativasDoCodigo && (erro is DbUpdateException or MySqlException) && ErrosDoBanco.EhChaveRepetida(erro) && ErrosDoBanco.NomeDaChaveRepetida(erro) == RegrasDoBancoDosFormularios.ChaveDoTokenDoLink)
+            {
+                // o código do link colidiu (improvável com 32 bytes aleatórios): gera outro
+            }
         }
 
-        // AUDITORIA-OK: as linhas de destinatário não são auditadas (quem recebe o formulário não é dado de auditoria, e no anônimo nenhum rastro pode sobrar); o evento Alterou é do caso de uso.
+        // AUDITORIA-OK: as linhas de destinatário não são auditadas (quem recebe o formulário não é dado de auditoria, e no anônimo nenhum rastro pode sobrar); o evento é do caso de uso.
         await db.FormulariosDestinatarios.Where(d => d.FormularioId == id).ExecuteDeleteAsync(ct);
         db.FormulariosDestinatarios.AddRange(novos.Alvo switch
         {

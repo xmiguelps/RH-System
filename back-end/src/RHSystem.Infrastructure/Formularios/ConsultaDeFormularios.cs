@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Formularios;
 using RHSystem.Application.Formularios.Construtor;
+using RHSystem.Application.Formularios.Destinatarios;
 using RHSystem.Domain.Formularios;
 using RHSystem.Infrastructure.Persistencia;
 
@@ -116,6 +117,9 @@ public sealed class ConsultaDeFormularios(AppDbContext db) : IConsultaDeFormular
         await db.Funcionarios.AsNoTracking().Where(f => ids.Contains(f.Id)).Select(f => new PessoaParaPublico(f.Id, f.Ativo)).ToListAsync(ct);
 
     public async Task<int> ContarSetoresExistentesAsync(IReadOnlyList<int> ids, CancellationToken ct) => await db.Setores.AsNoTracking().CountAsync(s => ids.Contains(s.Id), ct);
+
+    public async Task<IReadOnlyList<ParDeResposta>> ParesQueResponderamAsync(int formularioId, CancellationToken ct) =>
+        [.. (await db.FormulariosRespostas.AsNoTracking().Where(r => r.FormularioId == formularioId && r.FuncionarioId != null).Select(r => new { r.FuncionarioId, r.AvaliadoId }).Distinct().ToListAsync(ct)).Select(r => new ParDeResposta(r.FuncionarioId!.Value, r.AvaliadoId))];
 
     private async Task<IReadOnlyList<PerguntaLida>> PerguntasAsync(int formularioId, CancellationToken ct)
     {

@@ -260,6 +260,8 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeFormularios, ConsultaDeFormularios>();
         services.AddScoped<IDestinatariosDoFormulario, DestinatariosDoFormulario>();
         services.AddScoped<IAgendamentoDoFormulario, AgendamentoDoFormulario>();
+        services.AddScoped<ITarefaAgendada, PublicarFormularioTarefa>(); // o agendado vira publicado no dia, uma vez
+        services.AddScoped<ITarefaAgendada, EncerrarFormularioTarefa>(); // o prazo encerra o formulario no instante nominal
         services.AddScoped<IPerguntasDoFormularioRepositorio, PerguntasDoFormularioRepositorio>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();

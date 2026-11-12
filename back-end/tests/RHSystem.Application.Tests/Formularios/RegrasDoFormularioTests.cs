@@ -86,6 +86,25 @@ public class RegrasDoFormularioTests
         Assert.Equal(InstantesDoFormulario.InicioDoDiaAgendado(new DateOnly(2026, 10, 8)), InstantesDoFormulario.ProximaReabertura(new DateTime(2026, 10, 8, 2, 30, 0, DateTimeKind.Utc), 1, UnidadeDeRecorrencia.Dia));
 
     [Fact]
+    public void A_proxima_reabertura_dentro_do_limite_vale_ate_o_ultimo_dia_e_depois_dele_nao_ha_mais()
+    {
+        // 07/10 + 1 mês = 07/11
+        Assert.Equal(InstantesDoFormulario.InicioDoDiaAgendado(new DateOnly(2026, 11, 7)), InstantesDoFormulario.ProximaReaberturaDentroDoLimite(Agora, 1, UnidadeDeRecorrencia.Mes, new DateOnly(2026, 11, 7))); // o último dia ainda reabre
+        Assert.Null(InstantesDoFormulario.ProximaReaberturaDentroDoLimite(Agora, 1, UnidadeDeRecorrencia.Mes, new DateOnly(2026, 11, 6)));
+        Assert.Equal(InstantesDoFormulario.InicioDoDiaAgendado(new DateOnly(2026, 11, 7)), InstantesDoFormulario.ProximaReaberturaDentroDoLimite(Agora, 1, UnidadeDeRecorrencia.Mes, null)); // sem limite, reabre sempre
+    }
+
+    [Fact]
+    public void O_limite_da_recorrencia_e_conferido_no_dia_do_Brasil_e_nao_no_dia_em_UTC()
+    {
+        // a próxima reabertura é 00:00 -03:00 de 08/10 = 03:00Z: o dia local é 08, mesmo que o dia UTC também seja 08; com base às 23:30 locais (02:30Z do dia seguinte) o dia local da base continua o 07
+        var tarde = new DateTime(2026, 10, 8, 2, 30, 0, DateTimeKind.Utc);
+
+        Assert.NotNull(InstantesDoFormulario.ProximaReaberturaDentroDoLimite(tarde, 1, UnidadeDeRecorrencia.Dia, new DateOnly(2026, 10, 8)));
+        Assert.Null(InstantesDoFormulario.ProximaReaberturaDentroDoLimite(tarde, 1, UnidadeDeRecorrencia.Dia, new DateOnly(2026, 10, 7)));
+    }
+
+    [Fact]
     public void O_prazo_da_rodada_nova_avanca_o_mesmo_numero_de_dias_da_anterior()
     {
         // a rodada anterior abriu em 01/09 (manhã) com prazo em 15/09: 14 dias; a nova abre em 01/10

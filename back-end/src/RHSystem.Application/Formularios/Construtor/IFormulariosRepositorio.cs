@@ -1,4 +1,5 @@
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Formularios.Destinatarios;
 using RHSystem.Application.Formularios.Regras;
 using RHSystem.Domain.Formularios;
 
@@ -53,6 +54,9 @@ public interface IConsultaDeFormularios
 
     /// <summary>Quantos dos setores de <paramref name="ids"/> existem.</summary>
     Task<int> ContarSetoresExistentesAsync(IReadOnlyList<int> ids, CancellationToken ct);
+
+    /// <summary>Os pares (pessoa e avaliado) que já responderam o formulário com nome (as respostas de pessoa; sem as anônimas nem as de candidato): é o que "quem falta" tira dos pares que devem responder.</summary>
+    Task<IReadOnlyList<ParDeResposta>> ParesQueResponderamAsync(int formularioId, CancellationToken ct);
 }
 
 /// <summary>Uma pessoa escolhida na publicação: existe, e está ativa ou não.</summary>
@@ -70,7 +74,15 @@ public interface IAgendamentoDoFormulario
     Task AgendarPublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, CancellationToken ct);
 
     Task CancelarPublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, CancellationToken ct);
+
+    /// <summary>A tarefa que encerra o formulário pelo prazo (<c>ENCERRAR_FORMULARIO:formulario={id}:em={instante}</c>), no instante NOMINAL do encerramento: o começo do dia seguinte ao prazo (-03:00).</summary>
+    Task AgendarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
+
+    Task CancelarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
 }
+
+/// <summary>O efeito de publicar sobre o formulário: se já liga o <c>ATIVO</c> (agora) ou só marca o dia (agendado), se gera o código do link e a próxima reabertura de um formulário recorrente.</summary>
+public sealed record EfeitoDaPublicacao(bool Ativar, bool GerarToken, DateTime? ProximaReaberturaEmUtc);
 
 /// <summary>Os campos que a edição dos detalhes grava. <c>LimparPrazoERecorrencia</c> vale ao virar Sugestão (sempre aberta); <c>ExigirSemResposta</c>, ao mudar tipo ou sentido de um formulário com nome publicado.</summary>
 public sealed record DetalhesParaGravar(string Titulo, string? Descricao, TipoDeFormulario Tipo, SentidoDaAvaliacao? Sentido, bool Anonimo, bool LimparPrazoERecorrencia, bool ExigirSemResposta);
@@ -94,4 +106,19 @@ public interface IFormulariosRepositorio
     /// do link se o alvo deixou de ser <c>LINK</c>. <c>false</c> se outra aba publicou, encerrou ou mudou a data nesse meio tempo.
     /// </summary>
     Task<bool> AtualizarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, CancellationToken ct);
+
+    /// <summary>
+    /// Publica ou agenda: grava a publicação como <see cref="AtualizarPublicacaoAsync"/> (<c>NovaPublicacaoEmUtc</c> é a data de publicação, agora ou o começo do dia agendado), liga <c>ATIVO</c> se <see cref="EfeitoDaPublicacao.Ativar"/>, gera o código do link (43 caracteres;
+    /// nova tentativa se a chave única repetir) e grava a próxima reabertura. <c>false</c> se outra aba publicou, encerrou ou mudou o formulário nesse meio tempo.
+    /// </summary>
+    Task<bool> PublicarAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct);
+
+    /// <summary>A tarefa de publicar: liga <c>ATIVO</c> do formulário AGENDADO cuja data é exatamente <paramref name="publicacaoLidaEmUtc"/> (e que não foi encerrado) e grava a próxima reabertura. <c>false</c> se ele mudou, foi publicado ou apagado.</summary>
+    Task<bool> AtivarAgendadoAsync(int formularioId, DateTime publicacaoLidaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct);
+
+    /// <summary>
+    /// Encerra o formulário PUBLICADO como está lido: <c>ATIVO</c> falso e a data de encerramento no mesmo UPDATE (o CHECK do banco os amarra). <paramref name="cancelarReaberturas"/> tira a próxima reabertura (o encerramento à mão cancela a recorrência; o do prazo não).
+    /// <c>false</c> se outra aba encerrou ou mudou o formulário nesse meio tempo.
+    /// </summary>
+    Task<bool> EncerrarAsync(FormularioLido lido, DateTime encerradoEmUtc, bool cancelarReaberturas, CancellationToken ct);
 }

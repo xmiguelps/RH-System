@@ -54,6 +54,13 @@ public static class InstantesDoFormulario
         return FusoBrasil.InicioDoDiaEmUtc(proximo);
     }
 
+    /// <summary>A próxima reabertura, ou <c>null</c> se ela cairia depois do último dia em que ainda reabre (<paramref name="ate"/>, o dia no Brasil): a recorrência acaba ali.</summary>
+    public static DateTime? ProximaReaberturaDentroDoLimite(DateTime baseUtc, int intervalo, UnidadeDeRecorrencia unidade, DateOnly? ate)
+    {
+        var proxima = ProximaReabertura(baseUtc, intervalo, unidade);
+        return ate is { } limite && FusoBrasil.DiaLocalDe(proxima) > limite ? null : proxima;
+    }
+
     /// <summary>O prazo da rodada nova: avança o MESMO número de dias que a rodada anterior tinha entre a publicação e o prazo (hipótese do contrato).</summary>
     public static DateOnly NovoPrazo(DateOnly prazoAnterior, DateTime publicadoAnteriorUtc, DateTime novaPublicacaoUtc)
     {

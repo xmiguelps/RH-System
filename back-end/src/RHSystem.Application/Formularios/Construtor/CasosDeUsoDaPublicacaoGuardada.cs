@@ -27,22 +27,7 @@ public sealed class SalvarPublicacaoCasoDeUso(IConsultaDeFormularios consulta, I
             var agora = relogio.AgoraUtc;
             var lido = (await consulta.ObterAsync(formularioId, ct)).OuNaoEncontrado();
             var situacao = MapeadorDoFormulario.SituacaoDe(lido, agora);
-            var erros = new ColetorDeErros();
-            var campos = ValidacaoDaPublicacao.Validar(erros, corpo, FusoBrasil.Hoje(agora), lido.Tipo);
-            ConferirPrazoContraODiaAgendado(erros, corpo, lido, situacao);
-            if (campos is not null)
-            {
-                await ConferirExistenciaAsync(erros, campos, ct);
-            }
-
-            erros.LancarSeHouver();
-            ConferirSituacao(situacao);
-            if (RegrasDaPublicacao.Recusa(lido.Tipo, lido.Anonimo, campos!.Alvo) is { } recusa)
-            {
-                throw (recusa == RecusaDePublicacao.AnonimoSemLink ? MensagensDosFormularios.AnonimoSemLink : MensagensDosFormularios.LinkSoParaEntrevista).ComoProblema();
-            }
-
-            await ConferirPessoasAtivasAsync(campos, ct);
+            var campos = await ConferenciaDaPublicacao.ConferirAsync(consulta, lido, situacao, corpo, agora, paraPublicar: false, ct);
             var novoDia = situacao == SituacaoDoFormulario.Agendado && campos.AgendarPara is { } dia ? InstantesDoFormulario.InicioDoDiaAgendado(dia) : (DateTime?)null;
             if (novoDia == lido.PublicadoEmUtc)
             {
@@ -80,49 +65,6 @@ public sealed class SalvarPublicacaoCasoDeUso(IConsultaDeFormularios consulta, I
         }
 
         throw MensagensDosFormularios.FormularioMudouEmOutraTela;
-    }
-
-    /// <summary>Num agendado sem <c>agendarPara</c> no corpo o dia guardado continua valendo, e o prazo não pode ser anterior a ele.</summary>
-    private static void ConferirPrazoContraODiaAgendado(ColetorDeErros erros, FormularioPublicacaoComando corpo, FormularioLido lido, SituacaoDoFormulario situacao)
-    {
-        if (situacao == SituacaoDoFormulario.Agendado && corpo.AgendarPara is null && corpo.Prazo is { } prazo && lido.PublicadoEmUtc is { } publicacao && prazo < FusoBrasil.DiaLocalDe(publicacao))
-        {
-            erros.Adicionar("prazo", "O prazo não pode ser anterior ao dia agendado.");
-        }
-    }
-
-    private async Task ConferirExistenciaAsync(ColetorDeErros erros, PublicacaoValidada campos, CancellationToken ct)
-    {
-        if (campos.FuncionarioIds.Count > 0 && (await consulta.PessoasAsync(campos.FuncionarioIds, ct)).Count != campos.FuncionarioIds.Count)
-        {
-            erros.Adicionar("funcionarioIds", "Uma das pessoas escolhidas não existe.");
-        }
-
-        if (campos.SetorIds.Count > 0 && await consulta.ContarSetoresExistentesAsync(campos.SetorIds, ct) != campos.SetorIds.Count)
-        {
-            erros.Adicionar("setorIds", "Um dos setores escolhidos não existe.");
-        }
-    }
-
-    private static void ConferirSituacao(SituacaoDoFormulario situacao)
-    {
-        if (situacao == SituacaoDoFormulario.Publicado)
-        {
-            throw MensagensDosFormularios.FormularioJaPublicado.ComoProblema();
-        }
-
-        if (situacao == SituacaoDoFormulario.Encerrado)
-        {
-            throw MensagensDosFormularios.FormularioEncerradoParaEditar.ComoProblema();
-        }
-    }
-
-    private async Task ConferirPessoasAtivasAsync(PublicacaoValidada campos, CancellationToken ct)
-    {
-        if (campos.FuncionarioIds.Count > 0 && (await consulta.PessoasAsync(campos.FuncionarioIds, ct)).Any(p => !p.Ativo))
-        {
-            throw MensagensDosFormularios.PessoaInativaNoPublico.ComoProblema();
-        }
     }
 }
 
