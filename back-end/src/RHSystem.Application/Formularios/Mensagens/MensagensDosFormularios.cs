@@ -94,6 +94,12 @@ public static class MensagensDosFormularios
     public static ProblemaDeApiException PerguntasMudaramEmOutraTela { get; } =
         new(409, Conflito, "As perguntas deste formulário mudaram em outra tela. Atualize a página e tente de novo.");
 
+    /// <summary>
+    /// A edição que perdeu a corrida mais vezes do que o caso de uso tenta de novo (outra aba muda o formulário sem parar): 409 sem código. Sem exemplo no contrato: texto do executor.
+    /// </summary>
+    public static ProblemaDeApiException FormularioMudouEmOutraTela { get; } =
+        new(409, Conflito, "Este formulário mudou em outra tela. Atualize a página e tente de novo.");
+
     // ---------------------------------------------------------------- 422: o estado do formulário
 
     public static MensagemDoFormulario FormularioEncerradoParaEditar { get; } = new(422, Recusada, "O formulário está encerrado e não pode mais ser alterado.", "FORMULARIO_ENCERRADO");

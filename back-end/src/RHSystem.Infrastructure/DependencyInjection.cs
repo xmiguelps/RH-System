@@ -20,6 +20,7 @@ using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
+using RHSystem.Application.Formularios.Construtor;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
@@ -38,6 +39,7 @@ using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Comunicacao;
 using RHSystem.Infrastructure.Documentos;
 using RHSystem.Infrastructure.Emails;
+using RHSystem.Infrastructure.Formularios;
 using RHSystem.Infrastructure.Empresa;
 using RHSystem.Infrastructure.Escopo;
 using RHSystem.Infrastructure.Esquema;
@@ -253,6 +255,8 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeAvisosDaPessoa, ConsultaDeAvisosDaPessoa>();
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeAvisos>(); // a bolinha Avisos do menu
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
+        services.AddScoped<IFormulariosRepositorio, FormulariosRepositorio>();
+        services.AddScoped<IConsultaDeFormularios, ConsultaDeFormularios>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();
         services.AddScoped<IConsultaDeHolerites, ConsultaDeHolerites>();
