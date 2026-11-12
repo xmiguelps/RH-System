@@ -1,4 +1,5 @@
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Formularios.Destinatarios;
 using RHSystem.Application.Formularios.Regras;
 using RHSystem.Domain.Formularios;
@@ -57,7 +58,25 @@ public interface IConsultaDeFormularios
 
     /// <summary>Os pares (pessoa e avaliado) que já responderam o formulário com nome (as respostas de pessoa; sem as anônimas nem as de candidato): é o que "quem falta" tira dos pares que devem responder.</summary>
     Task<IReadOnlyList<ParDeResposta>> ParesQueResponderamAsync(int formularioId, CancellationToken ct);
+
+    /// <summary>A página da lista do RH, com o total e a contagem por tipo (que respeita a busca e a situação e ignora o tipo). A situação do filtro é a CALCULADA (o prazo vencido vale encerrado), pelo <paramref name="hoje"/> da aplicação.</summary>
+    Task<(IReadOnlyList<FormularioDaLista> Itens, int Total, FormularioContagemPorTipo Contagem)> ListarAsync(FiltroDeFormulariosRh filtro, ParametrosDeLista parametros, DateOnly hoje, CancellationToken ct);
+
+    /// <summary>O que cada formulário já recebeu, de uma vez só para os ids da página (a lista do RH e a exclusão leem daqui). Formulário sem nada recebido volta com tudo zerado.</summary>
+    Task<IReadOnlyDictionary<int, RespostasDoFormulario>> RespostasPorFormularioAsync(IReadOnlyList<int> ids, CancellationToken ct);
 }
+
+/// <summary>Os filtros da lista do RH: o tipo (as abas) e a situação CALCULADA.</summary>
+public sealed record FiltroDeFormulariosRh(TipoDeFormulario? Tipo, SituacaoDoFormulario? Situacao);
+
+/// <summary>Uma linha da lista como o banco a guarda: a situação NÃO vem pronta (quem lê a calcula com o relógio da aplicação).</summary>
+public sealed record FormularioDaLista(int Id, string Titulo, TipoDeFormulario Tipo, SentidoDaAvaliacao? Sentido, bool Anonimo, bool Ativo, AlvoDoFormulario? Alvo, DateTime? PublicadoEmUtc, DateTime? EncerradoEmUtc, DateOnly? Prazo, DateTime CriadoEmUtc);
+
+/// <summary>
+/// O que um formulário já recebeu. <c>Pares</c>: as pessoas (e avaliados) que responderam, só nos formulários com nome. <c>Candidatos</c>: as candidaturas por link. <c>Envios</c>: os envios de pessoas (a Sugestão aceita vários da mesma pessoa; cada envio é o grupo de linhas
+/// com a mesma data). <c>Participacoes</c>: as participações do anônimo (uma linha por pessoa e avaliado, sem a resposta).
+/// </summary>
+public sealed record RespostasDoFormulario(IReadOnlyList<ParDeResposta> Pares, int Candidatos, int Envios, int Participacoes);
 
 /// <summary>Uma pessoa escolhida na publicação: existe, e está ativa ou não.</summary>
 public sealed record PessoaParaPublico(int Id, bool Ativo);
@@ -79,6 +98,9 @@ public interface IAgendamentoDoFormulario
     Task AgendarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
 
     Task CancelarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
+
+    /// <summary>Cancela toda tarefa pendente do formulário (publicar, encerrar, reabrir, lembrete) e os e-mails de lembrete ainda na fila: a exclusão não deixa nada rodar depois.</summary>
+    Task CancelarTudoAsync(int formularioId, CancellationToken ct);
 }
 
 /// <summary>O efeito de publicar sobre o formulário: se já liga o <c>ATIVO</c> (agora) ou só marca o dia (agendado), se gera o código do link e a próxima reabertura de um formulário recorrente.</summary>
@@ -121,4 +143,10 @@ public interface IFormulariosRepositorio
     /// <c>false</c> se outra aba encerrou ou mudou o formulário nesse meio tempo.
     /// </summary>
     Task<bool> EncerrarAsync(FormularioLido lido, DateTime encerradoEmUtc, bool cancelarReaberturas, CancellationToken ct);
+
+    /// <summary>
+    /// A exclusão FÍSICA, na ordem das chaves (nenhuma tem <c>ON DELETE</c>): respostas, participações, destinatários, candidatos, alternativas, perguntas e o formulário. Devolve os caminhos dos arquivos (currículos e respostas de arquivo) para quem chama apagar do armazenamento
+    /// depois de confirmar a transação, ou <c>null</c> se o formulário já não existia (outra aba o apagou).
+    /// </summary>
+    Task<IReadOnlyList<string>?> ExcluirAsync(int formularioId, CancellationToken ct);
 }

@@ -41,7 +41,11 @@ public sealed class EncerrarFormularioCasoDeUso(
 
             if (!confirmar)
             {
-                await ExigirConfirmacaoSeHouverAsync(lido, FusoBrasil.Hoje(agora), ct);
+                var pendentes = await PendentesDoFormulario.ContarAsync(consulta, destinatarios, lido, FusoBrasil.Hoje(agora), ct);
+                if (pendentes is not 0)
+                {
+                    throw MensagensDosFormularios.ConfirmacaoNecessaria(pendentes);
+                }
             }
 
             var gravou = await unidade.ExecutarEmTransacaoAsync(
@@ -69,25 +73,5 @@ public sealed class EncerrarFormularioCasoDeUso(
         }
 
         throw MensagensDosFormularios.FormularioMudouEmOutraTela;
-    }
-
-    private async Task ExigirConfirmacaoSeHouverAsync(FormularioLido lido, DateOnly hoje, CancellationToken ct)
-    {
-        if (lido.Anonimo)
-        {
-            throw MensagensDosFormularios.ConfirmacaoNecessaria(null);
-        }
-
-        if (lido.Alvo is not (AlvoDoFormulario.Pessoas or AlvoDoFormulario.Setores) || lido.Tipo == TipoDeFormulario.Outro)
-        {
-            return; // por link e a Sugestão: ninguém é obrigado a responder
-        }
-
-        var quem = (await destinatarios.ObterAsync(lido.Id, hoje, ct)).OuNaoEncontrado();
-        var pendentes = quem.QuemFalta(await consulta.ParesQueResponderamAsync(lido.Id, ct)).Count;
-        if (pendentes > 0)
-        {
-            throw MensagensDosFormularios.ConfirmacaoNecessaria(pendentes);
-        }
     }
 }

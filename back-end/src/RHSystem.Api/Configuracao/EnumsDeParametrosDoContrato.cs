@@ -11,6 +11,7 @@ using RHSystem.Application.Ponto;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Colaboradores;
 using RHSystem.Domain.Comunicacao;
+using RHSystem.Domain.Formularios;
 using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Api.Configuracao;
@@ -58,8 +59,17 @@ public static class EnumsDeParametrosDoContrato
         [("listarAdvertencias", "tipo")] = typeof(TipoDeAdvertencia),
         [("listarAdvertenciasDaEquipe", "situacao")] = typeof(SituacaoDaAdvertencia),
         [("listarMinhasAdvertencias", "situacao")] = typeof(SituacaoDaAdvertencia),
+        [("listarFormulariosRh", "tipo")] = typeof(TipoDeFormulario),
+        [("listarFormulariosRh", "situacao")] = typeof(SituacaoDoFormulario),
+        [("listarFormulariosRh", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
+    };
+
+    /// <summary>Os valores que o contrato escreve em camelCase (não em MAIÚSCULAS_COM_SUBLINHADO), com o padrão, por <c>operationId</c> e nome do parâmetro.</summary>
+    private static readonly Dictionary<(string Operacao, string Parametro), (string[] Valores, string Padrao)> Literais = new()
+    {
+        [("listarFormulariosRh", "ordenarPor")] = (["criadoEm", "titulo", "prazo"], "criadoEm"),
     };
 
     /// <summary>Tem de vir DEPOIS de <see cref="NomesDeParametrosDoContrato"/>: a chave usa o nome já em camelCase.</summary>
@@ -74,6 +84,18 @@ public static class EnumsDeParametrosDoContrato
     {
         foreach (var parametro in operacao.Parameters ?? [])
         {
+            if (parametro is OpenApiParameter { In: ParameterLocation.Query, Name: { } nomeLiteral } literal
+                && Literais.TryGetValue((operacao.OperationId ?? string.Empty, nomeLiteral), out var valores))
+            {
+                literal.Schema = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.String,
+                    Enum = [.. valores.Valores.Select(v => (JsonNode)JsonValue.Create(v)!)],
+                    Default = JsonValue.Create(valores.Padrao),
+                };
+                continue;
+            }
+
             if (parametro is OpenApiParameter { In: ParameterLocation.Query, Name: { } nome } concreto
                 && Enums.TryGetValue((operacao.OperationId ?? string.Empty, nome), out var tipo))
             {

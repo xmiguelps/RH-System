@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Formularios;
 using RHSystem.Application.Formularios.Construtor;
 using RHSystem.Application.Formularios.Destinatarios;
@@ -120,6 +121,51 @@ public sealed class ConsultaDeFormularios(AppDbContext db) : IConsultaDeFormular
 
     public async Task<IReadOnlyList<ParDeResposta>> ParesQueResponderamAsync(int formularioId, CancellationToken ct) =>
         [.. (await db.FormulariosRespostas.AsNoTracking().Where(r => r.FormularioId == formularioId && r.FuncionarioId != null).Select(r => new { r.FuncionarioId, r.AvaliadoId }).Distinct().ToListAsync(ct)).Select(r => new ParDeResposta(r.FuncionarioId!.Value, r.AvaliadoId))];
+
+    private static readonly MapaDeOrdenacao<Formulario> Ordem = new MapaDeOrdenacao<Formulario>("criadoEm", DirecaoDeOrdenacao.Desc, f => f.Id)
+        .Por("criadoEm", f => f.CriadoEmUtc)
+        .Por("titulo", f => f.Titulo)
+        .Por("prazo", f => f.Prazo);
+
+    public async Task<(IReadOnlyList<FormularioDaLista> Itens, int Total, FormularioContagemPorTipo Contagem)> ListarAsync(FiltroDeFormulariosRh filtro, ParametrosDeLista parametros, DateOnly hoje, CancellationToken ct)
+    {
+        var baseDaLista = db.Formularios.AsNoTracking().NaSituacaoCalculada(filtro.Situacao, hoje);
+        if (parametros.Busca is { } busca)
+        {
+            var like = BuscaLike.Contem(busca);
+            baseDaLista = baseDaLista.Where(f => EF.Functions.Like(f.Titulo, like));
+        }
+
+        // as abas: a contagem respeita a busca e a situação e ignora o tipo, para os números não mudarem quando a pessoa troca de aba
+        var porTipo = (await baseDaLista.GroupBy(f => f.Tipo).Select(g => new { Tipo = g.Key, Quantos = g.Count() }).ToListAsync(ct)).ToDictionary(x => x.Tipo ?? TipoDeFormulario.Pesquisa, x => x.Quantos);
+        int Quantos(TipoDeFormulario tipo) => porTipo.GetValueOrDefault(tipo);
+        var contagem = new FormularioContagemPorTipo(porTipo.Values.Sum(), Quantos(TipoDeFormulario.Entrevista), Quantos(TipoDeFormulario.Admissao), Quantos(TipoDeFormulario.Avaliacao), Quantos(TipoDeFormulario.Pesquisa), Quantos(TipoDeFormulario.Outro));
+
+        var filtrada = filtro.Tipo is { } tipoPedido ? baseDaLista.Where(f => f.Tipo == tipoPedido) : baseDaLista;
+        var total = await filtrada.CountAsync(ct);
+        var pagina = await Ordem.Aplicar(filtrada, parametros).Skip(parametros.Pular).Take(parametros.TamanhoPagina)
+            .Select(f => new { f.Id, f.Titulo, f.Tipo, f.SentidoAvaliacao, f.Anonimo, f.Ativo, f.Alvo, f.PublicadoEmUtc, f.EncerradoEmUtc, f.Prazo, f.CriadoEmUtc })
+            .ToListAsync(ct);
+        return ([.. pagina.Select(f => new FormularioDaLista(f.Id, f.Titulo, f.Tipo ?? TipoDeFormulario.Pesquisa, f.SentidoAvaliacao, f.Anonimo, f.Ativo, f.Alvo, f.PublicadoEmUtc, f.EncerradoEmUtc, f.Prazo, f.CriadoEmUtc ?? DateTime.UnixEpoch))], total, contagem);
+    }
+
+    public async Task<IReadOnlyDictionary<int, RespostasDoFormulario>> RespostasPorFormularioAsync(IReadOnlyList<int> ids, CancellationToken ct)
+    {
+        var envios = await db.FormulariosRespostas.AsNoTracking()
+            .Where(r => ids.Contains(r.FormularioId) && r.FuncionarioId != null)
+            .Select(r => new { r.FormularioId, r.FuncionarioId, r.AvaliadoId, r.RespondidaEmUtc })
+            .Distinct()
+            .ToListAsync(ct);
+        var candidatos = (await db.FormulariosCandidatos.AsNoTracking().Where(c => ids.Contains(c.FormularioId)).GroupBy(c => c.FormularioId).Select(g => new { Id = g.Key, Quantos = g.Count() }).ToListAsync(ct)).ToDictionary(x => x.Id, x => x.Quantos);
+        var participacoes = (await db.FormulariosParticipacoes.AsNoTracking().Where(p => ids.Contains(p.FormularioId)).GroupBy(p => p.FormularioId).Select(g => new { Id = g.Key, Quantos = g.Count() }).ToListAsync(ct)).ToDictionary(x => x.Id, x => x.Quantos);
+        return ids.Distinct().ToDictionary(
+            id => id,
+            id => new RespostasDoFormulario(
+                [.. envios.Where(e => e.FormularioId == id).Select(e => new ParDeResposta(e.FuncionarioId!.Value, e.AvaliadoId)).Distinct()],
+                candidatos.GetValueOrDefault(id),
+                envios.Count(e => e.FormularioId == id),
+                participacoes.GetValueOrDefault(id)));
+    }
 
     private async Task<IReadOnlyList<PerguntaLida>> PerguntasAsync(int formularioId, CancellationToken ct)
     {

@@ -7,6 +7,11 @@ using RHSystem.Application.Formularios.Regras;
 namespace RHSystem.Api.Formularios;
 
 /// <summary>
+/// Os parâmetros de <c>GET /api/rh/formularios</c>. <c>Tipo</c>, <c>Situacao</c>, <c>OrdenarPor</c> e <c>Direcao</c> chegam como texto: o caso de uso os lê pelo nome do contrato (<c>ENTREVISTA</c>, <c>criadoEm</c>, <c>ASC</c>) e devolve todos os erros juntos num 400 só.
+/// </summary>
+public sealed record FiltrosDaListaDeFormularios(int Pagina = 1, int TamanhoPagina = 20, string? Busca = null, string? Tipo = null, string? Situacao = null, string? OrdenarPor = null, string? Direcao = null);
+
+/// <summary>
 /// Os formulários pelo RH (<c>/api/rh/formularios</c>). Os <c>operationId</c> e os códigos de resposta são os de <c>contrato/fontes/50-fatia-5-formularios.yaml</c>. Esta parte: criar, obter e editar os detalhes; as demais rotas entram nas tarefas seguintes
 /// da fatia.
 /// </summary>
@@ -16,6 +21,8 @@ public static class FormulariosRhEndpoints
 
     public static IServiceCollection AdicionarCasosDeUsoDosFormulariosDoRh(this IServiceCollection servicos)
     {
+        servicos.AddScoped<ListarFormulariosRhCasoDeUso>();
+        servicos.AddScoped<ExcluirFormularioCasoDeUso>();
         servicos.AddScoped<ObterFormularioRhCasoDeUso>();
         servicos.AddScoped<CriarFormularioCasoDeUso>();
         servicos.AddScoped<EditarFormularioCasoDeUso>();
@@ -32,6 +39,16 @@ public static class FormulariosRhEndpoints
     public static IEndpointRouteBuilder MapFormulariosRh(this IEndpointRouteBuilder rotas)
     {
         var rh = rotas.GrupoRh().WithTags(Etiqueta);
+
+        rh.MapGet("/formularios", Listar)
+            .WithName("listarFormulariosRh")
+            .Produces<FormularioRhLista>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status500InternalServerError);
+
+        rh.MapDelete("/formularios/{formularioId:int}", Excluir)
+            .WithName("excluirFormulario")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status500InternalServerError);
 
         rh.MapPost("/formularios", Criar)
             .WithName("criarFormulario")
@@ -129,6 +146,15 @@ public static class FormulariosRhEndpoints
                 StatusCodes.Status500InternalServerError);
 
         return rotas;
+    }
+
+    private static async Task<FormularioRhLista> Listar([AsParameters] FiltrosDaListaDeFormularios f, ListarFormulariosRhCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(f.Pagina, f.TamanhoPagina, f.Busca, f.Tipo, f.Situacao, f.OrdenarPor, f.Direcao, ct);
+
+    private static async Task<IResult> Excluir(int formularioId, bool? confirmar, ExcluirFormularioCasoDeUso casoDeUso, CancellationToken ct)
+    {
+        await casoDeUso.ExecutarAsync(formularioId, confirmar ?? false, ct);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> Criar(FormularioDetalhesComando corpo, CriarFormularioCasoDeUso casoDeUso, CancellationToken ct) => Results.Json(await casoDeUso.ExecutarAsync(corpo, ct), statusCode: StatusCodes.Status201Created);

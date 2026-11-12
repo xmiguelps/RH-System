@@ -81,6 +81,35 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         return linhas == 1;
     }
 
+    public async Task<IReadOnlyList<string>?> ExcluirAsync(int formularioId, CancellationToken ct)
+    {
+        var id = formularioId;
+        var arquivosDasRespostas = await db.FormulariosRespostas.AsNoTracking().Where(r => r.FormularioId == id && r.CaminhoArquivo != null).Select(r => r.CaminhoArquivo!).ToListAsync(ct);
+        var curriculos = await db.FormulariosCandidatos.AsNoTracking().Where(c => c.FormularioId == id && c.CaminhoCurriculo != null).Select(c => c.CaminhoCurriculo!).ToListAsync(ct);
+
+        // AUDITORIA-OK: a exclusão do formulário é auditada à mão pelo caso de uso (evento Excluiu, com o título e a quantidade de respostas, na mesma transação); as respostas, as participações, os destinatários e os candidatos não são auditados (nenhum rastro de quem respondeu).
+        await db.FormulariosRespostas.Where(r => r.FormularioId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as participações não são auditadas (nenhum rastro de quem participou do anônimo); o evento Excluiu é do caso de uso.
+        await db.FormulariosParticipacoes.Where(p => p.FormularioId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as linhas de destinatário não são auditadas; o evento Excluiu é do caso de uso.
+        await db.FormulariosDestinatarios.Where(d => d.FormularioId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: os candidatos não são auditados (dado pessoal que não vai a evento); o evento Excluiu é do caso de uso.
+        await db.FormulariosCandidatos.Where(c => c.FormularioId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as alternativas saem junto com o formulário, que o caso de uso audita (evento Excluiu).
+        await db.FormulariosAlternativas.Where(a => db.FormulariosPerguntas.Any(p => p.Id == a.PerguntaId && p.FormularioId == id)).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as perguntas saem junto com o formulário, que o caso de uso audita (evento Excluiu); o trigger do banco só recusa pergunta com resposta e as respostas já foram apagadas.
+        await db.FormulariosPerguntas.Where(p => p.FormularioId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: a exclusão do formulário é auditada à mão pelo caso de uso (evento Excluiu, na mesma transação).
+        var apagados = await db.Formularios.Where(f => f.Id == id).ExecuteDeleteAsync(ct);
+        return apagados == 1 ? [.. arquivosDasRespostas, .. curriculos] : null;
+    }
+
     private async Task<bool> GravarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct)
     {
         var id = lido.Id;
