@@ -9,6 +9,7 @@ using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Ponto;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Colaboradores;
+using RHSystem.Domain.Comunicacao;
 using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Api.Configuracao;
@@ -47,6 +48,8 @@ public static class EnumsDeParametrosDoContrato
         [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),
+        [("listarAvisos", "situacao")] = typeof(SituacaoDoAviso),
+        [("listarAvisos", "tipo")] = typeof(TipoDeAviso),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };

@@ -10,7 +10,7 @@ Colunas: `fatia` (0 a 8) e `situação`: `planejada` (só no contrato), `em anda
 | 1 | Colaboradores e base transversal | em andamento |
 | 2 | Importação por Excel | em andamento |
 | 3 | Ponto | em andamento |
-| 4 | Comunicação e documentos | planejada |
+| 4 | Comunicação e documentos | em andamento |
 | 5 | Formulários | planejada |
 | 6 | TAD (treinamentos) | planejada |
 | 7 | Gestão | planejada |
@@ -109,6 +109,14 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/ponto/folha/exportacao` | exportarPontoParaFolha | em andamento | só RH; `ano` e `mes` obrigatórios; CSV UTF-8 com BOM, `;`, CRLF, como anexo `ponto-AAAA-MM.csv`; uma linha por pessoa ativa em algum dia do mês (quem saiu no meio entra, quem saiu antes ou entra depois não), por nome; os números saem do mesmo espelho da tela; crédito e débito do banco do mês em colunas separadas (nenhum número negativo); texto neutralizado contra fórmula; cada exportação deixa o evento `PONTO`/`BAIXOU` sem nome nem hora de ninguém |
 | `GET /api/rh/funcionarios/{funcionarioId}/ponto/espelho/download` | baixarEspelhoDePontoPdf | em andamento | só RH; `ano` e `mes` (padrão o mês atual); o PDF (PDFsharp-MigraDoc 6.2.4, MIT, fonte Noto Sans embutida: nenhuma fonte do sistema) é gravado em `espelhos/` e devolvido por link temporário como anexo; o evento `PONTO`/`BAIXOU` (nome e mês) vem ANTES do link |
 | `GET /api/gestor/equipe/{funcionarioId}/ponto/espelho/download` | baixarEspelhoDePontoPdfDaEquipe | em andamento | só Gestor; só quem é da equipe dele (outro setor, o próprio gestor, quem não existe e gestor sem setor dão o mesmo 404); o gestor não baixa o do setor inteiro |
+| `GET /api/rh/avisos` | listarAvisos | em andamento | só RH; `situacao` (padrão `ATIVO`), `tipo` e `busca` no título e no conteúdo; a ordem é a da aba (ativos e expirados pela publicação, agendados por quem publica primeiro, rascunhos pelo mais recente); `leitura` só em ativo e expirado e conta só pessoas ativas; sem `ordenarPor` |
+| `POST /api/rh/avisos` | criarAviso | em andamento | só RH; rascunho (`publicar: false`, com data prevista opcional) ou publica (data vazia ou passada = agora, futura = agendado); simples até 280 caracteres, detalhado até 10.000; `expiraEm` vale até 23:59:59 -03:00; todos os erros de campo juntos no 400; a tarefa `PUBLICAR_AVISO` (e-mail, na T5) é agendada para a hora da publicação |
+| `GET /api/rh/avisos/resumo` | obterResumoDosAvisos | em andamento | só RH; contagem de cada aba, média de leitura dos ativos (inteiro, `null` sem ativo), os que expiram em 7 dias e o próximo a expirar |
+| `GET /api/rh/avisos/{avisoId}` | obterAviso | em andamento | só RH; qualquer situação, com o conteúdo inteiro; 404 se não existe |
+| `PUT /api/rh/avisos/{avisoId}` | editarAviso | em andamento | só RH; o tipo não muda; a data de publicação só muda em rascunho (vazia apaga a prevista) e agendado (vazia mantém; outra data reagenda a tarefa com chave nova); no ar, vazia ou igual (senão 422 `AVISO_PUBLICACAO_NAO_EDITAVEL`); expiração vazia tira a expiração; é um UPDATE condicional ao estado lido |
+| `DELETE /api/rh/avisos/{avisoId}` | excluirAviso | em andamento | só RH; exclusão de verdade, só de rascunho ou agendado (422 `AVISO_NAO_PODE_SER_EXCLUIDO` nos demais): apaga leituras e aviso na mesma transação, cancela a tarefa e audita `EXCLUIU` |
+| `POST /api/rh/avisos/{avisoId}/publicar` | publicarAviso | em andamento | só RH; publica o rascunho agora ou na data prevista se futura (grava a data efetiva); 422 `AVISO_JA_PUBLICADO` no que já foi publicado (inclusive no segundo clique); 400 se a expiração ficaria antes da publicação |
+| `POST /api/rh/avisos/{avisoId}/encerrar` | encerrarAviso | em andamento | só RH; só o ativo (422 `AVISO_NAO_ESTA_ATIVO` nos demais); a expiração vira agora e as leituras ficam |
 
 ## Pendências conhecidas
 
