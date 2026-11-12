@@ -52,6 +52,8 @@ public static class EnumsDeParametrosDoContrato
         [("listarAvisos", "situacao")] = typeof(SituacaoDoAviso),
         [("listarAvisos", "tipo")] = typeof(TipoDeAviso),
         [("listarLeiturasDoAviso", "situacao")] = typeof(FiltroDeLeitura),
+        [("listarHoleritesDoFuncionario", "tipo")] = typeof(TipoDeHolerite),
+        [("listarMeusHolerites", "tipo")] = typeof(TipoDeHolerite),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };

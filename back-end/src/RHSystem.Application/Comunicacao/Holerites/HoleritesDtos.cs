@@ -21,6 +21,30 @@ public static class LimitesDeHolerite
 /// <summary>Um holerite como a lista do RH o mostra (<c>HoleriteItemRh</c>). Nunca leva o caminho do arquivo: o download é por link temporário.</summary>
 public sealed record HoleriteItemRh(int Id, int FuncionarioId, TipoDeHolerite Tipo, int Mes, int Ano, int Versao, bool VersaoAtual, SituacaoDoHolerite Situacao, DateTime PublicacaoEmUtc);
 
+/// <summary>A página de holerites de uma pessoa, como o RH a vê (<c>HoleriteListaRh</c>): <c>UltimoPublicado</c> é o já publicado mais recentemente, sem filtro nem página.</summary>
+public sealed record HoleriteListaRh(IReadOnlyList<HoleriteItemRh> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas, HoleriteItemRh? UltimoPublicado);
+
+/// <summary>Um holerite na lista da própria pessoa (<c>HoleriteItemEu</c>): só publicados, só a versão atual. Sem versão, situação nem caminho.</summary>
+public sealed record HoleriteItemEu(int Id, TipoDeHolerite Tipo, int Mes, int Ano, DateTime PublicadoEmUtc);
+
+/// <summary>As abas da lista da pessoa (<c>contagens</c>), do ano pedido e sem olhar o filtro de tipo.</summary>
+public sealed record HoleriteContagensEu(int Todos, int Mensais, int Ferias, int DecimoTerceiro);
+
+/// <summary>A página de holerites da própria pessoa (<c>HoleriteListaEu</c>): o <c>Ano</c> usado, os anos do seletor (do mais recente para o mais antigo) e as contagens das abas.</summary>
+public sealed record HoleriteListaEu(IReadOnlyList<HoleriteItemEu> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas, int Ano, IReadOnlyList<int> AnosDisponiveis, HoleriteContagensEu Contagens);
+
+/// <summary>Os filtros da lista do RH: o ano e o tipo da competência, e se a lista traz também as versões substituídas.</summary>
+public sealed record FiltroDeHoleritesRh(int? Ano, TipoDeHolerite? Tipo, bool TodasAsVersoes);
+
+/// <summary>Uma linha da lista do RH como veio do banco; a situação (publicado ou agendado) se decide pelo relógio, no caso de uso.</summary>
+public sealed record HoleriteDaListaDoRh(int Id, int FuncionarioId, TipoDeHolerite Tipo, int Mes, int Ano, int Versao, bool VersaoAtual, DateTime? PublicacaoEmUtc);
+
+/// <summary>O que o download precisa: o caminho do arquivo (que nunca sai da API), o nome da pessoa e a competência e a versão (o evento de auditoria e o nome do arquivo).</summary>
+public sealed record HoleriteParaDownload(int Id, string FuncionarioNome, int Mes, int Ano, TipoDeHolerite Tipo, int Versao, string CaminhoArquivo);
+
+/// <summary>O que a lista da pessoa leu do banco: a página, o total, os anos com holerite publicado e os tipos dos visíveis do ano (as contagens saem daí).</summary>
+public sealed record ListaDeHoleritesDaPessoa(IReadOnlyList<HoleriteItemEu> Itens, int Total, IReadOnlyList<int> AnosDisponiveis, IReadOnlyList<TipoDeHolerite> TiposDoAno);
+
 /// <summary>O formulário do envio individual, como chegou: os campos de texto sem conferir e o arquivo (com a contagem de TODAS as partes de arquivo, de qualquer nome de campo).</summary>
 public sealed record NovoHolerite(string? Mes, string? Ano, string? Tipo, string? PublicarEm, string? NoDiaDoPagamento, ArquivoRecebido? Arquivo, int ArquivosRecebidos);
 

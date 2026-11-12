@@ -252,6 +252,7 @@ public static class DependencyInjection
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();
         services.AddScoped<IConsultaDeHolerites, ConsultaDeHolerites>();
+        services.AddScoped<IConsultaDeHoleritesDaPessoa, ConsultaDeHoleritesDaPessoa>();
         services.AddScoped<IAgendamentoDoHolerite, AgendamentoDoHolerite>();
         services.AddScoped<ITarefaAgendada, PublicarHoleriteTarefa>(); // o e-mail do holerite, na hora em que ele fica visivel
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosHolerites>(); // sem ela as sobras de holerites/ nunca seriam limpas

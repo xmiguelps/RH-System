@@ -1,3 +1,4 @@
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Domain.Comunicacao;
 
 namespace RHSystem.Application.Comunicacao.Holerites;
@@ -19,6 +20,21 @@ public interface IConsultaDeHolerites
     Task<int?> MaiorVersaoAsync(int funcionarioId, int ano, int mes, TipoDeHolerite tipo, CancellationToken ct);
 
     Task<HoleriteLido?> ObterAsync(int holeriteId, CancellationToken ct);
+
+    /// <summary>A página de holerites de uma pessoa para o RH, mais o já publicado mais recentemente (sem filtro nem página). Sem <c>TodasAsVersoes</c>, só a maior versão de cada competência e tipo (publicada ou agendada).</summary>
+    Task<(IReadOnlyList<HoleriteDaListaDoRh> Itens, int Total, HoleriteDaListaDoRh? UltimoPublicado)> ListarDaPessoaAsync(int funcionarioId, FiltroDeHoleritesRh filtro, ParametrosDeLista parametros, DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary>O holerite de qualquer versão, publicado ou agendado, com arquivo; <c>null</c> se não existe.</summary>
+    Task<HoleriteParaDownload?> ObterParaDownloadDoRhAsync(int holeriteId, CancellationToken ct);
+}
+
+/// <summary>A leitura dos holerites de quem está logado: só os PUBLICADOS (a data já chegou) e só a maior versão publicada de cada competência e tipo.</summary>
+public interface IConsultaDeHoleritesDaPessoa
+{
+    Task<ListaDeHoleritesDaPessoa> ListarAsync(int funcionarioId, int ano, TipoDeHolerite? tipo, ParametrosDeLista parametros, DateTime agoraUtc, CancellationToken ct);
+
+    /// <summary><c>null</c> se o holerite não é da pessoa, ainda não foi publicado ou não é a versão atual (a API não revela qual dos três).</summary>
+    Task<HoleriteParaDownload?> ObterParaDownloadAsync(int funcionarioId, int holeriteId, DateTime agoraUtc, CancellationToken ct);
 }
 
 /// <summary>A tarefa que manda o e-mail do holerite na hora em que ele fica visível (<c>PUBLICAR_HOLERITE:holerite={id}</c>; a data de um holerite nunca muda, então a chave não leva o instante).</summary>
