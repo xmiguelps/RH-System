@@ -392,6 +392,21 @@ public class PublicarEEncerrarTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task A_tarefa_publica_o_anonimo_agendado_que_tem_exatamente_5_pessoas()
+    {
+        var api = await ApiAsync();
+        var pessoas = await PessoasAsync(api, 5);
+        var id = await ProntoAsync(api, Titulo("Anônimo com 5"), anonimo: true);
+        await PublicarAsync(api, id, Corpo("PESSOAS", pessoas: pessoas, agendarPara: "2026-11-03"));
+        api.Api.Relogio.Fixar(new DateTime(2026, 11, 3, 3, 0, 5, DateTimeKind.Utc));
+
+        await ExecutarTarefaAsync(api, "PUBLICAR_FORMULARIO", id, "2026-11-03T03:00:00Z");
+
+        Assert.Equal("True", await TextoAsync(api, $"SELECT ATIVO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}")); // 5 é o mínimo: publica
+        api.Api.Relogio.Fixar(ElencoDeTeste.Hoje);
+    }
+
+    [Fact]
     public async Task A_tarefa_antiga_de_um_dia_que_o_RH_trocou_nao_publica_nada()
     {
         var api = await ApiAsync();
