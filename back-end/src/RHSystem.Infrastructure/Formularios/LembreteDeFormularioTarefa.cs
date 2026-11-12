@@ -4,6 +4,7 @@ using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Comum.Tempo;
 using RHSystem.Application.Formularios.Construtor;
+using RHSystem.Application.Formularios.Equipe;
 using RHSystem.Application.Formularios.Lembretes;
 using RHSystem.Application.Formularios.Regras;
 using RHSystem.Domain.Formularios;
@@ -21,6 +22,7 @@ public sealed class LembreteDeFormularioTarefa(
     IConsultaDeFormularios consulta,
     LembretesDoFormulario lembretes,
     IAgendamentoDoFormulario agendamento,
+    IConsultaDeEquipeDoFormulario equipes,
     IAuditor auditor,
     IRelogio relogio) : ITarefaAgendada
 {
@@ -48,9 +50,15 @@ public sealed class LembreteDeFormularioTarefa(
             return;
         }
 
+        IReadOnlyCollection<int>? equipe = null;
+        if (SetorDoEnvio(tarefa) is { } setorId)
+        {
+            equipe = [.. (await equipes.MembrosAsync(setorId, hoje, ct)).Select(m => m.Id)]; // o lembrete do gestor: só a equipe dele, como ela é hoje
+        }
+
         if (lido.Anonimo)
         {
-            _ = await lembretes.EnviarSigilosoAsync(lido, hoje, ct);
+            _ = await lembretes.EnviarSigilosoAsync(lido, hoje, equipe, ct);
             if (!envioDoManual)
             {
                 await auditor.RegistrarEGravarAsync(LembrarQuemFaltaFormularioCasoDeUso.Evento(lido, $"Mandou o lembrete automático do formulário \"{lido.Titulo}\"."), ct);
@@ -59,12 +67,15 @@ public sealed class LembreteDeFormularioTarefa(
             return;
         }
 
-        var (enviados, _) = await lembretes.LembrarComNomeAsync(lido, [], hoje, ct);
+        var (enviados, _) = await lembretes.LembrarComNomeAsync(lido, [], hoje, equipe, ct);
         if (enviados > 0)
         {
             await auditor.RegistrarEGravarAsync(LembrarQuemFaltaFormularioCasoDeUso.Evento(lido, $"Mandou o lembrete automático do formulário \"{lido.Titulo}\" para {enviados} pessoa(s) que ainda não responderam."), ct);
         }
     }
+
+    private static int? SetorDoEnvio(TarefaParaExecutar tarefa) =>
+        tarefa.Parametros is { ValueKind: System.Text.Json.JsonValueKind.Object } parametros && parametros.TryGetProperty("setorId", out var setor) && setor.TryGetInt32(out var id) ? id : null;
 
     /// <summary>Agenda o automático que ficou para trás (formulário publicado com prazo e a caixa ligada que não tem a tarefa): só de hoje em diante, nunca um lembrete atrasado.</summary>
     public async Task RecuperarAsync(CancellationToken ct)

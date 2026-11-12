@@ -46,12 +46,12 @@ public sealed class LembrarQuemFaltaFormularioCasoDeUso(Construtor.IConsultaDeFo
                 throw MensagensDosFormularios.FormularioAnonimo.ComoProblema();
             }
 
-            await lembretes.MarcarEAgendarSigilosoAsync(lido, hoje, agora, ct);
+            await lembretes.MarcarEAgendarSigilosoAsync(lido, hoje, agora, null, ct);
             await auditor.RegistrarEGravarAsync(Evento(lido, $"Mandou o lembrete do formulário \"{lido.Titulo}\"."), ct); // sempre, sem número nem destinatário
             return new FormularioLembreteResultado(true, null, null);
         }
 
-        var (enviados, ignorados) = await lembretes.LembrarComNomeAsync(lido, ids, hoje, ct);
+        var (enviados, ignorados) = await lembretes.LembrarComNomeAsync(lido, ids, hoje, null, ct);
         if (enviados > 0)
         {
             await auditor.RegistrarEGravarAsync(Evento(lido, $"Mandou o lembrete do formulário \"{lido.Titulo}\" para {enviados} pessoa(s) que ainda não responderam."), ct);

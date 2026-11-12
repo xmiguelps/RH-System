@@ -15,12 +15,17 @@ public sealed class LembretesDoFormulario(IDestinatariosDoFormulario destinatari
     private const int TamanhoDoLote = 100;
 
     /// <summary>
-    /// Lembra quem falta, com nome. <paramref name="pedidos"/> vazio = todos que faltam, e <c>ignorados</c> é todo mundo do público que NÃO recebeu agora (quem já respondeu, quem já recebeu hoje, quem não tem e-mail: "3 enviados e 5 ignorados" quando 5 já tinham respondido); com ids, só essas pessoas
+    /// Lembra quem falta, com nome (com <paramref name="equipe"/>, só quem é dela: o lembrete do gestor). <paramref name="pedidos"/> vazio = todos que faltam, e <c>ignorados</c> é todo mundo do público que NÃO recebeu agora (quem já respondeu, quem já recebeu hoje, quem não tem e-mail: "3 enviados e 5 ignorados" quando 5 já tinham respondido); com ids, só essas pessoas
     /// (quem já respondeu, não deve responder, está inativa, sem e-mail ou já recebeu hoje conta como ignorado).
     /// </summary>
-    public async Task<(int Enviados, int Ignorados)> LembrarComNomeAsync(FormularioLido lido, IReadOnlyList<int> pedidos, DateOnly hoje, CancellationToken ct)
+    public async Task<(int Enviados, int Ignorados)> LembrarComNomeAsync(FormularioLido lido, IReadOnlyList<int> pedidos, DateOnly hoje, IReadOnlyCollection<int>? equipe, CancellationToken ct)
     {
         var quem = await destinatarios.ObterAsync(lido.Id, hoje, ct) ?? throw new InvalidOperationException("O formulário não tem público calculável.");
+        if (equipe is not null)
+        {
+            quem = quem with { Pares = [.. quem.Pares.Where(p => equipe.Contains(p.PessoaId))] }; // o gestor só lembra a equipe dele
+        }
+
         var faltam = quem.QuemFalta(await pessoas.JaResponderamAsync(lido.Id, false, ct)).Select(p => p.PessoaId).Distinct().ToList();
         var distintos = pedidos.Distinct().ToList();
         var alvo = distintos.Count == 0 ? faltam : [.. distintos.Where(faltam.Contains)];
@@ -42,18 +47,24 @@ public sealed class LembretesDoFormulario(IDestinatariosDoFormulario destinatari
     /// <summary>
     /// A parte da ROTA no anônimo: marca "já saiu lembrete hoje" (<c>CONCLUIDA</c>) e agenda a tarefa que envia. Se a marca já existia (manual ou automático de hoje) não agenda de novo. Não devolve nada: a resposta é a mesma sempre.
     /// </summary>
-    public async Task MarcarEAgendarSigilosoAsync(FormularioLido lido, DateOnly hoje, DateTime agoraUtc, CancellationToken ct)
+    public async Task MarcarEAgendarSigilosoAsync(FormularioLido lido, DateOnly hoje, DateTime agoraUtc, int? setorId, CancellationToken ct)
     {
-        if (await agendador.RegistrarComoConcluidaAsync(RegrasDoLembrete.TipoDaTarefa, RegrasDoLembrete.ChaveDaMarca(lido.Id, hoje, RegrasDoLembrete.AlcanceTodos), hoje, ct))
+        var alcance = setorId is { } setor ? RegrasDoLembrete.AlcanceDoSetor(setor) : RegrasDoLembrete.AlcanceTodos;
+        if (await agendador.RegistrarComoConcluidaAsync(RegrasDoLembrete.TipoDaTarefa, RegrasDoLembrete.ChaveDaMarca(lido.Id, hoje, alcance), hoje, ct))
         {
-            _ = await agendador.AgendarAsync(new NovaTarefa(RegrasDoLembrete.TipoDaTarefa, RegrasDoLembrete.ChaveDoEnvio(lido.Id, hoje, RegrasDoLembrete.AlcanceTodos), agoraUtc, lido.Id, hoje), ct);
+            _ = await agendador.AgendarAsync(new NovaTarefa(RegrasDoLembrete.TipoDaTarefa, RegrasDoLembrete.ChaveDoEnvio(lido.Id, hoje, alcance), agoraUtc, lido.Id, hoje, setorId is null ? null : new { setorId }), ct);
         }
     }
 
     /// <summary>A parte da TAREFA no anônimo: quem ainda não participou (ativo e com e-mail) recebe um e-mail sigiloso, tudo numa transação. Devolve quantos entraram na fila (só a tarefa sabe; nada o mostra).</summary>
-    public async Task<int> EnviarSigilosoAsync(FormularioLido lido, DateOnly hoje, CancellationToken ct)
+    public async Task<int> EnviarSigilosoAsync(FormularioLido lido, DateOnly hoje, IReadOnlyCollection<int>? equipe, CancellationToken ct)
     {
         var quem = await destinatarios.ObterAsync(lido.Id, hoje, ct) ?? throw new InvalidOperationException("O formulário não tem público calculável.");
+        if (equipe is not null)
+        {
+            quem = quem with { Pares = [.. quem.Pares.Where(p => equipe.Contains(p.PessoaId))] };
+        }
+
         var faltam = quem.QuemFalta(await pessoas.JaResponderamAsync(lido.Id, true, ct)).Select(p => p.PessoaId).Distinct().ToList();
         var podem = await pessoas.PodemReceberAsync(faltam, ct);
         if (podem.Count == 0)
