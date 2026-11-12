@@ -54,6 +54,23 @@ public class ProblemaDeApiTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task A_confirmacao_necessaria_de_formulario_leva_o_titulo_proprio_e_pendentes_com_numero_ou_nulo_presente_no_json()
+    {
+        var cliente = await ClienteAsync();
+
+        var comNome = await cliente.GetAsync("/__teste/erros/problema-confirmacao/63");
+        var anonimo = await cliente.GetAsync("/__teste/erros/problema-confirmacao-anonima");
+
+        Assert.Equal((409, 409), ((int)comNome.StatusCode, (int)anonimo.StatusCode));
+        var a = await LerAsync(comNome);
+        Assert.Equal(("Confirmação necessária.", "63 pessoas ainda não responderam. Confirme para continuar.", "CONFIRMACAO_NECESSARIA", 63), (a.GetProperty("title").GetString(), a.GetProperty("detail").GetString(), a.GetProperty("codigo").GetString(), a.GetProperty("pendentes").GetInt32()));
+        var b = await LerAsync(anonimo);
+        Assert.Equal("Num formulário anônimo o sistema não diz quantas pessoas ainda não responderam. Confirme para continuar.", b.GetProperty("detail").GetString());
+        Assert.True(b.TryGetProperty("pendentes", out var pendentes), "o pendentes tem de sair no JSON mesmo vazio");
+        Assert.Equal(JsonValueKind.Null, pendentes.ValueKind);
+    }
+
+    [Fact]
     public async Task ProblemaDeApi_nao_deixa_extensao_sobrescrever_title_status_detail_traceId_nem_codigo()
     {
         var resposta = await (await ClienteAsync()).GetAsync("/__teste/erros/problema-com-extensao-reservada");
