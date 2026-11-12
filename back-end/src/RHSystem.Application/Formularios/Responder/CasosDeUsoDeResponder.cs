@@ -15,9 +15,10 @@ using RHSystem.Domain.Formularios;
 namespace RHSystem.Application.Formularios.Responder;
 
 /// <summary>
-/// <c>POST /api/eu/formularios/{formularioId}/respostas</c> (multipart: <c>respostas</c> em JSON, <c>arquivos</c> e <c>avaliadoId</c>), a pessoa logada respondendo COM NOME. Ordem das recusas: 404 (não existe, rascunho, por link ou a pessoa não deve responder), 422 situação (agendado, encerrado, inclusive o
+/// <c>POST /api/eu/formularios/{formularioId}/respostas</c> (multipart: <c>respostas</c> em JSON, <c>arquivos</c> e <c>avaliadoId</c>), a pessoa logada respondendo, COM NOME ou em formulário ANÔNIMO. Ordem das recusas: 404 (não existe, rascunho, por link ou a pessoa não deve responder), 422 situação (agendado, encerrado, inclusive o
 /// prazo vencido com a tarefa de encerrar parada), 400 (todos os campos e arquivos juntos), 422 <c>FUNCIONARIO_INATIVO</c>, 422 <c>AVALIADO_INVALIDO</c>, 409 <c>JA_RESPONDIDO</c> (uma resposta por pessoa e por avaliado; a Sugestão aceita várias). Tudo ou nada: os arquivos vão para o armazenamento fora de
-/// transação, UMA transação curta segura a linha do formulário, confere de novo se a pessoa já respondeu e grava todas as linhas com o MESMO instante (cortado ao segundo; na Sugestão, se já houve envio naquele segundo, o seguinte); falhou, os blobs são apagados. Responder com nome não grava auditoria.
+/// transação, UMA transação curta segura a linha do formulário, confere de novo se a pessoa já respondeu e grava todas as linhas com o MESMO instante (cortado ao segundo; na Sugestão, se já houve envio naquele segundo, o seguinte); falhou, os blobs são apagados.
+/// <b>No anônimo</b> não há arquivo (400 em <c>arquivos</c> se vier) e as linhas saem SEM autor e com a data do dia da publicação da rodada, mais a participação (UUID v4 no recibo, a chave única dá o 409 mesmo numa corrida). Nem com nome nem anônimo este caso de uso grava auditoria.
 /// </summary>
 public sealed class ResponderFormularioCasoDeUso(
     IConsultaDeFormularios consulta,
@@ -34,33 +35,39 @@ public sealed class ResponderFormularioCasoDeUso(
         var eu = escopo.FuncionarioId;
         var acesso = await AcessoAoFormularioParaResponder.ConferirAsync(consulta, meus, formularioId, eu, agora, ct);
         var lido = acesso.Lido;
-        if (lido.Anonimo)
-        {
-            throw new NotSupportedException("A resposta anônima entra na tarefa 13.");
-        }
-
         var erros = new ColetorDeErros();
         var avaliadoId = LerAvaliado(erros, lido, novo.AvaliadoId);
         var linhas = ValidacaoDaResposta.Validar(erros, lido.Perguntas, novo.Respostas, novo.Arquivos.Count);
-        var conferidos = await ConferirArquivosAsync(erros, novo, ct);
+        var conferidos = lido.Anonimo ? SemArquivos(erros, novo) : await ConferirArquivosAsync(erros, novo, ct);
         erros.LancarSeHouver();
 
         await ConferirPessoaEParAsync(lido, acesso.Posicao, eu, avaliadoId, ct);
 
-        await envio.GravarEEfetivarAsync(conferidos, caminhos => GravarAsync(lido, eu, avaliadoId, linhas, conferidos, caminhos, agora, ct), ct);
-        return new RespostaFormularioRecibo(lido.Id, null, Restantes(lido, acesso.Posicao, eu, avaliadoId));
+        var participacao = await envio.GravarEEfetivarAsync(conferidos, caminhos => GravarAsync(lido, eu, avaliadoId, linhas, conferidos, caminhos, agora, ct), ct);
+        return new RespostaFormularioRecibo(lido.Id, participacao?.ToString("D"), Restantes(lido, acesso.Posicao, eu, avaliadoId));
     }
 
-    /// <summary>A transação curta: segura o formulário, confere de novo, grava. Se o formulário já não estava publicado (outra aba o encerrou), lança DEPOIS da transação, o que faz o envio apagar os arquivos.</summary>
-    private async Task<bool> GravarAsync(FormularioLido lido, int eu, int? avaliadoId, IReadOnlyList<RespostaValidada> linhas, IReadOnlyList<ArquivoDeRespostaConferido> conferidos, IReadOnlyList<string> caminhos, DateTime agora, CancellationToken ct)
+    /// <summary>A transação curta: segura o formulário, confere de novo, grava. Se o formulário já não estava publicado (outra aba o encerrou), lança DEPOIS da transação, o que faz o envio apagar os arquivos. Devolve a participação (só no anônimo).</summary>
+    private async Task<Guid?> GravarAsync(FormularioLido lido, int eu, int? avaliadoId, IReadOnlyList<RespostaValidada> linhas, IReadOnlyList<ArquivoDeRespostaConferido> conferidos, IReadOnlyList<string> caminhos, DateTime agora, CancellationToken ct)
     {
         var sugestao = lido.Tipo == TipoDeFormulario.Outro;
-        var gravou = await unidade.ExecutarEmTransacaoAsync(
+        var gravacao = await unidade.ExecutarEmTransacaoAsync(
             async () =>
             {
                 if (!await respostas.SegurarAbertoAsync(lido.Id, lido.Anonimo, ct))
                 {
-                    return false;
+                    return new Gravacao(false, null);
+                }
+
+                if (lido.Anonimo)
+                {
+                    if (await respostas.JaParticipouAsync(lido.Id, eu, avaliadoId, ct))
+                    {
+                        throw MensagensDosFormularios.JaRespondidoPeloFuncionario.ComoProblema();
+                    }
+
+                    var dia = InstantesDoFormulario.DiaDaRodada(lido.PublicadoEmUtc!.Value); // a data grossa: o dia da publicação da rodada, igual para todos
+                    return new Gravacao(true, await respostas.GravarAnonimaAsync(lido.Id, eu, avaliadoId, dia, [.. linhas.Select(l => ParaGravar(l, caminhos, conferidos))], ct));
                 }
 
                 if (!sugestao && await respostas.JaRespondeuAsync(lido.Id, eu, avaliadoId, ct))
@@ -75,16 +82,18 @@ public sealed class ResponderFormularioCasoDeUso(
                 }
 
                 await respostas.GravarDeFuncionarioAsync(lido.Id, eu, avaliadoId, momento, [.. linhas.Select(l => ParaGravar(l, caminhos, conferidos))], ct);
-                return true;
+                return new Gravacao(true, null);
             },
             ct);
-        if (!gravou)
+        if (!gravacao.Gravou)
         {
             await RecusarFormularioQueMudouAsync(lido.Id, agora, ct);
         }
 
-        return gravou;
+        return gravacao.Participacao;
     }
+
+    private sealed record Gravacao(bool Gravou, Guid? Participacao);
 
     private static LinhaParaGravar ParaGravar(RespostaValidada linha, IReadOnlyList<string> caminhos, IReadOnlyList<ArquivoDeRespostaConferido> conferidos) =>
         linha.ArquivoIndice is { } indice
@@ -118,6 +127,17 @@ public sealed class ResponderFormularioCasoDeUso(
         }
 
         return id;
+    }
+
+    /// <summary>O formulário anônimo nunca tem arquivo (nem pergunta de arquivo, nem parte <c>arquivos</c>): qualquer parte de arquivo é 400 em <c>arquivos</c>.</summary>
+    private static IReadOnlyList<ArquivoDeRespostaConferido> SemArquivos(ColetorDeErros erros, NovaRespostaDeFormulario novo)
+    {
+        if (novo.ArquivosRecebidos > 0)
+        {
+            erros.Adicionar("arquivos", "Este formulário é anônimo e não recebe arquivos.");
+        }
+
+        return [];
     }
 
     private static async Task<IReadOnlyList<ArquivoDeRespostaConferido>> ConferirArquivosAsync(ColetorDeErros erros, NovaRespostaDeFormulario novo, CancellationToken ct)

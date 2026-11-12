@@ -10,6 +10,7 @@ using RHSystem.Infrastructure.Formularios;
 using Microsoft.Extensions.DependencyInjection;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
 using static RHSystem.Api.IntegrationTests.Formularios.FormulariosDeTeste;
+using static RHSystem.Api.IntegrationTests.Formularios.RespostasDeTeste;
 
 namespace RHSystem.Api.IntegrationTests.Formularios;
 
@@ -31,16 +32,6 @@ public class ResponderComNomeTests(MySqlFixture mysql)
 
     private sealed record Pesquisa(int Id, int Curta, int Longa, int Multipla, int Escala, int Sim, int Nao);
 
-    private static async Task<(HttpClient Cliente, int Id)> PessoaAsync(ApiDeAcesso api)
-    {
-        var setor = await AdvertenciasDeTeste.NovoSetorAsync(api);
-        var (id, _) = await AdvertenciasDeTeste.NovoMembroAsync(api, setor);
-        return (await AdvertenciasDeTeste.ClienteDeAsync(api, id), id);
-    }
-
-    private static Task EscolherPessoasAsync(ApiDeAcesso api, int formularioId, params int[] pessoas) =>
-        Sql.ExecutarAsync(api.Conexao, $"INSERT INTO FORMULARIOS_DESTINATARIOS (ID_FORMULARIO, ID_FUNCIONARIO) VALUES {string.Join(", ", pessoas.Select(p => $"({formularioId}, {p})"))}");
-
     /// <summary>Uma pesquisa publicada para as pessoas: curta obrigatória, longa opcional, múltipla escolha (Sim/Não) obrigatória e escala obrigatória.</summary>
     private static async Task<Pesquisa> PesquisaAsync(ApiDeAcesso api, string prefixo, params int[] pessoas)
     {
@@ -60,57 +51,6 @@ public class ResponderComNomeTests(MySqlFixture mysql)
     private static object VM(Pesquisa p) => new { perguntaId = p.Multipla, alternativaIds = new[] { p.Sim } };
 
     private static object VE(Pesquisa p, int valor = 4) => new { perguntaId = p.Escala, valorEscala = valor };
-
-    private static string Json(params object[] itens) => JsonSerializer.Serialize(itens);
-
-    private static MultipartFormDataContent Envio(string? respostas, int? avaliado = null, params (string Nome, byte[] Bytes)[] arquivos)
-    {
-        var formulario = new MultipartFormDataContent();
-        if (respostas is null && avaliado is null && arquivos.Length == 0)
-        {
-            formulario.Add(new StringContent("x"), "outro"); // um multipart sem nenhuma parte é "malformado" (400 do corpo); aqui falta só a parte respostas
-        }
-
-        if (respostas is not null)
-        {
-            formulario.Add(new StringContent(respostas, Encoding.UTF8), "respostas");
-        }
-
-        if (avaliado is { } id)
-        {
-            formulario.Add(new StringContent(id.ToString(System.Globalization.CultureInfo.InvariantCulture)), "avaliadoId");
-        }
-
-        foreach (var (nome, bytes) in arquivos)
-        {
-            formulario.Add(new ByteArrayContent(bytes), "arquivos", nome);
-        }
-
-        return formulario;
-    }
-
-    private static Task<HttpResponseMessage> ResponderAsync(HttpClient cliente, int formularioId, HttpContent envio) => cliente.PostAsync($"/api/eu/formularios/{formularioId}/respostas", envio);
-
-    private static async Task<JsonElement> ErrosAsync(HttpResponseMessage resposta) => (await CorpoAsync(resposta)).GetProperty("errors");
-
-    private static byte[] Docx(bool comODocumento = true)
-    {
-        using var memoria = new MemoryStream();
-        using (var zip = new ZipArchive(memoria, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            var entrada = zip.CreateEntry(comODocumento ? "word/document.xml" : "outro/arquivo.txt");
-            using var escritor = new StreamWriter(entrada.Open());
-            escritor.Write("<w:document/>");
-        }
-
-        return memoria.ToArray();
-    }
-
-    private static byte[] Doc() => [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, .. new byte[200]];
-
-    private static async Task<long> LinhasAsync(ApiDeAcesso api, int formularioId) => await ContarAsync(api, $"SELECT COUNT(*) FROM FORMULARIOS_RESPOSTAS WHERE ID_FORMULARIO = {formularioId}");
-
-    private static async Task<long> AuditoriaAsync(ApiDeAcesso api) => await ContarAsync(api, "SELECT (SELECT COUNT(*) FROM AUDITORIA_EVENTOS) + (SELECT COUNT(*) FROM AUDITORIA_MUDANCAS)");
 
     // ---------------------------------------------------------------- gravar
 

@@ -20,11 +20,20 @@ public interface IFormulariosRespostasRepositorio
     /// <summary>A pessoa já tem resposta neste formulário (para este avaliado, nas avaliações; <paramref name="avaliadoId"/> nulo nos outros).</summary>
     Task<bool> JaRespondeuAsync(int formularioId, int funcionarioId, int? avaliadoId, CancellationToken ct);
 
+    /// <summary>No formulário ANÔNIMO: a pessoa já tem participação registrada (para este avaliado, nas avaliações). A chave única da participação é a segunda barreira (409 também numa corrida).</summary>
+    Task<bool> JaParticipouAsync(int formularioId, int funcionarioId, int? avaliadoId, CancellationToken ct);
+
     /// <summary>O instante do envio mais recente da pessoa neste formulário (na Sugestão, que aceita vários envios), ou <c>null</c>.</summary>
     Task<DateTime?> UltimoEnvioAsync(int formularioId, int funcionarioId, CancellationToken ct);
 
     /// <summary>Grava todas as linhas do envio, com o MESMO <paramref name="instanteUtc"/> (cortado ao segundo). Sem evento de auditoria: responder com nome não audita nada.</summary>
     Task GravarDeFuncionarioAsync(int formularioId, int funcionarioId, int? avaliadoId, DateTime instanteUtc, IReadOnlyList<LinhaParaGravar> linhas, CancellationToken ct);
+
+    /// <summary>
+    /// Grava a resposta ANÔNIMA: as linhas SEM funcionário, sem candidato e sem arquivo, todas com a data grossa <paramref name="diaDaRodadaUtc"/> (o dia da publicação da rodada, 00:00 -03:00), e, à parte, a participação (a pessoa e o avaliado, sem data e sem ligação com as linhas) com um UUID v4 da
+    /// aplicação, que é devolvido. Sem evento de auditoria. Participação repetida = 409 <c>JA_RESPONDIDO</c> pela chave única.
+    /// </summary>
+    Task<Guid> GravarAnonimaAsync(int formularioId, int funcionarioId, int? avaliadoId, DateTime diaDaRodadaUtc, IReadOnlyList<LinhaParaGravar> linhas, CancellationToken ct);
 
     /// <summary>As linhas que a pessoa gravou neste formulário (para este avaliado, nas avaliações), em ordem de pergunta.</summary>
     Task<IReadOnlyList<RespostaLida>> DaPessoaAsync(int formularioId, int funcionarioId, int? avaliadoId, CancellationToken ct);

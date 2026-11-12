@@ -22,6 +22,9 @@ public sealed class FormulariosRespostasRepositorio(AppDbContext db) : IFormular
     public Task<bool> JaRespondeuAsync(int formularioId, int funcionarioId, int? avaliadoId, CancellationToken ct) =>
         db.FormulariosRespostas.AsNoTracking().AnyAsync(r => r.FormularioId == formularioId && r.FuncionarioId == funcionarioId && r.AvaliadoId == avaliadoId, ct);
 
+    public Task<bool> JaParticipouAsync(int formularioId, int funcionarioId, int? avaliadoId, CancellationToken ct) =>
+        db.FormulariosParticipacoes.AsNoTracking().AnyAsync(p => p.FormularioId == formularioId && p.FuncionarioId == funcionarioId && p.AvaliadoId == avaliadoId, ct);
+
     public async Task<DateTime?> UltimoEnvioAsync(int formularioId, int funcionarioId, CancellationToken ct) =>
         await db.FormulariosRespostas.AsNoTracking().Where(r => r.FormularioId == formularioId && r.FuncionarioId == funcionarioId).MaxAsync(r => r.RespondidaEmUtc, ct);
 
@@ -35,6 +38,27 @@ public sealed class FormulariosRespostasRepositorio(AppDbContext db) : IFormular
             }
 
             await db.SaveChangesAsync(ct);
+        }
+        catch (Exception erro) when (TradutorDeRecusaDosFormularios.Traduzir(erro) is { } problema)
+        {
+            db.ChangeTracker.Clear();
+            throw problema;
+        }
+    }
+
+    public async Task<Guid> GravarAnonimaAsync(int formularioId, int funcionarioId, int? avaliadoId, DateTime diaDaRodadaUtc, IReadOnlyList<LinhaParaGravar> linhas, CancellationToken ct)
+    {
+        try
+        {
+            foreach (var linha in linhas)
+            {
+                db.FormulariosRespostas.Add(FormularioResposta.Anonima(formularioId, linha.PerguntaId, linha.Resposta, diaDaRodadaUtc, avaliadoId, linha.AlternativaId));
+            }
+
+            var participacao = FormularioParticipacao.Criar(formularioId, funcionarioId, avaliadoId);
+            db.FormulariosParticipacoes.Add(participacao);
+            await db.SaveChangesAsync(ct);
+            return participacao.Id;
         }
         catch (Exception erro) when (TradutorDeRecusaDosFormularios.Traduzir(erro) is { } problema)
         {
