@@ -11,6 +11,7 @@ using RHSystem.Application.Auditoria;
 using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Cadastros;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comunicacao;
 using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
@@ -246,6 +247,7 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeAvisosDaPessoa, ConsultaDeAvisosDaPessoa>();
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeAvisos>(); // a bolinha Avisos do menu
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
+        services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<ITarefaAgendada, PublicarAvisoTarefa>(); // o e-mail e as linhas de leitura do aviso, na hora da publicacao
         services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosAtestados>();
