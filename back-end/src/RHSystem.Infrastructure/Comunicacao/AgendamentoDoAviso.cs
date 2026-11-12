@@ -14,6 +14,16 @@ public sealed class AgendamentoDoAviso(IAgendador agendador) : IAgendamentoDoAvi
 
     public static string Chave(int avisoId, DateTime publicacaoEmUtc) => ChaveDeIdempotencia.Montar(Tipo, ("aviso", avisoId), ("em", publicacaoEmUtc));
 
+    /// <summary>O instante da publicação que a chave guarda (<c>em=2026-10-07T12:42:00Z</c>), ou <c>null</c> se a chave não tem o formato.</summary>
+    public static DateTime? InstanteDaChave(string chave)
+    {
+        const string marca = ":em=";
+        var inicio = chave.LastIndexOf(marca, StringComparison.Ordinal);
+        return inicio >= 0 && DateTime.TryParseExact(chave[(inicio + marca.Length)..], "yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var instante)
+            ? instante
+            : null;
+    }
+
     public async Task AgendarAsync(int avisoId, DateTime publicacaoEmUtc, CancellationToken ct) =>
         _ = await agendador.AgendarAsync(new NovaTarefa(Tipo, Chave(avisoId, publicacaoEmUtc), publicacaoEmUtc, ReferenciaId: avisoId), ct);
 

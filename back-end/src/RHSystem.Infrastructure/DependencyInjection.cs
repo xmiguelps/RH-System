@@ -222,6 +222,7 @@ public static class DependencyInjection
         services.AddScoped<IPedidosDeAjusteRepositorio, PedidosDeAjusteRepositorio>();
         services.AddScoped<IConsultaDePedidosDeAjuste, ConsultaDePedidosDeAjuste>();
         services.AddSingleton<IRenderizadorDeEmail, ResultadoAjustePontoRenderizador>();
+        services.AddSingleton<IRenderizadorDeEmail, AvisoPublicadoRenderizador>();
         // As bolinhas do menu do gestor (a mesma conta serve às duas): os pedidos de ajuste que aguardam a etapa dele.
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PedidosDeAjusteDePontoDoGestor));
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
@@ -242,6 +243,7 @@ public static class DependencyInjection
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();
         services.AddScoped<IConsultaDeAvisos, ConsultaDeAvisos>();
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
+        services.AddScoped<ITarefaAgendada, PublicarAvisoTarefa>(); // o e-mail e as linhas de leitura do aviso, na hora da publicacao
         services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosAtestados>();
         services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();
