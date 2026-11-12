@@ -47,6 +47,9 @@ public interface IConsultaDeFormularios
     /// <summary><c>null</c> se o formulário não existe.</summary>
     Task<FormularioLido?> ObterAsync(int formularioId, CancellationToken ct);
 
+    /// <summary>O formulário que tem este código de link público, ou <c>null</c> (nenhum é o mesmo que um formulário que perdeu o link: o chamador responde o mesmo 404).</summary>
+    Task<int?> IdPorTokenAsync(string token, CancellationToken ct);
+
     /// <summary>A pergunta já tem resposta de pessoa, de candidato ou anônima (o trigger do banco conta as três).</summary>
     Task<bool> PerguntaTemRespostaAsync(int perguntaId, CancellationToken ct);
 

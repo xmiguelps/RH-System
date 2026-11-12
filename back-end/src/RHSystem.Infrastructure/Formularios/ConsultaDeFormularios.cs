@@ -112,6 +112,8 @@ public sealed class ConsultaDeFormularios(AppDbContext db) : IConsultaDeFormular
             pessoas);
     }
 
+    public async Task<int?> IdPorTokenAsync(string token, CancellationToken ct) => await db.Formularios.AsNoTracking().Where(f => f.TokenDoLink == token).Select(f => (int?)f.Id).FirstOrDefaultAsync(ct);
+
     public async Task<bool> PerguntaTemRespostaAsync(int perguntaId, CancellationToken ct) => await db.FormulariosRespostas.AsNoTracking().AnyAsync(r => r.PerguntaId == perguntaId, ct);
 
     public async Task<IReadOnlyList<PessoaParaPublico>> PessoasAsync(IReadOnlyList<int> ids, CancellationToken ct) =>

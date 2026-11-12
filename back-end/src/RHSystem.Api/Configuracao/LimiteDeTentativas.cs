@@ -11,6 +11,12 @@ public static class LimiteDeTentativasExtensions
     /// <summary>As três rotas públicas de senha (<c>esqueci</c>, <c>validar-link</c>, <c>definir</c>): o limite vale por IP E por rota (cada uma tem o balde dela).</summary>
     public const string PoliticaDeSenha = "senha";
 
+    /// <summary>A página pública do formulário do candidato: <c>Formularios:LimiteConsultaPorMinuto</c> (padrão 30) por IP, em janela de 1 minuto (a segunda barreira contra quem varre códigos de link).</summary>
+    public const string PoliticaDeFormularioConsulta = "formulario-consulta";
+
+    /// <summary>O envio da candidatura: <c>Formularios:LimiteEnvioPorHora</c> (padrão 10) por IP, em janela de 1 hora (a única proteção do link público contra currículo em massa; sem captcha, por decisão provisória do contrato).</summary>
+    public const string PoliticaDeFormularioEnvio = "formulario-envio";
+
     /// <summary>
     /// Limite de tentativas de login: <c>Autenticacao:LimiteLoginPorMinuto</c> (padrão 5) por IP, em janela de 1 minuto. Acima disso a
     /// resposta é 429 com o <c>ProblemDetails</c> do contrato e o cabeçalho <c>Retry-After</c> (o limitador do ASP.NET rejeita, por padrão,
@@ -20,6 +26,8 @@ public static class LimiteDeTentativasExtensions
     {
         var limite = configuracao.GetValue<int?>("Autenticacao:LimiteLoginPorMinuto") ?? 5;
         var limiteDeSenha = configuracao.GetValue<int?>("Autenticacao:LimiteSenhaPorMinuto") ?? 5;
+        var limiteDeConsulta = configuracao.GetValue<int?>("Formularios:LimiteConsultaPorMinuto") ?? 30;
+        var limiteDeEnvio = configuracao.GetValue<int?>("Formularios:LimiteEnvioPorHora") ?? 10;
 
         servicos.AddRateLimiter(opcoes =>
         {
@@ -42,6 +50,28 @@ public static class LimiteDeTentativasExtensions
                     {
                         PermitLimit = limiteDeSenha,
                         Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                    }));
+
+            opcoes.AddPolicy(PoliticaDeFormularioConsulta, contexto =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    contexto.Connection.RemoteIpAddress?.ToString() ?? "origem-desconhecida",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = limiteDeConsulta,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                    }));
+
+            opcoes.AddPolicy(PoliticaDeFormularioEnvio, contexto =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    contexto.Connection.RemoteIpAddress?.ToString() ?? "origem-desconhecida",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = limiteDeEnvio,
+                        Window = TimeSpan.FromHours(1),
                         QueueLimit = 0,
                         AutoReplenishment = true,
                     }));
