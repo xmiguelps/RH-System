@@ -56,13 +56,15 @@ public sealed class ObterPedidoDaEquipeCasoDeUso(IEscopoDoUsuario escopo, IConsu
 
 /// <summary>
 /// <c>POST .../aprovar</c> e <c>.../recusar</c> da etapa do gestor. Pedido fora do escopo = 404. Pelo estado lido: já decidido = 409 <c>PEDIDO_JA_DECIDIDO</c>, na etapa do RH = 409 <c>PEDIDO_ETAPA_INCORRETA</c>. A decisão é um UPDATE condicional (a corrida com o
-/// gestor ausente, com o RH e com o segundo clique devolve o mesmo 409 que a leitura teria dado). Aprovar NÃO muda nenhuma batida (o pedido segue <c>PENDENTE</c>, para o RH); recusar encerra. O evento e o e-mail do resultado saem na MESMA transação: se ela
+/// gestor ausente, com o RH e com o segundo clique devolve o mesmo 409 que a leitura teria dado). Aprovar NÃO muda nenhuma batida (o pedido segue <c>PENDENTE</c>, para o RH); recusar encerra e recalcula o banco de horas do dia (com a pessoa travada). O evento e o e-mail do resultado saem na MESMA transação: se ela
 /// desfaz, nada sai; a falha do envio (feito depois, pela fila) nunca desfaz a decisão.
 /// </summary>
 public sealed class DecidirComoGestorCasoDeUso(
     IEscopoDoUsuario escopo,
     IConsultaDePedidosDeAjuste consulta,
     IPedidosDeAjusteRepositorio repositorio,
+    IPontoRepositorio ponto,
+    IRecalculoDoBancoDeHoras recalculo,
     IUnidadeDeTrabalho unidade,
     IAuditor auditor,
     IFilaDeEmails fila,
@@ -84,12 +86,24 @@ public sealed class DecidirComoGestorCasoDeUso(
             async () =>
             {
                 var agora = relogio.AgoraUtc;
+                if (!aprovar)
+                {
+                    // Recusar encerra o pedido: a pessoa fica travada (como na decisão do RH) enquanto o dia é recalculado.
+                    _ = await ponto.TravarPessoaAsync(pedido.Funcionario.Id, ct) ?? throw new NaoEncontradoException();
+                }
+
                 if (!await repositorio.DecidirComoGestorAsync(pedidoId, equipe!.GestorId, aprovar, agora, observacao, ct))
                 {
                     // Outra decisão chegou antes (o gestor ausente, o RH ou o mesmo clique): o estado de agora diz qual dos dois 409.
                     var atual = (await consulta.ObterAsync(pedidoId, doGestor, ct)).OuNaoEncontrado();
                     ErrosDeEtapa.ConferirNaEtapaDoGestor(atual);
                     throw MensagensDoPonto.EtapaIncorreta.ComoProblema();
+                }
+
+                if (!aprovar)
+                {
+                    // O pedido em análise fazia a consolidação deixar o dia como estava; agora que ele encerrou, o dia é recalculado (a falta ou a hora extra que ficou esperando).
+                    await recalculo.RecalcularDiaAsync(pedido.Funcionario.Id, pedido.Dia, ct);
                 }
 
                 var descricao = $"{(aprovar ? "Aprovou" : "Recusou")} o pedido de ajuste de ponto do dia {pedido.Dia:dd/MM/yyyy} (etapa do gestor).";

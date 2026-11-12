@@ -7,12 +7,12 @@ namespace RHSystem.Infrastructure.Ponto;
 
 /// <summary>
 /// O saldo do banco de horas: <b>cada linha</b> (<c>QUANTIDADE</c>, em horas com 2 casas) vira minutos inteiros, com arredondamento, e só então os créditos somam e os débitos subtraem. Somar as horas e converter no fim erra até alguns minutos, e
-/// <c>FN_CALCULAR_SALDO_BANCO_HORAS</c> soma horas: por isso a conta é esta. O último dia consolidado vem da tarefa de consolidação (<c>null</c> enquanto ela não existe ou nunca rodou).
+/// <c>FN_CALCULAR_SALDO_BANCO_HORAS</c> soma horas: por isso a conta é esta. O último dia consolidado (<c>AtualizadoAte</c>) vem da tarefa de consolidação (<c>null</c> enquanto ela nunca rodou).
 /// </summary>
-public sealed class SaldoDoBancoDeHoras(AppDbContext db) : ISaldoDoBancoDeHoras
+public sealed class SaldoDoBancoDeHoras(AppDbContext db, IUltimoDiaConsolidado ultimoConsolidado) : ISaldoDoBancoDeHoras
 {
     public async Task<SaldoDoBanco> ObterAsync(int funcionarioId, CancellationToken ct) =>
-        new((await ObterSaldosAsync([funcionarioId], ct))[funcionarioId], null);
+        new((await ObterSaldosAsync([funcionarioId], ct))[funcionarioId], await ultimoConsolidado.ObterAsync(ct));
 
     public async Task<IReadOnlyDictionary<int, int>> ObterSaldosAsync(IReadOnlyCollection<int> funcionarioIds, CancellationToken ct)
     {

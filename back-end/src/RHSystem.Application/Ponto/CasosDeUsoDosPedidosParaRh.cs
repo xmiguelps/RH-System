@@ -46,7 +46,7 @@ public sealed class ObterPedidoParaRhCasoDeUso(IEscopoDoUsuario escopo, IConsult
 /// A decisão FINAL do RH (<c>aprovar</c> e <c>recusar</c>), numa transação só, com a pessoa do pedido travada (a mesma trava do bater ponto). Recusas, nesta ordem: pedido ainda na etapa do gestor = 409 <c>PEDIDO_ETAPA_INCORRETA</c>; já decidido = 409
 /// <c>PEDIDO_JA_DECIDIDO</c>; pedido SEM etapa do gestor, decidido pela própria pessoa = 422 <c>PEDIDO_PROPRIO</c> (vence) ou por quem do RH não está em <c>GESTORES</c> = 422 <c>PEDIDO_RH_FORA_DE_GESTORES</c> (o trigger do banco exige o gestor; aqui a mesma
 /// resposta sai antes de gravar). <b>Aprovar é tudo ou nada</b>: os itens se aplicam ao dia em memória e a conferência (sequência que fecha, nenhuma batida no mesmo segundo) vem ANTES de gravar; o dia pode ter mudado desde o pedido (outra correção do RH).
-/// O banco de horas do dia é recalculado, e o evento e o e-mail do resultado saem na mesma transação.
+/// O banco de horas do dia é recalculado (aprovando ou recusando: o dia com pedido em análise não lança), e o evento e o e-mail do resultado saem na mesma transação.
 /// </summary>
 public sealed class DecidirComoRhCasoDeUso(
     IEscopoDoUsuario escopo,
@@ -100,9 +100,15 @@ public sealed class DecidirComoRhCasoDeUso(
                     await repositorio.AplicarBatidasAsync(pedido.Funcionario.Id, pedido.Dia, aplicado.Dia, agora, ct);
                     await recalculo.RecalcularDiaAsync(pedido.Funcionario.Id, pedido.Dia, ct);
                 }
-                else if (!await repositorio.DecidirComoRhAsync(pedidoId, false, escopo.FuncionarioId, gestorIdDoRh, agora, observacao, ct))
+                else
                 {
-                    throw MensagensDoPonto.EtapaIncorreta.ComoProblema();
+                    if (!await repositorio.DecidirComoRhAsync(pedidoId, false, escopo.FuncionarioId, gestorIdDoRh, agora, observacao, ct))
+                    {
+                        throw MensagensDoPonto.EtapaIncorreta.ComoProblema();
+                    }
+
+                    // Enquanto o pedido esperava, a consolidação do dia deixou a linha antiga como estava; agora que ele saiu do estado pendente o dia é recalculado (a falta ou a hora extra que ficou esperando).
+                    await recalculo.RecalcularDiaAsync(pedido.Funcionario.Id, pedido.Dia, ct);
                 }
 
                 var descricao = $"{(aprovar ? "Aprovou" : "Recusou")} o pedido de ajuste de ponto do dia {pedido.Dia:dd/MM/yyyy} (etapa do RH).";

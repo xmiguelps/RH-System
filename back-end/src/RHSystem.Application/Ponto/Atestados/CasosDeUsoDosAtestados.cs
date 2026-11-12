@@ -142,6 +142,7 @@ public sealed class DecidirAtestadoCasoDeUso(
     IEscopoDoUsuario escopo,
     IConsultaDeAtestados consulta,
     IAtestadosRepositorio atestados,
+    IPontoRepositorio ponto,
     IRecalculoDoBancoDeHoras recalculo,
     IUnidadeDeTrabalho unidade,
     IAuditor auditor,
@@ -177,6 +178,13 @@ public sealed class DecidirAtestadoCasoDeUso(
         await unidade.ExecutarEmTransacaoAsync(
             async () =>
             {
+                PessoaDoPonto? pessoa = null;
+                if (decisao == SituacaoDoAtestado.Validado)
+                {
+                    // A pessoa fica travada (a mesma trava do bater ponto) enquanto os dias são recalculados, e a admissão limita o laço: o período vem do funcionário e pode começar antes de ela existir na empresa.
+                    pessoa = await ponto.TravarPessoaAsync(atestado.Funcionario.Id, ct) ?? throw new NaoEncontradoException();
+                }
+
                 if (!await atestados.DecidirAsync(atestadoId, decisao, escopo.FuncionarioId, agora, motivo, ct))
                 {
                     throw MensagensDoPonto.AtestadoJaDecidido.ComoProblema(); // outra decisão chegou antes
@@ -194,7 +202,7 @@ public sealed class DecidirAtestadoCasoDeUso(
 
                 if (validado)
                 {
-                    await RecalcularAsync(atestado, FusoBrasil.Hoje(agora), ct);
+                    await RecalcularAsync(atestado, pessoa!.DataAdmissao, FusoBrasil.Hoje(agora), ct);
                 }
 
                 return 0;
@@ -205,9 +213,9 @@ public sealed class DecidirAtestadoCasoDeUso(
         return MapeadorDoAtestado.Montar((await consulta.ObterAsync(atestadoId, doRh, ct)).OuNaoEncontrado());
     }
 
-    private async Task RecalcularAsync(AtestadoLido atestado, DateOnly hoje, CancellationToken ct)
+    private async Task RecalcularAsync(AtestadoLido atestado, DateOnly admissao, DateOnly hoje, CancellationToken ct)
     {
-        for (var dia = atestado.DataInicio; dia <= atestado.DataFim && dia < hoje; dia = dia.AddDays(1))
+        for (var dia = atestado.DataInicio > admissao ? atestado.DataInicio : admissao; dia <= atestado.DataFim && dia < hoje; dia = dia.AddDays(1))
         {
             await recalculo.RecalcularDiaAsync(atestado.Funcionario.Id, dia, ct);
         }

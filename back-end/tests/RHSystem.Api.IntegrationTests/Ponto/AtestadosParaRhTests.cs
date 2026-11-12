@@ -241,6 +241,38 @@ public class AtestadosParaRhTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Validar_um_periodo_que_comeca_antes_da_admissao_so_recalcula_a_partir_do_dia_da_admissao()
+    {
+        var api = await ApiAsync();
+        var espiao = new RecalculoEspiao();
+        var fabrica = api.Api.WithWebHostBuilder(construtor => construtor.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<IRecalculoDoBancoDeHoras>();
+            servicos.AddSingleton<IRecalculoDoBancoDeHoras>(espiao);
+        }));
+        var cliente = fabrica.CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = (await api.ClienteDoRhAgoraAsync()).DefaultRequestHeaders.Authorization;
+        var pessoa = api.Elenco.DeOutroSetor.FuncionarioId;
+        var admissaoOriginal = Convert.ToDateTime(await Sql.EscalarAsync(api.Conexao, $"SELECT DATA_ADMISSAO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa}"), System.Globalization.CultureInfo.InvariantCulture).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-09-28' WHERE ID_FUNCIONARIO = {pessoa}");
+        try
+        {
+            var atestado = await AtestadosDeTeste.SemearAsync(api.Conexao, pessoa, "0001-01-01", "2026-10-02"); // o ano digitado errado: dias sem ponto nenhum, antes de a pessoa existir na empresa
+
+            var resposta = await cliente.PostAsJsonAsync($"{Rota}/{atestado}/validar", new { });
+
+            Assert.Equal(200, (int)resposta.StatusCode);
+            Assert.Equal(
+                new[] { "2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02" }.Select(d => (pessoa, d)),
+                espiao.Chamadas.Select(c => (c.Funcionario, c.Dia.ToString("yyyy-MM-dd"))).Order());
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '{admissaoOriginal}' WHERE ID_FUNCIONARIO = {pessoa}");
+        }
+    }
+
+    [Fact]
     public async Task Atestado_ja_decidido_e_409_ATESTADO_JA_DECIDIDO_e_nada_muda()
     {
         var api = await ApiAsync();

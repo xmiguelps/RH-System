@@ -2,9 +2,11 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Contrato;
 using RHSystem.Api.IntegrationTests.Infra;
+using RHSystem.Application.Agendamento;
 using RHSystem.Domain.Ponto;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
 
@@ -82,6 +84,31 @@ public class BaterPontoTests(MySqlFixture mysql)
         // O dia foi criado pelo banco com a carga do cargo (44 h ÷ 5 = 8,80) e a batida guardada em -03:00.
         Assert.Equal(8.80m, Convert.ToDecimal(await Sql.EscalarAsync(api.Conexao, $"SELECT CARGA_HORARIA FROM PONTOS WHERE ID_FUNCIONARIO = {pessoa.FuncionarioId} AND DATA = '2026-03-01'"), CultureInfo.InvariantCulture));
         Assert.Equal("2026-03-01 09:42:40", Convert.ToDateTime(await Sql.EscalarAsync(api.Conexao, $"SELECT m.DATA_HORA_MARCACAO FROM PONTOS_MARCACOES m JOIN PONTOS p ON p.ID_PONTO = m.ID_PONTO WHERE p.ID_FUNCIONARIO = {pessoa.FuncionarioId}"), CultureInfo.InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task O_cartao_e_a_resposta_da_batida_trazem_o_ultimo_dia_consolidado_em_atualizadoAte()
+    {
+        var api = await ApiAsync(Dia(26));
+        await Sql.ExecutarAsync(api.Conexao, "DELETE FROM TAREFAS_AGENDADAS WHERE TIPO = 'CONSOLIDAR_BANCO_HORAS'");
+        try
+        {
+            await using (var escopo = api.Api.Services.CreateAsyncScope())
+            {
+                var agendador = escopo.ServiceProvider.GetRequiredService<IAgendador>();
+                await agendador.RegistrarComoConcluidaAsync("CONSOLIDAR_BANCO_HORAS", "CONSOLIDAR_BANCO_HORAS:dia=2026-02-27", new DateOnly(2026, 2, 27), CancellationToken.None);
+                await agendador.RegistrarComoConcluidaAsync("CONSOLIDAR_BANCO_HORAS", "CONSOLIDAR_BANCO_HORAS:dia=2026-02-25", new DateOnly(2026, 2, 25), CancellationToken.None);
+            }
+
+            var doCartao = await CartaoAsync(api, api.Elenco.MembroB);
+            var daBatida = await CorpoAsync(await BaterAsync(api, api.Elenco.MembroA, "ENTRADA"));
+
+            Assert.Equal(("2026-02-27", "2026-02-27"), (doCartao.GetProperty("bancoHoras").GetProperty("atualizadoAte").GetString(), daBatida.GetProperty("bancoHoras").GetProperty("atualizadoAte").GetString()));
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, "DELETE FROM TAREFAS_AGENDADAS WHERE TIPO = 'CONSOLIDAR_BANCO_HORAS'");
+        }
     }
 
     [Fact]

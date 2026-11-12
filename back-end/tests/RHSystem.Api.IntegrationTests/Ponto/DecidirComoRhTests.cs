@@ -378,7 +378,7 @@ public class DecidirComoRhTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- o que sai da decisão
 
     [Fact]
-    public async Task Aprovar_recalcula_o_dia_pela_porta_e_recusar_nao()
+    public async Task Aprovar_e_recusar_recalculam_o_dia_pela_porta()
     {
         var api = await ApiAsync();
         var e = api.Elenco;
@@ -398,7 +398,55 @@ public class DecidirComoRhTests(MySqlFixture mysql)
         await cliente.PostAsJsonAsync($"{RotaRh}/{aprovado.PedidoId}/aprovar", new { });
         await cliente.PostAsJsonAsync($"{RotaRh}/{recusado.PedidoId}/recusar", new { });
 
-        Assert.Equal([(aprovado.FuncionarioId, aprovado.Dia)], espiao.Chamadas);
+        Assert.Equal([(aprovado.FuncionarioId, aprovado.Dia), (recusado.FuncionarioId, recusado.Dia)], espiao.Chamadas); // o dia com pedido em análise não lança: ao sair do estado pendente, qualquer que seja o resultado, o dia é recalculado
+    }
+
+    [Fact]
+    public async Task Recusar_o_pedido_de_um_dia_util_sem_batida_lanca_a_falta_que_a_consolidacao_deixou_esperando()
+    {
+        var api = await ApiAsync();
+        var e = api.Elenco;
+        var cargo = await SementeDoCadastro.CargoAsync(api.Conexao, $"Cargo da recusa {Guid.NewGuid():N}", 44m);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ID_CARGO = {cargo} WHERE ID_FUNCIONARIO = {e.MembroA.FuncionarioId}");
+        var dia = new DateOnly(2026, 10, 1); // quinta-feira, dia útil, sem nenhuma batida
+        await PontoDeTeste.BaterEmAsync(api.Conexao, e.MembroA.FuncionarioId, dia);
+        var corpo = new { data = "2026-10-01", justificativa = "Esqueci de bater o dia inteiro.", itens = new object[] { new { tipo = "ENTRADA", instanteUtc = "2026-10-01T11:00:00Z", marcacaoId = (int?)null }, new { tipo = "SAIDA", instanteUtc = "2026-10-01T20:00:00Z", marcacaoId = (int?)null } } };
+        var criado = await (await api.ClienteAgoraAsync(e.MembroA.UsuarioId)).PostAsJsonAsync(RotaEu, corpo);
+        Assert.Equal(201, (int)criado.StatusCode);
+        var pedidoId = (await CorpoAsync(criado)).GetProperty("id").GetInt32();
+        await PelaEtapaDoGestorAsync(api, pedidoId);
+        await using (var escopo = api.Api.Services.CreateAsyncScope())
+        {
+            await escopo.ServiceProvider.GetRequiredService<IRecalculoDoBancoDeHoras>().RecalcularDiaAsync(e.MembroA.FuncionarioId, dia, CancellationToken.None); // a consolidação do dia: com o pedido em análise a linha antiga espera
+        }
+
+        var antes = await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroA.FuncionarioId} AND DIA_REFERENCIA = '2026-10-01'");
+        var resposta = await DecidirAsync(api, e.Rh, pedidoId, "recusar");
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(0, antes);
+        Assert.Equal(("DEBITO", "8.80", "Falta"), (await TextoAsync(api, $"SELECT TIPO_LANCAMENTO FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroA.FuncionarioId} AND DIA_REFERENCIA = '2026-10-01'"), await TextoAsync(api, $"SELECT QUANTIDADE FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroA.FuncionarioId} AND DIA_REFERENCIA = '2026-10-01'"), await TextoAsync(api, $"SELECT OBSERVACAO FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroA.FuncionarioId} AND DIA_REFERENCIA = '2026-10-01'")));
+    }
+
+    [Fact]
+    public async Task O_RH_aprova_o_pedido_de_quem_foi_inativado_depois_e_a_batida_entra_no_dia()
+    {
+        var api = await ApiAsync();
+        var e = api.Elenco;
+        var s = await PedirAsync(api, e.MembroB);
+        await PelaEtapaDoGestorAsync(api, s.PedidoId);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE WHERE ID_FUNCIONARIO = {s.FuncionarioId}");
+        try
+        {
+            var resposta = await DecidirAsync(api, e.Rh, s.PedidoId, "aprovar");
+
+            Assert.Equal(200, (int)resposta.StatusCode); // o contrato não recusa o pedido de inativo (decisão 3 do plano)
+            Assert.Equal(("APROVADA", 2L), ((await CorpoAsync(resposta)).GetProperty("status").GetString(), await BatidasAsync(api, s.FuncionarioId, s.Dia)));
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = TRUE WHERE ID_FUNCIONARIO = {s.FuncionarioId}");
+        }
     }
 
     private sealed class RecalculoEspiao : IRecalculoDoBancoDeHoras

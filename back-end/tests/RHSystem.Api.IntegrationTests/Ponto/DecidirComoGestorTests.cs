@@ -48,6 +48,32 @@ public class DecidirComoGestorTests(MySqlFixture mysql)
 
     private static async Task<string?> TextoAsync(ApiDeAcesso api, string sql) => (await Sql.EscalarAsync(api.Conexao, sql)) is { } v and not DBNull ? Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) : null;
 
+    [Fact]
+    public async Task Recusar_o_pedido_de_um_dia_util_sem_batida_lanca_a_falta_que_a_consolidacao_deixou_esperando()
+    {
+        var api = await ApiAsync();
+        var e = api.Elenco;
+        var cargo = await SementeDoCadastro.CargoAsync(api.Conexao, $"Cargo da recusa do gestor {Guid.NewGuid():N}", 44m);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ID_CARGO = {cargo} WHERE ID_FUNCIONARIO = {e.MembroB.FuncionarioId}");
+        var dia = new DateOnly(2026, 10, 2); // sexta-feira, dia útil, sem nenhuma batida
+        await PontoDeTeste.BaterEmAsync(api.Conexao, e.MembroB.FuncionarioId, dia);
+        var corpo = new { data = "2026-10-02", justificativa = "Esqueci de bater o dia inteiro.", itens = new object[] { new { tipo = "ENTRADA", instanteUtc = "2026-10-02T11:00:00Z", marcacaoId = (int?)null }, new { tipo = "SAIDA", instanteUtc = "2026-10-02T20:00:00Z", marcacaoId = (int?)null } } };
+        var criado = await (await api.ClienteAgoraAsync(e.MembroB.UsuarioId)).PostAsJsonAsync(RotaEu, corpo);
+        Assert.Equal(201, (int)criado.StatusCode);
+        var pedidoId = (await CorpoAsync(criado)).GetProperty("id").GetInt32();
+        await using (var escopo = api.Api.Services.CreateAsyncScope())
+        {
+            await escopo.ServiceProvider.GetRequiredService<IRecalculoDoBancoDeHoras>().RecalcularDiaAsync(e.MembroB.FuncionarioId, dia, CancellationToken.None); // a consolidação do dia: com o pedido em análise a linha antiga espera
+        }
+
+        var antes = await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroB.FuncionarioId} AND DIA_REFERENCIA = '2026-10-02'");
+        var resposta = await DecidirAsync(api, e.Gestor, pedidoId, "recusar");
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(0, antes);
+        Assert.Equal(("DEBITO", "8.80", "Falta"), (await TextoAsync(api, $"SELECT TIPO_LANCAMENTO FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroB.FuncionarioId} AND DIA_REFERENCIA = '2026-10-02'"), await TextoAsync(api, $"SELECT QUANTIDADE FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroB.FuncionarioId} AND DIA_REFERENCIA = '2026-10-02'"), await TextoAsync(api, $"SELECT OBSERVACAO FROM BANCOS_HORAS WHERE ID_FUNCIONARIO = {e.MembroB.FuncionarioId} AND DIA_REFERENCIA = '2026-10-02'")));
+    }
+
     // ---------------------------------------------------------------- a fila
 
     [Fact]
