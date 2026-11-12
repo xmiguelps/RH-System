@@ -99,6 +99,11 @@ public interface IAgendamentoDoFormulario
 
     Task CancelarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
 
+    /// <summary>
+    /// A tarefa do lembrete AUTOMÁTICO (<c>LEMBRETE_FORMULARIO:form={id}:dia={dia}:alcance=TODOS</c>), no começo do <paramref name="dia"/> (00:00 -03:00), 7 dias antes do prazo. A chave é a marca do dia: o lembrete manual do anônimo usa a mesma, então só um dos dois sai por dia. Chave que já existe é sucesso.
+    /// </summary>
+    Task AgendarLembreteAutomaticoAsync(int formularioId, DateOnly dia, CancellationToken ct);
+
     /// <summary>Cancela toda tarefa pendente do formulário (publicar, encerrar, reabrir, lembrete) e os e-mails de lembrete ainda na fila: a exclusão não deixa nada rodar depois.</summary>
     Task CancelarTudoAsync(int formularioId, CancellationToken ct);
 }

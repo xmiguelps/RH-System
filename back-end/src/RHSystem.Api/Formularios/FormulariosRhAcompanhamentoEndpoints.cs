@@ -2,6 +2,7 @@ using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
 using RHSystem.Application.Arquivos;
 using RHSystem.Application.Formularios.Acompanhar;
+using RHSystem.Application.Formularios.Lembretes;
 
 namespace RHSystem.Api.Formularios;
 
@@ -28,6 +29,7 @@ public static class FormulariosRhAcompanhamentoEndpoints
         servicos.AddScoped<BaixarArquivoDeRespostaCasoDeUso>();
         servicos.AddScoped<ObterResultadoDoFormularioCasoDeUso>();
         servicos.AddScoped<ExportarRespostasDoFormularioCasoDeUso>();
+        servicos.AddScoped<LembrarQuemFaltaFormularioCasoDeUso>();
         return servicos;
     }
 
@@ -60,6 +62,11 @@ public static class FormulariosRhAcompanhamentoEndpoints
             .Produces<string>(StatusCodes.Status200OK, "text/csv")
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        rh.MapPost("/formularios/{formularioId:int}/lembretes", Lembrar)
+            .WithName("lembrarQuemFaltaFormulario")
+            .Produces<FormularioLembreteResultado>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -78,6 +85,8 @@ public static class FormulariosRhAcompanhamentoEndpoints
         http.Response.Headers.CacheControl = "no-store"; // respostas de formulário são dado pessoal: nenhum cache guarda o arquivo
         return Results.Bytes(arquivo.Conteudo, "text/csv; charset=utf-8");
     }
+
+    private static async Task<FormularioLembreteResultado> Lembrar(int formularioId, FormularioLembreteComando corpo, LembrarQuemFaltaFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
 
     private static async Task<LinkTemporario> BaixarArquivo(int formularioId, int respostaId, BaixarArquivoDeRespostaCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, respostaId, ct);
 }

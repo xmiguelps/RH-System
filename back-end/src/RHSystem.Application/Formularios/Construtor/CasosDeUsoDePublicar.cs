@@ -5,6 +5,7 @@ using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Tempo;
 using RHSystem.Application.Comunicacao.Regras;
 using RHSystem.Application.Formularios.Destinatarios;
+using RHSystem.Application.Formularios.Lembretes;
 using RHSystem.Application.Formularios.Mensagens;
 using RHSystem.Application.Formularios.Regras;
 using RHSystem.Domain.Auditoria;
@@ -71,6 +72,10 @@ public sealed class PublicarFormularioCasoDeUso(
                     if (campos.Prazo is { } prazo)
                     {
                         await agendamento.AgendarEncerramentoAsync(formularioId, InstantesDoFormulario.EncerramentoNominal(prazo), ct);
+                        if (campos.LembreteAutomatico && campos.Alvo != AlvoDoFormulario.Link && lido.Tipo != TipoDeFormulario.Outro && RegrasDoLembrete.DiaDoAutomatico(prazo, FusoBrasil.DiaLocalDe(dataDePublicacao)) is { } diaDoLembrete)
+                        {
+                            await agendamento.AgendarLembreteAutomaticoAsync(formularioId, diaDoLembrete, ct);
+                        }
                     }
 
                     if (agendar)
