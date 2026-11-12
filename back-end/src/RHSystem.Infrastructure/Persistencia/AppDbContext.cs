@@ -5,6 +5,7 @@ using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
 using RHSystem.Domain.Colaboradores;
 using RHSystem.Domain.Comunicacao;
+using RHSystem.Domain.Formularios;
 using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Emails;
 using RHSystem.Domain.Empresa;
@@ -76,6 +77,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Holerite> Holerites => Set<Holerite>();
 
     public DbSet<Advertencia> Advertencias => Set<Advertencia>();
+
+    public DbSet<Formulario> Formularios => Set<Formulario>();
+
+    public DbSet<FormularioPergunta> FormulariosPerguntas => Set<FormularioPergunta>();
+
+    public DbSet<FormularioAlternativa> FormulariosAlternativas => Set<FormularioAlternativa>();
+
+    public DbSet<FormularioResposta> FormulariosRespostas => Set<FormularioResposta>();
+
+    public DbSet<FormularioCandidato> FormulariosCandidatos => Set<FormularioCandidato>();
+
+    public DbSet<FormularioDestinatario> FormulariosDestinatarios => Set<FormularioDestinatario>();
+
+    public DbSet<FormularioParticipacao> FormulariosParticipacoes => Set<FormularioParticipacao>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
