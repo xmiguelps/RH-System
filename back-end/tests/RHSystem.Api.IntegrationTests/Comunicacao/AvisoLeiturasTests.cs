@@ -201,6 +201,48 @@ public class AvisoLeiturasTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Um_segundo_clique_20_segundos_depois_ainda_e_o_mesmo_minuto_e_nao_manda_nem_audita_de_novo()
+    {
+        var api = await ApiAsync();
+        var id = await SemearAsync(api, Titulo("Mesmo minuto"), true, "2026-10-01 08:00:00");
+
+        await LembrarAsync(api, id);
+        var depoisDoPrimeiro = (await LembradosAsync(api, id)).Count;
+        api.Api.Relogio.Fixar(ElencoDeTeste.Hoje.AddSeconds(20));
+        await LembrarAsync(api, id);
+
+        Assert.Equal(depoisDoPrimeiro, (await LembradosAsync(api, id)).Count);
+        Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "AVISOS", id)); // o segundo clique não enfileirou nada: não há evento novo
+    }
+
+    [Fact]
+    public async Task O_lembrete_nao_vai_para_quem_saiu_da_empresa_nem_para_quem_ficou_sem_e_mail()
+    {
+        var api = await ApiAsync();
+        var id = await SemearAsync(api, Titulo("Sem saiu nem sem e-mail"), true, "2026-10-01 08:00:00");
+        var saiu = api.Elenco.MembroB.FuncionarioId;
+        var semEmail = api.Elenco.DeOutroSetor.FuncionarioId;
+        var emailOriginal = (string)(await Sql.EscalarAsync(api.Conexao, $"SELECT EMAIL_CORPORATIVO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {semEmail}"))!;
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE WHERE ID_FUNCIONARIO = {saiu}");
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET EMAIL_CORPORATIVO = NULL WHERE ID_FUNCIONARIO = {semEmail}");
+        try
+        {
+            var resposta = await LembrarAsync(api, id);
+
+            var lembrados = await LembradosAsync(api, id);
+            Assert.Equal(202, (int)resposta.StatusCode);
+            Assert.DoesNotContain(saiu, lembrados);
+            Assert.DoesNotContain(semEmail, lembrados);
+            Assert.Contains(api.Elenco.MembroA.FuncionarioId, lembrados);
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = TRUE WHERE ID_FUNCIONARIO = {saiu}");
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET EMAIL_CORPORATIVO = '{emailOriginal}' WHERE ID_FUNCIONARIO = {semEmail} AND EMAIL_CORPORATIVO IS NULL");
+        }
+    }
+
+    [Fact]
     public async Task Cliques_em_paralelo_no_mesmo_minuto_enfileiram_um_lote_so()
     {
         var api = await ApiAsync();

@@ -4,6 +4,8 @@ using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Auditoria;
 using RHSystem.Api.IntegrationTests.Contrato;
 using RHSystem.Api.IntegrationTests.Infra;
+using Microsoft.Extensions.DependencyInjection;
+using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Domain.Auditoria;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
 
@@ -17,6 +19,7 @@ namespace RHSystem.Api.IntegrationTests.Comunicacao;
 public class AvisosRhTests(MySqlFixture mysql)
 {
     private const string Rota = "/api/rh/avisos";
+    private static readonly CancellationToken Ct = CancellationToken.None;
     private static int _sequencia;
 
     private async Task<ApiDeAcesso> ApiAsync()
@@ -499,6 +502,155 @@ public class AvisosRhTests(MySqlFixture mysql)
         var esperadoMedia = (int)Math.Round((((1d / total) + 1d + 0d) / 3d) * 100d, MidpointRounding.AwayFromZero);
         Assert.Equal((esperadoMedia, 2, b, "Resumo B", "2026-10-11T02:59:59Z"), (resumo.GetProperty("leituraMediaDosAtivosPercentual").GetInt32(), resumo.GetProperty("expiramNosProximos7Dias").GetInt32(), resumo.GetProperty("proximoAExpirar").GetProperty("avisoId").GetInt32(), resumo.GetProperty("proximoAExpirar").GetProperty("titulo").GetString(), resumo.GetProperty("proximoAExpirar").GetProperty("expiraEmUtc").GetString()));
         Assert.True(c > 0);
+    }
+
+    // ---------------------------------------------------------------- o que a auditoria diz e os limites de data
+
+    [Fact]
+    public async Task Os_eventos_dizem_se_o_aviso_foi_publicado_agora_ou_agendado_e_para_quando()
+    {
+        var api = await ApiAsync();
+        var agora = Titulo("Evento agora");
+        var depois = Titulo("Evento depois");
+
+        var idAgora = await CriarComSucessoAsync(api, Novo(agora));
+        var idDepois = await CriarComSucessoAsync(api, Novo(depois, publicarEmUtc: "2026-10-09T11:00:00Z"));
+
+        Assert.Equal([$"Criou o aviso \"{agora}\".", $"Publicou o aviso \"{agora}\"."], (await EventosAsync(api, idAgora)).Select(e => e.Descricao));
+        Assert.Equal([$"Criou o aviso \"{depois}\".", $"Agendou o aviso \"{depois}\" para 09/10/2026 08:00."], (await EventosAsync(api, idDepois)).Select(e => e.Descricao));
+    }
+
+    [Fact]
+    public async Task Editar_agendado_com_a_mesma_data_nao_mexe_na_tarefa()
+    {
+        var api = await ApiAsync();
+        var id = await CriarComSucessoAsync(api, Novo(Titulo("Mesma data"), publicarEmUtc: "2026-10-09T11:00:00Z"));
+
+        var resposta = await EditarAsync(api, id, new { titulo = "Mesma data editada", conteudo = "Texto.", fixado = false, publicarEmUtc = "2026-10-09T11:00:00Z", expiraEm = (string?)null });
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal((1, 0), (await TarefasAsync(api, id, "PENDENTE", "2026-10-09T11:00:00Z"), await TarefasAsync(api, id, "CANCELADA")));
+    }
+
+    [Fact]
+    public async Task Publicar_com_expiracao_igual_a_publicacao_prevista_vale_porque_o_ultimo_dia_e_o_da_publicacao()
+    {
+        var api = await ApiAsync();
+        var id = await SemearAsync(api, Titulo("Expira na hora"), false, "2026-10-11 23:59:59", "2026-10-11 23:59:59");
+
+        var resposta = await AcaoAsync(api, id, "publicar");
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(("AGENDADO", "2026-10-12T02:59:59Z"), ((await CorpoAsync(resposta)).GetProperty("situacao").GetString(), (await CorpoAsync(resposta)).GetProperty("expiraEmUtc").GetString()));
+    }
+
+    [Fact]
+    public async Task Encerrar_o_aviso_ativo_publicado_ha_dias_o_leva_para_a_aba_dos_expirados_e_tira_da_dos_ativos()
+    {
+        var api = await ApiAsync();
+        var id = await SemearAsync(api, Titulo("Ativo antigo a encerrar"), true, "2026-10-01 08:00:00", null);
+
+        var resposta = await AcaoAsync(api, id, "encerrar");
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal("2026-10-07T12:42:00Z", (await CorpoAsync(resposta)).GetProperty("expiraEmUtc").GetString());
+        Assert.Contains(id, Ids(await CorpoAsync(await ListarAsync(api, "situacao=EXPIRADO&tamanhoPagina=100"))));
+        Assert.DoesNotContain(id, Ids(await CorpoAsync(await ListarAsync(api, "situacao=ATIVO&tamanhoPagina=100"))));
+    }
+
+    [Fact]
+    public async Task No_instante_exato_da_publicacao_o_aviso_e_ativo_e_no_da_expiracao_e_expirado()
+    {
+        var api = await ApiAsync();
+        var naHoraDePublicar = await SemearAsync(api, Titulo("Publica agora"), true, "2026-10-07 09:42:00", null);
+        var naHoraDeExpirar = await SemearAsync(api, Titulo("Expira agora"), true, "2026-10-01 08:00:00", "2026-10-07 09:42:00");
+
+        var ativos = Ids(await CorpoAsync(await ListarAsync(api, "situacao=ATIVO&tamanhoPagina=100")));
+        var agendados = Ids(await CorpoAsync(await ListarAsync(api, "situacao=AGENDADO&tamanhoPagina=100")));
+        var expirados = Ids(await CorpoAsync(await ListarAsync(api, "situacao=EXPIRADO&tamanhoPagina=100")));
+
+        Assert.Contains(naHoraDePublicar, ativos);
+        Assert.DoesNotContain(naHoraDePublicar, agendados);
+        Assert.Contains(naHoraDeExpirar, expirados);
+        Assert.DoesNotContain(naHoraDeExpirar, ativos);
+        Assert.Equal(("ATIVO", "EXPIRADO"), ((await ObterAsync(api, naHoraDePublicar)).GetProperty("situacao").GetString(), (await ObterAsync(api, naHoraDeExpirar)).GetProperty("situacao").GetString()));
+    }
+
+    [Fact]
+    public async Task No_repositorio_so_o_aviso_ativo_se_encerra_e_rascunho_agendado_e_expirado_ficam_como_estao()
+    {
+        var api = await ApiAsync();
+        var rascunho = await SemearAsync(api, Titulo("Repo rascunho"), false, null, null);
+        var agendado = await SemearAsync(api, Titulo("Repo agendado"), true, "2026-10-09 08:00:00", null);
+        var expirado = await SemearAsync(api, Titulo("Repo expirado"), true, "2026-09-01 08:00:00", "2026-09-30 23:59:59");
+        var ativo = await SemearAsync(api, Titulo("Repo ativo"), true, "2026-10-01 08:00:00", null);
+        await using var escopo = api.Api.Services.CreateAsyncScope();
+        var repositorio = escopo.ServiceProvider.GetRequiredService<IAvisosRepositorio>();
+
+        var resultados = new[]
+        {
+            await repositorio.EncerrarAsync(rascunho, ElencoDeTeste.Hoje, Ct),
+            await repositorio.EncerrarAsync(agendado, ElencoDeTeste.Hoje, Ct),
+            await repositorio.EncerrarAsync(expirado, ElencoDeTeste.Hoje, Ct),
+            await repositorio.EncerrarAsync(ativo, ElencoDeTeste.Hoje, Ct),
+        };
+
+        Assert.Equal(new[] { false, false, false, true }, resultados);
+        Assert.Equal((0L, 0L), (await ContarAsync(api, $"SELECT COUNT(*) FROM AVISOS WHERE ID_AVISO IN ({rascunho}, {agendado}) AND DATA_EXPIRACAO IS NOT NULL"), await ContarAsync(api, $"SELECT COUNT(*) FROM AVISOS WHERE ID_AVISO = {expirado} AND DATA_EXPIRACAO <> '2026-09-30 23:59:59'")));
+    }
+
+    // ---------------------------------------------------------------- resumo: a janela de 7 dias e o arredondamento
+
+    [Fact]
+    public async Task O_resumo_conta_como_expirando_em_7_dias_so_ate_7_dias_a_frente()
+    {
+        var api = await ApiAsync();
+        await Sql.ExecutarAsync(api.Conexao, "DELETE FROM AVISOS_VISUALIZACOES");
+        await Sql.ExecutarAsync(api.Conexao, "DELETE FROM AVISOS");
+        var dentro = await SemearAsync(api, "Expira em 6 dias e meio", true, "2026-10-01 08:00:00", "2026-10-13 23:59:59");
+        await SemearAsync(api, "Expira em 7 dias e meio", true, "2026-10-01 08:00:00", "2026-10-14 23:59:59");
+
+        var resumo = await CorpoAsync(await (await api.ClienteDoRhAgoraAsync()).GetAsync($"{Rota}/resumo"));
+
+        Assert.Equal((1, dentro), (resumo.GetProperty("expiramNosProximos7Dias").GetInt32(), resumo.GetProperty("proximoAExpirar").GetProperty("avisoId").GetInt32()));
+    }
+
+    [Fact]
+    public async Task A_media_de_leitura_arredonda_o_meio_para_cima()
+    {
+        var api = await ApiAsync();
+        await Sql.ExecutarAsync(api.Conexao, "DELETE FROM AVISOS_VISUALIZACOES");
+        await Sql.ExecutarAsync(api.Conexao, "DELETE FROM AVISOS");
+        var id = await SemearAsync(api, "Doze e meio por cento", true, "2026-10-01 08:00:00", null);
+        await Sql.ExecutarAsync(api.Conexao, $"DELETE FROM AVISOS_VISUALIZACOES WHERE ID_AVISO = {id} AND ID_AVISO_VISUALIZACAO NOT IN (SELECT ID FROM (SELECT ID_AVISO_VISUALIZACAO AS ID FROM AVISOS_VISUALIZACOES WHERE ID_AVISO = {id} ORDER BY ID_AVISO_VISUALIZACAO LIMIT 8) t)");
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE AVISOS_VISUALIZACOES SET VISUALIZADO = TRUE, DATA_VISUALIZACAO = '2026-10-06 10:00:00' WHERE ID_AVISO = {id} ORDER BY ID_AVISO_VISUALIZACAO LIMIT 1");
+        var ativas = await ContarAsync(api, $"SELECT COUNT(*) FROM AVISOS_VISUALIZACOES v JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = v.ID_FUNCIONARIO WHERE v.ID_AVISO = {id} AND f.ATIVO = TRUE");
+
+        var resumo = await CorpoAsync(await (await api.ClienteDoRhAgoraAsync()).GetAsync($"{Rota}/resumo"));
+
+        Assert.Equal(8L, ativas); // as oito linhas são de pessoas ativas: 1 de 8 é 12,5%
+        Assert.Equal(13, resumo.GetProperty("leituraMediaDosAtivosPercentual").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_leitura_do_aviso_nao_conta_quem_saiu_da_empresa_depois()
+    {
+        var api = await ApiAsync();
+        var id = await SemearAsync(api, Titulo("Leitura sem quem saiu"), true, "2026-10-01 08:00:00", null);
+        var saiu = api.Elenco.MembroB.FuncionarioId;
+        var antes = (await ObterAsync(api, id)).GetProperty("leitura").GetProperty("total").GetInt32();
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE WHERE ID_FUNCIONARIO = {saiu}");
+        try
+        {
+            var depois = (await ObterAsync(api, id)).GetProperty("leitura").GetProperty("total").GetInt32();
+            var naLista = (await CorpoAsync(await ListarAsync(api, "tamanhoPagina=100"))).GetProperty("itens").EnumerateArray().Single(a => a.GetProperty("id").GetInt32() == id).GetProperty("leitura").GetProperty("total").GetInt32();
+
+            Assert.Equal((antes - 1, antes - 1), (depois, naLista));
+        }
+        finally
+        {
+            await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = TRUE WHERE ID_FUNCIONARIO = {saiu}");
+        }
     }
 
     // ---------------------------------------------------------------- quem pode

@@ -194,6 +194,7 @@ public class PublicarAvisoTests(MySqlFixture mysql)
         var recente = await SemearAsync(api, Titulo("Recente sem tarefa"), true, "2026-10-05 08:00:00");
         var antigo = await SemearAsync(api, Titulo("Antigo sem tarefa"), true, "2026-09-01 08:00:00");
         var rascunho = await SemearAsync(api, Titulo("Rascunho sem tarefa"), false, null);
+        var rascunhoComData = await SemearAsync(api, Titulo("Rascunho com data recente"), false, "2026-10-08 08:00:00");
 
         await RecuperarAsync(api);
         var depoisDaPrimeira = await ContarAsync(api, "SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_AVISO'");
@@ -201,7 +202,7 @@ public class PublicarAvisoTests(MySqlFixture mysql)
 
         Assert.Equal(1, await ContarAsync(api, $"SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_AVISO' AND CHAVE_IDEMPOTENCIA = 'PUBLICAR_AVISO:aviso={futuro}:em=2026-10-09T11:00:00Z' AND SITUACAO = 'PENDENTE'"));
         Assert.Equal(1, await ContarAsync(api, $"SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_AVISO' AND CHAVE_IDEMPOTENCIA = 'PUBLICAR_AVISO:aviso={recente}:em=2026-10-05T11:00:00Z' AND SITUACAO = 'PENDENTE'"));
-        Assert.Equal(0, await ContarAsync(api, $"SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_AVISO' AND REFERENCIA_ID IN ({antigo}, {rascunho})"));
+        Assert.Equal(0, await ContarAsync(api, $"SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_AVISO' AND REFERENCIA_ID IN ({antigo}, {rascunho}, {rascunhoComData})"));
         Assert.Equal((2L, 2L), (depoisDaPrimeira, await ContarAsync(api, "SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_AVISO'")));
     }
 
@@ -233,8 +234,42 @@ public class PublicarAvisoTests(MySqlFixture mysql)
         Assert.DoesNotContain("<script>", modelo.Html, StringComparison.Ordinal);
         Assert.Contains("Recesso &lt;script&gt;alert(1)&lt;/script&gt;", modelo.Html, StringComparison.Ordinal);
         Assert.Contains("Fechado de 24 a 26/12 &amp; feriado.", modelo.Html, StringComparison.Ordinal);
+        Assert.Contains("&lt;b&gt;Nunes&lt;/b&gt;", modelo.Html, StringComparison.Ordinal); // WebUtility.HtmlEncode escreve o acento como entidade numérica (J&#250;lia), então só o trecho ASCII é comparado // o nome também é texto do usuário
+        Assert.DoesNotContain("<b>", modelo.Html, StringComparison.Ordinal);
+        Assert.EndsWith("Abra o RH-System para ler o aviso inteiro.", modelo.Texto, StringComparison.Ordinal);
         Assert.Equal(AuditoriaArea.Avisos, modelo.AreaDeAuditoria);
         Assert.DoesNotContain("julia@empresa.com.br", modelo.DescricaoDeAuditoria + modelo.RegistroAfetado, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void O_renderizador_do_lembrete_escapa_o_html_e_diz_que_a_pessoa_ainda_nao_abriu_o_aviso()
+    {
+        var carga = JsonSerializer.SerializeToElement(new { nome = "Júlia <b>Nunes</b>", titulo = "Recesso <script>x</script>", previa = "Fechado & feriado." });
+
+        var modelo = new AvisoLembreteRenderizador().Renderizar(carga, "julia@empresa.com.br");
+
+        Assert.Equal("AVISO_LEMBRETE", new AvisoLembreteRenderizador().Tipo);
+        Assert.Equal("Lembrete: Recesso <script>x</script>", modelo.Assunto);
+        Assert.Contains("Você ainda não abriu um aviso do RH no RH-System: Recesso <script>x</script>", modelo.Texto, StringComparison.Ordinal);
+        Assert.Contains("Fechado & feriado.", modelo.Texto, StringComparison.Ordinal);
+        Assert.Contains("&lt;b&gt;Nunes&lt;/b&gt;", modelo.Html, StringComparison.Ordinal); // WebUtility.HtmlEncode escreve o acento como entidade numérica (J&#250;lia), então só o trecho ASCII é comparado
+        Assert.Contains("Fechado &amp; feriado.", modelo.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script>", modelo.Html, StringComparison.Ordinal);
+        Assert.Equal(AuditoriaArea.Avisos, modelo.AreaDeAuditoria);
+        Assert.DoesNotContain("julia@empresa.com.br", modelo.DescricaoDeAuditoria + modelo.RegistroAfetado, StringComparison.Ordinal);
+        Assert.EndsWith("Abra o RH-System para ler o aviso inteiro.", modelo.Texto, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Sem_previa_o_texto_dos_dois_e_mails_nao_leva_o_paragrafo_da_previa()
+    {
+        var carga = JsonSerializer.SerializeToElement(new { nome = "Ana", titulo = "Aviso", previa = "  " });
+
+        var publicado = new AvisoPublicadoRenderizador().Renderizar(carga, "x@empresa.com.br");
+        var lembrete = new AvisoLembreteRenderizador().Renderizar(carga, "x@empresa.com.br");
+
+        Assert.Equal("Olá, Ana!\n\nO RH publicou um novo aviso no RH-System: Aviso\n\nAbra o RH-System para ler o aviso inteiro.", publicado.Texto);
+        Assert.Equal("Olá, Ana!\n\nVocê ainda não abriu um aviso do RH no RH-System: Aviso\n\nAbra o RH-System para ler o aviso inteiro.", lembrete.Texto);
     }
 
     [Fact]
