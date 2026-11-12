@@ -112,6 +112,11 @@ public sealed class ConsultaDeFormularios(AppDbContext db) : IConsultaDeFormular
 
     public async Task<bool> PerguntaTemRespostaAsync(int perguntaId, CancellationToken ct) => await db.FormulariosRespostas.AsNoTracking().AnyAsync(r => r.PerguntaId == perguntaId, ct);
 
+    public async Task<IReadOnlyList<PessoaParaPublico>> PessoasAsync(IReadOnlyList<int> ids, CancellationToken ct) =>
+        await db.Funcionarios.AsNoTracking().Where(f => ids.Contains(f.Id)).Select(f => new PessoaParaPublico(f.Id, f.Ativo)).ToListAsync(ct);
+
+    public async Task<int> ContarSetoresExistentesAsync(IReadOnlyList<int> ids, CancellationToken ct) => await db.Setores.AsNoTracking().CountAsync(s => ids.Contains(s.Id), ct);
+
     private async Task<IReadOnlyList<PerguntaLida>> PerguntasAsync(int formularioId, CancellationToken ct)
     {
         var linhas = await db.FormulariosPerguntas.AsNoTracking().Where(p => p.FormularioId == formularioId).OrderBy(p => p.Ordem).ThenBy(p => p.Id).ToListAsync(ct);

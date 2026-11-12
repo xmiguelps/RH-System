@@ -259,6 +259,7 @@ public static class DependencyInjection
         services.AddScoped<IFormulariosRepositorio, FormulariosRepositorio>();
         services.AddScoped<IConsultaDeFormularios, ConsultaDeFormularios>();
         services.AddScoped<IDestinatariosDoFormulario, DestinatariosDoFormulario>();
+        services.AddScoped<IAgendamentoDoFormulario, AgendamentoDoFormulario>();
         services.AddScoped<IPerguntasDoFormularioRepositorio, PerguntasDoFormularioRepositorio>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();

@@ -46,4 +46,50 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
                 ct);
         return linhas == 1;
     }
+
+    public async Task<bool> AtualizarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var ativoLido = lido.Ativo;
+        var anonimoLido = lido.Anonimo;
+        var encerradoLido = lido.EncerradoEmUtc;
+        var publicadoLido = lido.PublicadoEmUtc;
+        AlvoDoFormulario? alvo = novos.Alvo;
+        var porLink = novos.Alvo == AlvoDoFormulario.Link;
+        var prazo = novos.Prazo;
+        var intervalo = novos.Recorrencia?.Intervalo;
+        UnidadeDeRecorrencia? unidade = novos.Recorrencia?.Unidade;
+        var ate = novos.Recorrencia?.Ate;
+        var lembrete = novos.LembreteAutomatico;
+        var novoDia = novos.NovaPublicacaoEmUtc;
+
+        // AUDITORIA-OK: a publicação guardada é auditada à mão pelo caso de uso (evento Alterou, na mesma transação); o código do link some junto se o alvo deixou de ser LINK (o CHECK do banco os amarra).
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && f.Ativo == ativoLido && f.Anonimo == anonimoLido && f.EncerradoEmUtc == encerradoLido && f.PublicadoEmUtc == publicadoLido)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(f => f.Alvo, alvo)
+                    .SetProperty(f => f.Prazo, prazo)
+                    .SetProperty(f => f.RecorrenciaIntervalo, intervalo)
+                    .SetProperty(f => f.RecorrenciaUnidade, unidade)
+                    .SetProperty(f => f.RecorrenciaAte, ate)
+                    .SetProperty(f => f.LembreteAutomatico, lembrete)
+                    .SetProperty(f => f.PublicadoEmUtc, f => novoDia ?? f.PublicadoEmUtc)
+                    .SetProperty(f => f.TokenDoLink, f => porLink ? f.TokenDoLink : null),
+                ct);
+        if (linhas != 1)
+        {
+            return false;
+        }
+
+        // AUDITORIA-OK: as linhas de destinatário não são auditadas (quem recebe o formulário não é dado de auditoria, e no anônimo nenhum rastro pode sobrar); o evento Alterou é do caso de uso.
+        await db.FormulariosDestinatarios.Where(d => d.FormularioId == id).ExecuteDeleteAsync(ct);
+        db.FormulariosDestinatarios.AddRange(novos.Alvo switch
+        {
+            AlvoDoFormulario.Pessoas => novos.FuncionarioIds.Select(p => FormularioDestinatario.DaPessoa(id, p)),
+            AlvoDoFormulario.Setores => novos.SetorIds.Select(s => FormularioDestinatario.DoSetor(id, s)),
+            _ => [],
+        });
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
 }

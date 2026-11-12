@@ -2,6 +2,7 @@ using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Configuracao;
 using RHSystem.Application.Formularios;
 using RHSystem.Application.Formularios.Construtor;
+using RHSystem.Application.Formularios.Regras;
 
 namespace RHSystem.Api.Formularios;
 
@@ -21,6 +22,8 @@ public static class FormulariosRhEndpoints
         servicos.AddScoped<AdicionarPerguntaCasoDeUso>();
         servicos.AddScoped<EditarPerguntaCasoDeUso>();
         servicos.AddScoped<ExcluirPerguntaCasoDeUso>();
+        servicos.AddScoped<SalvarPublicacaoCasoDeUso>();
+        servicos.AddScoped<VerificarFormularioCasoDeUso>();
         return servicos;
     }
 
@@ -85,6 +88,22 @@ public static class FormulariosRhEndpoints
                 StatusCodes.Status422UnprocessableEntity,
                 StatusCodes.Status500InternalServerError);
 
+        rh.MapGet("/formularios/{formularioId:int}/verificacao", Verificar)
+            .WithName("verificarFormulario")
+            .Produces<FormularioVerificacao>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
+        rh.MapPut("/formularios/{formularioId:int}/publicacao", SalvarPublicacao)
+            .WithName("salvarPublicacaoFormulario")
+            .Produces<FormularioDetalheRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -98,6 +117,10 @@ public static class FormulariosRhEndpoints
         Results.Json(await casoDeUso.ExecutarAsync(formularioId, corpo, ct), statusCode: StatusCodes.Status201Created);
 
     private static async Task<PerguntaFormulario> EditarPergunta(int formularioId, int perguntaId, PerguntaComando corpo, EditarPerguntaCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, perguntaId, corpo, ct);
+
+    private static async Task<FormularioVerificacao> Verificar(int formularioId, VerificarFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, ct);
+
+    private static async Task<FormularioDetalheRh> SalvarPublicacao(int formularioId, FormularioPublicacaoComando corpo, SalvarPublicacaoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
 
     private static async Task<IResult> ExcluirPergunta(int formularioId, int perguntaId, ExcluirPerguntaCasoDeUso casoDeUso, CancellationToken ct)
     {
