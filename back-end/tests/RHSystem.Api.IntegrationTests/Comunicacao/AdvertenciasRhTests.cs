@@ -281,6 +281,36 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task O_ano_vai_de_1_de_janeiro_a_31_de_dezembro_na_lista_no_resumo_e_no_indicador_e_a_virada_do_ano_e_a_do_Brasil()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var primeiro = await SemearAsync(api, pessoa, "2043-01-01");
+        var ultimo = await SemearAsync(api, pessoa, "2043-12-31");
+        await SemearAsync(api, pessoa, "2042-12-31");
+        await SemearAsync(api, pessoa, "2044-01-01");
+        var (indicada, _) = await NovoMembroAsync(api, setor);
+        await SemearAsync(api, indicada, "2026-01-01");
+        await SemearAsync(api, indicada, "2026-12-31");
+        await SemearAsync(api, indicada, "2025-12-31");
+        await SemearAsync(api, indicada, "2027-01-01");
+
+        var lista = await ListarAsync(api, $"ano=2043&setorId={setor.SetorId}");
+        var resumo = await CorpoAsync(await (await RhAsync(api)).GetAsync($"{Rota}/resumo?ano=2043"));
+        api.Api.Relogio.Fixar(new DateTime(2027, 1, 1, 2, 59, 0, DateTimeKind.Utc)); // 23:59 de 31/12/2026 no Brasil
+        var indicador = await CorpoAsync(await (await RhAsync(api)).GetAsync($"/api/rh/funcionarios/{indicada}/indicadores"));
+        var resumoSemAno = await CorpoAsync(await (await RhAsync(api)).GetAsync($"{Rota}/resumo"));
+        var listaSemAno = await ListarAsync(api, $"setorId={setor.SetorId}");
+
+        Assert.Equal([ultimo, primeiro], Ids(lista));
+        Assert.Equal(2, resumo.GetProperty("contagens").GetProperty("todas").GetInt32());
+        Assert.Equal(2, indicador.GetProperty("advertenciasQuantidade").GetInt32());
+        Assert.Equal(2026, resumoSemAno.GetProperty("ano").GetInt32());
+        Assert.Equal(2, listaSemAno.GetProperty("total").GetInt32()); // as duas de 2026 da pessoa indicada: o ano ainda é 2026 no Brasil
+    }
+
+    [Fact]
     public async Task O_filtro_de_setor_e_o_setor_ATUAL_da_pessoa_e_cada_item_traz_o_resumo_da_pessoa_e_quem_aplicou()
     {
         var api = await ApiAsync();

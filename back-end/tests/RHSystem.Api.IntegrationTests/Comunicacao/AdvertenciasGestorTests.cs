@@ -93,6 +93,32 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         Assert.Equal((404, 404, 404), ((int)detalhe.StatusCode, (int)pessoa.StatusCode, (int)registrar.StatusCode));
     }
 
+    [Fact]
+    public async Task O_ano_do_gestor_vai_de_1_de_janeiro_a_31_de_dezembro_e_sem_ano_vale_o_do_Brasil()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (a, _) = await NovoMembroAsync(api, setor);
+        var primeiro = await SemearAsync(api, a, "2045-01-01");
+        var ultimo = await SemearAsync(api, a, "2045-12-31");
+        await SemearAsync(api, a, "2044-12-31");
+        await SemearAsync(api, a, "2046-01-01");
+        var de2026 = await SemearAsync(api, a, "2026-06-01");
+        var gestor = await GestorAsync(api, setor);
+
+        var lista = await CorpoDeAsync(gestor, $"{Rota}?ano=2045");
+        var resumo = await CorpoDeAsync(gestor, $"{Rota}/resumo?ano=2045");
+        api.Api.Relogio.Fixar(new DateTime(2027, 1, 1, 2, 59, 0, DateTimeKind.Utc)); // 23:59 de 31/12/2026 no Brasil
+        var gestorDepois = await GestorAsync(api, setor);
+        var semAno = await CorpoDeAsync(gestorDepois, Rota);
+        var resumoSemAno = await CorpoDeAsync(gestorDepois, $"{Rota}/resumo");
+
+        Assert.Equal([ultimo, primeiro], Ids(lista));
+        Assert.Equal(2, resumo.GetProperty("registradas").GetInt32());
+        Assert.Equal([de2026], Ids(semAno));
+        Assert.Equal((2026, 1), (resumoSemAno.GetProperty("ano").GetInt32(), resumoSemAno.GetProperty("registradas").GetInt32()));
+    }
+
     [Theory]
     [InlineData("ano=1999", "ano")]
     [InlineData("ano=2101", "ano")]

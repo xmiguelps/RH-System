@@ -48,6 +48,8 @@ public class RegrasDoHoleriteTests
     [InlineData("0", "2026", "MENSAL", "mes")]
     [InlineData("13", "2026", "MENSAL", "mes")]
     [InlineData("dez", "2026", "MENSAL", "mes")]
+    [InlineData("+9", "2026", "MENSAL", "mes")]
+    [InlineData("10", "+2026", "MENSAL", "ano")]
     [InlineData("10", null, "MENSAL", "ano")]
     [InlineData("10", "1999", "MENSAL", "ano")]
     [InlineData("10", "2101", "MENSAL", "ano")]
@@ -173,6 +175,32 @@ public class RegrasDoHoleriteTests
 
         Assert.Equal("HOLERITE_COMPETENCIA_ANTERIOR_A_ADMISSAO", primeira!.Mensagem.Codigo);
         Assert.Equal("HOLERITE_COMPETENCIA_POSTERIOR_AO_DESLIGAMENTO", segunda!.Mensagem.Codigo);
+    }
+
+    [Fact]
+    public void Nos_limites_das_datas_a_competencia_vale()
+    {
+        var ultimoDiaIgualAAdmissao = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(10, 2026, TipoDeHolerite.Mensal), Hoje, new DateOnly(2026, 10, 31), null);
+        var admissaoDepoisDoDia28 = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(10, 2026, TipoDeHolerite.Mensal), Hoje, new DateOnly(2026, 10, 29), null);
+        var desligamentoNoPrimeiroDia = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(4, 2026, TipoDeHolerite.Mensal), Hoje, Admissao, new DateOnly(2026, 4, 1));
+        var hojeNoPrimeiroDoMes = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(10, 2026, TipoDeHolerite.Mensal), new DateOnly(2026, 10, 1), Admissao, null);
+
+        Assert.Null(ultimoDiaIgualAAdmissao); // o último dia do mês é o da admissão: o mês da admissão vale
+        Assert.Null(admissaoDepoisDoDia28); // outubro vai até 31, não até 28
+        Assert.Null(desligamentoNoPrimeiroDia); // desligado no dia 1: o mês do desligamento vale
+        Assert.Null(hojeNoPrimeiroDoMes); // hoje é o dia 1: o mês atual não é futuro
+    }
+
+    [Fact]
+    public void Um_dia_depois_dos_limites_a_competencia_e_recusada()
+    {
+        var antesDaAdmissao = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(10, 2026, TipoDeHolerite.Mensal), Hoje, new DateOnly(2026, 11, 1), null);
+        var depoisDoDesligamento = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(4, 2026, TipoDeHolerite.Mensal), Hoje, Admissao, new DateOnly(2026, 3, 31));
+        var futura = RegraDaCompetenciaDoHolerite.Conferir(new CompetenciaDoHolerite(11, 2026, TipoDeHolerite.Mensal), new DateOnly(2026, 10, 31), Admissao, null);
+
+        Assert.Equal("HOLERITE_COMPETENCIA_ANTERIOR_A_ADMISSAO", antesDaAdmissao!.Mensagem.Codigo);
+        Assert.Equal("HOLERITE_COMPETENCIA_POSTERIOR_AO_DESLIGAMENTO", depoisDoDesligamento!.Mensagem.Codigo);
+        Assert.Equal("HOLERITE_COMPETENCIA_FUTURA", futura!.Mensagem.Codigo);
     }
 
     // ---------------------------------------------------------------- o instante da publicação

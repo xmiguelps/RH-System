@@ -82,6 +82,36 @@ public class ListasEDownloadsDeHoleriteTests(MySqlFixture mysql)
 
     private static Task<List<EventoLido>> EventosAsync(ApiDeAcesso api, int holeriteId) => AuditoriaDeTeste.EventosAsync(api.Conexao, "HOLERITES", holeriteId);
 
+    [Fact]
+    public async Task A_versao_atual_e_de_cada_tipo_e_de_cada_ano_e_o_empate_de_publicacao_vai_para_o_mais_recentemente_cadastrado()
+    {
+        var api = await ApiAsync();
+        var pessoa = await NovaAsync(api);
+        var mensal = await SemearAsync(api, pessoa.FuncionarioId, 2026, 9, "MENSAL", 1, "2026-10-05 11:30:00");
+        var feriasV2 = await SemearAsync(api, pessoa.FuncionarioId, 2026, 9, "FERIAS", 2, "2026-10-05 11:30:00"); // o mesmo instante e o mesmo mês: o id maior vem primeiro
+        var feriasDeOutroAno = await SemearAsync(api, pessoa.FuncionarioId, 2027, 9, "FERIAS", 3, "2026-10-06 11:30:00"); // versão 3 do mesmo mês e tipo, em OUTRO ano: não esconde a versão 2 de 2026
+        var feriasDe2026 = await SemearAsync(api, pessoa.FuncionarioId, 2026, 8, "FERIAS", 1, "2026-10-06 11:30:00");
+
+        var de2026 = await ListaDaPessoaAsync(api, pessoa, "ano=2026");
+        var de2027 = await ListaDaPessoaAsync(api, pessoa, "ano=2027");
+
+        // o mensal v1 continua visível ao lado das férias v2 (versão atual DE CADA TIPO); as férias de 2026 e as de 2027 não se escondem (versão atual DE CADA ANO)
+        Assert.Equal([feriasV2, mensal, feriasDe2026], Ids(de2026));
+        Assert.Equal([feriasDeOutroAno], Ids(de2027));
+    }
+
+    [Fact]
+    public async Task O_ultimo_publicado_inclui_o_holerite_publicado_no_instante_exato_do_relogio()
+    {
+        var api = await ApiAsync();
+        var pessoa = await NovaAsync(api);
+        var id = await SemearAsync(api, pessoa.FuncionarioId, 2026, 9, "MENSAL", 1, "2026-10-07 09:42:00"); // 12:42Z, o instante do relógio
+
+        var lista = await ListaDoRhAsync(api, pessoa.FuncionarioId);
+
+        Assert.Equal(id, lista.GetProperty("ultimoPublicado").GetProperty("id").GetInt32());
+    }
+
     // ---------------------------------------------------------------- a lista do RH
 
     [Fact]
