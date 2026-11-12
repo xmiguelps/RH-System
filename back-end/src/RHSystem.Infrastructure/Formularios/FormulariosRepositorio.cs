@@ -67,6 +67,44 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         return linhas == 1;
     }
 
+    public async Task<IReadOnlyList<string>?> ReabrirAsync(FormularioLido lido, DateTime reaberturaPrevistaEmUtc, DateTime novaPublicacaoEmUtc, DateOnly? novoPrazo, DateTime? proximaReaberturaEmUtc, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var previsto = reaberturaPrevistaEmUtc;
+        DateTime? publicacao = novaPublicacaoEmUtc;
+        DateTime? proxima = proximaReaberturaEmUtc;
+        DateOnly? prazo = novoPrazo;
+
+        // AUDITORIA-OK: a reabertura é auditada à mão pela tarefa (evento Alterou do Sistema, na mesma transação); ATIVO e a limpeza do encerramento saem no mesmo UPDATE (o CHECK do banco os amarra) e a data de reabertura guardada é a trava contra rodar duas vezes.
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && f.ProximaReaberturaEmUtc == previsto)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Ativo, true).SetProperty(f => f.EncerradoEmUtc, (DateTime?)null).SetProperty(f => f.PublicadoEmUtc, publicacao).SetProperty(f => f.Prazo, prazo).SetProperty(f => f.ProximaReaberturaEmUtc, proxima), ct);
+        if (linhas != 1)
+        {
+            return null;
+        }
+
+        var arquivos = await db.FormulariosRespostas.AsNoTracking().Where(r => r.FormularioId == id && r.CaminhoArquivo != null).Select(r => r.CaminhoArquivo!).ToListAsync(ct);
+
+        // AUDITORIA-OK: as respostas da rodada anterior saem sem histórico (decisão do dono, 2026-10-29) e nenhuma resposta é auditada (nenhum rastro de quem respondeu); o evento de reabertura é da tarefa.
+        await db.FormulariosRespostas.Where(r => r.FormularioId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as participações do anônimo saem junto com as respostas da rodada anterior (senão ninguém responderia de novo) e não são auditadas; o evento de reabertura é da tarefa.
+        await db.FormulariosParticipacoes.Where(p => p.FormularioId == id).ExecuteDeleteAsync(ct);
+        return arquivos;
+    }
+
+    public async Task<bool> AvancarReaberturaAsync(int formularioId, DateTime reaberturaPrevistaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct)
+    {
+        var id = formularioId;
+        var previsto = reaberturaPrevistaEmUtc;
+        DateTime? proxima = proximaReaberturaEmUtc;
+
+        // AUDITORIA-OK: só troca a data da próxima reabertura (ou a tira, quando a recorrência acaba); a tarefa audita à mão o que importa (a reabertura) e o avanço sem apagar nada não muda nada que o RH veja.
+        var linhas = await db.Formularios.Where(f => f.Id == id && f.ProximaReaberturaEmUtc == previsto).ExecuteUpdateAsync(s => s.SetProperty(f => f.ProximaReaberturaEmUtc, proxima), ct);
+        return linhas == 1;
+    }
+
     public async Task<bool> EncerrarAsync(FormularioLido lido, DateTime encerradoEmUtc, bool cancelarReaberturas, CancellationToken ct)
     {
         var id = lido.Id;

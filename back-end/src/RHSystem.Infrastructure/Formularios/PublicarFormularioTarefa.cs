@@ -61,6 +61,11 @@ public sealed class PublicarFormularioTarefa(
                     await destinatarios.FotografarAsync(formularioId, hoje, ct);
                 }
 
+                if (proxima is { } reabertura)
+                {
+                    await agendamento.AgendarReaberturaAsync(formularioId, reabertura, ct);
+                }
+
                 auditor.Registrar(new EventoDeAuditoriaNovo(AuditoriaArea.Formularios, AuditoriaAcao.Publicou, $"Publicou o formulário \"{lido.Titulo}\" (agendado).", $"Formulário \"{lido.Titulo}\"", "FORMULARIOS", formularioId));
                 await unidade.SalvarAsync(ct);
                 return true;

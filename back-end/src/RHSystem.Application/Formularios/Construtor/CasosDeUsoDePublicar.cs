@@ -83,6 +83,11 @@ public sealed class PublicarFormularioCasoDeUso(
                         await agendamento.AgendarPublicacaoAsync(formularioId, dataDePublicacao, ct);
                     }
 
+                    if (proxima is { } reabertura)
+                    {
+                        await agendamento.AgendarReaberturaAsync(formularioId, reabertura, ct);
+                    }
+
                     auditor.Registrar(new EventoDeAuditoriaNovo(AuditoriaArea.Formularios, AuditoriaAcao.Publicou, Descricao(lido.Titulo, agendar, campos.AgendarPara), $"Formulário \"{lido.Titulo}\"", "FORMULARIOS", formularioId));
                     await unidade.SalvarAsync(ct);
                     return true;

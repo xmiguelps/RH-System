@@ -46,6 +46,17 @@ public sealed class AgendamentoDoFormulario(IAgendador agendador, IFilaDeEmails 
         }
     }
 
+    public static string ChaveDeReabrir(int formularioId, DateTime reaberturaEmUtc) => ChaveDeIdempotencia.Montar(TipoDeReabrir, ("formulario", formularioId), ("em", reaberturaEmUtc));
+
+    public async Task AgendarReaberturaAsync(int formularioId, DateTime reaberturaEmUtc, CancellationToken ct)
+    {
+        var chave = ChaveDeReabrir(formularioId, reaberturaEmUtc);
+        if (!await agendador.AgendarAsync(new NovaTarefa(TipoDeReabrir, chave, reaberturaEmUtc, ReferenciaId: formularioId), ct))
+        {
+            _ = await agendador.ReativarAsync(chave, ct);
+        }
+    }
+
     public async Task CancelarPublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, CancellationToken ct) => _ = await agendador.CancelarAsync(ChaveDePublicar(formularioId, publicacaoEmUtc), ct);
 
     public async Task AgendarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct)

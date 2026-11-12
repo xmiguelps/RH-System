@@ -277,6 +277,7 @@ public static class DependencyInjection
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeFormularios>(); // a bolinha "formulariosPendentes" do menu
         services.AddScoped<ITarefaAgendada, PublicarFormularioTarefa>(); // o agendado vira publicado no dia, uma vez
         services.AddScoped<ITarefaAgendada, EncerrarFormularioTarefa>(); // o prazo encerra o formulario no instante nominal
+        services.AddScoped<ITarefaAgendada, ReabrirFormularioTarefa>(); // a rodada nova do formulario recorrente
         services.AddScoped<ITarefaAgendada, LembreteDeFormularioTarefa>(); // o lembrete automatico 7 dias antes do prazo e o envio do manual do anonimo
         services.AddScoped<IPerguntasDoFormularioRepositorio, PerguntasDoFormularioRepositorio>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();

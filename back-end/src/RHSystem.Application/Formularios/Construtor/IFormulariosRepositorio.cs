@@ -99,6 +99,9 @@ public interface IAgendamentoDoFormulario
 
     Task CancelarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
 
+    /// <summary>A tarefa que reabre o formulário recorrente (<c>REABRIR_FORMULARIO:formulario={id}:em={instante}</c>), no instante da próxima reabertura. Chave que já existe é sucesso (cancelada volta).</summary>
+    Task AgendarReaberturaAsync(int formularioId, DateTime reaberturaEmUtc, CancellationToken ct);
+
     /// <summary>
     /// A tarefa do lembrete AUTOMÁTICO (<c>LEMBRETE_FORMULARIO:form={id}:dia={dia}:alcance=TODOS</c>), no começo do <paramref name="dia"/> (00:00 -03:00), 7 dias antes do prazo. A chave é a marca do dia: o lembrete manual do anônimo usa a mesma, então só um dos dois sai por dia. Chave que já existe é sucesso.
     /// </summary>
@@ -141,6 +144,15 @@ public interface IFormulariosRepositorio
     Task<bool> PublicarAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct);
 
     /// <summary>A tarefa de publicar: liga <c>ATIVO</c> do formulário AGENDADO cuja data é exatamente <paramref name="publicacaoLidaEmUtc"/> (e que não foi encerrado) e grava a próxima reabertura. <c>false</c> se ele mudou, foi publicado ou apagado.</summary>
+    /// <summary>
+    /// Reabre o formulário recorrente SE a próxima reabertura guardada ainda é <paramref name="reaberturaPrevistaEmUtc"/>: liga o <c>ATIVO</c> e limpa o encerramento no mesmo UPDATE, grava a nova publicação, o prazo da rodada e a reabertura seguinte, e APAGA as respostas e as participações da rodada anterior.
+    /// Devolve os caminhos dos arquivos das respostas apagadas (o chamador os apaga do armazenamento depois da transação), ou <c>null</c> se a data já não era essa (outra execução avançou).
+    /// </summary>
+    Task<IReadOnlyList<string>?> ReabrirAsync(FormularioLido lido, DateTime reaberturaPrevistaEmUtc, DateTime novaPublicacaoEmUtc, DateOnly? novoPrazo, DateTime? proximaReaberturaEmUtc, CancellationToken ct);
+
+    /// <summary>Troca a próxima reabertura (a rodada ainda estava aberta: avança sem apagar nada; ou <c>null</c>: a recorrência acabou) SE ela ainda é <paramref name="reaberturaPrevistaEmUtc"/>.</summary>
+    Task<bool> AvancarReaberturaAsync(int formularioId, DateTime reaberturaPrevistaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct);
+
     Task<bool> AtivarAgendadoAsync(int formularioId, DateTime publicacaoLidaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct);
 
     /// <summary>
