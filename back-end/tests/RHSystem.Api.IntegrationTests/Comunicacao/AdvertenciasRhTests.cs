@@ -214,7 +214,9 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
         var resposta = await RegistrarAsync(api, pessoa, Registro());
 
         Assert.Equal(201, (int)resposta.StatusCode);
-        Assert.Equal(0, EmailsDa(api, "ADVERTENCIA_REGISTRADA", (await CorpoAsync(resposta)).GetProperty("id").GetInt32()));
+        var id = (await CorpoAsync(resposta)).GetProperty("id").GetInt32();
+        Assert.Equal(0, EmailsDa(api, "ADVERTENCIA_REGISTRADA", id));
+        Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "ADVERTENCIAS", id)); // sem e-mail a gravação não pega carona: o evento é gravado por ela mesma
     }
 
     // ---------------------------------------------------------------- a lista do RH
@@ -488,6 +490,22 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Responder_para_pessoa_sem_e_mail_corporativo_muda_a_situacao_sem_mandar_e_mail()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET EMAIL_CORPORATIVO = NULL WHERE ID_FUNCIONARIO = {pessoa}");
+        var id = await ContestadaAsync(api, pessoa);
+
+        var resposta = await ResponderAsync(api, id, new { decisao = "MANTER", resposta = "Mantemos." });
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(0, EmailsDa(api, "ADVERTENCIA_RESPONDIDA", id));
+        Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "ADVERTENCIAS", id));
+    }
+
+    [Fact]
     public async Task Acatar_cancela_a_advertencia_com_o_desfecho_ACATADA()
     {
         var api = await ApiAsync();
@@ -607,11 +625,12 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
         await SemearAsync(api, pessoa, "2026-01-10");
         await SemearAsync(api, pessoa, "2026-02-10", situacao: "APLICADA", cienciaLocal: "2026-02-11 10:00:00");
         await SemearAsync(api, pessoa, "2026-03-10", situacao: "CANCELADA", textoContestacao: "Contestei.", contestacaoLocal: "2026-03-11 10:00:00");
+        await SemearAsync(api, pessoa, "2026-04-10", situacao: "CONTESTADA", textoContestacao: "Contestei esta.", contestacaoLocal: "2026-04-11 10:00:00");
         await SemearAsync(api, pessoa, "2025-03-10");
 
         var corpo = await CorpoAsync(await (await RhAsync(api)).GetAsync($"/api/rh/funcionarios/{pessoa}/indicadores"));
 
-        Assert.Equal(2, corpo.GetProperty("advertenciasQuantidade").GetInt32());
+        Assert.Equal(3, corpo.GetProperty("advertenciasQuantidade").GetInt32()); // pendente, aplicada e contestada; a cancelada e a de outro ano não contam
     }
 
     // ---------------------------------------------------------------- perfis e contrato

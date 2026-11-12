@@ -118,6 +118,7 @@ public class RegrasDaAdvertenciaTests
     [InlineData("", false)]
     [InlineData("   ", false)]
     [InlineData("x", true)]
+    [InlineData("  x  ", true)]
     public void A_resposta_do_RH_tem_no_minimo_1_caractere_aparado(string? resposta, bool vale)
     {
         var coletor = new ColetorDeErros();
@@ -126,6 +127,10 @@ public class RegrasDaAdvertenciaTests
 
         Assert.Equal(vale, lida is not null);
         Assert.Equal(!vale, coletor.TemErros);
+        if (vale)
+        {
+            Assert.Equal(resposta!.Trim(), lida); // a resposta guardada é a aparada
+        }
     }
 
     [Fact]
@@ -186,6 +191,7 @@ public class RegrasDaAdvertenciaTests
                 Linha(SituacaoDaAdvertencia.Pendente, "Logística"),
                 Linha(SituacaoDaAdvertencia.Pendente, "Logística"),
                 Linha(SituacaoDaAdvertencia.Aplicada, "Comercial"),
+                Linha(SituacaoDaAdvertencia.Aplicada, "Comercial"),
                 Linha(SituacaoDaAdvertencia.Contestada, "Comercial"),
                 Linha(SituacaoDaAdvertencia.Cancelada, "Comercial"),
                 Linha(SituacaoDaAdvertencia.Cancelada, "Comercial"),
@@ -194,8 +200,8 @@ public class RegrasDaAdvertenciaTests
             ]);
 
         Assert.Equal(2026, resumo.Ano);
-        Assert.Equal(new AdvertenciaContagensRh(8, 2, 2, 1, 3), resumo.Contagens);
-        Assert.Equal(new AdvertenciaSetorComMaisRegistros("Comercial", 2), resumo.SetorComMaisRegistros); // 2 não canceladas empatam com Logística (2): o primeiro em ordem alfabética
+        Assert.Equal(new AdvertenciaContagensRh(9, 2, 3, 1, 3), resumo.Contagens);
+        Assert.Equal(new AdvertenciaSetorComMaisRegistros("Comercial", 3), resumo.SetorComMaisRegistros); // Comercial tem 3 não canceladas (as 3 canceladas não contam) e Logística 2
     }
 
     [Fact]
@@ -204,6 +210,7 @@ public class RegrasDaAdvertenciaTests
         var resumo = ResumosDeAdvertencia.DoRh(2026, [Linha(SituacaoDaAdvertencia.Pendente, "bravo"), Linha(SituacaoDaAdvertencia.Pendente, "Alfa"), Linha(SituacaoDaAdvertencia.Pendente, "Zulu")]);
 
         Assert.Equal(new AdvertenciaSetorComMaisRegistros("Alfa", 1), resumo.SetorComMaisRegistros);
+        Assert.Equal(new AdvertenciaSetorComMaisRegistros("alfa", 1), ResumosDeAdvertencia.DoRh(2026, [Linha(SituacaoDaAdvertencia.Pendente, "Bravo"), Linha(SituacaoDaAdvertencia.Pendente, "alfa")]).SetorComMaisRegistros); // minúscula antes de maiúscula de outra letra
         Assert.Equal(new AdvertenciaSetorComMaisRegistros("bravo", 2), ResumosDeAdvertencia.DoRh(2026, [Linha(SituacaoDaAdvertencia.Pendente, "bravo"), Linha(SituacaoDaAdvertencia.Aplicada, "bravo"), Linha(SituacaoDaAdvertencia.Pendente, "Alfa")]).SetorComMaisRegistros);
     }
 

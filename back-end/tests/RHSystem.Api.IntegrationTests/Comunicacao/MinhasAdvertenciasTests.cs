@@ -66,6 +66,20 @@ public class MinhasAdvertenciasTests(MySqlFixture mysql)
         Assert.Equal([pendenteAntiga], Ids(await CorpoAsync(await cliente.GetAsync($"{Rota}?tamanhoPagina=1&pagina=2"))));
     }
 
+    [Fact]
+    public async Task Com_a_mesma_data_a_pendente_registrada_por_ultimo_vem_primeiro()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _, cliente) = await PessoaAsync(api, setor);
+        var primeira = await SemearAsync(api, pessoa, "2026-09-10");
+        var segunda = await SemearAsync(api, pessoa, "2026-09-10");
+
+        var lista = await CorpoAsync(await cliente.GetAsync(Rota));
+
+        Assert.Equal([segunda, primeira], Ids(lista));
+    }
+
     [Theory]
     [InlineData("situacao=ABC", "situacao")]
     [InlineData("pagina=0", "pagina")]

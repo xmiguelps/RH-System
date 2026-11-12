@@ -10,7 +10,7 @@ public enum IndicadorDaFicha
 }
 
 /// <summary>
-/// Quem sabe um indicador da ficha (banco de horas: fatia 3; férias: 7; advertências: 7; treinamentos: 6). O valor é o MESMO da rota de origem (a tabela do contrato em
+/// Quem sabe um indicador da ficha (banco de horas: fatia 3; advertências: fatia 4; treinamentos: 6; férias: 7). O valor é o MESMO da rota de origem (a tabela do contrato em
 /// <c>obterIndicadoresDoFuncionario</c>). A 1b não registra nenhuma fonte (a leitura da ficha, na Task 7, diz o que cada indicador vale sem fonte).
 /// </summary>
 public interface IFonteDeIndicadorDaFicha

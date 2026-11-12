@@ -19,6 +19,8 @@ public class JanelaDeAniversariosTests
     [InlineData("2000-02-29", "2028-02-10", "2028-02-29")] // ano bissexto: 29/02
     [InlineData("2000-02-29", "2028-03-01", "2029-02-28")]
     [InlineData("1996-02-28", "2027-02-28", "2027-02-28")] // quem nasceu em 28/02 não muda
+    [InlineData("1990-01-29", "2027-01-20", "2027-01-29")] // o dia 29 de outro mês nunca vira 28
+    [InlineData("1990-03-29", "2027-03-20", "2027-03-29")]
     public void A_proxima_data_do_aniversario(string nascimento, string hoje, string esperado) =>
         Assert.Equal(DateOnly.Parse(esperado, System.Globalization.CultureInfo.InvariantCulture), JanelaDeAniversarios.ProximoAniversario(DateOnly.Parse(nascimento, System.Globalization.CultureInfo.InvariantCulture), DateOnly.Parse(hoje, System.Globalization.CultureInfo.InvariantCulture)));
 

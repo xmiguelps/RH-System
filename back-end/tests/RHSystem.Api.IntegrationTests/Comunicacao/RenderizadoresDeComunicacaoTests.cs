@@ -49,6 +49,9 @@ public class RenderizadoresDeComunicacaoTests
         Assert.Contains("Carlos registrou uma advertência verbal de 05/10/2026 para <b>Diego</b>.", copia.Texto, StringComparison.Ordinal);
         Assert.DoesNotContain("<b>", copia.Html, StringComparison.Ordinal);
         Assert.Contains("&lt;b&gt;Diego&lt;/b&gt;", copia.Html, StringComparison.Ordinal);
+        Assert.Contains("Advert&#234;ncias", copia.Html, StringComparison.Ordinal); // o fecho também é codificado
+        var semGestor = new AdvertenciaRegistradaRenderizador().Renderizar(Carga("""{"nome":"Ana","tipo":"verbal","data":"2026-10-05","paraRh":true,"pessoa":"Diego"}"""), "ana@empresa.com.br");
+        Assert.Contains("O gestor registrou uma advertência verbal de 05/10/2026 para Diego.", semGestor.Texto, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -76,5 +79,8 @@ public class RenderizadoresDeComunicacaoTests
         Assert.Equal("Resposta à sua contestação de advertência", mantida.Assunto);
         Assert.Contains("e manteve a advertência.", mantida.Texto, StringComparison.Ordinal);
         Assert.Equal((AuditoriaArea.Advertencias, "Colaborador Diego"), (mantida.AreaDeAuditoria, mantida.RegistroAfetado));
+        Assert.Contains("contesta&#231;&#227;o", mantida.Html, StringComparison.Ordinal); // a abertura também é codificada
+        var semResposta = new AdvertenciaRespondidaRenderizador().Renderizar(Carga("""{"nome":"Diego","decisao":"MANTER","data":"2026-10-05"}"""), "diego@empresa.com.br");
+        Assert.EndsWith("Resposta do RH:\n", semResposta.Texto, StringComparison.Ordinal);
     }
 }

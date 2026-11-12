@@ -55,8 +55,8 @@ public sealed class RegistradorDeAdvertencia(IAdvertenciasRepositorio advertenci
             return;
         }
 
-        // Quem do RH é a própria pessoa advertida já recebeu o e-mail dela: não ganha uma segunda mensagem em cópia.
-        foreach (var rh in (await consulta.DestinatariosDoRhAsync(ct)).Where(d => d.FuncionarioId != pessoa.Id))
+        // Quem do RH é a própria pessoa advertida recebe um e-mail só: a chave leva a advertência e a pessoa, então a cópia dela repete a chave da mensagem que ela já ganhou e a fila a descarta.
+        foreach (var rh in await consulta.DestinatariosDoRhAsync(ct))
         {
             await fila.EnfileirarAsync(
                 new EmailParaEnfileirar(TipoDoEmail, ChaveDeIdempotencia.Montar(TipoDoEmail, ("advertencia", id), ("func", rh.FuncionarioId)), rh.Email, new { nome = rh.Nome, tipo = nomeDoTipo, data = dia, paraRh = true, pessoa = pessoa.Nome, gestor = gestorNome }, rh.FuncionarioId, id),

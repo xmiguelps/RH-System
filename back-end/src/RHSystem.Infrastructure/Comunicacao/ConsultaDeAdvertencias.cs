@@ -75,10 +75,6 @@ public sealed class ConsultaDeAdvertencias(AppDbContext db) : IConsultaDeAdverte
 
             pessoas = db.Funcionarios.AsNoTracking().DaEquipe(equipe).Where(f => f.Id == funcionarioId);
         }
-        else if (escopo.Papel == PapelNaConsulta.PropriaPessoa)
-        {
-            pessoas = pessoas.Where(f => f.Id == escopo.FuncionarioId);
-        }
 
         return await (
             from f in pessoas
@@ -88,7 +84,7 @@ public sealed class ConsultaDeAdvertencias(AppDbContext db) : IConsultaDeAdverte
                 f.Ativo,
                 f.EmailCorporativo,
                 f.GestorId,
-                f.GestorId != null && db.Gestores.Any(g => g.Id == f.GestorId && db.Funcionarios.Any(x => x.Id == g.FuncionarioId && x.Ativo)))).FirstOrDefaultAsync(ct);
+                db.Gestores.Any(g => g.Id == f.GestorId && db.Funcionarios.Any(x => x.Id == g.FuncionarioId && x.Ativo)))).FirstOrDefaultAsync(ct);
     }
 
     public async Task<IReadOnlyList<AdvertenciaParaResumoRh>> DoAnoParaOResumoDoRhAsync(int ano, CancellationToken ct)

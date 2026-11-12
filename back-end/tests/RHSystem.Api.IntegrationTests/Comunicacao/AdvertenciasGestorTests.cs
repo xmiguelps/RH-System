@@ -87,6 +87,7 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         var registrar = await PostAsync(cliente, $"/api/gestor/equipe/{api.Elenco.MembroA.FuncionarioId}/advertencias", Registro());
 
         Assert.Empty(Ids(lista));
+        Assert.Equal(2026, resumo.GetProperty("ano").GetInt32());
         Assert.Equal((0, 0, 0, 0), (resumo.GetProperty("registradas").GetInt32(), resumo.GetProperty("aguardandoCiencia").GetProperty("quantidade").GetInt32(), resumo.GetProperty("pessoasComAdvertencia").GetInt32(), resumo.GetProperty("totalDaEquipe").GetInt32()));
         Assert.Empty(resumo.GetProperty("porPessoa").EnumerateArray());
         Assert.Empty(resumo.GetProperty("aguardandoCiencia").GetProperty("pessoas").EnumerateArray());
@@ -182,6 +183,7 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         var deInativo = await SemearAsync(api, inativo, "2026-09-15");
         await InativarAsync(api, inativo);
         var contestada = await SemearAsync(api, a, "2026-09-15", situacao: "CONTESTADA", textoContestacao: "segredo-da-contestacao", contestacaoLocal: "2026-09-17 10:05:00", gestorId: setor.GestorId);
+        var ciente = await SemearAsync(api, a, "2026-08-01", situacao: "APLICADA", cienciaLocal: "2026-08-02 10:00:00");
         var deOutroSetor = await SemearAsync(api, estranho, "2026-09-15");
         var doProprioGestor = await SemearAsync(api, setor.GestorFuncionarioId, "2026-09-15");
         var gestor = await GestorAsync(api, setor);
@@ -193,6 +195,7 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         Assert.Equal(["id", "data", "funcionario", "tipo", "motivo", "aplicadaPor", "situacao", "descricao", "dataCienciaUtc"], [.. corpo.EnumerateObject().Select(p => p.Name)]);
         Assert.Equal(("CONTESTADA", setor.GestorNome), (corpo.GetProperty("situacao").GetString(), corpo.GetProperty("aplicadaPor").GetProperty("nome").GetString()));
         Assert.DoesNotContain("segredo-da-contestacao", corpo.GetRawText(), StringComparison.Ordinal);
+        Assert.Equal("2026-08-02T13:00:00Z", (await CorpoDeAsync(gestor, $"{Rota}/{ciente}")).GetProperty("dataCienciaUtc").GetString());
         Assert.Equal((404, 404, 404, 404), ((int)(await gestor.GetAsync($"{Rota}/{deOutroSetor}")).StatusCode, (int)(await gestor.GetAsync($"{Rota}/{doProprioGestor}")).StatusCode, (int)(await gestor.GetAsync($"{Rota}/{int.MaxValue}")).StatusCode, (int)(await gestor.GetAsync($"{Rota}/{deInativo}")).StatusCode));
     }
 
@@ -207,6 +210,8 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         var (a, _) = await NovoMembroAsync(api, setor);
         var (estranho, _) = await NovoMembroAsync(api, outro);
         var (inativo, _) = await NovoMembroAsync(api, setor, ativo: false);
+        var (colega, _) = await NovoMembroAsync(api, setor);
+        var doColega = await SemearAsync(api, colega, "2026-05-01");
         var velha = await SemearAsync(api, a, "2024-03-01");
         var cancelada = await SemearAsync(api, a, "2025-03-01", situacao: "CANCELADA", textoContestacao: "Contestei.", contestacaoLocal: "2025-03-02 10:00:00");
         var atual = await SemearAsync(api, a, "2026-03-01");
@@ -215,6 +220,7 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         var lista = await CorpoDeAsync(gestor, $"/api/gestor/equipe/{a}/advertencias");
 
         Assert.Equal([atual, cancelada, velha], Ids(lista));
+        Assert.DoesNotContain(doColega, Ids(lista)); // só as da pessoa pedida, não as do resto da equipe
         Assert.Equal(404, (int)(await gestor.GetAsync($"/api/gestor/equipe/{estranho}/advertencias")).StatusCode);
         Assert.Equal(404, (int)(await gestor.GetAsync($"/api/gestor/equipe/{setor.GestorFuncionarioId}/advertencias")).StatusCode);
         Assert.Equal(404, (int)(await gestor.GetAsync($"/api/gestor/equipe/{inativo}/advertencias")).StatusCode);
@@ -247,6 +253,7 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         Assert.Equal(1, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'ADVERTENCIA_REGISTRADA' AND REFERENCIA_ID = {id} AND ID_FUNCIONARIO = {pessoa}"));
         Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'ADVERTENCIA_REGISTRADA' AND REFERENCIA_ID = {id} AND ID_FUNCIONARIO = {setor.GestorFuncionarioId}"));
         Assert.Equal(rhs, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'ADVERTENCIA_REGISTRADA' AND REFERENCIA_ID = {id} AND JSON_EXTRACT(CARGA, '$.paraRh') = TRUE"));
+        Assert.Equal(setor.GestorNome, await TextoAsync(api, $"SELECT JSON_UNQUOTE(JSON_EXTRACT(CARGA, '$.gestor')) FROM FILA_EMAILS WHERE TIPO = 'ADVERTENCIA_REGISTRADA' AND REFERENCIA_ID = {id} AND JSON_EXTRACT(CARGA, '$.paraRh') = TRUE LIMIT 1")); // a cópia diz quem registrou
         var evento = Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "ADVERTENCIAS", id));
         Assert.Equal((AuditoriaArea.Advertencias, AuditoriaAcao.Criou, $"Registrou uma advertência escrita de 05/10/2026 para {nome}.", setor.GestorFuncionarioId), (evento.Area, evento.Acao, evento.Descricao, evento.FuncionarioAtorId));
     }
@@ -264,6 +271,37 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
         Assert.Equal(201, (int)resposta.StatusCode);
         var id = (await CorpoAsync(resposta)).GetProperty("id").GetInt32();
         Assert.Equal(1, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'ADVERTENCIA_REGISTRADA' AND REFERENCIA_ID = {id} AND ID_FUNCIONARIO = {pessoa}"));
+    }
+
+    [Fact]
+    public async Task O_dia_do_ocorrido_de_hoje_e_o_do_Brasil_tambem_no_registro_do_gestor()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        api.Api.Relogio.Fixar(new DateTime(2026, 10, 8, 2, 0, 0, DateTimeKind.Utc)); // ainda é 23:00 de 07/10 no Brasil
+
+        var hoje = await PostAsync(await GestorAsync(api, setor), $"/api/gestor/equipe/{pessoa}/advertencias", Registro(data: "2026-10-07"));
+        var amanha = await PostAsync(await GestorAsync(api, setor), $"/api/gestor/equipe/{pessoa}/advertencias", Registro(data: "2026-10-08"));
+
+        Assert.Equal((201, 400), ((int)hoje.StatusCode, (int)amanha.StatusCode));
+    }
+
+    [Fact]
+    public async Task Quem_do_RH_esta_inativo_nao_recebe_a_copia()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var (rhInativo, _) = await NovoMembroAsync(api, setor);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET ID_NIVEL_ACESSO = (SELECT ID_NIVEL_ACESSO FROM NIVEIS_DE_ACESSO WHERE NOME_NIVEL_ACESSO = 'RH') WHERE ID_FUNCIONARIO = {rhInativo}");
+        await InativarAsync(api, rhInativo);
+
+        var resposta = await PostAsync(await GestorAsync(api, setor), $"/api/gestor/equipe/{pessoa}/advertencias", Registro());
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        var id = (await CorpoAsync(resposta)).GetProperty("id").GetInt32();
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'ADVERTENCIA_REGISTRADA' AND REFERENCIA_ID = {id} AND ID_FUNCIONARIO = {rhInativo}"));
     }
 
     [Fact]
