@@ -41,6 +41,10 @@ public sealed class Agendador(AppDbContext db, IRelogio relogio) : IAgendador
         // AUDITORIA-OK: tabela técnica, sem registro por decisão (e a condição PENDENTE no WHERE faz de cancelar e reservar uma disputa que só um ganha)
         await db.TarefasAgendadas.Where(t => t.ChaveDeIdempotencia == chaveDeIdempotencia && t.Situacao == SituacaoDaTarefa.Pendente).ExecuteUpdateAsync(s => s.SetProperty(t => t.Situacao, SituacaoDaTarefa.Cancelada), ct);
 
+    public async Task<int> ReativarAsync(string chaveDeIdempotencia, CancellationToken ct) =>
+        // AUDITORIA-OK: tabela técnica, sem registro por decisão (e a condição CANCELADA no WHERE só reativa o que ninguém rodou)
+        await db.TarefasAgendadas.Where(t => t.ChaveDeIdempotencia == chaveDeIdempotencia && t.Situacao == SituacaoDaTarefa.Cancelada).ExecuteUpdateAsync(s => s.SetProperty(t => t.Situacao, SituacaoDaTarefa.Pendente), ct);
+
     private async Task<bool> InserirAsync(TarefaAgendada tarefa, CancellationToken ct)
     {
         // Salva o que já estava pendente ANTES: um 1062 desta tarefa não pode levar junto o resto do que o chamador tinha no contexto.

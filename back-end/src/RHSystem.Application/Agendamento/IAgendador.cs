@@ -29,4 +29,7 @@ public interface IAgendador
 
     /// <summary><c>PENDENTE</c> vira <c>CANCELADA</c>. Devolve 1, ou 0 se não achou a chave ou se a tarefa já rodou (ou está rodando): cancelar nunca tira uma tarefa de dentro de uma execução.</summary>
     Task<int> CancelarAsync(string chaveDeIdempotencia, CancellationToken ct);
+
+    /// <summary><c>CANCELADA</c> volta a <c>PENDENTE</c> (a data de um agendado que volta a um instante já usado: a chave leva o instante e uma chave cancelada nunca se recria). Devolve 1, ou 0 se a tarefa não estava cancelada.</summary>
+    Task<int> ReativarAsync(string chaveDeIdempotencia, CancellationToken ct);
 }

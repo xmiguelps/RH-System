@@ -4,6 +4,7 @@ using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
 using RHSystem.Domain.Colaboradores;
+using RHSystem.Domain.Comunicacao;
 using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Emails;
 using RHSystem.Domain.Empresa;
@@ -67,6 +68,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Feriado> Feriados => Set<Feriado>();
 
     public DbSet<Atestado> Atestados => Set<Atestado>();
+
+    public DbSet<Aviso> Avisos => Set<Aviso>();
+
+    public DbSet<LeituraDeAviso> LeiturasDeAviso => Set<LeituraDeAviso>();
+
+    public DbSet<Holerite> Holerites => Set<Holerite>();
+
+    public DbSet<Advertencia> Advertencias => Set<Advertencia>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

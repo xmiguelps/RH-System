@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using RHSystem.Application.Acesso;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Ponto;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Colaboradores;
+using RHSystem.Domain.Comunicacao;
 using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Api.Configuracao;
@@ -47,6 +49,15 @@ public static class EnumsDeParametrosDoContrato
         [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),
+        [("listarAvisos", "situacao")] = typeof(SituacaoDoAviso),
+        [("listarAvisos", "tipo")] = typeof(TipoDeAviso),
+        [("listarLeiturasDoAviso", "situacao")] = typeof(FiltroDeLeitura),
+        [("listarHoleritesDoFuncionario", "tipo")] = typeof(TipoDeHolerite),
+        [("listarMeusHolerites", "tipo")] = typeof(TipoDeHolerite),
+        [("listarAdvertencias", "situacao")] = typeof(SituacaoDaAdvertencia),
+        [("listarAdvertencias", "tipo")] = typeof(TipoDeAdvertencia),
+        [("listarAdvertenciasDaEquipe", "situacao")] = typeof(SituacaoDaAdvertencia),
+        [("listarMinhasAdvertencias", "situacao")] = typeof(SituacaoDaAdvertencia),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };

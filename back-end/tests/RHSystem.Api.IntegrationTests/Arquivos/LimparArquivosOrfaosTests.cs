@@ -243,5 +243,7 @@ public class LimparArquivosOrfaosTests(MySqlFixture mysql)
         public Task<bool> RegistrarComoConcluidaAsync(string tipo, string chaveDeIdempotencia, DateOnly? diaReferencia, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<int> CancelarAsync(string chaveDeIdempotencia, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<int> ReativarAsync(string chaveDeIdempotencia, CancellationToken ct) => throw new NotSupportedException();
     }
 }
