@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RHSystem.Api.IntegrationTests.Infra;
+using RHSystem.Application.Agendamento;
 using RHSystem.Application.Emails;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
 
@@ -27,6 +28,13 @@ public class FluxoDeAcessoDePontaAPontaTests(MySqlFixture mysql)
         var api = await ApiDeAcesso.ObterAsync(mysql, nameof(FluxoDeAcessoDePontaAPontaTests));
         api.Api.Relogio.Fixar(ElencoDeTeste.Hoje);
         api.Api.Enviador.Limpar();
+
+        // A condição do ponto (fatia 3) só libera o desligamento depois da consolidação do último dia: aqui o banco de horas já está fechado, e o fluxo de acesso é o que se prova.
+        await api.NoEscopoAsync(async sp =>
+        {
+            await sp.GetRequiredService<IAgendador>().RegistrarComoConcluidaAsync("CONSOLIDAR_BANCO_HORAS", "CONSOLIDAR_BANCO_HORAS:dia=2030-12-31", new DateOnly(2030, 12, 31), CancellationToken.None);
+            return true;
+        });
         return api;
     }
 

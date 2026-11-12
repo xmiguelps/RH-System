@@ -1,12 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Api.IntegrationTests.Colaboradores;
 
 /// <summary>
-/// O registro da porta dos pedidos parados no gestor no contêiner de verdade: o padrão (composto) não faz nada e uma fatia registrada por <c>AddScoped</c> é chamada pela porta única.
-/// A fatia falsa entra por uma API derivada (<c>WithWebHostBuilder</c>), não pelo <c>ApiFactory</c> comum: se o <c>ApiFactory</c> a registrasse sempre, "o padrão não faz nada" nunca poderia ser medido.
+/// O registro da porta dos pedidos parados no gestor no contêiner de verdade: o composto reúne as fatias registradas (hoje só a do ponto, a da fatia 3) e uma fatia registrada por <c>AddScoped</c> é chamada pela porta única.
+/// A fatia falsa entra por uma API derivada (<c>WithWebHostBuilder</c>), não pelo <c>ApiFactory</c> comum.
 /// </summary>
 [Collection(MySqlCollection.Nome)]
 public class PedidosParadosNoGestorRegistroTests(MySqlFixture mysql)
@@ -27,7 +28,7 @@ public class PedidosParadosNoGestorRegistroTests(MySqlFixture mysql)
     }
 
     [Fact]
-    public async Task IPedidosParadosNoGestor_esta_registrado_e_o_padrao_nao_faz_nada()
+    public async Task IPedidosParadosNoGestor_esta_registrado_com_a_fatia_do_ponto_e_sem_pedido_parado_nao_faz_nada()
     {
         var api = await ApiCompartilhada.ObterAsync(mysql);
         await using var escopo = api.Services.CreateAsyncScope();
@@ -35,8 +36,8 @@ public class PedidosParadosNoGestorRegistroTests(MySqlFixture mysql)
         var porta = escopo.ServiceProvider.GetRequiredService<IPedidosParadosNoGestor>();
 
         Assert.IsType<PedidosParadosNoGestorComposto>(porta);
-        Assert.Empty(escopo.ServiceProvider.GetServices<IPedidosParadosNoGestorDaFatia>()); // até as fatias 3 e 7 registrarem as delas, a lista é vazia
-        await porta.PassarParaORhAsync(123, CancellationToken.None); // com um gestorId qualquer: termina sem lançar
+        Assert.IsType<PedidosParadosNoGestorDoPonto>(Assert.Single(escopo.ServiceProvider.GetServices<IPedidosParadosNoGestorDaFatia>())); // até a fatia 7 registrar a dela, o ponto é a única
+        await porta.PassarParaORhAsync(123, CancellationToken.None); // um gestorId sem pedido parado: termina sem lançar
         Assert.Equal(PedidosAprovados.Zero, await porta.AprovarEtapaDoGestorAsync(123, CancellationToken.None));
     }
 

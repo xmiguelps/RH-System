@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Contrato;
 using RHSystem.Api.IntegrationTests.Infra;
@@ -34,8 +35,11 @@ public class IndicadoresDaFichaTests(MySqlFixture mysql)
     public async Task Indicadores_sem_nenhuma_fonte_devolvem_os_quatro_campos_null()
     {
         var api = await ApiAsync();
+        var semFontes = api.Api.WithWebHostBuilder(b => b.ConfigureServices(servicos => servicos.RemoveAll<IFonteDeIndicadorDaFicha>())); // o banco de horas (fatia 3) já tem fonte de verdade: aqui o mecanismo é provado sem nenhuma
+        var cliente = semFontes.CreateClient();
+        cliente.DefaultRequestHeaders.Authorization = api.Api.ClienteComo(api.Elenco.Rh).DefaultRequestHeaders.Authorization;
 
-        var resposta = await api.Api.ClienteComo(api.Elenco.Rh).GetAsync($"/api/rh/funcionarios/{api.Elenco.MembroA.FuncionarioId}/indicadores");
+        var resposta = await cliente.GetAsync($"/api/rh/funcionarios/{api.Elenco.MembroA.FuncionarioId}/indicadores");
 
         Assert.Equal(200, (int)resposta.StatusCode);
         var corpo = await CorpoAsync(resposta);
@@ -53,6 +57,7 @@ public class IndicadoresDaFichaTests(MySqlFixture mysql)
         var api = await ApiAsync();
         var comFontes = api.Api.WithWebHostBuilder(b => b.ConfigureServices(servicos =>
         {
+            servicos.RemoveAll<IFonteDeIndicadorDaFicha>();
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.BancoDeHorasMinutos, -125)); // a primeira registrada vence
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.BancoDeHorasMinutos, 999));
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.FeriasDisponiveisDias, 22));

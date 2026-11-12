@@ -18,6 +18,7 @@ public static class FormulariosDoContrato
 {
     public const string AdicionarDocumento = "adicionarDocumentoDoFuncionario";
     public const string EnviarMeuDocumento = "enviarMeuDocumento";
+    public const string EnviarAtestado = "enviarAtestado";
     public const string BaixarModeloDeImportacao = "baixarModeloDeImportacao";
     public const string ValidarPlanilhaDeImportacao = "validarPlanilhaDeImportacao";
 
@@ -43,6 +44,16 @@ public static class FormulariosDoContrato
         else if (operacao.OperationId == EnviarMeuDocumento)
         {
             operacao.RequestBody = Multipart(obrigatorios: ["arquivo"], ("arquivo", Binario()));
+        }
+        else if (operacao.OperationId == EnviarAtestado)
+        {
+            operacao.RequestBody = Multipart(
+                obrigatorios: ["dataInicio", "dataFim", "arquivo"],
+                ("dataInicio", new OpenApiSchema { Type = JsonSchemaType.String, Format = "date" }),
+                ("dataFim", new OpenApiSchema { Type = JsonSchemaType.String, Format = "date" }),
+                ("horaInicio", new OpenApiSchema { Type = JsonSchemaType.String, Pattern = EsquemasDoContrato.PadraoDoHorario }),
+                ("horaFim", new OpenApiSchema { Type = JsonSchemaType.String, Pattern = EsquemasDoContrato.PadraoDoHorario }),
+                ("arquivo", Binario()));
         }
         else if (operacao.OperationId == ValidarPlanilhaDeImportacao)
         {

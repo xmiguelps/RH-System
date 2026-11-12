@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using RHSystem.Application.Acesso;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Consultas;
+using RHSystem.Application.Ponto;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Colaboradores;
+using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Api.Configuracao;
 
@@ -29,6 +32,23 @@ public static class EnumsDeParametrosDoContrato
         [("listarFuncionarios", "tipoContrato")] = typeof(TipoDeContrato),
         [("listarFuncionarios", "ordenarPor")] = typeof(FuncionarioOrdenarPor),
         [("listarFuncionarios", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("listarMeusPedidosDeAjuste", "status")] = typeof(StatusDoPedidoDeAjuste),
+        [("listarMeusPedidosDeAjuste", "etapa")] = typeof(EtapaDoPedido),
+        [("listarMeusPedidosDeAjuste", "ordenarPor")] = typeof(PontoPedidoOrdenarPor),
+        [("listarMeusPedidosDeAjuste", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("listarPedidosDeAjusteDaEquipe", "status")] = typeof(StatusDoPedidoDeAjuste),
+        [("listarPedidosDeAjusteDaEquipe", "etapa")] = typeof(EtapaDoPedido),
+        [("listarPedidosDeAjusteDaEquipe", "ordenarPor")] = typeof(PontoPedidoOrdenarPor),
+        [("listarPedidosDeAjusteDaEquipe", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("listarPedidosDeAjusteParaRh", "status")] = typeof(StatusDoPedidoDeAjuste),
+        [("listarPedidosDeAjusteParaRh", "etapa")] = typeof(EtapaDoPedido),
+        [("listarPedidosDeAjusteParaRh", "ordenarPor")] = typeof(PontoPedidoOrdenarPor),
+        [("listarPedidosDeAjusteParaRh", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
+        [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
+        [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),
+        [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
+        [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };
 
     /// <summary>Tem de vir DEPOIS de <see cref="NomesDeParametrosDoContrato"/>: a chave usa o nome já em camelCase.</summary>

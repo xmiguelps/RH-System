@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Infra;
+using RHSystem.Application.Agendamento;
 using RHSystem.Application.Colaboradores;
 
 namespace RHSystem.Api.IntegrationTests.Colaboradores;
@@ -41,6 +42,13 @@ internal static class DesligamentoDeTeste
         var api = await ApiDeAcesso.ObterAsync(mysql, chave);
         api.Api.Relogio.Fixar(Agora);
         await Sql.ExecutarAsync(api.Conexao, "DELETE FROM TAREFAS_AGENDADAS");
+
+        // A condição do ponto (fatia 3) só libera o desligamento depois da consolidação do último dia da pessoa: aqui o banco de horas já está fechado (até 2030), e o que é da fatia 1 continua valendo como antes, sem depender do relógio da consolidação.
+        await api.NoEscopoAsync(async sp =>
+        {
+            await sp.GetRequiredService<IAgendador>().RegistrarComoConcluidaAsync("CONSOLIDAR_BANCO_HORAS", "CONSOLIDAR_BANCO_HORAS:dia=2030-12-31", new DateOnly(2030, 12, 31), CancellationToken.None);
+            return true;
+        });
         return api;
     }
 

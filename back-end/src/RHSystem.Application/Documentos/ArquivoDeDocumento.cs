@@ -5,8 +5,8 @@ using RHSystem.Application.Comum;
 namespace RHSystem.Application.Documentos;
 
 /// <summary>
-/// O arquivo de um documento, no que o RH (Task 7) e a própria pessoa (Task 8) compartilham: a validação (400 em <c>arquivo</c>, o tipo vem dos primeiros bytes, até 10 MiB) e o envio (blob fora de qualquer transação, o resto
-/// numa transação curta que o chamador abre, e o blob apagado se qualquer passo falhar). A regra existe num lugar só.
+/// O arquivo de um documento, no que o RH (Task 7), a própria pessoa (Task 8) e o atestado de ponto (fatia 3, que tem o limite dele) compartilham: a validação (400 em <c>arquivo</c>, o tipo vem dos primeiros bytes, até 10 MiB nos documentos) e o envio (blob
+/// fora de qualquer transação, o resto numa transação curta que o chamador abre, e o blob apagado se qualquer passo falhar). A regra existe num lugar só.
 /// </summary>
 public static class ValidacaoDeArquivoDeDocumento
 {
@@ -14,7 +14,11 @@ public static class ValidacaoDeArquivoDeDocumento
     /// Confere o arquivo recebido e devolve o tipo que o CONTEÚDO revelou (<c>null</c> quando há erro, que vai para <paramref name="erros"/> em <c>arquivo</c>). <paramref name="arquivosRecebidos"/> conta TODAS as partes de
     /// arquivo do formulário, de qualquer nome de campo.
     /// </summary>
-    public static async Task<TipoDeArquivo?> ValidarAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, CancellationToken ct)
+    public static Task<TipoDeArquivo?> ValidarAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, CancellationToken ct) =>
+        ValidarAsync(erros, arquivo, arquivosRecebidos, mensagemSemArquivo, LimitesDeDocumento.TamanhoMaximoBytes, "O arquivo pode ter até 10 MB.", ct);
+
+    /// <summary>A mesma conferência com o limite de tamanho de quem chama (o atestado aceita até 5 MiB): <paramref name="mensagemDoLimite"/> é o texto do 400 em <c>arquivo</c> quando passa de <paramref name="tamanhoMaximoBytes"/>.</summary>
+    public static async Task<TipoDeArquivo?> ValidarAsync(ColetorDeErros erros, ArquivoRecebido? arquivo, int arquivosRecebidos, string mensagemSemArquivo, long tamanhoMaximoBytes, string mensagemDoLimite, CancellationToken ct)
     {
         if (arquivosRecebidos > 1)
         {
@@ -34,9 +38,9 @@ public static class ValidacaoDeArquivoDeDocumento
             return null;
         }
 
-        if (arquivo.Tamanho > LimitesDeDocumento.TamanhoMaximoBytes)
+        if (arquivo.Tamanho > tamanhoMaximoBytes)
         {
-            erros.Adicionar("arquivo", "O arquivo pode ter até 10 MB.");
+            erros.Adicionar("arquivo", mensagemDoLimite);
             return null;
         }
 

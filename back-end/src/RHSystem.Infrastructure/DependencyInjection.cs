@@ -18,6 +18,9 @@ using RHSystem.Application.Escopo;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
+using RHSystem.Application.Ponto;
+using RHSystem.Application.Ponto.Atestados;
+using RHSystem.Application.Ponto.Feriados;
 using RHSystem.Infrastructure.Acesso;
 using RHSystem.Infrastructure.Agendamento;
 using RHSystem.Infrastructure.Agendamento.Tarefas;
@@ -35,6 +38,7 @@ using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Gestores;
 using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
+using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Infrastructure;
 
@@ -122,6 +126,9 @@ public static class DependencyInjection
         services.AddScoped<ITarefaAgendada, EfetivarDesligamentoTarefa>();
         services.AddScoped<ITarefaAgendada, LimparArquivosOrfaosTarefa>();
         services.AddScoped<ITarefaAgendada, LimparImportacoesVencidasTarefa>(); // por hora: a prévia e o arquivo de uma importação vencida têm dado pessoal
+        services.AddScoped<ITarefaAgendada, ImportarFeriadosTarefa>(); // por ano: os nacionais calculados e os estaduais da UF da empresa
+        services.AddScoped<ITarefaAgendada, RepetirFeriadoTarefa>(); // por ano: o "repetir todos os anos" do municipal
+        services.AddScoped<ITarefaAgendada, ConsolidarBancoDeHorasTarefa>(); // por dia: o banco de horas, a partir das 12:00 do dia seguinte
         services.AddHostedService<AgendadorHostedService>();
 
         // Arquivos (Blob Storage; Azurite em desenvolvimento): o armazenamento e a listagem são o MESMO objeto. Sem Armazenamento:ConexaoBlob o app sobe e a primeira operação com arquivo falha com erro claro no log.
@@ -203,9 +210,36 @@ public static class DependencyInjection
         // registrarem (AddScoped); sem nenhuma, não faz nada (dívida registrada em contrato/STATUS.md).
         services.AddScoped<IPedidosParadosNoGestor, PedidosParadosNoGestorComposto>();
 
-        // Situação de hoje: a fonte padrão só conhece o fim de semana (nada de ponto, atestado, férias nem horário ainda). A fatia 3 registra a fonte dela DEPOIS desta (o último
-        // registro vale) e a ficha e a lista de colaboradores passam a mostrar a situação de verdade sem mudar aqui.
-        services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaSemRegistros>();
+        // Situação de hoje: a fonte da 1b (FonteDeFatosDoDiaSemRegistros, só o fim de semana) ficou para os testes de unidade; o ponto (fatia 3) registra a dele, que conhece feriado, férias, atestado, batida e o horário da empresa.
+        // O calendário e as férias do ponto também servem ao espelho e à consolidação do banco de horas.
+        services.AddScoped<ICalendarioDoPonto, CalendarioDoPonto>();
+        services.AddScoped<IFeriasDoPonto, FeriasDoPonto>();
+        services.AddScoped<IPontoRepositorio, PontoRepositorio>();
+        services.AddScoped<ISaldoDoBancoDeHoras, SaldoDoBancoDeHoras>();
+        services.AddScoped<IConsultaDoPonto, ConsultaDoPonto>();
+        services.AddScoped<IPedidosDeAjusteRepositorio, PedidosDeAjusteRepositorio>();
+        services.AddScoped<IConsultaDePedidosDeAjuste, ConsultaDePedidosDeAjuste>();
+        services.AddSingleton<IRenderizadorDeEmail, ResultadoAjustePontoRenderizador>();
+        // As bolinhas do menu do gestor (a mesma conta serve às duas): os pedidos de ajuste que aguardam a etapa dele.
+        services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PedidosDeAjusteDePontoDoGestor));
+        services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDePedidosParaORh>();
+        // A porta do recálculo do banco de horas: a consolidação (tarefa agendada) registra a implementação de verdade depois desta.
+        services.AddScoped<IRecalculoDoBancoDeHoras, RecalculoDoBancoDeHoras>();
+        services.AddScoped<IUltimoDiaConsolidado, UltimoDiaConsolidado>();
+        services.AddScoped<IConsultaDoBancoDeHoras, ConsultaDoBancoDeHoras>();
+        services.AddScoped<IConsultaDaFolha, ConsultaDaFolha>();
+        services.AddSingleton<IGeradorDePdfDoEspelho, GeradorDePdfDoEspelho>(); // o espelho em PDF: fonte embutida, montado na memória
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosEspelhos>(); // espelhos/: de uso único, nada o referencia
+        services.AddScoped<IFonteDeIndicadorDaFicha, FonteDoBancoDeHorasNaFicha>(); // o indicador "banco de horas" da ficha deixa de ser nulo
+        services.AddScoped<ICondicaoParaEfetivarDesligamento, CondicaoDoBancoDeHorasParaDesligamento>(); // o desligamento espera o último dia da pessoa estar consolidado
+        // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
+        services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
+        services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
+        services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
+        services.AddScoped<IConsultaDeAtestados, ConsultaDeAtestados>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosAtestados>();
+        services.AddScoped<IFonteDeFatosDoDia, FonteDeFatosDoDiaDoPonto>();
         services.AddScoped<ISituacaoDeHoje, SituacaoDeHojeServico>();
 
         services.AddSingleton<ISenhaHasher, SenhaHasher>();

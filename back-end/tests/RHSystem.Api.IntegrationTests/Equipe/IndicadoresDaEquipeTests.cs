@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Contrato;
 using RHSystem.Api.IntegrationTests.Infra;
@@ -39,7 +40,10 @@ public class IndicadoresDaEquipeTests(MySqlFixture mysql)
     {
         var api = await ApiAsync();
 
-        var semFonte = await api.Api.ClienteComo(api.Elenco.Gestor).GetAsync(Rota(api));
+        var semFontes = api.Api.WithWebHostBuilder(b => b.ConfigureServices(servicos => servicos.RemoveAll<IFonteDeIndicadorDaFicha>())); // o banco de horas (fatia 3) já tem fonte de verdade: aqui o mecanismo é provado sem nenhuma
+        var clienteSemFonte = semFontes.CreateClient();
+        clienteSemFonte.DefaultRequestHeaders.Authorization = api.Api.ClienteComo(api.Elenco.Gestor).DefaultRequestHeaders.Authorization;
+        var semFonte = await clienteSemFonte.GetAsync(Rota(api));
 
         Assert.Equal(200, (int)semFonte.StatusCode);
         var corpo = await CorpoAsync(semFonte);
@@ -49,6 +53,7 @@ public class IndicadoresDaEquipeTests(MySqlFixture mysql)
 
         var comFontes = api.Api.WithWebHostBuilder(b => b.ConfigureServices(servicos =>
         {
+            servicos.RemoveAll<IFonteDeIndicadorDaFicha>();
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.BancoDeHorasMinutos, -125)); // a primeira registrada vence
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.BancoDeHorasMinutos, 999));
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.FeriasDisponiveisDias, 22));
@@ -69,7 +74,11 @@ public class IndicadoresDaEquipeTests(MySqlFixture mysql)
     public async Task Fonte_que_so_sabe_um_indicador_deixa_os_outros_null()
     {
         var api = await ApiAsync();
-        var comUmaFonte = api.Api.WithWebHostBuilder(b => b.ConfigureServices(s => s.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.TreinamentosPendentes, 0))));
+        var comUmaFonte = api.Api.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        {
+            s.RemoveAll<IFonteDeIndicadorDaFicha>();
+            s.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.TreinamentosPendentes, 0));
+        }));
         var cliente = comUmaFonte.CreateClient();
         cliente.DefaultRequestHeaders.Authorization = api.Api.ClienteComo(api.Elenco.Gestor).DefaultRequestHeaders.Authorization;
 
