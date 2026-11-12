@@ -91,6 +91,24 @@ public class EspelhoEmPdfTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Cada_dia_sai_numa_linha_com_minutos_de_dois_digitos_traco_onde_nao_ha_valor_e_a_situacao_certa()
+    {
+        var api = await ApiAsync();
+        var pedro = api.Elenco.MembroA;
+        var atrasado = new DateOnly(2026, 10, 1);
+        await BaterEmAsync(api.Conexao, pedro.FuncionarioId, atrasado, (TipoDeMarcacao.Entrada, Utc(atrasado, 11, 20)), (TipoDeMarcacao.Saida, Utc(atrasado, 15)), (TipoDeMarcacao.Entrada, Utc(atrasado, 16)), (TipoDeMarcacao.Saida, Utc(atrasado, 21, 50))); // 3:40 + 5:50 = 9:30 de 8:48: +0:42 e 20 min de atraso
+        var curto = new DateOnly(2026, 10, 2);
+        await BaterEmAsync(api.Conexao, pedro.FuncionarioId, curto, (TipoDeMarcacao.Entrada, Utc(curto, 11)), (TipoDeMarcacao.Saida, Utc(curto, 15)), (TipoDeMarcacao.Entrada, Utc(curto, 16)), (TipoDeMarcacao.Saida, Utc(curto, 20, 5))); // 4:00 + 4:05 = 8:05 de 8:48: -0:43
+
+        var link = await CorpoAsync(await ComoRhAsync(api, pedro.FuncionarioId));
+
+        var texto = TextoDoPdf(api.Api.Armazenamento.Conteudo(CaminhoDoLink(link))!);
+        Assert.Contains("01/10QuiAtraso08:20–12:00·13:00–18:509:308:48+0:4220min", texto, StringComparison.Ordinal); // a situação é a do dia, não o título da coluna
+        Assert.Contains("02/10SexNormal08:00–12:00·13:00–17:058:058:48-0:43–", texto, StringComparison.Ordinal); // 8:05 e não 8:5; sem atraso, traço
+        Assert.Contains("03/10SábFolga––0:00––04/10DomFolga––0:00––", texto, StringComparison.Ordinal); // sem batida e sem expediente: traço em períodos, horas, saldo e atraso
+    }
+
+    [Fact]
     public async Task Sem_ano_e_mes_vale_o_mes_atual_e_ano_ou_mes_fora_da_faixa_da_400_sem_gerar_arquivo()
     {
         var api = await ApiAsync();
