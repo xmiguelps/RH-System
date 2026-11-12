@@ -265,6 +265,7 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeMeusFormularios, ConsultaDeMeusFormularios>();
         services.AddScoped<IFormulariosRespostasRepositorio, FormulariosRespostasRepositorio>();
         services.AddScoped<IConsultaDeAcompanhamento, ConsultaDeAcompanhamento>();
+        services.AddScoped<IConsultaDeResultado, ConsultaDeResultado>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosFormularios>(); // sem ela as sobras e, pior, os arquivos de resposta de formularios/ nunca seriam tratados pela limpeza de sobras
         services.AddScoped<EnvioDeArquivosDeFormulario>();
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeFormularios>(); // a bolinha "formulariosPendentes" do menu

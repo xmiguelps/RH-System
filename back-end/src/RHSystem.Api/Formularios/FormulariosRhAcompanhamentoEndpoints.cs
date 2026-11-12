@@ -11,8 +11,11 @@ public sealed record FiltrosDosRespondentes(int Pagina = 1, int TamanhoPagina = 
 /// <summary>Os parâmetros de <c>GET /api/rh/formularios/{id}/respostas/funcionarios/{funcionarioId}</c>: o avaliado (nas avaliações) e o instante do envio (na Sugestão).</summary>
 public sealed record FiltrosDasRespostasDeFuncionario(int? AvaliadoId = null, DateTime? RespondidoEmUtc = null);
 
+/// <summary>O <c>avaliadoId</c> de <c>GET /api/rh/formularios/{id}/resultado</c> (obrigatório nas avaliações, proibido nos outros tipos: o caso de uso confere).</summary>
+public sealed record FiltrosDoResultado(int? AvaliadoId = null);
+
 /// <summary>
-/// Quem respondeu e ver respostas, só o RH (<c>/api/rh/formularios/{id}/...</c>). Os <c>operationId</c> e os códigos de resposta são os de <c>contrato/fontes/50-fatia-5-formularios.yaml</c>.
+/// Quem respondeu, ver respostas, resultado e exportação, só o RH (<c>/api/rh/formularios/{id}/...</c>). Os <c>operationId</c> e os códigos de resposta são os de <c>contrato/fontes/50-fatia-5-formularios.yaml</c>.
 /// </summary>
 public static class FormulariosRhAcompanhamentoEndpoints
 {
@@ -23,6 +26,8 @@ public static class FormulariosRhAcompanhamentoEndpoints
         servicos.AddScoped<ListarRespondentesDoFormularioCasoDeUso>();
         servicos.AddScoped<ObterRespostasDeFuncionarioCasoDeUso>();
         servicos.AddScoped<BaixarArquivoDeRespostaCasoDeUso>();
+        servicos.AddScoped<ObterResultadoDoFormularioCasoDeUso>();
+        servicos.AddScoped<ExportarRespostasDoFormularioCasoDeUso>();
         return servicos;
     }
 
@@ -45,6 +50,16 @@ public static class FormulariosRhAcompanhamentoEndpoints
             .Produces<LinkTemporario>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
+        rh.MapGet("/formularios/{formularioId:int}/resultado", Resultado)
+            .WithName("obterResultadoFormulario")
+            .Produces<FormularioResultado>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        rh.MapGet("/formularios/{formularioId:int}/exportacao", Exportar)
+            .WithName("exportarRespostasFormulario")
+            .Produces<string>(StatusCodes.Status200OK, "text/csv")
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -53,6 +68,16 @@ public static class FormulariosRhAcompanhamentoEndpoints
 
     private static async Task<RespostaFormularioFuncionario> RespostasDeFuncionario(int formularioId, int funcionarioId, [AsParameters] FiltrosDasRespostasDeFuncionario f, ObterRespostasDeFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(formularioId, funcionarioId, f.AvaliadoId, f.RespondidoEmUtc, ct);
+
+    private static async Task<FormularioResultado> Resultado(int formularioId, [AsParameters] FiltrosDoResultado f, ObterResultadoDoFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, f.AvaliadoId, ct);
+
+    private static async Task<IResult> Exportar(int formularioId, ExportarRespostasDoFormularioCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
+    {
+        var arquivo = await casoDeUso.ExecutarAsync(formularioId, ct);
+        http.Response.Headers.ContentDisposition = $"attachment; filename=\"{arquivo.NomeDoArquivo}\"";
+        http.Response.Headers.CacheControl = "no-store"; // respostas de formulário são dado pessoal: nenhum cache guarda o arquivo
+        return Results.Bytes(arquivo.Conteudo, "text/csv; charset=utf-8");
+    }
 
     private static async Task<LinkTemporario> BaixarArquivo(int formularioId, int respostaId, BaixarArquivoDeRespostaCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, respostaId, ct);
 }

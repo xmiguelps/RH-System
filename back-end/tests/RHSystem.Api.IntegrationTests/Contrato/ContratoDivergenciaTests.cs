@@ -149,6 +149,8 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "listarRespondentesFormulario",
         "obterRespostasDeFuncionario",
         "baixarArquivoDeResposta",
+        "obterResultadoFormulario",
+        "exportarRespostasFormulario",
         "editarFeriado",
         "obterMeuBancoDeHoras",
         "obterBancoDeHorasDeFuncionario",
