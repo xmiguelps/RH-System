@@ -83,6 +83,14 @@ public static class MensagensDaComunicacao
     /// <summary>A competência por extenso, depois da palavra "holerite": <c>mensal de outubro de 2026</c>, <c>do 13º salário de dezembro de 2026</c>, <c>de férias de março de 2027</c>.</summary>
     public static string TextoDaCompetencia(TipoDeHolerite tipo, int mes, int ano) => $"{NomeDoTipo(tipo)} de {Meses[mes - 1]} de {ano}";
 
+    // ---------------------------------------------------------------- erros de item do lote (só no resultado, sem texto no contrato)
+
+    public const string CodigoDoArquivoInvalidoNoLote = "ARQUIVO_INVALIDO";
+
+    public const string CodigoDaPessoaNaoEncontradaNoLote = "FUNCIONARIO_NAO_ENCONTRADO";
+
+    public const string TextoDaPessoaNaoEncontradaNoLote = "Esta pessoa não foi encontrada.";
+
     // ---------------------------------------------------------------- advertências
 
     public static MensagemDaComunicacao AdvertenciaNaoEstaContestada { get; } = new(422, Recusada, "Só uma advertência contestada pode receber resposta.", "ADVERTENCIA_NAO_ESTA_CONTESTADA");

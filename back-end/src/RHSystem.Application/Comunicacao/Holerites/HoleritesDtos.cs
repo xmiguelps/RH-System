@@ -39,3 +39,25 @@ public enum OperacaoDeHolerite
     Envio,
     NovaVersao,
 }
+
+/// <summary>Os limites do envio em lote (<c>enviarHoleritesEmLote</c>): até 200 PDFs e 100 MiB no total (cada PDF segue o limite de 5 MiB). O teto da requisição tem folga para os campos e o JSON dos itens.</summary>
+public static class LimitesDoLoteDeHolerites
+{
+    public const int MaximoDeItens = 200;
+
+    public const long TamanhoTotalMaximoBytes = 100L * 1024 * 1024;
+
+    public const long TetoDaRequisicaoBytes = 110L * 1024 * 1024;
+}
+
+/// <summary>Uma linha da lista <c>itens</c> do lote: o PDF (<c>nomeDoArquivo</c>, o nome do arquivo enviado em <c>arquivos</c>) e a pessoa dona do holerite. Quem liga cada arquivo a uma pessoa é o RH: a API não adivinha pelo conteúdo nem pelo nome.</summary>
+public sealed record HoleriteLoteItemComando(int FuncionarioId, string NomeDoArquivo);
+
+/// <summary>O formulário do lote, como chegou: os campos de texto, <c>itens</c> como o JSON que veio, os arquivos do campo <c>arquivos</c> e a contagem de TODAS as partes de arquivo de qualquer campo.</summary>
+public sealed record NovoLoteDeHoleritesBruto(string? Mes, string? Ano, string? Tipo, string? PublicarEm, string? NoDiaDoPagamento, string? Itens, IReadOnlyList<ArquivoRecebido> Arquivos, int ArquivosRecebidos);
+
+/// <summary>O resultado de um item (<c>HoleriteLoteItemResultado</c>): o holerite criado, ou o código e o texto do erro dele.</summary>
+public sealed record HoleriteLoteItemResultado(int FuncionarioId, string NomeDoArquivo, bool Sucesso, HoleriteItemRh? Holerite, string? CodigoDoErro, string? MensagemDoErro);
+
+/// <summary>O resultado do lote (<c>HoleriteLoteResultado</c>): <c>Enviados</c> são os publicados mais os agendados.</summary>
+public sealed record HoleriteLoteResultado(int Total, int Enviados, int ComErro, IReadOnlyList<HoleriteLoteItemResultado> Itens);

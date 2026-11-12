@@ -22,6 +22,7 @@ public static class FormulariosDoContrato
     public const string EnviarAtestado = "enviarAtestado";
     public const string EnviarHolerite = "enviarHolerite";
     public const string SubstituirHolerite = "substituirHolerite";
+    public const string EnviarHoleritesEmLote = "enviarHoleritesEmLote";
     public const string BaixarModeloDeImportacao = "baixarModeloDeImportacao";
     public const string ValidarPlanilhaDeImportacao = "validarPlanilhaDeImportacao";
 
@@ -76,6 +77,33 @@ public static class FormulariosDoContrato
                 ("arquivo", Binario()),
                 ("publicarEm", new OpenApiSchema { Type = JsonSchemaType.String, Format = "date" }),
                 ("noDiaDoPagamento", new OpenApiSchema { Type = JsonSchemaType.Boolean }));
+        }
+        else if (operacao.OperationId == EnviarHoleritesEmLote)
+        {
+            operacao.RequestBody = Multipart(
+                obrigatorios: ["mes", "ano", "tipo", "itens", "arquivos"],
+                ("mes", new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "1", Maximum = "12" }),
+                ("ano", new OpenApiSchema { Type = JsonSchemaType.Integer, Minimum = "2000", Maximum = "2100" }),
+                ("tipo", Enum<TipoDeHolerite>()),
+                ("publicarEm", new OpenApiSchema { Type = JsonSchemaType.String, Format = "date" }),
+                ("noDiaDoPagamento", new OpenApiSchema { Type = JsonSchemaType.Boolean }),
+                ("itens", new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Array,
+                    MinItems = 1,
+                    MaxItems = 200,
+                    Items = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Required = new HashSet<string> { "funcionarioId", "nomeDoArquivo" },
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["funcionarioId"] = new OpenApiSchema { Type = JsonSchemaType.Integer },
+                            ["nomeDoArquivo"] = new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 1 },
+                        },
+                    },
+                }),
+                ("arquivos", new OpenApiSchema { Type = JsonSchemaType.Array, MinItems = 1, MaxItems = 200, Items = Binario() }));
         }
         else if (operacao.OperationId == ValidarPlanilhaDeImportacao)
         {

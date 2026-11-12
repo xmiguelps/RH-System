@@ -19,6 +19,7 @@ public static class HoleritesRhEndpoints
         servicos.AddScoped<PublicadorDeHolerite>();
         servicos.AddScoped<EnviarHoleriteCasoDeUso>();
         servicos.AddScoped<SubstituirHoleriteCasoDeUso>();
+        servicos.AddScoped<EnviarHoleritesEmLoteCasoDeUso>();
         return servicos;
     }
 
@@ -54,7 +55,27 @@ public static class HoleritesRhEndpoints
                 StatusCodes.Status422UnprocessableEntity,
                 StatusCodes.Status500InternalServerError);
 
+        rh.MapPost("/holerites/lote", EnviarEmLote)
+            .WithName(FormulariosDoContrato.EnviarHoleritesEmLote)
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(LimitesDoLoteDeHolerites.TetoDaRequisicaoBytes), new RequestFormLimitsAttribute { MultipartBodyLengthLimit = LimitesDoLoteDeHolerites.TetoDaRequisicaoBytes, ValueCountLimit = 1000 })
+            .Produces<HoleriteLoteResultado>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
         return rotas;
+    }
+
+    private static async Task<IResult> EnviarEmLote(HttpRequest requisicao, EnviarHoleritesEmLoteCasoDeUso casoDeUso, CancellationToken ct)
+    {
+        var formulario = await LeituraDeFormulario.LerAsync(requisicao, ct);
+        var arquivos = formulario.Files.GetFiles("arquivos").Select(f => new RHSystem.Application.Documentos.ArquivoRecebido(f.FileName, f.Length, f.OpenReadStream)).ToList();
+        var lote = new NovoLoteDeHoleritesBruto(Texto(formulario, "mes"), Texto(formulario, "ano"), Texto(formulario, "tipo"), Texto(formulario, "publicarEm"), Texto(formulario, "noDiaDoPagamento"), Texto(formulario, "itens"), arquivos, formulario.Files.Count);
+        return Results.Ok(await casoDeUso.ExecutarAsync(lote, ct));
     }
 
     private static async Task<IResult> Enviar(int funcionarioId, HttpRequest requisicao, EnviarHoleriteCasoDeUso casoDeUso, CancellationToken ct)
