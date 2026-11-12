@@ -21,6 +21,7 @@ using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
 using RHSystem.Application.Formularios.Construtor;
+using RHSystem.Application.Formularios.Destinatarios;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
@@ -257,6 +258,7 @@ public static class DependencyInjection
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
         services.AddScoped<IFormulariosRepositorio, FormulariosRepositorio>();
         services.AddScoped<IConsultaDeFormularios, ConsultaDeFormularios>();
+        services.AddScoped<IDestinatariosDoFormulario, DestinatariosDoFormulario>();
         services.AddScoped<IPerguntasDoFormularioRepositorio, PerguntasDoFormularioRepositorio>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();
