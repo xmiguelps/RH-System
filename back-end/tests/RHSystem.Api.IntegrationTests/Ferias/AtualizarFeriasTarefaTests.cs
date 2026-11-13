@@ -113,4 +113,17 @@ public class AtualizarFeriasTarefaTests(MySqlFixture mysql)
 
         Assert.Equal(1, Contar(api, $"SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = '{Tarefa}' AND CHAVE_IDEMPOTENCIA = '{Tarefa}:dia=2026-10-07'"));
     }
+
+    [Fact]
+    public async Task Ferias_aprovadas_que_terminam_hoje_entram_em_gozo()
+    {
+        var api = await ApiAsync();
+        var (setor, _, gestorId, _, _) = await EquipeAsync(api, "Termina hoje");
+        var pessoa = await PessoaAsync(api, "Termina hoje", new DateOnly(2022, 3, 14), setor);
+        var id = await SemearAsync(api, pessoa.FuncionarioId, "2025-03-14", "2026-03-13", "2026-09-28", "2026-10-07", "APROVADA", gestorId: gestorId, gestorAprovou: true, rhId: api.Elenco.Rh.FuncionarioId);
+
+        await ExecutarAsync(api);
+
+        Assert.Equal("EM_GOZO", await StatusAsync(api, id));
+    }
 }

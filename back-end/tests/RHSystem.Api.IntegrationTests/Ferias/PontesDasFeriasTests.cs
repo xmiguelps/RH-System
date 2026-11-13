@@ -157,4 +157,28 @@ public class PontesDasFeriasTests(MySqlFixture mysql)
         Assert.Equal(2, depois.GetProperty("pendenciasDaEquipe").GetInt32());
         Assert.Equal(0, depois.GetProperty("pedidosDeAjusteDePonto").GetInt32()); // a bolinha do ponto não ganha férias
     }
+
+    [Fact]
+    public async Task O_evento_resumo_so_sai_quando_algum_pedido_andou()
+    {
+        var api = await ApiAsync();
+        var (comPedido, _, gestorComPedido, m1, _) = await EquipeAsync(api, "Resumo com pedido");
+        var (semPedido, _, _, _, _) = await EquipeAsync(api, "Resumo sem pedido");
+        _ = await PedidoComOGestorAsync(api, m1.FuncionarioId, gestorComPedido);
+        long Resumos() => Contar(api, "SELECT COUNT(*) FROM AUDITORIA_EVENTOS WHERE AREA = 'FERIAS' AND DESCRICAO LIKE 'O sistema passou para a etapa do RH%'");
+        async Task TirarOGestorAsync(int setor)
+        {
+            var nome = await TextoAsync(api, $"SELECT NOME_SETOR FROM SETORES WHERE ID_SETOR = {setor}");
+            var resposta = await (await api.ClienteDoRhAgoraAsync()).PutAsJsonAsync($"/api/rh/setores/{setor}", new { nome, descricao = (string?)null, gestorFuncionarioId = (int?)null });
+            Assert.Equal(200, (int)resposta.StatusCode);
+        }
+
+        var antes = Resumos();
+        await TirarOGestorAsync(semPedido);
+        var depoisDoSetorSemPedido = Resumos();
+        await TirarOGestorAsync(comPedido);
+        var depoisDoSetorComPedido = Resumos();
+
+        Assert.Equal((antes, antes + 1), (depoisDoSetorSemPedido, depoisDoSetorComPedido));
+    }
 }

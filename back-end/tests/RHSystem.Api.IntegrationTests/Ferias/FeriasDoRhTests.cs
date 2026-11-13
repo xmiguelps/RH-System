@@ -313,4 +313,26 @@ public class FeriasDoRhTests(MySqlFixture mysql)
             Assert.Equal(1, EmailsDoPedido(api, disputa));
         }
     }
+
+    // ---------------------------------------------------------------- as bordas que a mutação mostrou
+
+    [Fact]
+    public async Task A_busca_e_os_filtros_de_situacao_so_trazem_o_que_casa()
+    {
+        var api = await ApiAsync();
+        var rh = api.Elenco.Rh.FuncionarioId;
+        _ = await AnaEmGestoresAsync(api);
+        var (_, _, gestorId, m1, m2) = await EquipeAsync(api, "Filtros do RH");
+        var emGozo = await SemearAsync(api, m1.FuncionarioId, "2025-03-14", "2026-03-13", "2026-10-05", "2026-10-16", "EM_GOZO", gestorId: gestorId, gestorAprovou: true, rhId: rh);
+        var rejeitada = await SemearAsync(api, m1.FuncionarioId, "2025-03-14", "2026-03-13", "2027-02-08", "2027-02-22", "REJEITADA", gestorId: gestorId, resultadoDoGestor: "RECUSOU", motivo: "Equipe desfalcada.");
+        var cancelada = await SemearAsync(api, m1.FuncionarioId, "2025-03-14", "2026-03-13", "2027-03-08", "2027-03-22", "CANCELADA", gestorId: gestorId);
+        _ = await SemearAsync(api, m2.FuncionarioId, "2025-03-14", "2026-03-13", "2026-10-05", "2026-10-16", "EM_GOZO", gestorId: gestorId, gestorAprovou: true, rhId: rh);
+        var cliente = await api.ClienteDoRhAgoraAsync();
+
+        async Task<List<int>> ListarAsync(string situacao) => Ids(await CorpoAsync(await cliente.GetAsync($"{Lista}?tamanhoPagina=100&busca={Uri.EscapeDataString(m1.Nome)}&situacao={situacao}")));
+
+        Assert.Equal([emGozo], await ListarAsync("EM_GOZO"));
+        Assert.Equal([rejeitada], await ListarAsync("REJEITADA"));
+        Assert.Equal([cancelada], await ListarAsync("CANCELADA"));
+    }
 }

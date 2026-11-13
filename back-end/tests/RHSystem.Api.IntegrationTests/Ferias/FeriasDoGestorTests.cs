@@ -376,4 +376,79 @@ public class FeriasDoGestorTests(MySqlFixture mysql)
         Assert.Equal("APROVOU", await TextoAsync(api, $"SELECT RESULTADO_GESTOR FROM FERIAS WHERE ID_FERIAS = {pedido}"));
         Assert.Equal(0, EmailsDoPedido(api, pedido));
     }
+
+    // ---------------------------------------------------------------- as bordas que a mutação mostrou
+
+    [Fact]
+    public async Task Os_conflitos_pegam_as_ferias_que_terminam_no_primeiro_dia_e_as_que_comecam_no_ultimo_dia_do_pedido()
+    {
+        var api = await ApiAsync();
+        var (setor, gestor, gestorId, m1, m2) = await EquipeAsync(api, "Conflitos nas pontas");
+        var m3 = await PessoaAsync(api, "Membro 3 pontas", new DateOnly(2022, 3, 14), setor);
+        var pedido = await PedidoComOGestorAsync(api, m1.FuncionarioId, gestorId); // 16 a 30 de novembro
+        await SemearAsync(api, m2.FuncionarioId, "2025-03-14", "2026-03-13", "2026-11-10", "2026-11-16", "APROVADA", gestorId: gestorId, gestorAprovou: true, rhId: api.Elenco.Rh.FuncionarioId); // termina no 1º dia do pedido
+        await SemearAsync(api, m3.FuncionarioId, "2025-03-14", "2026-03-13", "2026-11-30", "2026-12-04", "APROVADA", gestorId: gestorId, gestorAprovou: true, rhId: api.Elenco.Rh.FuncionarioId); // começa no último dia do pedido
+
+        var resposta = await (await ClienteAsync(api, gestor)).GetAsync(Lista);
+
+        var item = (await CorpoAsync(resposta)).GetProperty("itens").EnumerateArray().Single(i => i.GetProperty("id").GetInt32() == pedido);
+        Assert.Equal([(m2.FuncionarioId, 1), (m3.FuncionarioId, 1)], item.GetProperty("conflitos").EnumerateArray().Select(c => (c.GetProperty("funcionario").GetProperty("id").GetInt32(), c.GetProperty("diasEmComum").GetInt32())));
+    }
+
+    [Fact]
+    public async Task A_lista_so_traz_o_pedido_que_aponta_para_este_gestor_E_e_de_gente_da_equipe_dele()
+    {
+        var api = await ApiAsync();
+        var (_, gestor, gestorId, m1, _) = await EquipeAsync(api, "Base da lista");
+        var (_, _, outroGestorId, deOutroSetor, _) = await EquipeAsync(api, "Base da lista 2");
+        var meu = await PedidoComOGestorAsync(api, m1.FuncionarioId, gestorId);
+        _ = await PedidoComOGestorAsync(api, m1.FuncionarioId, outroGestorId, "2027-02-08", "2027-02-22"); // gente da equipe, mas o pedido aponta para outro gestor
+        _ = await PedidoComOGestorAsync(api, deOutroSetor.FuncionarioId, gestorId, "2027-03-08", "2027-03-22"); // pessoa de outro setor, o pedido aponta para este gestor
+
+        var corpo = await CorpoAsync(await (await ClienteAsync(api, gestor)).GetAsync($"{Lista}?tamanhoPagina=100"));
+
+        Assert.Equal([meu], Ids(corpo));
+    }
+
+    [Fact]
+    public async Task A_sugestao_que_comeca_no_ultimo_dia_do_periodo_aquisitivo_e_recusada_por_isso_e_nao_por_estar_no_passado()
+    {
+        var api = await ApiAsync();
+        var (_, gestor, gestorId, membro, _) = await EquipeAsync(api, "Sugestao no fim do periodo");
+        var pedido = await PedidoComOGestorAsync(api, membro.FuncionarioId, gestorId); // período de 14/03/2025 a 13/03/2026
+
+        var resposta = await PostAsync(await ClienteAsync(api, gestor), pedido, "sugerir-outra-data", new { dataInicio = "2026-03-13", dataFim = "2026-03-27" });
+
+        Assert.Equal(400, (int)resposta.StatusCode);
+        var erros = (await CorpoAsync(resposta)).GetProperty("errors");
+        Assert.Equal(["A sugestão precisa começar depois do fim do período aquisitivo do pedido."], erros.GetProperty("dataInicio").EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
+    public async Task A_sugestao_pode_comecar_hoje_mas_nao_ontem()
+    {
+        var api = await ApiAsync();
+        var (_, gestor, gestorId, membro, _) = await EquipeAsync(api, "Sugestao hoje");
+        var pedido = await PedidoComOGestorAsync(api, membro.FuncionarioId, gestorId);
+        var cliente = await ClienteAsync(api, gestor);
+
+        var ontem = await PostAsync(cliente, pedido, "sugerir-outra-data", new { dataInicio = "2026-10-06", dataFim = "2026-10-20" });
+        var hoje = await PostAsync(cliente, pedido, "sugerir-outra-data", new { dataInicio = "2026-10-07", dataFim = "2026-10-21" });
+
+        Assert.Equal((400, 200), ((int)ontem.StatusCode, (int)hoje.StatusCode));
+        Assert.Equal("2026-10-07", await TextoAsync(api, $"SELECT DATE_FORMAT(SUGESTAO_DATA_INICIO, '%Y-%m-%d') FROM FERIAS WHERE ID_FERIAS = {pedido}"));
+    }
+
+    [Fact]
+    public async Task A_sugestao_confere_o_saldo_sem_contar_o_proprio_pedido_que_esta_sendo_trocado()
+    {
+        var api = await ApiAsync();
+        var (_, gestor, gestorId, membro, _) = await EquipeAsync(api, "Sugestao sem o proprio pedido");
+        await SemearAsync(api, membro.FuncionarioId, "2025-03-14", "2026-03-13", "2026-04-13", "2026-04-24", "CONCLUIDA", "2026-02-20 10:10:00", gestorId, true, api.Elenco.Rh.FuncionarioId); // 12 dias tirados: sobram 18
+        var pedido = await PedidoComOGestorAsync(api, membro.FuncionarioId, gestorId); // 15 dias esperando o gestor
+
+        var resposta = await PostAsync(await ClienteAsync(api, gestor), pedido, "sugerir-outra-data", new { dataInicio = "2026-12-07", dataFim = "2026-12-24" }); // 18 dias: cabem só se o pedido de 15 não contar contra si mesmo
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+    }
 }

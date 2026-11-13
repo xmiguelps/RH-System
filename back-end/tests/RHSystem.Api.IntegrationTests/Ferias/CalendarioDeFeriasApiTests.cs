@@ -98,4 +98,32 @@ public class CalendarioDeFeriasApiTests(MySqlFixture mysql)
         Assert.Equal((0, 13), (semSetor.GetProperty("itens").GetArrayLength(), semSetor.GetProperty("semanas").GetArrayLength()));
         Assert.Equal(403, (int)comum.StatusCode);
     }
+
+    [Theory]
+    [InlineData("2000-01-01", 200)]
+    [InlineData("2100-12-31", 200)]
+    [InlineData("1999-12-31", 400)]
+    [InlineData("2101-01-01", 400)]
+    public async Task O_inicio_do_quadro_vale_de_2000_a_2100(string inicio, int esperado)
+    {
+        var api = await ApiAsync();
+        var (_, gestor, _, _, _) = await EquipeAsync(api, "Calendario anos " + inicio);
+
+        var resposta = await (await api.ClienteAgoraAsync(gestor.UsuarioId)).GetAsync($"{Rota}?inicio={inicio}&semanas=1");
+
+        Assert.Equal(esperado, (int)resposta.StatusCode);
+    }
+
+    [Fact]
+    public async Task O_quadro_inclui_as_ferias_que_comecam_no_ultimo_dia_da_janela()
+    {
+        var api = await ApiAsync();
+        var (_, gestor, gestorId, m1, _) = await EquipeAsync(api, "Calendario ultimo dia");
+        var noUltimoDia = await SemearAsync(api, m1.FuncionarioId, "2025-03-14", "2026-03-13", "2027-01-03", "2027-01-12", "APROVADA", gestorId: gestorId, gestorAprovou: true, rhId: api.Elenco.Rh.FuncionarioId);
+
+        var corpo = await CorpoAsync(await (await api.ClienteAgoraAsync(gestor.UsuarioId)).GetAsync(Rota));
+
+        Assert.Equal("2027-01-03", corpo.GetProperty("fim").GetString()); // o domingo da 13ª semana
+        Assert.Equal([noUltimoDia], Ids(corpo));
+    }
 }

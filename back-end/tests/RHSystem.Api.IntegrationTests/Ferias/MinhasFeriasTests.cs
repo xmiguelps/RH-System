@@ -383,8 +383,8 @@ public class MinhasFeriasTests(MySqlFixture mysql)
     {
         var api = await ApiAsync();
         var (bruno, _) = await BrunoAsync(api, com340: false);
-        var mensagem = "Preciso de uma semana para tratar de assunto pessoal. " + new string('y', 440);
-        Assert.True(mensagem.Length <= 500);
+        var mensagem = "Preciso de uma semana para tratar de assunto pessoal. ".PadRight(500, 'y');
+        Assert.Equal(500, mensagem.Length);
 
         var resposta = await PedirAsync(api, bruno, Pedido("2026-11-16", "2026-11-30", mensagem: mensagem));
 

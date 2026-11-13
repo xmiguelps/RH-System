@@ -9,6 +9,7 @@ using RHSystem.Api.IntegrationTests.Contrato;
 using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Api.IntegrationTests.Ponto;
 using RHSystem.Application.Ferias;
+using RHSystem.Application.Ponto;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Infrastructure.Ferias;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
@@ -249,5 +250,80 @@ public class FichaERegistroDeFeriasTests(MySqlFixture mysql)
         Assert.Equal(1, respostas.Count(r => (int)r.StatusCode == 422));
         Assert.Equal(1, respostas.Count(r => (int)r.StatusCode == 201));
         Assert.Equal(16, Contar(api, $"SELECT SUM(DATEDIFF(DATA_FIM, DATA_INICIO) + 1) FROM FERIAS WHERE ID_FUNCIONARIO = {pessoa.FuncionarioId}"));
+    }
+
+    // ---------------------------------------------------------------- quais dias do banco de horas o registro recalcula
+
+    private sealed class RecalculoEspiao(DateOnly? falhaNoDia = null) : IRecalculoDoBancoDeHoras
+    {
+        private readonly List<DateOnly> _dias = [];
+
+        public IReadOnlyList<DateOnly> Dias
+        {
+            get
+            {
+                lock (_dias)
+                {
+                    return [.. _dias];
+                }
+            }
+        }
+
+        public Task RecalcularDiaAsync(int funcionarioId, DateOnly dia, CancellationToken ct)
+        {
+            lock (_dias)
+            {
+                _dias.Add(dia);
+            }
+
+            return dia == falhaNoDia ? Task.FromException(new InvalidOperationException("falha de teste")) : Task.CompletedTask;
+        }
+    }
+
+    private static async Task<(HttpResponseMessage Resposta, RecalculoEspiao Espiao)> RegistrarComEspiaoAsync(ApiDeAcesso api, string nome, string inicio, string fim, DateOnly? falhaNoDia = null)
+    {
+        var pessoa = await PessoaAsync(api, nome, new DateOnly(2022, 3, 14), api.Elenco.SetorComercialId);
+        var espiao = new RecalculoEspiao(falhaNoDia);
+        using var fabrica = api.Api.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+        {
+            s.RemoveAll<IRecalculoDoBancoDeHoras>();
+            s.AddSingleton<IRecalculoDoBancoDeHoras>(espiao);
+        }));
+        var rh = fabrica.CreateClient();
+        rh.DefaultRequestHeaders.Authorization = (await api.ClienteDoRhAgoraAsync()).DefaultRequestHeaders.Authorization;
+        return (await RegistrarAsync(rh, pessoa.FuncionarioId, Registro(inicio, fim)), espiao);
+    }
+
+    [Fact]
+    public async Task O_registro_inteiro_no_passado_recalcula_todos_os_dias_das_ferias_do_primeiro_ao_ultimo_e_so_eles()
+    {
+        var api = await ApiAsync();
+
+        var (resposta, espiao) = await RegistrarComEspiaoAsync(api, "Recalculo no passado", "2026-09-14", "2026-09-27");
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        Assert.Equal(Enumerable.Range(0, 14).Select(i => new DateOnly(2026, 9, 14).AddDays(i)), espiao.Dias);
+    }
+
+    [Fact]
+    public async Task O_registro_que_atravessa_hoje_recalcula_so_os_dias_que_ja_passaram_e_nao_hoje_nem_o_futuro()
+    {
+        var api = await ApiAsync();
+
+        var (resposta, espiao) = await RegistrarComEspiaoAsync(api, "Recalculo atravessa hoje", "2026-10-05", "2026-10-18");
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        Assert.Equal([new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 6)], espiao.Dias);
+    }
+
+    [Fact]
+    public async Task A_falha_no_recalculo_de_um_dia_nao_derruba_o_registro_nem_os_outros_dias()
+    {
+        var api = await ApiAsync();
+
+        var (resposta, espiao) = await RegistrarComEspiaoAsync(api, "Recalculo com falha", "2026-09-14", "2026-09-27", falhaNoDia: new DateOnly(2026, 9, 16));
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        Assert.Equal(14, espiao.Dias.Count);
     }
 }
