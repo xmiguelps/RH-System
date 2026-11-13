@@ -147,16 +147,7 @@ public sealed class ResponderFormularioCasoDeUso(
             erros.Adicionar("arquivos", "Envie os arquivos na parte \"arquivos\".");
         }
 
-        var conferidos = new List<ArquivoDeRespostaConferido>(novo.Arquivos.Count);
-        foreach (var arquivo in novo.Arquivos)
-        {
-            if (await ValidacaoDeArquivoDeFormulario.ValidarAsync(erros, "arquivos", arquivo, ct) is { } tipo)
-            {
-                conferidos.Add(new ArquivoDeRespostaConferido(arquivo, tipo, NomeParaDownload.Limpar(arquivo.NomeOriginal, tipo.Extensao)));
-            }
-        }
-
-        return conferidos;
+        return await ConferenciaDeArquivos.ConferirAsync(erros, "arquivos", novo.Arquivos, ct);
     }
 
     /// <summary>A pessoa está ativa, o avaliado é um dos dela e ela ainda não respondeu (conferência rápida antes de gravar arquivo; a que vale é a da transação).</summary>

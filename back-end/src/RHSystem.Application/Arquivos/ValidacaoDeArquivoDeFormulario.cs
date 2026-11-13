@@ -14,6 +14,9 @@ public static class ValidacaoDeArquivoDeFormulario
     /// <summary>O teto do corpo de uma resposta: até 10 arquivos de 5 MiB e mais 1 MiB do resto (o texto das respostas). Acima disso a requisição nem é lida (413).</summary>
     public const long TetoDaRequisicaoBytes = (10 * TamanhoMaximoBytes) + (1024 * 1024);
 
+    /// <summary>O teto do corpo de uma candidatura: o currículo e até 10 arquivos de resposta de 5 MiB e mais 1 MiB do resto.</summary>
+    public const long TetoDaCandidaturaBytes = (11 * TamanhoMaximoBytes) + (1024 * 1024);
+
     public const string MensagemDoTipo = "Envie um arquivo PDF ou Word (.doc ou .docx).";
 
     public const string MensagemDoTamanho = "Cada arquivo pode ter até 5 MB.";
