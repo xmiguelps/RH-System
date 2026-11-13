@@ -635,4 +635,58 @@ public class PublicarEEncerrarTests(MySqlFixture mysql)
 
         Assert.Equal((1L, 0L), (await TarefasAsync(api, "ENCERRAR_FORMULARIO", semTarefa, "PENDENTE", "2026-10-31T03:00:00Z"), await TarefasAsync(api, "ENCERRAR_FORMULARIO", semPrazo, "PENDENTE")));
     }
+
+    private static async Task ExecutarTarefaComChaveAsync(ApiDeAcesso api, string tipo, int formularioId, string chave)
+    {
+        await using var escopo = api.Api.Services.CreateAsyncScope();
+        await escopo.ServiceProvider.GetServices<ITarefaAgendada>().Single(t => t.Tipo == tipo).ExecutarAsync(new TarefaParaExecutar(0, chave, formularioId, null, null, 0), Ct);
+    }
+
+    private static Task<string?> NovaTentativaAsync(ApiDeAcesso api, int formularioId) =>
+        TextoAsync(api, $"SELECT MIN(CHAVE_IDEMPOTENCIA) FROM TAREFAS_AGENDADAS WHERE TIPO = 'PUBLICAR_FORMULARIO' AND REFERENCIA_ID = {formularioId} AND SITUACAO = 'PENDENTE' AND CHAVE_IDEMPOTENCIA LIKE '%:r=%'");
+
+    [Fact]
+    public async Task O_anonimo_agendado_barrado_pela_tarefa_e_tentado_de_novo_pela_recuperacao_e_publica_quando_o_publico_volta_a_ter_5()
+    {
+        var api = await ApiAsync();
+        var pessoas = await PessoasAsync(api, 5);
+        var id = await ProntoAsync(api, Titulo("Anônimo que voltou"), anonimo: true);
+        await PublicarAsync(api, id, Corpo("PESSOAS", pessoas: pessoas, agendarPara: "2026-11-03"));
+        await AdvertenciasDeTeste.InativarAsync(api, pessoas[0]);
+        api.Api.Relogio.Fixar(new DateTime(2026, 11, 3, 3, 0, 5, DateTimeKind.Utc));
+        await ExecutarTarefaAsync(api, "PUBLICAR_FORMULARIO", id, "2026-11-03T03:00:00Z"); // barrado: 4 pessoas ativas
+        var barrado = await TextoAsync(api, $"SELECT ATIVO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}");
+        var nova = await PessoaAsync(api, "Pessoa que entrou");
+        await Sql.ExecutarAsync(api.Conexao, $"INSERT INTO FORMULARIOS_DESTINATARIOS (ID_FORMULARIO, ID_FUNCIONARIO) VALUES ({id}, {nova})"); // o RH corrige o público: volta a ter 5
+
+        await RecuperarAsync(api, "PUBLICAR_FORMULARIO");
+        var chave = await NovaTentativaAsync(api, id);
+        await ExecutarTarefaComChaveAsync(api, "PUBLICAR_FORMULARIO", id, chave!);
+
+        Assert.Equal("False", barrado);
+        Assert.NotNull(chave); // a recuperação horária cria uma nova tentativa para o agendado que já passou do dia
+        Assert.Equal("True", await TextoAsync(api, $"SELECT ATIVO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}"));
+        api.Api.Relogio.Fixar(ElencoDeTeste.Hoje);
+    }
+
+    [Fact]
+    public async Task O_agendado_que_ficou_sem_pergunta_nao_e_publicado_e_publica_quando_o_RH_poe_uma_pergunta()
+    {
+        var api = await ApiAsync();
+        var pessoas = await PessoasAsync(api, 2);
+        var id = await ProntoAsync(api, Titulo("Agendado sem pergunta"));
+        await PublicarAsync(api, id, Corpo("PESSOAS", pessoas: pessoas, agendarPara: "2026-11-03"));
+        await Sql.ExecutarAsync(api.Conexao, $"DELETE FROM FORMULARIOS_PERGUNTAS WHERE ID_FORMULARIO = {id}"); // o RH apagou todas as perguntas enquanto estava agendado
+        api.Api.Relogio.Fixar(new DateTime(2026, 11, 3, 3, 0, 5, DateTimeKind.Utc));
+        await ExecutarTarefaAsync(api, "PUBLICAR_FORMULARIO", id, "2026-11-03T03:00:00Z");
+        var semPergunta = await TextoAsync(api, $"SELECT ATIVO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}");
+
+        await PerguntaAsync(api, id, "Como foi?", obrigatoria: true);
+        await RecuperarAsync(api, "PUBLICAR_FORMULARIO");
+        await ExecutarTarefaComChaveAsync(api, "PUBLICAR_FORMULARIO", id, (await NovaTentativaAsync(api, id))!);
+
+        Assert.Equal("False", semPergunta); // sem pergunta nenhum envio seria aceito: não publica
+        Assert.Equal("True", await TextoAsync(api, $"SELECT ATIVO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}"));
+        api.Api.Relogio.Fixar(ElencoDeTeste.Hoje);
+    }
 }

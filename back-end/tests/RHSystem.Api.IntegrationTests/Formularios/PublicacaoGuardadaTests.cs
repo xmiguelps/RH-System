@@ -387,4 +387,20 @@ public class PublicacaoGuardadaTests(MySqlFixture mysql)
         Assert.Equal("O formulário não tem nenhuma pergunta.", a.GetProperty("itens")[1].GetProperty("mensagem").GetString());
         Assert.Equal(200, (int)b.StatusCode);
     }
+
+    [Fact]
+    public async Task Agendado_que_vira_por_link_ganha_o_codigo_do_link_e_o_mantem_ao_guardar_de_novo()
+    {
+        var api = await ApiAsync();
+        var id = await SemearAsync(api, Titulo("Entrevista que virou link"), "AGENDADO", tipo: "ENTREVISTA", alvo: "PESSOAS");
+
+        var primeira = await SalvarAsync(api, id, Corpo("LINK", prazo: "2026-10-31"));
+        var codigo = await TextoAsync(api, $"SELECT LINK_PUBLICO_CODIGO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}");
+        var segunda = await SalvarAsync(api, id, Corpo("LINK", prazo: "2026-10-31"));
+
+        Assert.Equal((200, 200), ((int)primeira.StatusCode, (int)segunda.StatusCode));
+        Assert.Equal(43, codigo?.Length); // sem o código a tarefa publicaria uma entrevista por link que ninguém consegue abrir
+        Assert.Equal(codigo, (await CorpoAsync(primeira)).GetProperty("publicacao").GetProperty("tokenDoLink").GetString());
+        Assert.Equal(codigo, await TextoAsync(api, $"SELECT LINK_PUBLICO_CODIGO FROM FORMULARIOS WHERE ID_FORMULARIO = {id}")); // guardar de novo não troca o código
+    }
 }

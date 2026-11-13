@@ -285,4 +285,33 @@ public class CandidaturaTests(MySqlFixture mysql)
         Assert.Equal([201, 201, 400], new[] { nome150, email150Valido, email151Recusado }.Select(r => (int)r.StatusCode));
         Assert.True((await ErrosAsync(email151Recusado)).TryGetProperty("email", out _));
     }
+
+    [Fact]
+    public async Task Um_erro_inesperado_na_rota_publica_e_logado_sem_o_codigo_do_link()
+    {
+        var api = await ApiAsync();
+        var e = await EntrevistaAsync(api, "ZCand11");
+        var logs = new ColetorDeLogs();
+        var cliente = api.Api.WithWebHostBuilder(b => b.ConfigureLogging(l => l.AddProvider(logs))).CreateClient();
+        api.Api.Armazenamento.FalharNaGravacao = new IOException("armazenamento fora do ar");
+        HttpResponseMessage resposta;
+        try
+        {
+            resposta = await EnviarAsync(cliente, e.Token, Candidatura(RespostasOk(e), curriculo: ("cv.pdf", ArquivosDeTeste.Pdf())));
+        }
+        finally
+        {
+            api.Api.Armazenamento.FalharNaGravacao = null;
+        }
+
+        string[] registros;
+        lock (logs.Mensagens)
+        {
+            registros = [.. logs.Mensagens];
+        }
+
+        Assert.Equal(500, (int)resposta.StatusCode);
+        Assert.Contains(registros, m => m.Contains("Erro inesperado em POST", StringComparison.Ordinal)); // o erro foi logado...
+        Assert.DoesNotContain(registros, m => m.Contains(e.Token, StringComparison.Ordinal)); // ...sem o código do link (o caminho vai como /api/publico/formularios/{token}/respostas)
+    }
 }

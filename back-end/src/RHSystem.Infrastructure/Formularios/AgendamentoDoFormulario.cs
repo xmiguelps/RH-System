@@ -59,6 +59,13 @@ public sealed class AgendamentoDoFormulario(IAgendador agendador, IFilaDeEmails 
 
     public async Task CancelarPublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, CancellationToken ct) => _ = await agendador.CancelarAsync(ChaveDePublicar(formularioId, publicacaoEmUtc), ct);
 
+    public async Task AgendarNovaTentativaDePublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, DateTime agoraUtc, CancellationToken ct)
+    {
+        var hora = new DateTime(agoraUtc.Year, agoraUtc.Month, agoraUtc.Day, agoraUtc.Hour, 0, 0, DateTimeKind.Utc);
+        var chave = ChaveDeIdempotencia.Montar(TipoDePublicar, ("formulario", formularioId), ("r", hora), ("em", publicacaoEmUtc)); // o instante fica por último: InstanteDaChave lê o ":em=" final
+        _ = await agendador.AgendarAsync(new NovaTarefa(TipoDePublicar, chave, agoraUtc, ReferenciaId: formularioId), ct);
+    }
+
     public async Task AgendarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct)
     {
         var chave = ChaveDeEncerrar(formularioId, encerramentoNominalEmUtc);

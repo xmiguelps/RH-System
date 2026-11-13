@@ -134,7 +134,7 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
         var regraDoBanco = erroDoBanco is { SqlState: "45000" } ? erroDoBanco.Message : null;
         if (regraDoBanco is not null)
         {
-            log.LogWarning("Uma regra do banco de dados recusou a operação em {Metodo} {Caminho}: {Regra}", contexto.Request.Method, contexto.Request.Path, regraDoBanco);
+            log.LogWarning("Uma regra do banco de dados recusou a operação em {Metodo} {Caminho}: {Regra}", contexto.Request.Method, CaminhoParaLog(contexto), regraDoBanco);
             await Problemas.EscreverPadraoAsync(contexto, StatusCodes.Status422UnprocessableEntity, regraDoBanco: regraDoBanco);
             return true;
         }
@@ -142,7 +142,7 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
         if (erroDoBanco is { ErrorCode: MySqlErrorCode.DuplicateKeyEntry })
         {
             // A mensagem do MySQL traz o valor repetido e o nome da chave: nem vai para a resposta nem para o log.
-            log.LogWarning("Uma chave única do banco de dados recusou a operação em {Metodo} {Caminho}", contexto.Request.Method, contexto.Request.Path);
+            log.LogWarning("Uma chave única do banco de dados recusou a operação em {Metodo} {Caminho}", contexto.Request.Method, CaminhoParaLog(contexto));
             await Problemas.EscreverPadraoAsync(contexto, StatusCodes.Status409Conflict);
             return true;
         }
@@ -153,9 +153,24 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
             return true;
         }
 
-        log.LogError(excecao, "Erro inesperado em {Metodo} {Caminho}", contexto.Request.Method, contexto.Request.Path);
+        log.LogError(excecao, "Erro inesperado em {Metodo} {Caminho}", contexto.Request.Method, CaminhoParaLog(contexto));
         await Problemas.EscreverPadraoAsync(contexto, StatusCodes.Status500InternalServerError);
         return true;
+    }
+
+    /// <summary>O caminho que vai ao log: nas rotas públicas do formulário o código do link (o segredo de quem tem o link) sai como <c>{token}</c>, em qualquer erro.</summary>
+    internal static string CaminhoParaLog(HttpContext contexto)
+    {
+        const string prefixo = "/api/publico/formularios/";
+        var caminho = contexto.Request.Path.Value ?? string.Empty;
+        if (!caminho.StartsWith(prefixo, StringComparison.OrdinalIgnoreCase))
+        {
+            return caminho;
+        }
+
+        var resto = caminho[prefixo.Length..];
+        var barra = resto.IndexOf('/', StringComparison.Ordinal);
+        return prefixo + "{token}" + (barra < 0 ? string.Empty : resto[barra..]);
     }
 
     /// <summary>

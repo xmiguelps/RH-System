@@ -50,7 +50,12 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         return linhas == 1;
     }
 
-    public Task<bool> AtualizarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, CancellationToken ct) => GravarPublicacaoAsync(lido, novos, new EfeitoDaPublicacao(Ativar: false, GerarToken: false, ProximaReaberturaEmUtc: null), ct);
+    /// <summary>Guardar a publicação. O AGENDADO que passa a ser por link ganha o código AGORA (a tarefa só liga o <c>ATIVO</c> e não gera código: sem ele o formulário nasceria publicado e sem ninguém conseguir abrir); o que já tem código o mantém e o rascunho só ganha o código ao publicar.</summary>
+    public Task<bool> AtualizarPublicacaoAsync(FormularioLido lido, PublicacaoParaGravar novos, CancellationToken ct)
+    {
+        var agendado = !lido.Ativo && lido.PublicadoEmUtc is not null && lido.EncerradoEmUtc is null;
+        return GravarPublicacaoAsync(lido, novos, new EfeitoDaPublicacao(Ativar: false, GerarToken: agendado && novos.Alvo == AlvoDoFormulario.Link && lido.TokenDoLink is null, ProximaReaberturaEmUtc: null), ct);
+    }
 
     public Task<bool> PublicarAsync(FormularioLido lido, PublicacaoParaGravar novos, EfeitoDaPublicacao efeito, CancellationToken ct) => GravarPublicacaoAsync(lido, novos, efeito, ct);
 

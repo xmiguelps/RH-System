@@ -40,6 +40,11 @@ public sealed class PublicarFormularioTarefa(
         }
 
         var hoje = FusoBrasil.Hoje(relogio.AgoraUtc);
+        if (lido.Perguntas.Count == 0)
+        {
+            return; // o RH apagou todas as perguntas enquanto estava agendado: sem pergunta nenhum envio seria aceito (a verificação mostra o bloqueio e a recuperação horária tenta de novo)
+        }
+
         if (lido.Anonimo && (await destinatarios.ObterAsync(formularioId, hoje, ct))!.PessoasQueRespondem < MensagensDosFormularios.MinimoDePessoasNoAnonimo)
         {
             return;
@@ -75,10 +80,15 @@ public sealed class PublicarFormularioTarefa(
 
     public async Task RecuperarAsync(CancellationToken ct)
     {
+        var agora = relogio.AgoraUtc;
         var agendados = await db.Formularios.AsNoTracking().Where(f => !f.Ativo && f.EncerradoEmUtc == null && f.PublicadoEmUtc != null).Select(f => new { f.Id, f.PublicadoEmUtc }).ToListAsync(ct);
         foreach (var agendado in agendados)
         {
             await agendamento.AgendarPublicacaoAsync(agendado.Id, agendado.PublicadoEmUtc!.Value, ct);
+            if (agendado.PublicadoEmUtc <= agora)
+            {
+                await agendamento.AgendarNovaTentativaDePublicacaoAsync(agendado.Id, agendado.PublicadoEmUtc.Value, agora, ct); // já passou do dia e continua agendado: a tarefa o deixou para trás
+            }
         }
     }
 }

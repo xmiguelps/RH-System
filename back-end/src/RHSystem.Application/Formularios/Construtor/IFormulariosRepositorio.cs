@@ -97,6 +97,12 @@ public interface IAgendamentoDoFormulario
 
     Task CancelarPublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, CancellationToken ct);
 
+    /// <summary>
+    /// Uma NOVA TENTATIVA de publicar o agendado que já passou do dia e continua agendado (a tarefa o deixou para trás: anônimo com menos de 5 pessoas, formulário sem pergunta): a chave leva a hora (<c>PUBLICAR_FORMULARIO:formulario={id}:r={hora}:em={instante}</c>), então a recuperação horária cria uma por hora
+    /// em vez de esbarrar na tarefa original, que já está concluída. A tarefa relê tudo: se o bloqueio passou, publica; senão não faz nada e a próxima hora tenta de novo.
+    /// </summary>
+    Task AgendarNovaTentativaDePublicacaoAsync(int formularioId, DateTime publicacaoEmUtc, DateTime agoraUtc, CancellationToken ct);
+
     /// <summary>A tarefa que encerra o formulário pelo prazo (<c>ENCERRAR_FORMULARIO:formulario={id}:em={instante}</c>), no instante NOMINAL do encerramento: o começo do dia seguinte ao prazo (-03:00).</summary>
     Task AgendarEncerramentoAsync(int formularioId, DateTime encerramentoNominalEmUtc, CancellationToken ct);
 
