@@ -21,6 +21,21 @@ public sealed class ConsultaDeFerias(AppDbContext db) : IConsultaDeFerias
             .Select(f => new PessoaParaFerias(f.Id, f.Nome, f.Ativo, f.DataAdmissao, f.DataDesligamento))
             .FirstOrDefaultAsync(ct);
 
+    public async Task<IReadOnlyDictionary<int, int>> DiasDisponiveisDasPessoasAsync(IReadOnlyCollection<int> funcionarioIds, DateOnly hoje, CancellationToken ct)
+    {
+        if (funcionarioIds.Count == 0)
+        {
+            return new Dictionary<int, int>();
+        }
+
+        var pessoas = await db.Funcionarios.AsNoTracking()
+            .Where(f => funcionarioIds.Contains(f.Id))
+            .Select(f => new PessoaParaFerias(f.Id, f.Nome, f.Ativo, f.DataAdmissao, f.DataDesligamento))
+            .ToListAsync(ct);
+        var linhas = (await CarregarAsync(db.PedidosDeFerias.AsNoTracking().Where(f => funcionarioIds.Contains(f.FuncionarioId)), ct)).ToLookup(l => l.Funcionario.Id);
+        return pessoas.ToDictionary(p => p.Id, p => SaldoDeFerias.De(p.DataAdmissao, p.DataDesligamento, hoje, [.. linhas[p.Id].Select(l => l.ParaSaldo())]).DiasDisponiveis);
+    }
+
     public async Task<IReadOnlyList<FeriasLida>> DaPessoaAsync(int funcionarioId, CancellationToken ct) =>
         await CarregarAsync(db.PedidosDeFerias.AsNoTracking().Where(f => f.FuncionarioId == funcionarioId), ct);
 

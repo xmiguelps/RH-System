@@ -50,6 +50,9 @@ public interface IConsultaDeFerias
 {
     Task<PessoaParaFerias?> PessoaAsync(int funcionarioId, CancellationToken ct);
 
+    /// <summary>Os dias de férias disponíveis (o MESMO saldo de <see cref="SaldoDeFerias"/>) de várias pessoas de uma vez, em número CONSTANTE de consultas (o painel da equipe). Quem não existe fica de fora.</summary>
+    Task<IReadOnlyDictionary<int, int>> DiasDisponiveisDasPessoasAsync(IReadOnlyCollection<int> funcionarioIds, DateOnly hoje, CancellationToken ct);
+
     /// <summary>Todas as linhas de férias da pessoa (qualquer status), sem ordem garantida.</summary>
     Task<IReadOnlyList<FeriasLida>> DaPessoaAsync(int funcionarioId, CancellationToken ct);
 
