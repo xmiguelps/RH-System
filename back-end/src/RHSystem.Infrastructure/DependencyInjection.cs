@@ -279,6 +279,7 @@ public static class DependencyInjection
         services.AddScoped<IAdesoesRepositorio, AdesoesRepositorio>(); // os três pedidos: adesão, dependente e trajeto
         services.AddScoped<IAoEfetivarDesligamento, CancelaPedidosDeBeneficioAoDesligar>(); // desligar cancela os pedidos de benefício pendentes
         services.AddScoped<IExcecoesDePagamentoRepositorio, ExcecoesDePagamentoRepositorio>(); // as exceções de pagamento do RH (fatia 7)
+        services.AddScoped<IFonteDoProximoPagamento, FonteDoProximoPagamento>(); // o "próximo pagamento" da ficha do RH: a mesma conta do cartão
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();

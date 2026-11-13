@@ -62,6 +62,7 @@ public class IndicadoresDaFichaTests(MySqlFixture mysql)
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.BancoDeHorasMinutos, 999));
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.FeriasDisponiveisDias, 22));
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.TreinamentosPendentes, 4)); // de outra tela: não entra neste corpo
+            servicos.RemoveAll<IFonteDoProximoPagamento>(); // a fonte real (fatia 7) sai: a primeira registrada vence
             servicos.AddScoped<IFonteDoProximoPagamento>(_ => new ProximoPagamentoFalso(new DateOnly(2026, 10, 30)));
         }));
         var cliente = comFontes.CreateClient();
