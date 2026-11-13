@@ -97,7 +97,7 @@ public class TreinamentoFuncionarioConfiguracao : IEntityTypeConfiguration<Trein
         builder.Property(l => l.Id).HasColumnName("ID_TREINAMENTO_FUNCIONARIO");
         builder.Property(l => l.TreinamentoId).HasColumnName("ID_TREINAMENTO");
         builder.Property(l => l.FuncionarioId).HasColumnName("ID_FUNCIONARIO");
-        builder.Property(l => l.Situacao).HasColumnName("STATUS_TREINAMENTO").HasConversion(new EnumComoTextoMaiusculo<SituacaoNoTreinamento>());
+        builder.Property(l => l.Situacao).HasColumnName("STATUS_TREINAMENTO").HasConversion(new EnumComoTextoMaiusculoTolerante<SituacaoNoTreinamento>()); // REPROVADO e CANCELADO (o banco aceita, a API não usa) leem como null
         builder.Property(l => l.IniciadoEm).HasColumnName("DATA_INICIO");
         builder.Property(l => l.ConcluidoEm).HasColumnName("DATA_CONCLUSAO");
 

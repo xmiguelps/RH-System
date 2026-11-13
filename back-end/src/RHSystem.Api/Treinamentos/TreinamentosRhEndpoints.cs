@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using RHSystem.Api.Autorizacao;
 using RHSystem.Api.Comum;
 using RHSystem.Api.Configuracao;
+using RHSystem.Application.Arquivos;
 using RHSystem.Application.Documentos;
 using RHSystem.Application.Treinamentos.Construtor;
+using RHSystem.Application.Treinamentos.Fazer;
 
 namespace RHSystem.Api.Treinamentos;
 
@@ -35,6 +37,7 @@ public static class TreinamentosRhEndpoints
         servicos.AddScoped<PublicarTreinamentoCasoDeUso>();
         servicos.AddScoped<EncerrarTreinamentoCasoDeUso>();
         servicos.AddScoped<ExcluirTreinamentoCasoDeUso>();
+        servicos.AddScoped<BaixarCertificadoDeParticipanteCasoDeUso>();
         return servicos;
     }
 
@@ -112,6 +115,12 @@ public static class TreinamentosRhEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        rh.MapGet("/treinamentos/{treinamentoId:int}/participantes/{funcionarioId:int}/certificado/download", BaixarCertificadoDeParticipante)
+            .WithName("baixarCertificadoDeParticipante")
+            .WithTags("Certificados")
+            .Produces<LinkTemporario>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -136,6 +145,8 @@ public static class TreinamentosRhEndpoints
         await casoDeUso.ExecutarAsync(treinamentoId, confirmar ?? false, ct);
         return Results.NoContent();
     }
+
+    private static async Task<LinkTemporario> BaixarCertificadoDeParticipante(int treinamentoId, int funcionarioId, BaixarCertificadoDeParticipanteCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(treinamentoId, funcionarioId, ct);
 
     private static async Task<IResult> AdicionarModulo(int treinamentoId, HttpRequest requisicao, AdicionarModuloDeTreinamentoCasoDeUso casoDeUso, CancellationToken ct) =>
         Results.Json(await casoDeUso.ExecutarAsync(treinamentoId, await LerModuloAsync(requisicao, ct), ct), statusCode: StatusCodes.Status201Created);

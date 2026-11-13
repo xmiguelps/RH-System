@@ -71,6 +71,10 @@ public static class EnumsDeParametrosDoContrato
         [("listarRespondentesFormulario", "situacao")] = typeof(SituacaoDoRespondente),
         [("contarPublicoDeTreinamento", "publico")] = typeof(PublicoDoTreinamento),
         [("listarTreinamentos", "situacao")] = typeof(SituacaoDoTreinamento),
+        [("listarMeusTreinamentos", "aba")] = typeof(AbaDosMeusTreinamentos),
+        [("listarParticipantesDeTreinamento", "situacao")] = typeof(SituacaoNoTreinamento),
+        [("listarParticipantesDeTreinamento", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("exportarParticipantesDeTreinamento", "situacao")] = typeof(SituacaoNoTreinamento),
         [("listarTreinamentos", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
@@ -89,6 +93,7 @@ public static class EnumsDeParametrosDoContrato
     {
         [("listarFormulariosRh", "ordenarPor")] = (["criadoEm", "titulo", "prazo"], "criadoEm"),
         [("listarTreinamentos", "ordenarPor")] = (["TITULO", "COMECA_EM"], "COMECA_EM"),
+        [("listarParticipantesDeTreinamento", "ordenarPor")] = (["NOME", "SETOR", "SITUACAO", "INICIO", "CONCLUSAO"], "NOME"),
     };
 
     /// <summary>Tem de vir DEPOIS de <see cref="NomesDeParametrosDoContrato"/>: a chave usa o nome já em camelCase.</summary>

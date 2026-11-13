@@ -26,7 +26,11 @@ using RHSystem.Application.Formularios.Equipe;
 using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Lembretes;
 using RHSystem.Application.Formularios.Publico;
+using RHSystem.Application.Treinamentos.Acompanhar;
 using RHSystem.Application.Treinamentos.Construtor;
+using RHSystem.Application.Treinamentos.Equipe;
+using RHSystem.Application.Treinamentos.Fazer;
+using RHSystem.Application.Treinamentos.Onboarding;
 using RHSystem.Infrastructure.Treinamentos;
 using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
@@ -275,6 +279,21 @@ public static class DependencyInjection
         services.AddScoped<ICandidatosRepositorio, CandidatosRepositorio>();
         services.AddScoped<ITreinamentosRepositorio, TreinamentosRepositorio>();
         services.AddScoped<IConsultaDeTreinamentos, ConsultaDeTreinamentos>();
+        services.AddScoped<IConsultaDeMeusTreinamentos, ConsultaDeMeusTreinamentos>();
+        services.AddScoped<IConsultaDeParticipantes, ConsultaDeParticipantes>();
+        services.AddScoped<IConsultaDaEquipeNosTreinamentos, ConsultaDaEquipeNosTreinamentos>();
+        services.AddScoped<IOnboardingDosTreinamentos, OnboardingDosTreinamentos>();
+        services.AddScoped<ITarefaAgendada, IncluirAdmitidosNoTreinamentoTarefa>(); // diaria: inclui no treinamento obrigatorio quem for admitido (a caixa incluiAdmitidos)
+        services.AddScoped<IInclusaoNoOnboarding, InclusaoNoOnboarding>(); // DEPOIS de OnboardingIndisponivel (fatia 1): o último registro vale e a caixa do cadastro, da readmissão e da importação passa a incluir de verdade
+        services.AddScoped<IFonteDeIndicadorDaFicha, FonteDoIndicadorDeTreinamentos>(); // o indicador "treinamentos pendentes" da ficha deixa de ser nulo: é o resumo.pendentes das fichas de treinamento
+        services.AddScoped<IMinhaParticipacaoRepositorio, MinhaParticipacaoRepositorio>();
+        services.AddScoped<IConclusaoDoModulo, ConclusaoDoTreinamentoRepositorio>();
+        services.AddScoped<ICertificadosRepositorio, CertificadosRepositorio>();
+        services.AddSingleton<IGeradorDePdfDoCertificado, GeradorDePdfDoCertificado>();
+        services.AddSingleton<IEnderecoDaConferencia, EnderecoDaConferencia>();
+        services.AddScoped<GarantidorDoPdfDoCertificado>();
+        services.AddScoped<IEmissaoDoCertificado, EmissaoDoCertificado>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDeCertificados>(); // sem ela as sobras de certificados/ nunca seriam limpas (e a fonte errada apagaria um certificado válido)
         services.AddScoped<IModulosRepositorio, ModulosRepositorio>();
         services.AddScoped<IPublicoDoTreinamento, AlcanceDoPublicoDoTreinamento>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosModulos>(); // sem ela as sobras de treinamentos/ nunca seriam limpas

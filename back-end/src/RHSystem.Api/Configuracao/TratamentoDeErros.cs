@@ -158,11 +158,17 @@ internal sealed class TratadorGlobalDeErros(ILogger<TratadorGlobalDeErros> log) 
         return true;
     }
 
-    /// <summary>O caminho que vai ao log: nas rotas públicas do formulário o código do link (o segredo de quem tem o link) sai como <c>{token}</c>, em qualquer erro.</summary>
+    /// <summary>O caminho que vai ao log: nas rotas públicas do formulário o código do link (o segredo de quem tem o link) sai como <c>{token}</c> e na conferência do certificado o código sai como <c>{codigo}</c>, em qualquer erro.</summary>
     internal static string CaminhoParaLog(HttpContext contexto)
     {
         const string prefixo = "/api/publico/formularios/";
+        const string prefixoDoCertificado = "/api/publico/certificados/";
         var caminho = contexto.Request.Path.Value ?? string.Empty;
+        if (caminho.StartsWith(prefixoDoCertificado, StringComparison.OrdinalIgnoreCase))
+        {
+            return prefixoDoCertificado + "{codigo}";
+        }
+
         if (!caminho.StartsWith(prefixo, StringComparison.OrdinalIgnoreCase))
         {
             return caminho;
