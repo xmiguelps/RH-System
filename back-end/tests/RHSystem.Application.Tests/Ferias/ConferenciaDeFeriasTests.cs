@@ -45,6 +45,23 @@ public class ConferenciaDeFeriasTests
 
     private static ResultadoDaRegra Regra(ConferenciaDeFerias c, RegraDeFerias regra) => c.Regras.Single(r => r.Regra == regra);
 
+    [Theory]
+    [InlineData(2023, 2, 6, false)] // bem antes do fim do primeiro período (13/03/2023)
+    [InlineData(2023, 3, 13, false)] // no último dia do período
+    [InlineData(2023, 3, 14, true)] // o primeiro dia depois do fim
+    public void Inicio_antes_do_fim_do_primeiro_periodo_nao_cabe_no_saldo_mesmo_com_o_saldo_cheio_porque_o_banco_recusaria(int ano, int mes, int dia, bool cabe)
+    {
+        var c = ConferenciaDeFerias.Conferir(Pedido(D(ano, mes, dia), D(ano, mes, dia).AddDays(9)), Contexto(ferias: [], modo: ModoDaConferencia.Rh));
+
+        var saldo = Regra(c, RegraDeFerias.CabeNoSaldo);
+        Assert.Equal(cabe, saldo.Atendida);
+        Assert.Equal(cabe, c.PodeEnviar);
+        if (!cabe)
+        {
+            Assert.Equal("As férias precisam começar depois do fim do período aquisitivo (13/03/2023).", saldo.Mensagem);
+        }
+    }
+
     [Fact]
     public void O_exemplo_do_contrato_15_dias_a_partir_de_16_de_novembro_atende_as_sete_regras_e_sobram_3_dias()
     {

@@ -62,7 +62,7 @@ public sealed record ConferenciaDeFerias(int TotalDias, int DiasQueSobram, bool 
         var regras = new List<ResultadoDaRegra>
         {
             new(RegraDeFerias.DuracaoDaParte, gozo is >= 5 and <= 30, gozo is >= 5 and <= 30 ? MensagensDasRegrasDeFerias.DuracaoOk : MensagensDasRegrasDeFerias.DuracaoFalha),
-            Saldo(periodo, sobram),
+            Saldo(periodo, sobram, comando.DataInicio),
             ParteDe14(doPeriodo, gozo, sobram),
             MaximoDe3(doPeriodo.Count),
         };
@@ -86,11 +86,17 @@ public sealed record ConferenciaDeFerias(int TotalDias, int DiasQueSobram, bool 
         return new ConferenciaDeFerias(gozo, sobram, regras.All(r => r.Atendida), datasValidas ? comando.DataInicio.AddDays(-2) : null, regras, periodo, escolha.SemPeriodoFechado);
     }
 
-    private static ResultadoDaRegra Saldo(PeriodoComSaldo? periodo, int sobram)
+    private static ResultadoDaRegra Saldo(PeriodoComSaldo? periodo, int sobram, DateOnly inicio)
     {
         if (periodo is null)
         {
             return new ResultadoDaRegra(RegraDeFerias.CabeNoSaldo, false, MensagensDasRegrasDeFerias.SemUmAnoDeCasa);
+        }
+
+        // nenhum período fechado termina antes do início: o banco recusaria o pedido (início depois do fim do período), então o saldo não cabe, qualquer que seja o que sobra
+        if (periodo.Fim >= inicio)
+        {
+            return new ResultadoDaRegra(RegraDeFerias.CabeNoSaldo, false, MensagensDasRegrasDeFerias.InicioAntesDoFimDoPeriodo(periodo.Fim));
         }
 
         return sobram >= 0

@@ -198,6 +198,25 @@ public class FichaERegistroDeFeriasTests(MySqlFixture mysql)
         await inexistente.AfirmarConformeAoContratoAsync("registrarFeriasPeloRh");
     }
 
+    [Fact]
+    public async Task Registro_e_conferencia_com_inicio_antes_do_fim_do_primeiro_periodo_dizem_que_nao_cabe_e_o_registro_da_422_sem_gravar()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "Registro antes do periodo", new DateOnly(2022, 3, 14), api.Elenco.SetorComercialId);
+        var rh = await api.ClienteDoRhAgoraAsync();
+
+        var conferencia = await rh.PostAsJsonAsync($"{RotaDoRh(pessoa.FuncionarioId)}/conferencia", new { dataInicio = "2023-02-06", dataFim = "2023-02-15", abonoPecuniario = false, diasAbono = 0 });
+        var registro = await RegistrarAsync(rh, pessoa.FuncionarioId, Registro("2023-02-06", "2023-02-15"));
+
+        Assert.Equal((200, 422), ((int)conferencia.StatusCode, (int)registro.StatusCode));
+        var corpo = await CorpoAsync(conferencia);
+        Assert.False(corpo.GetProperty("podeEnviar").GetBoolean());
+        var problema = await CorpoAsync(registro);
+        Assert.Equal("FERIAS_REGRAS_NAO_ATENDIDAS", Codigo(problema)); // nunca o 422 genérico de "operação recusada"
+        Assert.Equal(["CABE_NO_SALDO"], problema.GetProperty("regras").EnumerateArray().Where(r => !r.GetProperty("atendida").GetBoolean()).Select(r => r.GetProperty("codigo").GetString()!));
+        Assert.Equal(0, LinhasDe(api, pessoa.FuncionarioId));
+    }
+
     // ---------------------------------------------------------------- conferir o registro
 
     [Fact]

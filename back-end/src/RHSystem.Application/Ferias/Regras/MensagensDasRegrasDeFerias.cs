@@ -29,6 +29,8 @@ public static class MensagensDasRegrasDeFerias
 
     public const string AntecedenciaFalha = "Precisa começar pelo menos 30 dias depois de hoje.";
 
+    public static string InicioAntesDoFimDoPeriodo(DateOnly fimDoPeriodo) => $"As férias precisam começar depois do fim do período aquisitivo ({fimDoPeriodo.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)}).";
+
     public static string CabeFalha(int faltam) => faltam == 1 ? "Passa do saldo disponível: falta 1 dia." : $"Passa do saldo disponível: faltam {faltam} dias.";
 
     public static string MaximoDe3Ok(int numeroDaParte) => $"É a {numeroDaParte}ª parte do período.";
