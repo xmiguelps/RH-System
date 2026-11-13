@@ -29,9 +29,9 @@ Uma linha por rota, com a mesma chave de `ROTAS.md`. `em andamento`: implementad
 | `GET /api/rh/auditoria` | listarEventosDeAuditoria | em andamento | |
 | `GET /api/rh/auditoria/exportacao` | exportarAuditoria | em andamento | |
 | `GET /api/rh/auditoria/{eventoId}` | obterEventoDeAuditoria | em andamento | |
-| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: ok (4); formulários: ok (5); ponto: 3; férias: 7) |
-| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: ok (4); formulários: ok (5); ponto: 3; férias: 7) |
-| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | parcial: cada contador vale 0 até a fatia dona registrar a fonte (documentos: ok (1c); avisos: ok (4); formulários: ok (5); ponto: 3; férias: 7) |
+| `GET /api/eu/contadores-do-menu` | obterContadoresDoMenuDoFuncionario | em andamento | completo: documentos (1c), avisos (4), formulários (5), ajustes de ponto (3) e férias que esperam o gestor (7, só em `pendenciasDaEquipe`: a sugestão de data não conta) têm fonte registrada; cada fonte que falha vira 0 sem derrubar a rota |
+| `GET /api/gestor/contadores-do-menu` | obterContadoresDoMenuDoGestor | em andamento | completo: documentos (1c), avisos (4), formulários (5), ajustes de ponto (3) e férias que esperam o gestor (7, só em `pendenciasDaEquipe`: a sugestão de data não conta) têm fonte registrada; cada fonte que falha vira 0 sem derrubar a rota |
+| `GET /api/rh/contadores-do-menu` | obterContadoresDoMenuDoRh | em andamento | completo: documentos (1c), avisos (4), formulários (5), ajustes de ponto (3) e férias que esperam o gestor (7, só em `pendenciasDaEquipe`: a sugestão de data não conta) têm fonte registrada; cada fonte que falha vira 0 sem derrubar a rota |
 | `POST /api/auth/senha/esqueci` | solicitarRedefinicaoDeSenha | em andamento | sempre 202; um pedido por pessoa a cada 60 s (decisão 6 do plano da 1b) |
 | `POST /api/auth/senha/validar-link` | validarLinkDeSenha | em andamento | |
 | `POST /api/auth/senha/definir` | definirSenhaPeloLink | em andamento | sem login automático |

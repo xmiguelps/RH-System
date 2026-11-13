@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Infrastructure.Ferias;
 using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Api.IntegrationTests.Colaboradores;
@@ -25,6 +26,12 @@ public class PedidosParadosNoGestorRegistroTests(MySqlFixture mysql)
             chamadas.Add($"Passar:{gestorId}");
             return Task.CompletedTask;
         }
+
+        public Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct)
+        {
+            chamadas.Add($"PassarPessoa:{funcionarioId}");
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]
@@ -36,8 +43,11 @@ public class PedidosParadosNoGestorRegistroTests(MySqlFixture mysql)
         var porta = escopo.ServiceProvider.GetRequiredService<IPedidosParadosNoGestor>();
 
         Assert.IsType<PedidosParadosNoGestorComposto>(porta);
-        Assert.IsType<PedidosParadosNoGestorDoPonto>(Assert.Single(escopo.ServiceProvider.GetServices<IPedidosParadosNoGestorDaFatia>())); // até a fatia 7 registrar a dela, o ponto é a única
+        Assert.Equal(
+            [typeof(PedidosParadosNoGestorDoPonto), typeof(PedidosParadosNoGestorDasFerias)],
+            escopo.ServiceProvider.GetServices<IPedidosParadosNoGestorDaFatia>().Select(f => f.GetType())); // o ponto (fatia 3) e as férias (fatia 7)
         await porta.PassarParaORhAsync(123, CancellationToken.None); // um gestorId sem pedido parado: termina sem lançar
+        await porta.PassarParaORhOsDaPessoaAsync(123, CancellationToken.None); // uma pessoa sem pedido parado: idem
         Assert.Equal(PedidosAprovados.Zero, await porta.AprovarEtapaDoGestorAsync(123, CancellationToken.None));
     }
 

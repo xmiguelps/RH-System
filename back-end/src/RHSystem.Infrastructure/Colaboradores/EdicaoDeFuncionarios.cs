@@ -31,7 +31,8 @@ public sealed class EdicaoDeFuncionarios(
     IGestorDoFuncionario gestores,
     ILinksDeSenha links,
     IRelogio relogio,
-    ICadastroDeFuncionarios cadastro) : IEdicaoDeFuncionarios
+    ICadastroDeFuncionarios cadastro,
+    IPedidosParadosNoGestor pedidosParados) : IEdicaoDeFuncionarios
 {
     private const string CodigoDeCampoInvalido = ValidacaoDeCamposDoCadastro.CodigoDeCampoInvalido;
 
@@ -78,6 +79,12 @@ public sealed class EdicaoDeFuncionarios(
         GravarDadosPessoais(funcionario, dados, pessoais);
         await AplicarBeneficiosAsync(funcionario, dados.BeneficioIds, linhas, ct);
         await CadastroDeFuncionarios.SalvarLinhaAsync(db, 0, ct);
+
+        // Trocou de setor: os pedidos dela que esperavam o gestor do setor antigo passam ao RH (a etapa de um pedido é fixada na criação e só avança: "passar ao RH" é ação explícita), na mesma transação da edição.
+        if (setorMudou)
+        {
+            await pedidosParados.PassarParaORhOsDaPessoaAsync(funcionarioId, ct);
+        }
     }
 
     /// <summary>As regras da edição que dependem do estado atual da pessoa. A data de admissão é 400 (campo); as outras são 422.</summary>

@@ -11,6 +11,7 @@ public sealed class PedidosParadosEspiao : IPedidosParadosNoGestor
 {
     public const string Aprovar = nameof(IPedidosParadosNoGestor.AprovarEtapaDoGestorAsync);
     public const string PassarParaORh = nameof(IPedidosParadosNoGestor.PassarParaORhAsync);
+    public const string PassarOsDaPessoa = nameof(IPedidosParadosNoGestor.PassarParaORhOsDaPessoaAsync);
 
     private readonly object _trava = new();
     private readonly List<(string Metodo, int GestorId)> _chamadas = [];
@@ -42,6 +43,9 @@ public sealed class PedidosParadosEspiao : IPedidosParadosNoGestor
     }
 
     public async Task PassarParaORhAsync(int gestorId, CancellationToken ct) => await RegistrarAsync(PassarParaORh, gestorId);
+
+    /// <summary>A troca de setor da pessoa: registra a chamada com o id da PESSOA no lugar do gestor.</summary>
+    public async Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct) => await RegistrarAsync(PassarOsDaPessoa, funcionarioId);
 
     private async Task RegistrarAsync(string metodo, int gestorId)
     {

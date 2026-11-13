@@ -37,7 +37,7 @@ public class LimitesDosPedidosParadosEDosAtestadosTests(MySqlFixture mysql)
     private static async Task<T> NaTransacaoDaPortaAsync<T>(ApiDeAcesso api, Func<IPedidosParadosNoGestorDaFatia, Task<T>> acao) =>
         await api.NaTransacaoAsync(async sp =>
         {
-            var resultado = await acao(sp.GetRequiredService<IPedidosParadosNoGestorDaFatia>());
+            var resultado = await acao(sp.GetServices<IPedidosParadosNoGestorDaFatia>().OfType<RHSystem.Infrastructure.Ponto.PedidosParadosNoGestorDoPonto>().Single());
             await sp.GetRequiredService<IUnidadeDeTrabalho>().SalvarAsync(CancellationToken.None); // o evento resumo do auditor sai com a gravação de quem chamou
             return resultado;
         });

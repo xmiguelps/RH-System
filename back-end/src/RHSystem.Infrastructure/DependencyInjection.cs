@@ -265,6 +265,9 @@ public static class DependencyInjection
         services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
         // Férias (fatia 7): a consulta e o repositório (a conferência das regras e os casos de uso são registrados pela API).
         services.AddScoped<IConsultaDeFerias, ConsultaDeFerias>();
+        services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDasFerias>(); // as férias na porta dos pedidos parados (o composto soma com a do ponto)
+        services.AddScoped<IFonteDeIndicadorDaFicha, FonteDoIndicadorDeFerias>(); // "férias disponíveis" da ficha: o mesmo saldo da rota de férias
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDeFeriasParaOGestor>(); // a bolinha "pendências da equipe" soma as férias que esperam o gestor
         services.AddSingleton<IRenderizadorDeEmail, ResultadoFeriasRenderizador>();
         services.AddScoped<IFeriasRepositorio, FeriasRepositorio>();
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();

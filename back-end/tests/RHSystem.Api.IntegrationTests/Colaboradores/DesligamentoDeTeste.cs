@@ -29,6 +29,12 @@ internal sealed class FatiaDeTeste(List<string> chamadas, bool lanca = false) : 
         chamadas.Add($"Passar:{gestorId}");
         return lanca ? throw new InvalidOperationException("a fatia quebrou (de propósito)") : Task.CompletedTask;
     }
+
+    public Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct)
+    {
+        chamadas.Add($"PassarPessoa:{funcionarioId}");
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>O que os testes de desligamento têm em comum: o relógio de 2026-10-07T12:42Z, o serviço chamado como o RH ou como o Sistema e as leituras do que o banco guardou.</summary>

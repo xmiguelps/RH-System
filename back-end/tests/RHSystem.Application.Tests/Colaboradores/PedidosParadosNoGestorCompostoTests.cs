@@ -21,6 +21,24 @@ public class PedidosParadosNoGestorCompostoTests
             chamadas.Add($"{nome}.Passar:{gestorId}");
             return lanca is null ? Task.CompletedTask : throw lanca;
         }
+
+        public Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct)
+        {
+            chamadas.Add($"{nome}.PassarPessoa:{funcionarioId}");
+            return lanca is null ? Task.CompletedTask : throw lanca;
+        }
+    }
+
+    [Fact]
+    public async Task A_troca_de_setor_da_pessoa_chama_todas_as_fatias_com_o_id_da_pessoa_na_ordem_do_registro_e_sem_fatia_nao_faz_nada()
+    {
+        var chamadas = new List<string>();
+        var composto = new PedidosParadosNoGestorComposto([new FatiaFalsa("ponto", chamadas, PedidosAprovados.Zero), new FatiaFalsa("ferias", chamadas, PedidosAprovados.Zero)]);
+
+        await composto.PassarParaORhOsDaPessoaAsync(41, CancellationToken.None);
+        await new PedidosParadosNoGestorComposto([]).PassarParaORhOsDaPessoaAsync(41, CancellationToken.None);
+
+        Assert.Equal(["ponto.PassarPessoa:41", "ferias.PassarPessoa:41"], chamadas);
     }
 
     [Fact]

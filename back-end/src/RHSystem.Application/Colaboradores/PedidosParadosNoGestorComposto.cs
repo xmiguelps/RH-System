@@ -26,4 +26,12 @@ public sealed class PedidosParadosNoGestorComposto(IEnumerable<IPedidosParadosNo
             await fatia.PassarParaORhAsync(gestorId, ct);
         }
     }
+
+    public async Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct)
+    {
+        foreach (var fatia in fatias)
+        {
+            await fatia.PassarParaORhOsDaPessoaAsync(funcionarioId, ct);
+        }
+    }
 }
