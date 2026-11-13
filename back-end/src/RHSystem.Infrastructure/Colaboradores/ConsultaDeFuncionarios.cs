@@ -140,7 +140,7 @@ public sealed partial class ConsultaDeFuncionarios(AppDbContext db, IRelogio rel
         var beneficios = await db.BeneficiosDosFuncionarios.AsNoTracking()
             .Where(b => b.FuncionarioId == funcionarioId && b.Ativo && b.Status == StatusDoPedidoDeBeneficio.Aprovado)
             .OrderBy(b => b.BeneficioId)
-            .Select(b => new { b.BeneficioId, b.Beneficio!.Nome })
+            .Select(b => new { b.BeneficioId, b.Beneficio!.Nome, Dependentes = db.Dependentes.Count(d => d.AdesaoId == b.Id && d.Status == StatusDoPedidoDeBeneficio.Aprovado) })
             .ToListAsync(ct);
 
         var agendado = await db.DesligamentosAgendados.AsNoTracking()
@@ -178,7 +178,7 @@ public sealed partial class ConsultaDeFuncionarios(AppDbContext db, IRelogio rel
             situacao,
             situacaoHoje,
             desligamento,
-            [.. beneficios.Select(b => new FuncionarioBeneficioItem(b.BeneficioId, b.Nome, 0))],
+            [.. beneficios.Select(b => new FuncionarioBeneficioItem(b.BeneficioId, b.Nome, b.Dependentes))],
             new FuncionarioAcesso(acesso?.Situacao ?? UsuarioSistemaSituacao.SemConvite, acesso?.Ativo ?? false));
     }
 

@@ -3,6 +3,7 @@ using RHSystem.Domain.Agendamento;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
+using RHSystem.Domain.Ferias;
 using RHSystem.Domain.Colaboradores;
 using RHSystem.Domain.Comunicacao;
 using RHSystem.Domain.Formularios;
@@ -11,6 +12,7 @@ using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Emails;
 using RHSystem.Domain.Empresa;
 using RHSystem.Domain.Importacoes;
+using RHSystem.Domain.Pagamento;
 using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Infrastructure.Persistencia;
@@ -104,6 +106,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TreinamentoFuncionario> TreinamentosFuncionarios => Set<TreinamentoFuncionario>();
 
     public DbSet<TreinamentoCertificado> TreinamentosCertificados => Set<TreinamentoCertificado>();
+
+    public DbSet<PedidoDeFerias> PedidosDeFerias => Set<PedidoDeFerias>();
+
+    public DbSet<ExcecaoDePagamento> ExcecoesDePagamento => Set<ExcecaoDePagamento>();
+
+    public DbSet<Dependente> Dependentes => Set<Dependente>();
+
+    public DbSet<TrajetoDeValeTransporte> TrajetosDeValeTransporte => Set<TrajetoDeValeTransporte>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

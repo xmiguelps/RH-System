@@ -205,6 +205,32 @@ public class EditarFuncionarioTests(MySqlFixture mysql)
         Assert.Equal(new[] { fica, entra }.Order(), ficha.GetProperty("beneficios").EnumerateArray().Select(b => b.GetProperty("beneficioId").GetInt32()).Order());
     }
 
+    [Fact]
+    public async Task Editar_tirando_o_beneficio_cancela_os_pedidos_de_dependente_e_de_trajeto_pendentes_dele_e_deixa_os_ja_aprovados()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar tira com filhos");
+        var sai = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Sai com filhos");
+        await SementeDoCadastro.BeneficioDoColaboradorAsync(api.Conexao, pessoa.Id, sai);
+        var adesao = (int)(await LinhaAsync(api, pessoa.Id, sai))!.Value.Id;
+        var pendente = await Beneficios.BeneficiosDeTeste.DependenteAsync(api, adesao, "Zyx Pendente", pedidoEm: "2026-10-06 08:00:00");
+        var aprovado = await Beneficios.BeneficiosDeTeste.DependenteAsync(api, adesao, "Zyx Aprovado", status: "APROVADO", pedidoEm: "2026-08-01 09:00:00", respondidoEm: "2026-08-02 10:00:00");
+        var trajetoPendente = await Beneficios.BeneficiosDeTeste.TrajetoAsync(api, adesao, pedidoEm: "2026-10-06 08:00:00");
+        var trajetoAprovado = await Beneficios.BeneficiosDeTeste.TrajetoAsync(api, adesao, status: "APROVADO", pedidoEm: "2025-08-03 09:00:00", respondidoEm: "2025-08-05 12:00:00");
+
+        var resposta = await EditarAsync(api, pessoa.Id, Corpo(pessoa, beneficios: []));
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal((false, "APROVADO"), ((await LinhaAsync(api, pessoa.Id, sai))!.Value.Ativo, (await LinhaAsync(api, pessoa.Id, sai))!.Value.Status));
+        // o pedido pendente de um benefício que saiu não pode ficar sem quem o decida (a adesão não está mais ativa: aprovar ou recusar daria 409)
+        Assert.Equal("CANCELADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM DEPENDENTES WHERE ID_DEPENDENTE = {pendente}") as string);
+        Assert.Equal("CANCELADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM TRAJETOS_VALE_TRANSPORTE WHERE ID_TRAJETO = {trajetoPendente}") as string);
+        Assert.Equal("APROVADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM DEPENDENTES WHERE ID_DEPENDENTE = {aprovado}") as string); // o já respondido não muda (Reativar traz de volta)
+        Assert.Equal("APROVADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM TRAJETOS_VALE_TRANSPORTE WHERE ID_TRAJETO = {trajetoAprovado}") as string);
+        var fila = await CorpoAsync(await api.Api.ClienteComo(api.Elenco.Rh).GetAsync($"/api/rh/beneficios-adesoes?beneficioId={sai}"));
+        Assert.Empty(fila.GetProperty("itens").EnumerateArray());
+    }
+
     [Theory]
     [InlineData("PENDENTE")]
     [InlineData("RECUSADO")]
@@ -597,5 +623,58 @@ public class EditarFuncionarioTests(MySqlFixture mysql)
         await (await EditarAsync(api, 987_654, Corpo(pessoa))).AfirmarConformeAoContratoAsync("editarFuncionario"); // o 404
         await (await EditarAsync(api, pessoa.Id, Corpo(pessoa, cpf: outra.Cpf))).AfirmarConformeAoContratoAsync("editarFuncionario"); // o 409
         await (await EditarAsync(api, inativo.Id, Corpo(inativo, beneficios: [beneficio]))).AfirmarConformeAoContratoAsync("editarFuncionario"); // o 422
+    }
+
+    [Fact]
+    public async Task Editar_concedendo_beneficio_novo_grava_quem_concedeu_e_quando_e_continua_sem_data_de_pedido()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar-concede");
+        var beneficio = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio direto editar");
+
+        var resposta = await EditarAsync(api, pessoa.Id, Corpo(pessoa, beneficios: [beneficio]));
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(
+            $"APROVADO|1|{api.Elenco.Rh.FuncionarioId}|2026-10-07 09:42:00|-",
+            await Sql.EscalarAsync(api.Conexao, $"SELECT CONCAT_WS('|', STATUS_PEDIDO, BENEFICIO_ATIVO, IFNULL(ID_FUNCIONARIO_RH, '-'), IFNULL(DATE_FORMAT(DATA_RESPOSTA, '%Y-%m-%d %H:%i:%s'), '-'), IFNULL(DATE_FORMAT(DATA_PEDIDO, '%Y-%m-%d'), '-')) FROM BENEFICIOS_FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa.Id} AND ID_BENEFICIO = {beneficio}"));
+    }
+
+    [Theory]
+    [InlineData("PENDENTE")]
+    [InlineData("RECUSADO")]
+    [InlineData("CANCELADO")]
+    public async Task Editar_reconcedendo_a_mesma_linha_troca_quem_respondeu_e_quando_limpa_o_motivo_e_guarda_a_data_do_pedido(string status)
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, $"editar-reconcede {status}");
+        var beneficio = await SementeDoCadastro.BeneficioAsync(api.Conexao, $"Beneficio reconcedido {status}");
+        await LinhaDeStatusAsync(api, pessoa.Id, beneficio, status);
+
+        var resposta = await EditarAsync(api, pessoa.Id, Corpo(pessoa, beneficios: [beneficio]));
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(
+            $"APROVADO|1|{api.Elenco.Rh.FuncionarioId}|2026-10-07 09:42:00|-|2026-10-01",
+            await Sql.EscalarAsync(api.Conexao, $"SELECT CONCAT_WS('|', STATUS_PEDIDO, BENEFICIO_ATIVO, IFNULL(ID_FUNCIONARIO_RH, '-'), IFNULL(DATE_FORMAT(DATA_RESPOSTA, '%Y-%m-%d %H:%i:%s'), '-'), IFNULL(MOTIVO_RECUSA, '-'), IFNULL(DATE_FORMAT(DATA_PEDIDO, '%Y-%m-%d'), '-')) FROM BENEFICIOS_FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa.Id} AND ID_BENEFICIO = {beneficio}"));
+    }
+
+    [Fact]
+    public async Task Editar_dando_beneficio_que_tem_pedido_pendente_com_dependente_pendente_deixa_o_dependente_para_o_RH_decidir()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar-filho-pendente");
+        var beneficio = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio com dependente pendente");
+        await LinhaDeStatusAsync(api, pessoa.Id, beneficio, "PENDENTE");
+        var adesao = (int)(await LinhaAsync(api, pessoa.Id, beneficio))!.Value.Id;
+        var dependente = await RHSystem.Api.IntegrationTests.Beneficios.BeneficiosDeTeste.DependenteAsync(api, adesao, "Zyx Pendente");
+
+        var edicao = await EditarAsync(api, pessoa.Id, Corpo(pessoa, beneficios: [beneficio]));
+        var decisao = await api.Api.ClienteComo(api.Elenco.Rh).PostAsync($"/api/rh/beneficios-adesoes/{adesao}/dependentes/{dependente}/aprovar", content: null);
+
+        Assert.Equal(200, (int)edicao.StatusCode);
+        Assert.Equal(("APROVADO", true), ((await LinhaAsync(api, pessoa.Id, beneficio))!.Value.Status, (await LinhaAsync(api, pessoa.Id, beneficio))!.Value.Ativo));
+        Assert.Equal(200, (int)decisao.StatusCode); // a adesão agora está ativa: o dependente pode ser decidido
+        Assert.Equal("APROVADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM DEPENDENTES WHERE ID_DEPENDENTE = {dependente}"));
     }
 }

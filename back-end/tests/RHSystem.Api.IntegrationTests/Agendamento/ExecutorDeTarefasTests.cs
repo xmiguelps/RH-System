@@ -257,8 +257,8 @@ public class ExecutorDeTarefasTests(MySqlFixture mysql)
 
         var recuperados = await RecuperarAsync(api);
 
-        // Vinte tipos (a fatia 6 acrescentou a que inclui no treinamento obrigatório quem for admitido; os dezenove anteriores: as cinco limpezas, a que efetiva desligamento, as duas dos feriados e a do banco de horas da fatia 3, as de publicar aviso e publicar holerite da fatia 4, as de publicar, encerrar, reabrir e lembrar formulário da fatia 5 e quatro de teste; a LIMPAR_IMPORTACOES_VENCIDAS da fatia 2 é a quinta limpeza, e esta é por hora); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
-        Assert.Equal(20, recuperados);
+        // Vinte e um tipos (a fatia 7 acrescentou a diária das férias, ATUALIZAR_FERIAS; os vinte anteriores: a da fatia 6 que inclui no treinamento obrigatório quem for admitido e os dezenove de antes: as cinco limpezas, a que efetiva desligamento, as duas dos feriados e a do banco de horas da fatia 3, as de publicar aviso e publicar holerite da fatia 4, as de publicar, encerrar, reabrir e lembrar formulário da fatia 5 e quatro de teste; a LIMPAR_IMPORTACOES_VENCIDAS da fatia 2 é a quinta limpeza, e esta é por hora); o que lança não conta, e o resto recupera, inclusive os que vêm DEPOIS dele.
+        Assert.Equal(21, recuperados); // mais a das ferias (fatia 7): ATUALIZAR_FERIAS
         Assert.Contains(TarefaQueNaoRecuperaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);
         Assert.Contains(TarefaRecuperavelDeTeste.TipoDaTarefa, api.Tarefas.Recuperacoes);

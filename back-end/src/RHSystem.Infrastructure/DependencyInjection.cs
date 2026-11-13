@@ -36,6 +36,9 @@ using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
+using RHSystem.Application.Beneficios.Adesoes;
+using RHSystem.Application.Ferias;
+using RHSystem.Application.Pagamento;
 using RHSystem.Application.Ponto;
 using RHSystem.Application.Ponto.Atestados;
 using RHSystem.Application.Ponto.Feriados;
@@ -58,6 +61,10 @@ using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Gestores;
 using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
+using RHSystem.Infrastructure.Beneficios;
+using RHSystem.Infrastructure.Ferias;
+using RHSystem.Infrastructure.Pagamento;
+using RHSystem.Infrastructure.Painel;
 using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Infrastructure;
@@ -261,6 +268,20 @@ public static class DependencyInjection
         services.AddScoped<ICondicaoParaEfetivarDesligamento, CondicaoDoBancoDeHorasParaDesligamento>(); // o desligamento espera o último dia da pessoa estar consolidado
         // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
         services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
+        // Férias (fatia 7): a consulta e o repositório (a conferência das regras e os casos de uso são registrados pela API).
+        services.AddScoped<IConsultaDeFerias, ConsultaDeFerias>();
+        services.AddScoped<ITarefaAgendada, AtualizarFeriasTarefa>(); // diaria: entra em gozo, conclui, cancela o pedido vencido e expira a sugestao sem resposta
+        services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDasFerias>(); // as férias na porta dos pedidos parados (o composto soma com a do ponto)
+        services.AddScoped<IFonteDeIndicadorDaFicha, FonteDoIndicadorDeFerias>(); // "férias disponíveis" da ficha: o mesmo saldo da rota de férias
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDeFeriasParaOGestor>(); // a bolinha "pendências da equipe" soma as férias que esperam o gestor
+        services.AddSingleton<IRenderizadorDeEmail, ResultadoFeriasRenderizador>();
+        services.AddScoped<IFeriasRepositorio, FeriasRepositorio>();
+        services.AddScoped<IConsultaDeAdesoes, ConsultaDeAdesoes>(); // "Benefícios" da própria pessoa (fatia 7)
+        services.AddScoped<IAdesoesRepositorio, AdesoesRepositorio>(); // os três pedidos: adesão, dependente e trajeto
+        services.AddScoped<IAoEfetivarDesligamento, CancelaPedidosDeBeneficioAoDesligar>(); // desligar cancela os pedidos de benefício pendentes
+        services.AddScoped<IExcecoesDePagamentoRepositorio, ExcecoesDePagamentoRepositorio>(); // as exceções de pagamento do RH (fatia 7)
+        services.AddScoped<IFonteDoProximoPagamento, FonteDoProximoPagamento>(); // o "próximo pagamento" da ficha do RH: a mesma conta do cartão
+        services.AddScoped<IConsultaDoPainelDoRh, ConsultaDoPainelDoRh>(); // as filas de pendências e as pessoas da presença do painel do RH (fatia 7)
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();

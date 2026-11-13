@@ -7,6 +7,7 @@ using RHSystem.Application.Autenticacao;
 using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Tempo;
+using RHSystem.Application.Escopo;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
 using RHSystem.Domain.Colaboradores;
@@ -26,6 +27,7 @@ namespace RHSystem.Infrastructure.Colaboradores;
 public sealed class CadastroDeFuncionarios(
     AppDbContext db,
     IRelogio relogio,
+    IAtorAtual ator,
     IGeradorDeMatriculas matriculas,
     IServicoDeConvite convites,
     IGestorDoFuncionario gestores,
@@ -133,7 +135,7 @@ public sealed class CadastroDeFuncionarios(
             {
                 foreach (var beneficioId in novo.BeneficioIds)
                 {
-                    db.BeneficiosDosFuncionarios.Add(BeneficioDoFuncionario.Conceder(funcionario.Id, beneficioId));
+                    db.BeneficiosDosFuncionarios.Add(BeneficioDoFuncionario.Conceder(funcionario.Id, beneficioId, ator.FuncionarioId, relogio.AgoraUtc));
                 }
 
                 await SalvarLinhaAsync(db, i, ct);

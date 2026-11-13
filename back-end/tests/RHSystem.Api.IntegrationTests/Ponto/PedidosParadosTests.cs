@@ -51,14 +51,16 @@ public class PedidosParadosTests(MySqlFixture mysql)
     {
         var api = await ApiAsync();
         var c = await MontarAsync(api);
+        const string Resumo = "SELECT COUNT(*) FROM AUDITORIA_EVENTOS WHERE AREA = 'PONTO' AND DESCRICAO LIKE '%aprovou sozinha (gestor ausente) a etapa do gestor de 1 pedido(s)%'";
+        var resumosAntes = await Sql.ContarAsync(api.Conexao, Resumo); // outro teste da classe (ligar a ausência pela rota) também gera o evento: conta-se só o desta chamada
 
         var aprovados = await api.NaTransacaoAsync(async sp =>
         {
-            var resultado = await sp.GetRequiredService<IPedidosParadosNoGestorDaFatia>().AprovarEtapaDoGestorAsync(c.Setor.Gestor.GestorId, CancellationToken.None);
+            var resultado = await sp.GetServices<IPedidosParadosNoGestorDaFatia>().OfType<RHSystem.Infrastructure.Ponto.PedidosParadosNoGestorDoPonto>().Single().AprovarEtapaDoGestorAsync(c.Setor.Gestor.GestorId, CancellationToken.None);
             await sp.GetRequiredService<IUnidadeDeTrabalho>().SalvarAsync(CancellationToken.None); // o evento resumo do auditor sai com a gravação de quem chamou
             return resultado;
         });
-        var denovo = await api.NaTransacaoAsync(sp => sp.GetRequiredService<IPedidosParadosNoGestorDaFatia>().AprovarEtapaDoGestorAsync(c.Setor.Gestor.GestorId, CancellationToken.None));
+        var denovo = await api.NaTransacaoAsync(sp => sp.GetServices<IPedidosParadosNoGestorDaFatia>().OfType<RHSystem.Infrastructure.Ponto.PedidosParadosNoGestorDoPonto>().Single().AprovarEtapaDoGestorAsync(c.Setor.Gestor.GestorId, CancellationToken.None));
 
         Assert.Equal((new PedidosAprovados(1, 0), PedidosAprovados.Zero), (aprovados, denovo)); // idempotente: a segunda chamada não acha mais nada parado
         Assert.Equal(("PENDENTE", "APROVOU", "True", "2026-10-07 09:42:00"), (
@@ -68,7 +70,7 @@ public class PedidosParadosTests(MySqlFixture mysql)
             Convert.ToDateTime(await Sql.EscalarAsync(api.Conexao, $"SELECT DATA_ETAPA_GESTOR FROM PONTOS_MANUTENCOES WHERE ID_MANUTENCAO_PONTO = {c.ParadoNoGestor}"), System.Globalization.CultureInfo.InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)));
         Assert.Equal("False", await TextoAsync(api, $"SELECT ETAPA_GESTOR_AUTOMATICA FROM PONTOS_MANUTENCOES WHERE ID_MANUTENCAO_PONTO = {c.JaAprovadoPeloGestor}")); // o que o gestor já aprovou continua dele
         Assert.Null(await TextoAsync(api, $"SELECT RESULTADO_GESTOR FROM PONTOS_MANUTENCOES WHERE ID_MANUTENCAO_PONTO = {c.DeOutroGestor}")); // o de outro gestor não é tocado
-        Assert.Equal(1, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM AUDITORIA_EVENTOS WHERE AREA = 'PONTO' AND DESCRICAO LIKE '%aprovou sozinha (gestor ausente) a etapa do gestor de 1 pedido(s)%'")); // um evento resumo por chamada, e só quando andou algum
+        Assert.Equal(resumosAntes + 1, await Sql.ContarAsync(api.Conexao, Resumo)); // um evento resumo por chamada, e só quando andou algum
     }
 
     [Fact]
@@ -79,7 +81,7 @@ public class PedidosParadosTests(MySqlFixture mysql)
 
         await api.NaTransacaoAsync(async sp =>
         {
-            await sp.GetRequiredService<IPedidosParadosNoGestorDaFatia>().PassarParaORhAsync(c.Setor.Gestor.GestorId, CancellationToken.None);
+            await sp.GetServices<IPedidosParadosNoGestorDaFatia>().OfType<RHSystem.Infrastructure.Ponto.PedidosParadosNoGestorDoPonto>().Single().PassarParaORhAsync(c.Setor.Gestor.GestorId, CancellationToken.None);
             return 0;
         });
 

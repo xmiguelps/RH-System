@@ -37,7 +37,7 @@ public sealed record GestorReferencia(int GestorId, int FuncionarioId, string No
 
 public sealed record FuncionarioEndereco(string? Cep, string? Logradouro, string? Numero, string? Complemento, string? Bairro, string? Cidade, string? Uf);
 
-/// <summary>Um benefício ativo da pessoa. <c>QuantidadeDependentes</c> é 0 até a fatia 7.</summary>
+/// <summary>Um benefício ativo da pessoa. <c>QuantidadeDependentes</c> são os dependentes <c>APROVADO</c> ligados a ele (0 sem nenhum): só a ficha do RH tem este número, o gestor nunca.</summary>
 public sealed record FuncionarioBeneficioItem(int BeneficioId, string Nome, int QuantidadeDependentes);
 
 public sealed record FuncionarioDesligamento(DateOnly UltimoDiaDeTrabalho, FuncionarioDesligamentoSituacao Situacao);

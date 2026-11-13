@@ -10,8 +10,8 @@ public enum StatusDoPedidoDeBeneficio
 }
 
 /// <summary>
-/// Uma linha de <c>BENEFICIOS_FUNCIONARIOS</c>: o benefício que a pessoa tem. A fatia 1b só cria linhas <c>APROVADO</c> (o RH concede no cadastro e na
-/// edição) e só desativa ou reativa linhas <c>APROVADO</c>; o pedido do colaborador (colunas de resposta e de recusa) é da fatia 7.
+/// Uma linha de <c>BENEFICIOS_FUNCIONARIOS</c>: o benefício que a pessoa tem ou pediu. A fatia 1b cria linhas <c>APROVADO</c> (o RH concede no cadastro e na edição); a fatia 7 acrescenta o PEDIDO da pessoa (<see cref="Pedir"/>, <see cref="Reabrir"/>) e a resposta do RH. As colunas do pedido
+/// são nulas na concessão direta. Os instantes são UTC na aplicação e -03:00 no banco, sempre pelo relógio da aplicação (o <c>DEFAULT</c> do banco não vale). Esta entidade não é <c>[Auditado]</c>: os eventos de benefício são escritos à mão e nunca levam dependente nem trajeto.
 /// </summary>
 public class BeneficioDoFuncionario
 {
@@ -31,24 +31,99 @@ public class BeneficioDoFuncionario
 
     public StatusDoPedidoDeBeneficio Status { get; private set; }
 
-    /// <summary>Uma linha nova: ativa e aprovada.</summary>
-    public static BeneficioDoFuncionario Conceder(int funcionarioId, int beneficioId) =>
+    /// <summary>Quando a pessoa pediu (<c>DATA_PEDIDO</c>); <c>null</c> na concessão direta do RH, que não é pedido.</summary>
+    public DateTime? PedidoEmUtc { get; private set; }
+
+    public DateOnly? DataInicioDesejada { get; private set; }
+
+    /// <summary>A autorização de desconto em folha da pessoa (<c>AUTORIZA_DESCONTO_FOLHA</c>); o padrão <c>FALSE</c> do banco não é declarado.</summary>
+    public bool AutorizaDescontoNaFolha { get; private set; }
+
+    /// <summary>Quem do RH respondeu e quando (as duas colunas andam juntas, <c>CHECK</c>).</summary>
+    public int? FuncionarioRhId { get; private set; }
+
+    public DateTime? RespondidoEmUtc { get; private set; }
+
+    public string? MotivoDaRecusa { get; private set; }
+
+    /// <summary>O pedido da pessoa: nasce <c>PENDENTE</c> e INATIVO (o <c>CHECK</c> só aceita ativo com <c>APROVADO</c>).</summary>
+    public static BeneficioDoFuncionario Pedir(int funcionarioId, int beneficioId, DateOnly? dataInicioDesejada, bool autorizaDescontoNaFolha, DateTime agoraUtc) =>
         new()
+        {
+            FuncionarioId = funcionarioId,
+            BeneficioId = beneficioId,
+            Ativo = false,
+            Status = StatusDoPedidoDeBeneficio.Pendente,
+            PedidoEmUtc = AoSegundo(agoraUtc),
+            DataInicioDesejada = dataInicioDesejada,
+            AutorizaDescontoNaFolha = autorizaDescontoNaFolha,
+        };
+
+    /// <summary>
+    /// A mesma linha volta a ser um pedido <c>PENDENTE</c> (a chave única <c>(ID_FUNCIONARIO, ID_BENEFICIO)</c> impede uma segunda): recusado, cancelado ou aprovado que o RH tirou. Limpa a resposta e a data dela JUNTAS e o motivo (os <c>CHECK</c> exigem as duas colunas de resposta juntas).
+    /// </summary>
+    public void Reabrir(DateOnly? dataInicioDesejada, bool autorizaDescontoNaFolha, DateTime agoraUtc)
+    {
+        Status = StatusDoPedidoDeBeneficio.Pendente;
+        Ativo = false;
+        PedidoEmUtc = AoSegundo(agoraUtc);
+        DataInicioDesejada = dataInicioDesejada;
+        AutorizaDescontoNaFolha = autorizaDescontoNaFolha;
+        FuncionarioRhId = null;
+        RespondidoEmUtc = null;
+        MotivoDaRecusa = null;
+    }
+
+    internal static DateTime AoSegundo(DateTime instanteUtc)
+    {
+        if (instanteUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("O instante precisa ter Kind = Utc.", nameof(instanteUtc));
+        }
+
+        return new DateTime(instanteUtc.Ticks - (instanteUtc.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+    }
+
+    /// <summary>
+    /// Uma linha nova: ativa e aprovada. A concessão direta do RH não é pedido (<c>DATA_PEDIDO</c> fica nula), mas registra QUEM concedeu e QUANDO (as duas colunas andam juntas, <c>CHECK</c>); sem ator (<paramref name="respondidoPorId"/> nulo) as duas ficam nulas.
+    /// </summary>
+    public static BeneficioDoFuncionario Conceder(int funcionarioId, int beneficioId, int? respondidoPorId = null, DateTime? agoraUtc = null)
+    {
+        var linha = new BeneficioDoFuncionario
         {
             FuncionarioId = funcionarioId,
             BeneficioId = beneficioId,
             Ativo = true,
             Status = StatusDoPedidoDeBeneficio.Aprovado,
         };
+        linha.RegistrarQuemRespondeu(respondidoPorId, agoraUtc);
+        return linha;
+    }
 
     /// <summary>
     /// O RH concede um benefício que já tem linha para a pessoa (pendente, recusado, cancelado ou aprovado e desativado): a chave única
     /// <c>(ID_FUNCIONARIO, ID_BENEFICIO)</c> impede uma segunda linha, então a mesma é atualizada para ativa e aprovada.
     /// </summary>
-    public void Reconceder()
+    public void Reconceder(int? respondidoPorId = null, DateTime? agoraUtc = null)
     {
         Status = StatusDoPedidoDeBeneficio.Aprovado;
         Ativo = true;
+        MotivoDaRecusa = null;
+        RegistrarQuemRespondeu(respondidoPorId, agoraUtc);
+    }
+
+    /// <summary>Quem do RH respondeu e quando, juntos: sem ator a resposta anterior (se houve) é limpa JUNTA, para o <c>CHECK</c> nunca ver uma coluna sem a outra.</summary>
+    private void RegistrarQuemRespondeu(int? respondidoPorId, DateTime? agoraUtc)
+    {
+        if (respondidoPorId is null)
+        {
+            FuncionarioRhId = null;
+            RespondidoEmUtc = null;
+            return;
+        }
+
+        FuncionarioRhId = respondidoPorId;
+        RespondidoEmUtc = AoSegundo(agoraUtc ?? throw new ArgumentNullException(nameof(agoraUtc), "Quem respondeu precisa de quando."));
     }
 
     public void Desativar() => Ativo = false;

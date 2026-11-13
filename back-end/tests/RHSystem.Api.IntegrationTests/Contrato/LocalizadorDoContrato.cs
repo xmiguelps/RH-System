@@ -40,6 +40,7 @@ public static class LocalizadorDoContrato
     {
         YamlMappingNode mapa => new JsonObject(mapa.Children.Select(c => new KeyValuePair<string, JsonNode?>(((YamlScalarNode)c.Key).Value ?? string.Empty, Converter(c.Value)))),
         YamlSequenceNode lista => new JsonArray(lista.Children.Select(Converter).ToArray()),
+        YamlScalarNode { Style: YamlDotNet.Core.ScalarStyle.Plain, Value: "null" or "~" } => null, // o null do YAML (sem aspas), por exemplo dentro de um enum anulável; "null" entre aspas continua texto
         YamlScalarNode simples => JsonValue.Create(simples.Value),
         _ => null,
     };

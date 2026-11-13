@@ -23,7 +23,7 @@ public sealed class PedidosParadosNoGestorDoPonto(AppDbContext db, IRelogio relo
         var aprovados = await db.PedidosDeAjuste
             .Where(p => p.Status == StatusDoPedidoDeAjuste.Pendente && p.GestorId == gestorId && p.ResultadoDoGestor == null)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.ResultadoDoGestor, ResultadoDaEtapaDoGestor.Aprovou).SetProperty(p => p.EtapaDoGestorEmUtc, agora).SetProperty(p => p.EtapaDoGestorAutomatica, true), ct);
-        Resumir(aprovados, "aprovou sozinha (gestor ausente) a etapa do gestor de");
+        await ResumirAsync(aprovados, "aprovou sozinha (gestor ausente) a etapa do gestor de", ct);
         return new PedidosAprovados(aprovados, 0);
     }
 
@@ -33,14 +33,27 @@ public sealed class PedidosParadosNoGestorDoPonto(AppDbContext db, IRelogio relo
         var passados = await db.PedidosDeAjuste
             .Where(p => p.Status == StatusDoPedidoDeAjuste.Pendente && p.GestorId == gestorId && p.ResultadoDoGestor == null)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.GestorId, (int?)null), ct);
-        Resumir(passados, "passou para a etapa do RH");
+        await ResumirAsync(passados, "passou para a etapa do RH", ct);
     }
 
-    private void Resumir(int quantidade, string oQue)
+    public async Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct)
+    {
+        // AUDITORIA-OK: a passagem ao RH não é decisão de ninguém e a troca de setor já é auditada pela edição da ficha; esta chamada registra um evento resumo com a quantidade.
+        var passados = await db.PedidosDeAjuste
+            .Where(p => p.Status == StatusDoPedidoDeAjuste.Pendente && p.FuncionarioId == funcionarioId && p.GestorId != null && p.ResultadoDoGestor == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.GestorId, (int?)null), ct);
+        await ResumirAsync(passados, "passou para a etapa do RH, porque a pessoa trocou de setor,", ct);
+    }
+
+    /// <summary>
+    /// O evento resumo (um por chamada, só quando algum pedido andou). É GRAVADO aqui mesmo, dentro da transação de quem chamou: nem todo chamador salva depois de chamar a porta (a ausência do gestor e a troca do gestor do setor não salvam), e o evento ficaria na fila do contexto sem sair.
+    /// </summary>
+    private async Task ResumirAsync(int quantidade, string oQue, CancellationToken ct)
     {
         if (quantidade > 0)
         {
             auditor.Registrar(new EventoDeAuditoriaNovo(AuditoriaArea.Ponto, AuditoriaAcao.Alterou, $"O sistema {oQue} {quantidade} pedido(s) de ajuste de ponto.", "Pedidos de ajuste de ponto"));
+            await db.SaveChangesAsync(ct);
         }
     }
 }

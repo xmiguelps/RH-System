@@ -59,6 +59,7 @@ public class IndicadoresDaEquipeTests(MySqlFixture mysql)
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.FeriasDisponiveisDias, 22));
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.TreinamentosPendentes, 4));
             servicos.AddScoped<IFonteDeIndicadorDaFicha>(_ => new FonteDeIndicadorFalsa(IndicadorDaFicha.AdvertenciasQuantidade, 1));
+            servicos.RemoveAll<IFonteDoProximoPagamento>();
             servicos.AddScoped<IFonteDoProximoPagamento>(_ => new ProximoPagamentoFalso()); // o gestor não tem este campo, mesmo com fonte registrada
         }));
         var cliente = comFontes.CreateClient();

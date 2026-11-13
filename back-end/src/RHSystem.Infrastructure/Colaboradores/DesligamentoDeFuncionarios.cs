@@ -35,7 +35,8 @@ public sealed class DesligamentoDeFuncionarios(
     IAgendador agendador,
     IAuditor auditor,
     IPedidosParadosNoGestor pedidos,
-    IEnumerable<ICondicaoParaEfetivarDesligamento> condicoes) : IDesligamentoDeFuncionarios
+    IEnumerable<ICondicaoParaEfetivarDesligamento> condicoes,
+    IEnumerable<IAoEfetivarDesligamento> aoEfetivar) : IDesligamentoDeFuncionarios
 {
     /// <summary>Mais longe que isto o dia é erro de digitação (9999-12-31 daria 500 em quem faz conta com a data).</summary>
     private const int AnosAFrenteNoMaximo = 10;
@@ -174,6 +175,11 @@ public sealed class DesligamentoDeFuncionarios(
         if (gestorId is { } gestor)
         {
             await pedidos.PassarParaORhAsync(gestor, ct);
+        }
+
+        foreach (var fatia in aoEfetivar)
+        {
+            await fatia.AposEfetivarAsync(funcionario.Id, ct);
         }
     }
 

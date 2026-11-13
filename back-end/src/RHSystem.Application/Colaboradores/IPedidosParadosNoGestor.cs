@@ -16,6 +16,11 @@ public interface IPedidosParadosNoGestor
 
     /// <summary>O gestor deixou o setor, foi trocado ou foi desligado: os pedidos parados na etapa dele passam à etapa do RH, sem aprovação.</summary>
     Task PassarParaORhAsync(int gestorId, CancellationToken ct);
+
+    /// <summary>
+    /// A PESSOA trocou de setor: os pedidos DELA que esperavam o gestor do setor antigo passam à etapa do RH, sem aprovação (o gestor antigo não a enxerga mais e o novo não recebe o que nasceu para o outro). Idempotente; roda no contexto e na transação de quem chamou (a edição da ficha).
+    /// </summary>
+    Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct);
 }
 
 /// <summary>
@@ -28,4 +33,6 @@ public interface IPedidosParadosNoGestorDaFatia
     Task<PedidosAprovados> AprovarEtapaDoGestorAsync(int gestorId, CancellationToken ct);
 
     Task PassarParaORhAsync(int gestorId, CancellationToken ct);
+
+    Task PassarParaORhOsDaPessoaAsync(int funcionarioId, CancellationToken ct);
 }
