@@ -20,7 +20,7 @@ public sealed record ResumoDoPedido(
     string Titulo,
     DateTime PedidoEmUtc,
     StatusDoPedidoDeBeneficio Situacao,
-    string? MotivoDaRecusa,
+    string? MotivoRecusa,
     DateOnly RespostaPrevistaAte);
 
 public static class PedidosDaPessoa

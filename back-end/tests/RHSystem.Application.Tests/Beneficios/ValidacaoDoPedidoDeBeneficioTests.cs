@@ -55,7 +55,7 @@ public class ValidacaoDoPedidoDeBeneficioTests
     [Fact]
     public void Os_erros_de_um_dependente_da_lista_levam_o_indice_e_os_de_um_dependente_so_levam_o_campo()
     {
-        var ruim = new DadosDoDependente(" ", null, Hoje.AddDays(1));
+        var ruim = new DadosDoDependente(" ", null!, Hoje.AddDays(1));
 
         var daLista = Erros(() => ValidacaoDoPedidoDeBeneficio.Adesao(Hoje, [Helena, ruim], null, Hoje));
         var avulso = Erros(() => ValidacaoDoPedidoDeBeneficio.Dependente(ruim, Hoje));
@@ -94,7 +94,7 @@ public class ValidacaoDoPedidoDeBeneficioTests
     {
         ValidacaoDoPedidoDeBeneficio.Trajeto(new DadosDoTrajeto(Texto(200), Texto(200), Texto(255)));
 
-        var vazios = Erros(() => ValidacaoDoPedidoDeBeneficio.Trajeto(new DadosDoTrajeto("  ", null, "")));
+        var vazios = Erros(() => ValidacaoDoPedidoDeBeneficio.Trajeto(new DadosDoTrajeto("  ", null!, "")));
         var longos = Erros(() => ValidacaoDoPedidoDeBeneficio.Trajeto(new DadosDoTrajeto(Texto(201), Texto(201), Texto(256))));
 
         Assert.Equal(["Informe a origem do trajeto."], vazios["origem"]);
@@ -108,7 +108,7 @@ public class ValidacaoDoPedidoDeBeneficioTests
     [Fact]
     public void O_trajeto_da_adesao_leva_o_prefixo_do_campo()
     {
-        var erros = Erros(() => ValidacaoDoPedidoDeBeneficio.Adesao(Hoje, [], new DadosDoTrajeto(null, "x", "y"), Hoje));
+        var erros = Erros(() => ValidacaoDoPedidoDeBeneficio.Adesao(Hoje, [], new DadosDoTrajeto(null!, "x", "y"), Hoje));
 
         Assert.Equal(["trajeto.origem"], erros.Keys);
     }
@@ -116,7 +116,7 @@ public class ValidacaoDoPedidoDeBeneficioTests
     [Fact]
     public void Todos_os_erros_de_uma_adesao_vem_juntos()
     {
-        var erros = Erros(() => ValidacaoDoPedidoDeBeneficio.Adesao(Hoje.AddDays(-2), [new DadosDoDependente(null, "x", Hoje)], new DadosDoTrajeto("a", null, "c"), Hoje));
+        var erros = Erros(() => ValidacaoDoPedidoDeBeneficio.Adesao(Hoje.AddDays(-2), [new DadosDoDependente(null!, "x", Hoje)], new DadosDoTrajeto("a", null!, "c"), Hoje));
 
         Assert.Equal(["dataInicioDesejada", "dependentes[0].nome", "trajeto.destino"], erros.Keys.Order());
     }

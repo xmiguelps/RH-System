@@ -111,11 +111,11 @@ public class PedidosEDependentesTests
     }
 
     [Fact]
-    public void Os_dados_aparados_perdem_os_espacos_das_pontas_e_nulo_continua_nulo()
+    public void Os_dados_aparados_perdem_os_espacos_das_pontas_e_nulo_vira_vazio()
     {
         Assert.Equal(new DadosDoDependente("Ana", "FILHA", D(2020, 1, 1)), new DadosDoDependente(" Ana ", " FILHA", D(2020, 1, 1)).Aparado());
-        Assert.Equal(new DadosDoDependente(null, null, D(2020, 1, 1)), new DadosDoDependente(null, null, D(2020, 1, 1)).Aparado());
+        Assert.Equal(new DadosDoDependente(string.Empty, string.Empty, D(2020, 1, 1)), new DadosDoDependente(null!, null!, D(2020, 1, 1)).Aparado());
         Assert.Equal(new DadosDoTrajeto("Rua A, 1", "Av. B, 2", "Ônibus 10"), new DadosDoTrajeto(" Rua A, 1 ", "Av. B, 2 ", " Ônibus 10").Aparado());
-        Assert.Equal(new DadosDoTrajeto(null, null, null), new DadosDoTrajeto(null, null, null).Aparado());
+        Assert.Equal(new DadosDoTrajeto(string.Empty, string.Empty, string.Empty), new DadosDoTrajeto(null!, null!, null!).Aparado());
     }
 }

@@ -61,7 +61,7 @@ public class ListasDoBeneficioTests
         var listas = ListasDoBeneficio.Montar(Catalogo, [Linha(Odonto, StatusDoPedidoDeBeneficio.Recusado, false, "Fora da carência", Resposta)]);
 
         var odonto = Assert.Single(listas.Disponiveis, d => d.Item.Id == Odonto.Id);
-        Assert.Equal(new UltimoPedidoDoBeneficio(StatusDoPedidoDeBeneficio.Recusado, "Fora da carência", Resposta), odonto.UltimoPedido);
+        Assert.Equal(new UltimoPedidoDoBeneficio(SituacaoDoUltimoPedido.Recusado, "Fora da carência", Resposta), odonto.UltimoPedido);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class ListasDoBeneficioTests
         var listas = ListasDoBeneficio.Montar(Catalogo, [Linha(Gympass, StatusDoPedidoDeBeneficio.Cancelado, false)]);
 
         var gympass = Assert.Single(listas.Disponiveis, d => d.Item.Id == Gympass.Id);
-        Assert.Equal(new UltimoPedidoDoBeneficio(StatusDoPedidoDeBeneficio.Cancelado, null, null), gympass.UltimoPedido);
+        Assert.Equal(new UltimoPedidoDoBeneficio(SituacaoDoUltimoPedido.Cancelado, null, null), gympass.UltimoPedido);
     }
 
     [Fact]

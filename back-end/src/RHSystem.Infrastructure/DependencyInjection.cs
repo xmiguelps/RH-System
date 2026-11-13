@@ -36,6 +36,7 @@ using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
+using RHSystem.Application.Beneficios.Adesoes;
 using RHSystem.Application.Ferias;
 using RHSystem.Application.Ponto;
 using RHSystem.Application.Ponto.Atestados;
@@ -59,6 +60,7 @@ using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Gestores;
 using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
+using RHSystem.Infrastructure.Beneficios;
 using RHSystem.Infrastructure.Ferias;
 using RHSystem.Infrastructure.Ponto;
 
@@ -271,6 +273,8 @@ public static class DependencyInjection
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeFeriasParaOGestor>(); // a bolinha "pendências da equipe" soma as férias que esperam o gestor
         services.AddSingleton<IRenderizadorDeEmail, ResultadoFeriasRenderizador>();
         services.AddScoped<IFeriasRepositorio, FeriasRepositorio>();
+        services.AddScoped<IConsultaDeAdesoes, ConsultaDeAdesoes>(); // "Benefícios" da própria pessoa (fatia 7)
+        services.AddScoped<IAdesoesRepositorio, AdesoesRepositorio>(); // os três pedidos: adesão, dependente e trajeto
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();

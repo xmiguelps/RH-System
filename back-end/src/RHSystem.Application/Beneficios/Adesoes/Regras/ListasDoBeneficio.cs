@@ -14,13 +14,21 @@ public sealed record AdesaoDaPessoa(
     DateOnly? InicioEm,
     bool AutorizaDescontoEmFolha,
     string? MotivoDaRecusa,
-    DateTime? RespondidoEmUtc);
+    DateTime? RespondidoEmUtc,
+    DateTime? PedidoEmUtc = null);
 
 /// <summary>Um cartão de "Seus benefícios": o item do catálogo e a adesão ativa e aprovada.</summary>
 public sealed record CartaoDeBeneficio(ItemDoCatalogo Item, AdesaoDaPessoa Adesao);
 
+/// <summary>Como o pedido anterior terminou: só <c>RECUSADO</c> ou <c>CANCELADO</c> chegam a <c>ultimoPedido</c> (o contrato).</summary>
+public enum SituacaoDoUltimoPedido
+{
+    Recusado,
+    Cancelado,
+}
+
 /// <summary>O pedido anterior, recusado ou cancelado, do mesmo benefício.</summary>
-public sealed record UltimoPedidoDoBeneficio(StatusDoPedidoDeBeneficio Situacao, string? MotivoDaRecusa, DateTime? RespondidoEmUtc);
+public sealed record UltimoPedidoDoBeneficio(SituacaoDoUltimoPedido Situacao, string? MotivoRecusa, DateTime? RespondidoEmUtc);
 
 /// <summary>Um item de "Disponíveis para você". <see cref="UltimoPedido"/> é <c>null</c> quando nunca houve pedido, ou quando a linha é de um benefício aprovado que o RH desativou.</summary>
 public sealed record BeneficioDisponivel(ItemDoCatalogo Item, UltimoPedidoDoBeneficio? UltimoPedido);
@@ -61,9 +69,12 @@ public sealed record ListasDoBeneficio(IReadOnlyList<CartaoDeBeneficio> Cartoes,
                 continue;
             }
 
-            var ultimo = adesao.Status is StatusDoPedidoDeBeneficio.Recusado or StatusDoPedidoDeBeneficio.Cancelado
-                ? new UltimoPedidoDoBeneficio(adesao.Status, adesao.MotivoDaRecusa, adesao.RespondidoEmUtc)
-                : null;
+            var ultimo = adesao.Status switch
+            {
+                StatusDoPedidoDeBeneficio.Recusado => new UltimoPedidoDoBeneficio(SituacaoDoUltimoPedido.Recusado, adesao.MotivoDaRecusa, adesao.RespondidoEmUtc),
+                StatusDoPedidoDeBeneficio.Cancelado => new UltimoPedidoDoBeneficio(SituacaoDoUltimoPedido.Cancelado, adesao.MotivoDaRecusa, adesao.RespondidoEmUtc),
+                _ => null,
+            };
             disponiveis.Add(new BeneficioDisponivel(item, ultimo));
         }
 
