@@ -379,6 +379,11 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
         Assert.Equal(["Zyx Aprovada"], tela.GetProperty("dependentesCadastrados").EnumerateArray().Select(d => d.GetProperty("nome").GetString()));
         var evento = Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "DEPENDENTES", aprovado));
         Assert.Equal((AuditoriaArea.Beneficios, AuditoriaAcao.Aprovou), (evento.Area, evento.Acao));
+        Assert.Equal([("Situação", "Pendente", "Aprovado")], evento.Mudancas.Select(m => (m.Campo, m.ValorAntes!, m.ValorDepois!)));
+        var eventoDaRecusa = Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "DEPENDENTES", recusado));
+        Assert.Equal((AuditoriaArea.Beneficios, AuditoriaAcao.Recusou), (eventoDaRecusa.Area, eventoDaRecusa.Acao));
+        Assert.StartsWith("Recusou a inclusão de um dependente em ", eventoDaRecusa.Descricao, StringComparison.Ordinal);
+        Assert.Equal([("Situação", "Pendente", "Recusado")], eventoDaRecusa.Mudancas.Select(m => (m.Campo, m.ValorAntes!, m.ValorDepois!)));
         var log = (await AuditoriaDeTeste.TudoDoLogAsync(api.Conexao)).Texto;
         Assert.DoesNotContain("Zyx", log, StringComparison.Ordinal);
         Assert.DoesNotContain("certidão", log, StringComparison.Ordinal);
@@ -407,6 +412,12 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
         await aprovou.AfirmarConformeAoContratoAsync("aprovarTrajetoDeBeneficio");
         Assert.Equal(novo, await EmVigorAsync());
         Assert.Equal(["APROVADO", "APROVADO", "RECUSADO"], (await CorpoAsync(aprovou)).GetProperty("trajetos").EnumerateArray().Select(t => t.GetProperty("situacao").GetString()!));
+        var eventoDoAprovado = Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "TRAJETOS_VALE_TRANSPORTE", novo));
+        var eventoDoRecusado = Assert.Single(await AuditoriaDeTeste.EventosAsync(api.Conexao, "TRAJETOS_VALE_TRANSPORTE", outroNovo));
+        Assert.StartsWith("Aprovou a atualização do trajeto em ", eventoDoAprovado.Descricao, StringComparison.Ordinal);
+        Assert.StartsWith("Recusou a atualização do trajeto em ", eventoDoRecusado.Descricao, StringComparison.Ordinal);
+        Assert.Equal((AuditoriaAcao.Aprovou, "Pendente", "Aprovado"), (eventoDoAprovado.Acao, eventoDoAprovado.Mudancas.Single().ValorAntes, eventoDoAprovado.Mudancas.Single().ValorDepois));
+        Assert.Equal((AuditoriaAcao.Recusou, "Pendente", "Recusado"), (eventoDoRecusado.Acao, eventoDoRecusado.Mudancas.Single().ValorAntes, eventoDoRecusado.Mudancas.Single().ValorDepois));
         var log = (await AuditoriaDeTeste.TudoDoLogAsync(api.Conexao)).Texto;
         Assert.DoesNotContain("Zyx", log, StringComparison.Ordinal);
     }
@@ -434,7 +445,7 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- a lista
 
     [Fact]
-    public async Task A_lista_padrao_traz_as_pendentes_e_as_aprovadas_com_filho_pendente_pela_menor_data_pendente()
+    public async Task A_lista_padrao_traz_as_pendentes_e_as_aprovadas_com_filho_pendente_pela_menor_data_PENDENTE()
     {
         var api = await ApiAsync();
         var item = await ItemAsync(api, dependentes: true, trajeto: true);
@@ -443,14 +454,19 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
         var c = await NovaAsync(api, "Pessoa C da lista");
         var d = await NovaAsync(api, "Pessoa D da lista");
         var e = await NovaAsync(api, "Pessoa E da lista");
+        var f = await NovaAsync(api, "Pessoa F da lista");
         var adesaoA = await AdesaoAsync(api, a.FuncionarioId, item, "PENDENTE", ativo: false, pedidoEm: "2026-10-05 08:00:00", inicio: "2026-11-01", autoriza: true);
         _ = await DependenteAsync(api, adesaoA, "Zyx A", pedidoEm: "2026-10-05 08:00:00");
         var adesaoB = await AdesaoAsync(api, b.FuncionarioId, item); // dada direto: sem pedido
-        _ = await TrajetoAsync(api, adesaoB, pedidoEm: "2026-10-01 10:00:00");
+        _ = await TrajetoAsync(api, adesaoB, pedidoEm: "2026-10-08 08:00:00"); // o que espera
+        _ = await DependenteAsync(api, adesaoB, "Zyx B antigo", status: "APROVADO", pedidoEm: "2026-08-01 08:00:00", respondidoEm: "2026-08-02 10:00:00"); // já respondido: não conta para a fila
         var adesaoC = await AdesaoAsync(api, c.FuncionarioId, item, "APROVADO", pedidoEm: "2026-09-01 08:00:00", respondidoEm: "2026-09-02 10:00:00");
         _ = await DependenteAsync(api, adesaoC, status: "APROVADO", respondidoEm: "2026-09-02 10:00:00");
         var adesaoD = await AdesaoAsync(api, d.FuncionarioId, item, "PENDENTE", ativo: false, pedidoEm: "2026-10-06 08:00:00");
-        var adesaoE = await AdesaoAsync(api, e.FuncionarioId, item, "RECUSADO", ativo: false, pedidoEm: "2026-09-10 08:00:00", respondidoEm: "2026-09-11 10:00:00");
+        var adesaoE = await AdesaoAsync(api, e.FuncionarioId, item);
+        _ = await DependenteAsync(api, adesaoE, "Zyx E", pedidoEm: "2026-10-09 08:00:00"); // o que espera
+        _ = await TrajetoAsync(api, adesaoE, status: "APROVADO", pedidoEm: "2026-08-01 08:00:00", respondidoEm: "2026-08-02 10:00:00"); // já respondido: não conta para a fila
+        var adesaoF = await AdesaoAsync(api, f.FuncionarioId, item, "RECUSADO", ativo: false, pedidoEm: "2026-09-10 08:00:00", respondidoEm: "2026-09-11 10:00:00");
         var rh = await api.ClienteDoRhAgoraAsync();
         string Url(string extra = "") => $"{Rota}?beneficioId={item}{extra}";
 
@@ -459,10 +475,10 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
         Assert.Equal(200, (int)padrao.StatusCode);
         await padrao.AfirmarConformeAoContratoAsync("listarPedidosDeBeneficio");
         var corpo = await CorpoAsync(padrao);
-        Assert.Equal([adesaoB, adesaoA, adesaoD], Ids(corpo)); // B espera desde 01/10 (o trajeto), A desde 05/10, D desde 06/10
-        Assert.Equal((1, 20, 3, 1), (corpo.GetProperty("pagina").GetInt32(), corpo.GetProperty("tamanhoPagina").GetInt32(), corpo.GetProperty("total").GetInt32(), corpo.GetProperty("totalPaginas").GetInt32()));
-        var daB = corpo.GetProperty("itens")[0];
-        Assert.Equal((b.FuncionarioId, JsonValueKind.Null, JsonValueKind.Null, JsonValueKind.Null, "APROVADO", 0, 1), (
+        Assert.Equal([adesaoA, adesaoD, adesaoB, adesaoE], Ids(corpo)); // espera desde 05/10 (a adesão), 06/10 (a adesão), 08/10 (o trajeto) e 09/10 (o dependente)
+        Assert.Equal((1, 20, 4, 1), (corpo.GetProperty("pagina").GetInt32(), corpo.GetProperty("tamanhoPagina").GetInt32(), corpo.GetProperty("total").GetInt32(), corpo.GetProperty("totalPaginas").GetInt32()));
+        var daB = corpo.GetProperty("itens")[2];
+        Assert.Equal((b.FuncionarioId, JsonValueKind.Null, JsonValueKind.Null, JsonValueKind.Null, "APROVADO", 1, 1), (
             daB.GetProperty("funcionario").GetProperty("id").GetInt32(),
             daB.GetProperty("pedidoEmUtc").ValueKind,
             daB.GetProperty("respostaPrevistaAte").ValueKind,
@@ -470,7 +486,7 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
             daB.GetProperty("situacao").GetString()!,
             daB.GetProperty("dependentes").GetArrayLength(),
             daB.GetProperty("trajetos").GetArrayLength()));
-        var daA = corpo.GetProperty("itens")[1];
+        var daA = corpo.GetProperty("itens")[0];
         Assert.Equal(("PENDENTE", "2026-10-05T11:00:00Z", "2026-10-13", "2026-11-01", true, JsonValueKind.Null, JsonValueKind.Null, 1), (
             daA.GetProperty("situacao").GetString()!,
             Utc(daA.GetProperty("pedidoEmUtc")).ToString("yyyy-MM-ddTHH:mm:ssZ"),
@@ -481,15 +497,15 @@ public class AdesoesParaRhTests(MySqlFixture mysql)
             daA.GetProperty("motivoRecusa").ValueKind,
             daA.GetProperty("dependentes").GetArrayLength()));
 
-        Assert.Equal([adesaoC, adesaoB], Ids(await CorpoAsync(await rh.GetAsync(Url("&situacao=APROVADO"))))); // a concedida direto (sem pedido) por último
-        Assert.Equal([adesaoE], Ids(await CorpoAsync(await rh.GetAsync(Url("&situacao=RECUSADO")))));
+        Assert.Equal([adesaoC, adesaoB, adesaoE], Ids(await CorpoAsync(await rh.GetAsync(Url("&situacao=APROVADO"))))); // a concedida direto (sem pedido) por último, em ordem de id
+        Assert.Equal([adesaoF], Ids(await CorpoAsync(await rh.GetAsync(Url("&situacao=RECUSADO")))));
         Assert.Empty(Ids(await CorpoAsync(await rh.GetAsync(Url("&situacao=CANCELADO")))));
         Assert.Equal([adesaoA], Ids(await CorpoAsync(await rh.GetAsync(Url($"&busca={Uri.EscapeDataString(a.Nome)}")))));
         Assert.Empty(Ids(await CorpoAsync(await rh.GetAsync($"{Rota}?beneficioId={item + 1_000_000}"))));
 
-        var segunda = await CorpoAsync(await rh.GetAsync(Url("&pagina=2&tamanhoPagina=2")));
-        Assert.Equal([adesaoD], Ids(segunda));
-        Assert.Equal((3, 2, 2), (segunda.GetProperty("total").GetInt32(), segunda.GetProperty("totalPaginas").GetInt32(), segunda.GetProperty("pagina").GetInt32()));
+        var segunda = await CorpoAsync(await rh.GetAsync(Url("&pagina=2&tamanhoPagina=3")));
+        Assert.Equal([adesaoE], Ids(segunda));
+        Assert.Equal((4, 2, 2), (segunda.GetProperty("total").GetInt32(), segunda.GetProperty("totalPaginas").GetInt32(), segunda.GetProperty("pagina").GetInt32()));
         var invalida = await rh.GetAsync(Url("&situacao=XYZ"));
         Assert.Equal(400, (int)invalida.StatusCode);
         await invalida.AfirmarConformeAoContratoAsync("listarPedidosDeBeneficio");
