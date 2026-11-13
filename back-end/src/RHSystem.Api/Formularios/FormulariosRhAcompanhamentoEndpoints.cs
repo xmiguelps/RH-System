@@ -31,6 +31,7 @@ public static class FormulariosRhAcompanhamentoEndpoints
         servicos.AddScoped<ObterRespostasDeFuncionarioCasoDeUso>();
         servicos.AddScoped<BaixarArquivoDeRespostaCasoDeUso>();
         servicos.AddScoped<ListarCandidatosDoFormularioCasoDeUso>();
+        servicos.AddScoped<ListarAvaliadosDoFormularioCasoDeUso>();
         servicos.AddScoped<ObterRespostasDeCandidatoCasoDeUso>();
         servicos.AddScoped<BaixarCurriculoDeCandidatoCasoDeUso>();
         servicos.AddScoped<ObterResultadoDoFormularioCasoDeUso>();
@@ -73,6 +74,11 @@ public static class FormulariosRhAcompanhamentoEndpoints
             .Produces<LinkTemporario>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
+        rh.MapGet("/formularios/{formularioId:int}/avaliados", Avaliados)
+            .WithName("listarAvaliadosFormulario")
+            .Produces<FormularioAvaliadosLista>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         rh.MapGet("/formularios/{formularioId:int}/resultado", Resultado)
             .WithName("obterResultadoFormulario")
             .Produces<FormularioResultado>(StatusCodes.Status200OK)
@@ -103,6 +109,8 @@ public static class FormulariosRhAcompanhamentoEndpoints
     private static async Task<RespostaFormularioCandidato> RespostasDeCandidato(int formularioId, int candidatoId, ObterRespostasDeCandidatoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, candidatoId, ct);
 
     private static async Task<LinkTemporario> BaixarCurriculo(int formularioId, int candidatoId, BaixarCurriculoDeCandidatoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, candidatoId, ct);
+
+    private static async Task<FormularioAvaliadosLista> Avaliados(int formularioId, ListarAvaliadosDoFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, ct);
 
     private static async Task<FormularioResultado> Resultado(int formularioId, [AsParameters] FiltrosDoResultado f, ObterResultadoDoFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, f.AvaliadoId, ct);
 
