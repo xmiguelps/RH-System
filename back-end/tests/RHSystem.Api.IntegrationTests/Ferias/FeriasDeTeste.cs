@@ -35,6 +35,10 @@ internal sealed class RepositorioDeFeriasComGancho(IFeriasRepositorio real) : IF
 
     public Task<bool> SugerirComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, DateOnly inicio, DateOnly fim, CancellationToken ct) => real.SugerirComoGestorAsync(feriasId, gestorId, agoraUtc, inicio, fim, ct);
 
+    public Task<bool> ConfirmarComoRhAsync(int feriasId, int funcionarioRhId, int? gestorIdDoRh, DateTime agoraUtc, CancellationToken ct) => real.ConfirmarComoRhAsync(feriasId, funcionarioRhId, gestorIdDoRh, agoraUtc, ct);
+
+    public Task<bool> RecusarComoRhAsync(int feriasId, int funcionarioRhId, int? gestorIdDoRh, DateTime agoraUtc, string motivo, CancellationToken ct) => real.RecusarComoRhAsync(feriasId, funcionarioRhId, gestorIdDoRh, agoraUtc, motivo, ct);
+
     public Task<bool> AceitarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct) => real.AceitarSugestaoAsync(feriasId, funcionarioId, agoraUtc, ct);
 
     public Task<bool> RecusarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct) => real.RecusarSugestaoAsync(feriasId, funcionarioId, agoraUtc, ct);

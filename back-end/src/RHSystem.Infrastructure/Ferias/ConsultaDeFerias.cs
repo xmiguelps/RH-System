@@ -84,6 +84,37 @@ public sealed class ConsultaDeFerias(AppDbContext db) : IConsultaDeFerias
             });
     }
 
+    public async Task<(IReadOnlyList<FeriasLida> Itens, int Total)> ListarParaRhAsync(SituacaoDasFerias situacao, int? setorId, ParametrosDeLista parametros, CancellationToken ct)
+    {
+        var filtrada = db.PedidosDeFerias.AsNoTracking().Where(NaSituacao(situacao));
+        if (setorId is { } setor)
+        {
+            filtrada = filtrada.Where(p => db.Funcionarios.Any(f => f.Id == p.FuncionarioId && f.SetorId == setor));
+        }
+
+        if (parametros.Busca is { } busca)
+        {
+            var like = BuscaLike.Contem(busca);
+            filtrada = filtrada.Where(p => db.Funcionarios.Any(f => f.Id == p.FuncionarioId && EF.Functions.Like(f.Nome, like)));
+        }
+
+        var total = await filtrada.CountAsync(ct);
+        var ids = await filtrada.OrderBy(p => p.SolicitadaEmUtc).ThenBy(p => p.Id).Skip(parametros.Pular).Take(parametros.TamanhoPagina).Select(p => p.Id).ToListAsync(ct);
+        if (ids.Count == 0)
+        {
+            return ([], total);
+        }
+
+        var lidos = await CarregarAsync(db.PedidosDeFerias.AsNoTracking().Where(p => ids.Contains(p.Id)), ct);
+        return ([.. ids.Select(id => lidos.Single(l => l.Id == id))], total);
+    }
+
+    public async Task<FeriasLida?> ObterAsync(int feriasId, CancellationToken ct) =>
+        (await CarregarAsync(db.PedidosDeFerias.AsNoTracking().Where(p => p.Id == feriasId), ct)).FirstOrDefault();
+
+    public async Task<int?> GestorIdDaPessoaAsync(int funcionarioId, CancellationToken ct) =>
+        await db.Gestores.AsNoTracking().Where(g => g.FuncionarioId == funcionarioId).Select(g => (int?)g.Id).FirstOrDefaultAsync(ct);
+
     public async Task<string?> EmailCorporativoAsync(int funcionarioId, CancellationToken ct) =>
         await db.Funcionarios.AsNoTracking().Where(f => f.Id == funcionarioId).Select(f => f.EmailCorporativo).FirstOrDefaultAsync(ct);
 

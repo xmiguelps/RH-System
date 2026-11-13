@@ -70,6 +70,15 @@ public interface IConsultaDeFerias
     /// <summary>Os conflitos e a equipe disponível de cada pedido (por <c>id</c>), em poucas consultas para a lista inteira.</summary>
     Task<IReadOnlyDictionary<int, ContextoDoPedidoDaEquipe>> ContextoDaEquipeAsync(IReadOnlyList<FeriasLida> pedidos, CancellationToken ct);
 
+    /// <summary>A página dos pedidos de TODA a empresa (só o RH), na situação pedida, do mais antigo ao mais novo; <paramref name="setorId"/> filtra pelo setor de quem pede e a busca do <paramref name="parametros"/> procura no nome dela.</summary>
+    Task<(IReadOnlyList<FeriasLida> Itens, int Total)> ListarParaRhAsync(SituacaoDasFerias situacao, int? setorId, ParametrosDeLista parametros, CancellationToken ct);
+
+    /// <summary>Um pedido de qualquer pessoa (só o RH); que não existe volta <c>null</c>.</summary>
+    Task<FeriasLida?> ObterAsync(int feriasId, CancellationToken ct);
+
+    /// <summary>A linha de <c>GESTORES</c> da pessoa (<c>null</c> se ela não está lá): o banco a exige na decisão final de um pedido sem etapa do gestor.</summary>
+    Task<int?> GestorIdDaPessoaAsync(int funcionarioId, CancellationToken ct);
+
     /// <summary>O e-mail corporativo da pessoa (<c>null</c> quando não tem: nada entra na fila).</summary>
     Task<string?> EmailCorporativoAsync(int funcionarioId, CancellationToken ct);
 }

@@ -28,6 +28,14 @@ public interface IFeriasRepositorio
     /// A resposta da PESSOA à sugestão do gestor, cada uma UM <c>UPDATE</c> condicional ao pedido do dono continuar esperando a resposta (<c>SOLICITADA</c>, <c>SUGERIU_DATA</c> e sem resposta). Aceitar copia as datas sugeridas para as do pedido (as sugeridas ficam: o <c>CHECK</c> exige) e grava <c>ACEITOU</c>;
     /// recusar e expirar viram <c>CANCELADA</c> com <c>RECUSOU</c> ou <c>EXPIROU</c> no mesmo <c>UPDATE</c>. <c>false</c>: outra resposta (ou a tarefa) chegou antes.
     /// </summary>
+    /// <summary>
+    /// As duas decisões do RH, a final: cada uma UM <c>UPDATE</c> condicional ao pedido estar na etapa do RH (<c>COM_O_RH</c>). O <c>ID_GESTOR</c> fica o que já era e, num pedido sem etapa do gestor, passa a ser a linha de <c>GESTORES</c> de quem decide (o trigger do banco exige o gestor e que ele não seja a
+    /// pessoa do pedido). A recusa de trigger sobe traduzida (422 <c>PEDIDO_PROPRIO</c> ou <c>PEDIDO_RH_FORA_DE_GESTORES</c>). Não tocam na <c>OBSERVACAO</c>.
+    /// </summary>
+    Task<bool> ConfirmarComoRhAsync(int feriasId, int funcionarioRhId, int? gestorIdDoRh, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> RecusarComoRhAsync(int feriasId, int funcionarioRhId, int? gestorIdDoRh, DateTime agoraUtc, string motivo, CancellationToken ct);
+
     Task<bool> AceitarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct);
 
     Task<bool> RecusarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct);

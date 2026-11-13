@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Comunicacao.Regras;
 using RHSystem.Application.Ferias;
+using RHSystem.Application.Ferias.Regras;
 using RHSystem.Domain.Ferias;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Gestao;
@@ -60,6 +61,65 @@ public sealed class FeriasRepositorio(AppDbContext db) : IFeriasRepositorio
             ct);
         return linhas == 1;
     }
+
+    public async Task<bool> ConfirmarComoRhAsync(int feriasId, int funcionarioRhId, int? gestorIdDoRh, DateTime agoraUtc, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+
+        try
+        {
+            // AUDITORIA-OK: a confirmação do RH é auditada à mão pelo caso de uso (evento Aprovou, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF. Status final, quem do RH, quando e a data da análise vão no mesmo UPDATE (CHECK e trigger).
+            var linhas = await NaEtapaDoRh(feriasId).ExecuteUpdateAsync(
+                s => s.SetProperty(p => p.Status, StatusDasFerias.Aprovada)
+                    .SetProperty(p => p.FuncionarioRhId, rh)
+                    .SetProperty(p => p.ConfirmadaPeloRhEmUtc, agora)
+                    .SetProperty(p => p.AnalisadaEmUtc, agora)
+                    .SetProperty(p => p.GestorId, p => p.GestorId ?? gestorIdDoRh),
+                ct);
+            return linhas == 1;
+        }
+        catch (DbUpdateException erro) when (TradutorDeRecusaDaGestao.Traduzir(erro) is { } problema)
+        {
+            throw problema;
+        }
+        catch (MySqlConnector.MySqlException erro) when (TradutorDeRecusaDaGestao.Traduzir(erro) is { } problema)
+        {
+            throw problema; // o ExecuteUpdate não embrulha o erro do MySQL em DbUpdateException
+        }
+    }
+
+    public async Task<bool> RecusarComoRhAsync(int feriasId, int funcionarioRhId, int? gestorIdDoRh, DateTime agoraUtc, string motivo, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+        string? motivoDaRecusa = motivo;
+
+        try
+        {
+            // AUDITORIA-OK: a recusa do RH é auditada à mão pelo caso de uso (evento Recusou, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF. Status, quem do RH, quando, a data da análise e o motivo vão no mesmo UPDATE (CHECK e trigger).
+            var linhas = await NaEtapaDoRh(feriasId).ExecuteUpdateAsync(
+                s => s.SetProperty(p => p.Status, StatusDasFerias.Rejeitada)
+                    .SetProperty(p => p.FuncionarioRhId, rh)
+                    .SetProperty(p => p.ConfirmadaPeloRhEmUtc, agora)
+                    .SetProperty(p => p.AnalisadaEmUtc, agora)
+                    .SetProperty(p => p.GestorId, p => p.GestorId ?? gestorIdDoRh)
+                    .SetProperty(p => p.MotivoRecusa, motivoDaRecusa),
+                ct);
+            return linhas == 1;
+        }
+        catch (DbUpdateException erro) when (TradutorDeRecusaDaGestao.Traduzir(erro) is { } problema)
+        {
+            throw problema;
+        }
+        catch (MySqlConnector.MySqlException erro) when (TradutorDeRecusaDaGestao.Traduzir(erro) is { } problema)
+        {
+            throw problema;
+        }
+    }
+
+    /// <summary>O pedido na etapa do RH (<c>COM_O_RH</c>): ainda <c>SOLICITADA</c>, e sem etapa do gestor, ou com o gestor aprovado, ou com a sugestão aceita.</summary>
+    private IQueryable<PedidoDeFerias> NaEtapaDoRh(int feriasId) => db.PedidosDeFerias.Where(p => p.Id == feriasId).Where(ConsultaDeFerias.NaSituacao(SituacaoDasFerias.ComORh));
 
     public async Task<bool> AceitarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct)
     {

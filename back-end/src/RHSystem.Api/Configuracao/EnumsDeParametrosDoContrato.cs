@@ -53,6 +53,7 @@ public static class EnumsDeParametrosDoContrato
         [("listarPedidosDeAjusteParaRh", "ordenarPor")] = typeof(PontoPedidoOrdenarPor),
         [("listarPedidosDeAjusteParaRh", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("listarFeriasDaEquipe", "situacao")] = typeof(SituacaoDasFerias),
+        [("listarFeriasParaORh", "situacao")] = typeof(SituacaoDasFerias),
         [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),
