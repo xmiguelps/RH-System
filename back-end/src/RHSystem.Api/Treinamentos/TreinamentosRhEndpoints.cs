@@ -27,6 +27,7 @@ public static class TreinamentosRhEndpoints
         servicos.AddScoped<ReordenarModulosDeTreinamentoCasoDeUso>();
         servicos.AddScoped<AtualizarModuloDeTreinamentoCasoDeUso>();
         servicos.AddScoped<ExcluirModuloDeTreinamentoCasoDeUso>();
+        servicos.AddScoped<PublicarTreinamentoCasoDeUso>();
         return servicos;
     }
 
@@ -79,6 +80,11 @@ public static class TreinamentosRhEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        rh.MapPost("/treinamentos/{treinamentoId:int}/publicar", Publicar)
+            .WithName("publicarTreinamento")
+            .Produces<TreinamentoRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -88,6 +94,8 @@ public static class TreinamentosRhEndpoints
         await casoDeUso.ExecutarAsync(f.Publico, f.SetorIds, f.FuncionarioIds, ct);
 
     private static async Task<TreinamentoRh> Obter(int treinamentoId, ObterTreinamentoRhCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(treinamentoId, ct);
+
+    private static async Task<TreinamentoRh> Publicar(int treinamentoId, PublicarTreinamentoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(treinamentoId, ct);
 
     private static async Task<IResult> AdicionarModulo(int treinamentoId, HttpRequest requisicao, AdicionarModuloDeTreinamentoCasoDeUso casoDeUso, CancellationToken ct) =>
         Results.Json(await casoDeUso.ExecutarAsync(treinamentoId, await LerModuloAsync(requisicao, ct), ct), statusCode: StatusCodes.Status201Created);

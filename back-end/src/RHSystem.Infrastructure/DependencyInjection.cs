@@ -276,6 +276,7 @@ public static class DependencyInjection
         services.AddScoped<ITreinamentosRepositorio, TreinamentosRepositorio>();
         services.AddScoped<IConsultaDeTreinamentos, ConsultaDeTreinamentos>();
         services.AddScoped<IModulosRepositorio, ModulosRepositorio>();
+        services.AddScoped<IPublicoDoTreinamento, AlcanceDoPublicoDoTreinamento>();
         services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosModulos>(); // sem ela as sobras de treinamentos/ nunca seriam limpas
         services.AddScoped<IConsultaDeLembretes, ConsultaDeLembretes>();
         services.AddScoped<IConsultaDeEquipeDoFormulario, ConsultaDeEquipeDoFormulario>();

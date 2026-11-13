@@ -54,4 +54,16 @@ public interface ITreinamentosRepositorio
     /// Publicado: só título, descrição, a caixa de admitidos e a data de início.
     /// </summary>
     Task<bool> AtualizarAsync(TreinamentoLido lido, CamposDoTreinamento novos, CancellationToken ct);
+
+    /// <summary>Marca o treinamento como publicado por <c>UPDATE</c> condicional a "ainda não publicado nem encerrado": <c>false</c> se outra chamada publicou (ou encerrou) antes.</summary>
+    Task<bool> PublicarAsync(int treinamentoId, CancellationToken ct);
+
+    /// <summary>Cria a linha <c>INSCRITO</c> de cada pessoa que ainda não tem linha no treinamento (as datas ficam vazias) e devolve quantas criou. O banco recusa inativo: quem chama passa só pessoas ativas.</summary>
+    Task<int> InscreverAsync(int treinamentoId, IReadOnlyList<int> funcionarioIds, CancellationToken ct);
+}
+
+/// <summary>A porta do público: QUEM é do público do treinamento agora. Só pessoas ATIVAS com a admissão já ocorrida (<c>TODOS</c> = todas elas, <c>SETORES</c> = as dos setores escolhidos, <c>PESSOAS</c> = as escolhidas); treinamento sem público não alcança ninguém.</summary>
+public interface IPublicoDoTreinamento
+{
+    Task<IReadOnlyList<int>> PessoasAsync(int treinamentoId, DateOnly hoje, CancellationToken ct);
 }

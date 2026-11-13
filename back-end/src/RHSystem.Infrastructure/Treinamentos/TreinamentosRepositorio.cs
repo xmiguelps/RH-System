@@ -70,6 +70,24 @@ public sealed class TreinamentosRepositorio(AppDbContext db) : ITreinamentosRepo
         return true;
     }
 
+    public async Task<bool> PublicarAsync(int treinamentoId, CancellationToken ct)
+    {
+        var id = treinamentoId;
+
+        // AUDITORIA-OK: a publicação é auditada à mão pelo caso de uso (evento Publicou, na mesma transação); o UPDATE só vale se o treinamento ainda não foi publicado nem encerrado (duas chamadas ao mesmo tempo: só uma ganha).
+        var linhas = await db.Treinamentos.Where(t => t.Id == id && !t.Publicado && t.EncerradoEmUtc == null).ExecuteUpdateAsync(s => s.SetProperty(t => t.Publicado, true), ct);
+        return linhas == 1;
+    }
+
+    public async Task<int> InscreverAsync(int treinamentoId, IReadOnlyList<int> funcionarioIds, CancellationToken ct)
+    {
+        var existentes = await db.TreinamentosFuncionarios.AsNoTracking().Where(l => l.TreinamentoId == treinamentoId).Select(l => l.FuncionarioId).ToListAsync(ct);
+        var novos = funcionarioIds.Distinct().Except(existentes).ToList();
+        db.TreinamentosFuncionarios.AddRange(novos.Select(pessoa => TreinamentoFuncionario.Criar(treinamentoId, pessoa, SituacaoNoTreinamento.Inscrito)));
+        await db.SaveChangesAsync(ct);
+        return novos.Count;
+    }
+
     /// <summary><c>TODOS</c> não guarda linha; <c>SETORES</c> uma por setor; <c>PESSOAS</c> uma por pessoa (o caso de uso já zerou a lista do outro público).</summary>
     private void AdicionarPublico(int treinamentoId, CamposDoTreinamento campos)
     {
