@@ -2,5 +2,4 @@
 # O teste ConformidadeDoModeloTests confere os dois lados: toda tabela do banco esta mapeada ou esta aqui, e nenhuma daqui esta mapeada.
 # Quando uma fatia mapeia uma tabela, ela sai desta lista no mesmo passo.
 SEQUENCIAS  # so por SQL cru (V001); ver Task 2
-PAGAMENTOS_EXCECOES
 SCHEMA_VERSOES  # criada pelo executor de scripts, nao e entidade

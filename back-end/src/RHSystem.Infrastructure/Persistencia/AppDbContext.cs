@@ -12,6 +12,7 @@ using RHSystem.Domain.Documentos;
 using RHSystem.Domain.Emails;
 using RHSystem.Domain.Empresa;
 using RHSystem.Domain.Importacoes;
+using RHSystem.Domain.Pagamento;
 using RHSystem.Domain.Ponto;
 
 namespace RHSystem.Infrastructure.Persistencia;
@@ -107,6 +108,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TreinamentoCertificado> TreinamentosCertificados => Set<TreinamentoCertificado>();
 
     public DbSet<PedidoDeFerias> PedidosDeFerias => Set<PedidoDeFerias>();
+
+    public DbSet<ExcecaoDePagamento> ExcecoesDePagamento => Set<ExcecaoDePagamento>();
 
     public DbSet<Dependente> Dependentes => Set<Dependente>();
 
