@@ -33,6 +33,39 @@ public sealed class ConsultaDeAcompanhamento(AppDbContext db) : IConsultaDeAcomp
             .Select(r => new RespostaLida(r.Id, r.PerguntaId, r.Resposta, r.AlternativaId, r.NomeArquivoOriginal, r.RespondidaEmUtc))
             .ToListAsync(ct);
 
+    public async Task<(IReadOnlyList<CandidatoLido> Itens, int Total)> CandidatosAsync(int formularioId, string? busca, int pular, int tamanho, CancellationToken ct)
+    {
+        var consulta = db.FormulariosCandidatos.AsNoTracking().Where(c => c.FormularioId == formularioId);
+        if (busca is not null)
+        {
+            var like = BuscaLike.Contem(busca);
+            consulta = consulta.Where(c => EF.Functions.Like(c.Nome, like) || EF.Functions.Like(c.Email, like));
+        }
+
+        var total = await consulta.CountAsync(ct);
+        var itens = await consulta
+            .OrderByDescending(c => c.CadastradoEmUtc)
+            .ThenByDescending(c => c.Id)
+            .Skip(pular)
+            .Take(tamanho)
+            .Select(c => new CandidatoLido(c.Id, c.Nome, c.Email, c.Telefone, c.CaminhoCurriculo, c.CadastradoEmUtc))
+            .ToListAsync(ct);
+        return (itens, total);
+    }
+
+    public async Task<CandidatoLido?> CandidatoAsync(int formularioId, int candidatoId, CancellationToken ct) =>
+        await db.FormulariosCandidatos.AsNoTracking()
+            .Where(c => c.Id == candidatoId && c.FormularioId == formularioId)
+            .Select(c => new CandidatoLido(c.Id, c.Nome, c.Email, c.Telefone, c.CaminhoCurriculo, c.CadastradoEmUtc))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyList<RespostaLida>> DoCandidatoAsync(int formularioId, int candidatoId, CancellationToken ct) =>
+        await db.FormulariosRespostas.AsNoTracking()
+            .Where(r => r.FormularioId == formularioId && r.CandidatoId == candidatoId)
+            .OrderBy(r => r.PerguntaId)
+            .Select(r => new RespostaLida(r.Id, r.PerguntaId, r.Resposta, r.AlternativaId, r.NomeArquivoOriginal, r.RespondidaEmUtc))
+            .ToListAsync(ct);
+
     public async Task<ArquivoDeRespostaLido?> ArquivoAsync(int formularioId, int respostaId, CancellationToken ct) =>
         await db.FormulariosRespostas.AsNoTracking()
             .Where(r => r.Id == respostaId && r.FormularioId == formularioId && !r.Anonimo && r.CaminhoArquivo != null && r.NomeArquivoOriginal != null)

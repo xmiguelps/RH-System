@@ -27,5 +27,15 @@ public sealed record FormularioRespondentesRh(IReadOnlyList<FormularioRespondent
 /// <summary>O que uma pessoa respondeu, para o RH (<c>RespostaFormularioFuncionario</c>): <c>Avaliado</c> só nas avaliações e <c>RespondidoEmUtc</c> é o instante do envio.</summary>
 public sealed record RespostaFormularioFuncionario(int FormularioId, string Titulo, FuncionarioResumo Funcionario, FuncionarioResumo? Avaliado, DateTime RespondidoEmUtc, IReadOnlyList<RespostaFormularioDada> Respostas);
 
+/// <summary>Dados de quem respondeu por link (<c>CandidatoResumo</c>). Dado pessoal: só o RH vê. <c>TemCurriculo</c> diz se há currículo; o caminho do armazenamento nunca sai.</summary>
+public sealed record CandidatoResumo(int Id, string Nome, string Email, string? Telefone, bool TemCurriculo, DateTime RespondidoEmUtc);
+
+/// <summary>A lista de candidatos de um formulário por link (<c>CandidatoLista</c>).</summary>
+public sealed record CandidatoLista(IReadOnlyList<CandidatoResumo> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas)
+    : RespostaPaginada<CandidatoResumo>(Itens, Pagina, TamanhoPagina, Total, TotalPaginas);
+
+/// <summary>O que um candidato respondeu, para o RH (<c>RespostaFormularioCandidato</c>).</summary>
+public sealed record RespostaFormularioCandidato(int FormularioId, string Titulo, CandidatoResumo Candidato, IReadOnlyList<RespostaFormularioDada> Respostas);
+
 /// <summary>Os filtros da lista de respondentes já lidos: aba, setor e busca (só no nome de quem responde).</summary>
 public sealed record FiltroDeRespondentes(SituacaoDoRespondente? Situacao, int? SetorId, string? Busca);

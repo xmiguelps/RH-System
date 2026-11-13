@@ -11,6 +11,9 @@ public sealed record PessoaDaLista(int Id, string Nome, bool Ativo, string? Carg
 /// <summary>O arquivo de uma resposta: o caminho (que nunca sai da API) e o nome que a pessoa deu.</summary>
 public sealed record ArquivoDeRespostaLido(string Caminho, string Nome);
 
+/// <summary>Um candidato como a leitura do RH o traz: o caminho do currículo fica aqui dentro (só o caso de uso do download o usa para gerar o link) e nunca sai na resposta.</summary>
+public sealed record CandidatoLido(int Id, string Nome, string Email, string? Telefone, string? CaminhoDoCurriculo, DateTime CadastradoEmUtc);
+
 /// <summary>A leitura do RH sobre as respostas de um formulário. Nenhuma rota daqui devolve o id de uma resposta anônima nem a ordem de gravação dela: o anônimo só tem a CONTAGEM de participações.</summary>
 public interface IConsultaDeAcompanhamento
 {
@@ -25,6 +28,15 @@ public interface IConsultaDeAcompanhamento
 
     /// <summary>As linhas de UM envio da pessoa (para este avaliado, nas avaliações; no instante dado na Sugestão, <c>null</c> nos outros tipos), em ordem de pergunta.</summary>
     Task<IReadOnlyList<RespostaLida>> DoEnvioAsync(int formularioId, int funcionarioId, int? avaliadoId, DateTime? instanteUtc, CancellationToken ct);
+
+    /// <summary>Uma página dos candidatos do formulário, os mais recentes primeiro (empate pelo número, o maior primeiro), com o total já filtrado pela <paramref name="busca"/> (nome ou e-mail, sem diferenciar caixa nem acento; <c>null</c> = tudo).</summary>
+    Task<(IReadOnlyList<CandidatoLido> Itens, int Total)> CandidatosAsync(int formularioId, string? busca, int pular, int tamanho, CancellationToken ct);
+
+    /// <summary>O candidato <paramref name="candidatoId"/> DESTE formulário, ou <c>null</c> (não existe ou é de outro formulário).</summary>
+    Task<CandidatoLido?> CandidatoAsync(int formularioId, int candidatoId, CancellationToken ct);
+
+    /// <summary>As linhas de resposta do candidato, em ordem de pergunta.</summary>
+    Task<IReadOnlyList<RespostaLida>> DoCandidatoAsync(int formularioId, int candidatoId, CancellationToken ct);
 
     /// <summary>O arquivo da resposta <paramref name="respostaId"/> DESTE formulário, ou <c>null</c> (não existe, é de outro formulário, é anônima ou não tem arquivo).</summary>
     Task<ArquivoDeRespostaLido?> ArquivoAsync(int formularioId, int respostaId, CancellationToken ct);

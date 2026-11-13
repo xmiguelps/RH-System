@@ -9,6 +9,9 @@ namespace RHSystem.Api.Formularios;
 /// <summary>Os parâmetros de <c>GET /api/rh/formularios/{id}/respondentes</c>. <c>Situacao</c> chega como texto (o caso de uso o lê pelo nome do contrato e devolve todos os erros juntos num 400 só).</summary>
 public sealed record FiltrosDosRespondentes(int Pagina = 1, int TamanhoPagina = 20, string? Busca = null, string? Situacao = null, int? SetorId = null);
 
+/// <summary>Os parâmetros de <c>GET /api/rh/formularios/{id}/candidatos</c> (formulário por link): a página e a busca no nome e no e-mail.</summary>
+public sealed record FiltrosDosCandidatos(int Pagina = 1, int TamanhoPagina = 20, string? Busca = null);
+
 /// <summary>Os parâmetros de <c>GET /api/rh/formularios/{id}/respostas/funcionarios/{funcionarioId}</c>: o avaliado (nas avaliações) e o instante do envio (na Sugestão).</summary>
 public sealed record FiltrosDasRespostasDeFuncionario(int? AvaliadoId = null, DateTime? RespondidoEmUtc = null);
 
@@ -27,6 +30,9 @@ public static class FormulariosRhAcompanhamentoEndpoints
         servicos.AddScoped<ListarRespondentesDoFormularioCasoDeUso>();
         servicos.AddScoped<ObterRespostasDeFuncionarioCasoDeUso>();
         servicos.AddScoped<BaixarArquivoDeRespostaCasoDeUso>();
+        servicos.AddScoped<ListarCandidatosDoFormularioCasoDeUso>();
+        servicos.AddScoped<ObterRespostasDeCandidatoCasoDeUso>();
+        servicos.AddScoped<BaixarCurriculoDeCandidatoCasoDeUso>();
         servicos.AddScoped<ObterResultadoDoFormularioCasoDeUso>();
         servicos.AddScoped<ExportarRespostasDoFormularioCasoDeUso>();
         servicos.AddScoped<LembrarQuemFaltaFormularioCasoDeUso>();
@@ -49,6 +55,21 @@ public static class FormulariosRhAcompanhamentoEndpoints
 
         rh.MapGet("/formularios/{formularioId:int}/arquivos/{respostaId:int}/download", BaixarArquivo)
             .WithName("baixarArquivoDeResposta")
+            .Produces<LinkTemporario>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
+        rh.MapGet("/formularios/{formularioId:int}/candidatos", Candidatos)
+            .WithName("listarCandidatosFormulario")
+            .Produces<CandidatoLista>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        rh.MapGet("/formularios/{formularioId:int}/respostas/candidatos/{candidatoId:int}", RespostasDeCandidato)
+            .WithName("obterRespostasDeCandidato")
+            .Produces<RespostaFormularioCandidato>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        rh.MapGet("/formularios/{formularioId:int}/candidatos/{candidatoId:int}/curriculo/download", BaixarCurriculo)
+            .WithName("baixarCurriculoDeCandidato")
             .Produces<LinkTemporario>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
 
@@ -75,6 +96,13 @@ public static class FormulariosRhAcompanhamentoEndpoints
 
     private static async Task<RespostaFormularioFuncionario> RespostasDeFuncionario(int formularioId, int funcionarioId, [AsParameters] FiltrosDasRespostasDeFuncionario f, ObterRespostasDeFuncionarioCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(formularioId, funcionarioId, f.AvaliadoId, f.RespondidoEmUtc, ct);
+
+    private static async Task<CandidatoLista> Candidatos(int formularioId, [AsParameters] FiltrosDosCandidatos f, ListarCandidatosDoFormularioCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(formularioId, f.Pagina, f.TamanhoPagina, f.Busca, ct);
+
+    private static async Task<RespostaFormularioCandidato> RespostasDeCandidato(int formularioId, int candidatoId, ObterRespostasDeCandidatoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, candidatoId, ct);
+
+    private static async Task<LinkTemporario> BaixarCurriculo(int formularioId, int candidatoId, BaixarCurriculoDeCandidatoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, candidatoId, ct);
 
     private static async Task<FormularioResultado> Resultado(int formularioId, [AsParameters] FiltrosDoResultado f, ObterResultadoDoFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, f.AvaliadoId, ct);
 
