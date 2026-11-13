@@ -8,6 +8,7 @@ using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Ferias.Regras;
+using RHSystem.Application.Painel;
 using RHSystem.Domain.Beneficios;
 using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Responder;
@@ -56,6 +57,7 @@ public static class EnumsDeParametrosDoContrato
         [("listarFeriasDaEquipe", "situacao")] = typeof(SituacaoDasFerias),
         [("listarFeriasParaORh", "situacao")] = typeof(SituacaoDasFerias),
         [("listarPedidosDeBeneficio", "situacao")] = typeof(StatusDoPedidoDeBeneficio),
+        [("listarPendenciasDoRh", "tipo")] = typeof(PainelPendenciaTipo),
         [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),

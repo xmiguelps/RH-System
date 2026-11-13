@@ -64,6 +64,7 @@ using RHSystem.Infrastructure.Persistencia;
 using RHSystem.Infrastructure.Beneficios;
 using RHSystem.Infrastructure.Ferias;
 using RHSystem.Infrastructure.Pagamento;
+using RHSystem.Infrastructure.Painel;
 using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Infrastructure;
@@ -280,6 +281,7 @@ public static class DependencyInjection
         services.AddScoped<IAoEfetivarDesligamento, CancelaPedidosDeBeneficioAoDesligar>(); // desligar cancela os pedidos de benefício pendentes
         services.AddScoped<IExcecoesDePagamentoRepositorio, ExcecoesDePagamentoRepositorio>(); // as exceções de pagamento do RH (fatia 7)
         services.AddScoped<IFonteDoProximoPagamento, FonteDoProximoPagamento>(); // o "próximo pagamento" da ficha do RH: a mesma conta do cartão
+        services.AddScoped<IConsultaDoPainelDoRh, ConsultaDoPainelDoRh>(); // as filas de pendências e as pessoas da presença do painel do RH (fatia 7)
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();
