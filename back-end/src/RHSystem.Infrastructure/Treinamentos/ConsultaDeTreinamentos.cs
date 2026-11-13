@@ -55,6 +55,22 @@ public sealed class ConsultaDeTreinamentos(AppDbContext db) : IConsultaDeTreinam
         };
     }
 
+    public async Task<PendentesDoTreinamento> ContarPendentesAsync(int treinamentoId, CancellationToken ct)
+    {
+        var id = treinamentoId;
+        var ativas = db.TreinamentosFuncionarios.AsNoTracking().Where(l => l.TreinamentoId == id && db.Funcionarios.Any(f => f.Id == l.FuncionarioId && f.Ativo));
+        return new PendentesDoTreinamento(
+            await ativas.CountAsync(l => l.Situacao == SituacaoNoTreinamento.EmAndamento, ct),
+            await ativas.CountAsync(l => l.Situacao == SituacaoNoTreinamento.Inscrito, ct));
+    }
+
+    public async Task<int> ContarCertificadosEmitidosAsync(int treinamentoId, CancellationToken ct)
+    {
+        var id = treinamentoId;
+        var emite = await db.Treinamentos.AsNoTracking().Where(t => t.Id == id).Select(t => t.EmiteCertificado).SingleOrDefaultAsync(ct);
+        return emite ? await db.TreinamentosFuncionarios.AsNoTracking().CountAsync(l => l.TreinamentoId == id && l.Situacao == SituacaoNoTreinamento.Concluido, ct) : 0;
+    }
+
     public async Task<IReadOnlyList<int>> SetoresInexistentesAsync(IReadOnlyList<int> ids, CancellationToken ct)
     {
         var existem = await db.Setores.AsNoTracking().Where(s => ids.Contains(s.Id)).Select(s => s.Id).ToListAsync(ct);

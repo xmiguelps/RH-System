@@ -79,6 +79,42 @@ public sealed class TreinamentosRepositorio(AppDbContext db) : ITreinamentosRepo
         return linhas == 1;
     }
 
+    public async Task<bool> EncerrarAsync(TreinamentoLido lido, DateTime agoraUtc, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var comecaLido = lido.ComecaEm;
+        DateTime? agora = agoraUtc;
+
+        // AUDITORIA-OK: o encerramento é auditado à mão pelo caso de uso (evento Alterou, na mesma transação); o UPDATE só vale se o treinamento continua publicado, não encerrado e com a mesma data de início (duas chamadas ao mesmo tempo: só uma ganha).
+        var linhas = await db.Treinamentos
+            .Where(t => t.Id == id && t.Publicado && t.EncerradoEmUtc == null && t.ComecaEm == comecaLido)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.EncerradoEmUtc, agora), ct);
+        return linhas == 1;
+    }
+
+    public async Task ExcluirAsync(int treinamentoId, CancellationToken ct)
+    {
+        var id = treinamentoId;
+
+        // AUDITORIA-OK: a exclusão do treinamento é auditada à mão pelo caso de uso (evento Excluiu, na mesma transação); o progresso dos módulos some junto, primeiro (aponta para os módulos).
+        _ = await db.TreinamentosModulosProgresso.Where(p => db.TreinamentosModulos.Any(m => m.Id == p.ModuloId && m.TreinamentoId == id)).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: os módulos somem junto com o treinamento (evento Excluiu do caso de uso).
+        _ = await db.TreinamentosModulos.Where(m => m.TreinamentoId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as linhas de certificado são as que o trigger cria a cada conclusão; nenhuma é de certificado emitido quando se chega aqui (o caso de uso recusa antes).
+        _ = await db.TreinamentosCertificados.Where(c => c.TreinamentoId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: as linhas dos participantes somem junto com o treinamento (evento Excluiu do caso de uso).
+        _ = await db.TreinamentosFuncionarios.Where(l => l.TreinamentoId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: o público escolhido some junto com o treinamento (evento Excluiu do caso de uso).
+        _ = await db.TreinamentosPublico.Where(p => p.TreinamentoId == id).ExecuteDeleteAsync(ct);
+
+        // AUDITORIA-OK: por último o próprio treinamento (evento Excluiu do caso de uso, na mesma transação).
+        _ = await db.Treinamentos.Where(t => t.Id == id).ExecuteDeleteAsync(ct);
+    }
+
     public async Task<int> InscreverAsync(int treinamentoId, IReadOnlyList<int> funcionarioIds, CancellationToken ct)
     {
         var existentes = await db.TreinamentosFuncionarios.AsNoTracking().Where(l => l.TreinamentoId == treinamentoId).Select(l => l.FuncionarioId).ToListAsync(ct);
