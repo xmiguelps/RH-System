@@ -46,6 +46,45 @@ public sealed class ObterFeriasDaPessoaDaEquipeCasoDeUso(IEscopoDoUsuario escopo
 }
 
 /// <summary>
+/// <c>GET /api/gestor/ferias/calendario</c>: o quadro "Férias da equipe" (segunda a domingo, <c>semanas</c> de 1 a 26, padrão 13, começando na segunda da semana do <c>inicio</c> ou de hoje). Só as pessoas da equipe de hoje; só as que têm férias na janela. Gestor sem setor: o quadro vazio.
+/// </summary>
+public sealed class ObterCalendarioDeFeriasDaEquipeCasoDeUso(IEscopoDoUsuario escopo, IConsultaDeFerias consulta, IRelogio relogio)
+{
+    public async Task<FeriasCalendario> ExecutarAsync(DateOnly? inicio, int semanas, CancellationToken ct)
+    {
+        var erros = new ColetorDeErros();
+        if (semanas is < 1 or > CalendarioDeFerias.SemanasMaximo)
+        {
+            erros.Adicionar("semanas", "Informe de 1 a 26 semanas.");
+        }
+
+        if (inicio is { Year: < ValidacaoDeFerias.AnoMinimo or > ValidacaoDeFerias.AnoMaximo })
+        {
+            erros.Adicionar("inicio", "Informe uma data entre 2000 e 2100.");
+        }
+
+        erros.LancarSeHouver();
+        var janela = CalendarioDeFerias.Janela(inicio, semanas, FusoBrasil.Hoje(relogio.AgoraUtc));
+        var equipe = await escopo.ObterEquipeAsync(ct);
+        if (equipe is null)
+        {
+            return new FeriasCalendario(janela.Inicio, janela.Fim, janela.Semanas, []);
+        }
+
+        var itens = new List<FeriasCalendarioItem>();
+        foreach (var pedido in (await consulta.DaEquipeNaJanelaAsync(equipe, janela.Inicio, janela.Fim, ct)).OrderBy(p => p.DataInicio).ThenBy(p => p.Id))
+        {
+            if (CalendarioDeFerias.Situacao(pedido.ComoLinha(), equipe.GestorId) is { } situacao)
+            {
+                itens.Add(new FeriasCalendarioItem(pedido.Id, pedido.Funcionario, pedido.DataInicio, pedido.DataFim, situacao));
+            }
+        }
+
+        return new FeriasCalendario(janela.Inicio, janela.Fim, janela.Semanas, itens);
+    }
+}
+
+/// <summary>
 /// <c>GET /api/rh/funcionarios/{funcionarioId}/ferias</c>: a aba Férias da ficha do RH. A lista NÃO traz os pedidos que ainda estão com o gestor ou esperando a resposta da pessoa ("os pedidos aparecem aqui depois que o gestor analisa"), mas <c>resumo.pedidosEmAnalise</c> os conta. Pessoa que não existe: 404.
 /// </summary>
 public sealed class ObterFeriasDaFichaDoFuncionarioCasoDeUso(IEscopoDoUsuario escopo, IConsultaDeFerias consulta, IRelogio relogio)

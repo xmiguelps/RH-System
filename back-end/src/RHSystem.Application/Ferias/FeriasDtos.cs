@@ -142,6 +142,12 @@ public record FeriasConferenciaComando
     public int DiasAbono { get; init; }
 }
 
+/// <summary>Uma barra do quadro de férias da equipe: o pedido, a pessoa, o período e a cor.</summary>
+public sealed record FeriasCalendarioItem(int FeriasId, FuncionarioResumo Funcionario, DateOnly DataInicio, DateOnly DataFim, SituacaoDoItemDoCalendario Situacao);
+
+/// <summary>O quadro "Férias da equipe": a janela (segunda a domingo), a segunda de cada coluna e as barras (só as pessoas que têm férias na janela).</summary>
+public sealed record FeriasCalendario(DateOnly Inicio, DateOnly Fim, IReadOnlyList<DateOnly> Semanas, IReadOnlyList<FeriasCalendarioItem> Itens);
+
 /// <summary>A aba Férias da ficha de uma pessoa (do RH ou do gestor): os números, os períodos aquisitivos e os pedidos, do mais novo ao mais antigo.</summary>
 public sealed record FeriasFicha(FuncionarioResumo Funcionario, FeriasResumo Resumo, IReadOnlyList<FeriasPeriodoAquisitivo> PeriodosAquisitivos, IReadOnlyList<FeriasPedido> Ferias);
 

@@ -79,6 +79,9 @@ public interface IConsultaDeFerias
     /// <summary>A linha de <c>GESTORES</c> da pessoa (<c>null</c> se ela não está lá): o banco a exige na decisão final de um pedido sem etapa do gestor.</summary>
     Task<int?> GestorIdDaPessoaAsync(int funcionarioId, CancellationToken ct);
 
+    /// <summary>Os pedidos das pessoas da equipe de hoje do gestor (por pessoa, não pelo <c>ID_GESTOR</c>) que encostam na janela, menos os rejeitados e cancelados.</summary>
+    Task<IReadOnlyList<FeriasLida>> DaEquipeNaJanelaAsync(EquipeDoGestor equipe, DateOnly de, DateOnly ate, CancellationToken ct);
+
     /// <summary>A pessoa como resumo (nome, cargo, setor); <c>null</c> se não existe.</summary>
     Task<FuncionarioResumo?> ResumoAsync(int funcionarioId, CancellationToken ct);
 

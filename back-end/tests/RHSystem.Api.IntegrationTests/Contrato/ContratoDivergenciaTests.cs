@@ -36,6 +36,7 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "aprovarFeriasComoGestor",
         "recusarFeriasComoGestor",
         "sugerirOutraDataDasFerias",
+        "obterCalendarioDeFeriasDaEquipe",
         "aceitarSugestaoDeDataDasFerias",
         "recusarSugestaoDeDataDasFerias",
         "listarFeriasParaORh",
