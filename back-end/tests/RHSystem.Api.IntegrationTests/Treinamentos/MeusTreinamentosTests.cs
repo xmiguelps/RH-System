@@ -283,7 +283,7 @@ public class MeusTreinamentosTests(MySqlFixture mysql)
         var api = await ApiAsync();
         var (eu, cliente) = await PessoaAsync(api, "ZMeu7 Ana");
         var (outra, clienteDaOutra) = await PessoaAsync(api, "ZMeu7 Bia");
-        var emite = await EmAndamentoAsync(api, Titulo("ZMeu7 emite"), obrigatorio: true, emite: true);
+        var emite = await SemearAsync(api, Titulo("ZMeu7 emite"), "EM_ANDAMENTO", obrigatorio: true, publico: "TODOS", emite: true, onboarding: true);
         var m1 = await ModuloAsync(api, emite, 1, "VIDEO", duracao: 15);
         var m2 = await ModuloAsync(api, emite, 2, "TEXTO", duracao: 20);
         var m3 = await ModuloAsync(api, emite, 3, "PDF", duracao: null, caminho: "treinamentos/segredo.pdf", nomeArquivo: "apostila.pdf");
@@ -293,6 +293,9 @@ public class MeusTreinamentosTests(MySqlFixture mysql)
         await ProgressoAsync(api, m2, eu, "2026-08-02 10:35:00");
         await ProgressoAsync(api, m3, eu, "2026-09-15 11:05:00");
         await ProgressoAsync(api, m1, outra, "2026-08-03 08:00:00");
+        // a outra pessoa também concluiu este treinamento e tem o SEU certificado: o da Ana não pode se confundir com ele
+        var terceira = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, Titulo("ZMeu7 Caio"), Perfil.Funcionario, null, true, new DateOnly(2026, 1, 2));
+        await LinhaAsync(api, emite, terceira, "CONCLUIDO", "2026-08-03");
         const string codigoV4 = "a7f3c1d2-5e9b-4c68-b2d1-8f04e6a93b57";
         await Sql.ExecutarAsync(api.Conexao, $"UPDATE TREINAMENTOS_CERTIFICADOS SET CODIGO_VALIDACAO = '{codigoV4}', DATA_EMISSAO = '2026-09-15' WHERE ID_TREINAMENTO = {emite} AND ID_FUNCIONARIO = {eu}");
         var certificadoId = await ContarAsync(api, $"SELECT ID_CERTIFICADO FROM TREINAMENTOS_CERTIFICADOS WHERE ID_TREINAMENTO = {emite} AND ID_FUNCIONARIO = {eu}");
@@ -308,12 +311,15 @@ public class MeusTreinamentosTests(MySqlFixture mysql)
         var modulos = corpo.GetProperty("modulos").EnumerateArray().ToList();
         Assert.Equal([m1, m2, m3], modulos.Select(m => m.GetProperty("id").GetInt32()));
         Assert.Equal(["2026-08-02T13:10:00Z", "2026-08-02T13:35:00Z", "2026-09-15T14:05:00Z"], modulos.Select(m => m.GetProperty("concluidoEmUtc").GetString()!)); // o banco guarda -03:00
+        Assert.Equal([true, true, true], modulos.Select(m => m.GetProperty("concluido").GetBoolean()));
+        Assert.True(corpo.GetProperty("onboarding").GetBoolean());
         Assert.All(modulos, m => Assert.Equal(["concluido", "concluidoEmUtc", "duracaoMinutos", "id", "ordem", "tipo", "titulo"], m.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal))); // nada de conteúdo, link nem caminho
         Assert.DoesNotContain("segredo.pdf", corpo.GetRawText(), StringComparison.Ordinal);
 
         // a outra pessoa vê só o progresso DELA e nenhum certificado
         var dela = await CorpoAsync(await clienteDaOutra.GetAsync($"{Rota}/{emite}"));
         Assert.Equal(("EM_ANDAMENTO", 1, 2, JsonValueKind.Null), (dela.GetProperty("situacao").GetString(), dela.GetProperty("modulosConcluidos").GetInt32(), dela.GetProperty("moduloAtual").GetInt32(), dela.GetProperty("certificado").ValueKind));
+        Assert.Equal([true, false, false], dela.GetProperty("modulos").EnumerateArray().Select(m => m.GetProperty("concluido").GetBoolean()));
     }
 
     [Fact]

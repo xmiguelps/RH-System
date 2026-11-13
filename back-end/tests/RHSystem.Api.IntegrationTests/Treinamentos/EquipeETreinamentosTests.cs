@@ -44,6 +44,7 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
         var api = await ApiAsync();
         var p = Titulo("ZEqu1");
         var (gestor, a, b, outroSetor, comercial, financeiro) = (api.Elenco.Gestor.FuncionarioId, api.Elenco.MembroA.FuncionarioId, api.Elenco.MembroB.FuncionarioId, api.Elenco.DeOutroSetor.FuncionarioId, api.Elenco.SetorComercialId, api.Elenco.SetorFinanceiroId);
+        _ = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, Titulo("ZEqu1 Terceiro"), Perfil.Funcionario, comercial, true, new DateOnly(2026, 1, 2)); // a equipe tem 3 pessoas: a conta do "público de pessoas" não pode confundir quem não foi escolhido
         var obrigatorio = await SemearAsync(api, $"{p} B obrigatorio", "EM_ANDAMENTO", obrigatorio: true);
         await LinhaAsync(api, obrigatorio, a, "CONCLUIDO");
         await LinhaAsync(api, obrigatorio, b, "EM_ANDAMENTO", "2026-10-02");
@@ -59,6 +60,8 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
         await LinhaAsync(api, opcionalDaPessoa, a, "INSCRITO");
         var doFinanceiro = await SemearAsync(api, $"{p} E so do financeiro", "EM_ANDAMENTO", obrigatorio: false, publico: "SETORES");
         await PublicoDoSetorAsync(api, doFinanceiro, financeiro);
+        var semData = await SemearAsync(api, $"{p} H obrigatorio sem data", "EM_ANDAMENTO", obrigatorio: true, onboarding: true);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE TREINAMENTOS SET DATA_INICIO = NULL WHERE ID_TREINAMENTO = {semData}");
         _ = await SemearAsync(api, $"{p} F rascunho", obrigatorio: true);
         var encerrado = await SemearAsync(api, $"{p} G encerrado", "ENCERRADO", obrigatorio: true);
         await LinhaAsync(api, encerrado, b, "CONCLUIDO");
@@ -69,13 +72,14 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
 
         Assert.Equal(200, (int)resposta.StatusCode);
         await resposta.AfirmarConformeAoContratoAsync("listarTreinamentosDaEquipe");
-        Assert.Equal([antigo, encerrado, obrigatorio, opcionalDaPessoa, opcionalDoSetor], itens.Select(i => i.GetProperty("id").GetInt32())); // obrigatórios pelo comecaEm (01/08, 01/09, 01/10), depois os opcionais (01/10, 20/10); sem o do financeiro e sem o rascunho
+        Assert.Equal([antigo, encerrado, obrigatorio, semData, opcionalDaPessoa, opcionalDoSetor], itens.Select(i => i.GetProperty("id").GetInt32())); // obrigatórios pelo comecaEm (01/08, 01/09, 01/10, sem data por último), depois os opcionais (01/10, 20/10); sem o do financeiro e sem o rascunho
+        Assert.Equal([false, false, false, true, false, false], itens.Select(i => i.GetProperty("onboarding").GetBoolean()));
         (int, int, int, string) Numeros(int posicao) => (itens[posicao].GetProperty("totalNaEquipe").GetInt32(), itens[posicao].GetProperty("concluiram").GetInt32(), itens[posicao].GetProperty("inscritos").GetInt32(), itens[posicao].GetProperty("situacao").GetString()!);
         Assert.Equal((1, 0, 1, "EM_ANDAMENTO"), Numeros(0)); // só A tem linha no antigo
         Assert.Equal((1, 1, 1, "ENCERRADO"), Numeros(1));
         Assert.Equal((2, 1, 2, "EM_ANDAMENTO"), Numeros(2)); // A concluiu, B em andamento; o gestor e o outro setor ficam de fora
-        Assert.Equal((1, 0, 1, "EM_ANDAMENTO"), Numeros(3)); // opcional da pessoa: só ela está no público e se inscreveu
-        Assert.Equal((tamanhoDaEquipe, 0, 0, "AGENDADO"), Numeros(4)); // opcional do setor: a equipe inteira, ninguém inscrito
+        Assert.Equal((1, 0, 1, "EM_ANDAMENTO"), Numeros(4)); // opcional da pessoa: só ela está no público e se inscreveu
+        Assert.Equal((tamanhoDaEquipe, 0, 0, "AGENDADO"), Numeros(5)); // opcional do setor: a equipe inteira, ninguém inscrito
         Assert.DoesNotContain("certificado", await resposta.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
     }
 
@@ -101,6 +105,11 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
     {
         var api = await ApiAsync();
         var (gestor, a, b, outroSetor, emAdmissao) = (api.Elenco.Gestor.FuncionarioId, api.Elenco.MembroA.FuncionarioId, api.Elenco.MembroB.FuncionarioId, api.Elenco.DeOutroSetor.FuncionarioId, api.Elenco.EmAdmissao.FuncionarioId);
+        var c = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, Titulo("ZEqu3 Caio"), Perfil.Funcionario, api.Elenco.SetorComercialId, true, new DateOnly(2026, 1, 2));
+        var d = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, Titulo("ZEqu3 Dani"), Perfil.Funcionario, api.Elenco.SetorComercialId, true, new DateOnly(2026, 1, 2));
+        var e = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, Titulo("ZEqu3 Edu"), Perfil.Funcionario, api.Elenco.SetorComercialId, true, new DateOnly(2026, 1, 2));
+        var outro = await SemearAsync(api, Titulo("ZEqu3 outro treinamento"), "EM_ANDAMENTO", obrigatorio: true);
+        var moduloDoOutro = await ModuloAsync(api, outro, 1);
         var t = await SemearAsync(api, Titulo("ZEqu3"), "EM_ANDAMENTO", obrigatorio: true, emite: true);
         var modulos = new int[4];
         for (var i = 0; i < 4; i++)
@@ -114,6 +123,11 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
             await ProgressoAsync(api, m, a, "2026-09-15 11:05:00");
         }
 
+        await LinhaAsync(api, outro, a, "EM_ANDAMENTO", "2026-10-06");
+        await ProgressoAsync(api, moduloDoOutro, a, "2026-10-06 18:00:00"); // do MESMO a, de OUTRO treinamento e mais tarde: nunca pode virar o instante da conclusão deste
+        await LinhaAsync(api, t, c, "INSCRITO");
+        await LinhaAsync(api, t, d, "CONCLUIDO", "2026-09-10", "2026-09-20"); // concluiu antes de os módulos existirem: sem progresso, só o dia
+        await LinhaAsync(api, t, e, "INSCRITO");
         await LinhaAsync(api, t, b, "EM_ANDAMENTO", "2026-10-02");
         await ProgressoAsync(api, modulos[0], b, "2026-10-02 09:00:00");
         await ProgressoAsync(api, modulos[1], b, "2026-10-03 09:00:00");
@@ -128,10 +142,11 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
 
         Assert.Equal(200, (int)resposta.StatusCode);
         await resposta.AfirmarConformeAoContratoAsync("listarPessoasDaEquipeNoTreinamento");
-        Assert.Equal((1, 1), (corpo.GetProperty("concluiram").GetInt32(), corpo.GetProperty("faltamConcluir").GetInt32()));
+        Assert.Equal((2, 3), (corpo.GetProperty("concluiram").GetInt32(), corpo.GetProperty("faltamConcluir").GetInt32())); // A e D concluíram; B, C e E faltam
         var nomes = itens.Select(i => i.GetProperty("funcionario").GetProperty("nome").GetString()).ToList();
         Assert.Equal(nomes.Order(StringComparer.Ordinal), nomes); // por nome
-        Assert.Equal(new[] { a, b }.Order(), itens.Select(i => i.GetProperty("funcionario").GetProperty("id").GetInt32()).Order()); // só a equipe com linha: nem o gestor, nem o outro setor, nem quem está em admissão
+        Assert.Equal(new[] { a, b, c, d, e }.Order(), itens.Select(i => i.GetProperty("funcionario").GetProperty("id").GetInt32()).Order()); // só a equipe com linha: nem o gestor, nem o outro setor, nem quem está em admissão
+        Assert.Equal("2026-09-20T03:00:00Z", itens.Single(i => i.GetProperty("funcionario").GetProperty("id").GetInt32() == d).GetProperty("concluidoEmUtc").GetString()); // sem progresso: o dia gravado às 00:00 em -03:00
         var daA = itens.Single(i => i.GetProperty("funcionario").GetProperty("id").GetInt32() == a);
         var daB = itens.Single(i => i.GetProperty("funcionario").GetProperty("id").GetInt32() == b);
         Assert.Equal(("CONCLUIDO", "2026-09-15T14:05:00Z", 4, 4, JsonValueKind.Null, JsonValueKind.Null), (daA.GetProperty("situacao").GetString(), daA.GetProperty("concluidoEmUtc").GetString(), daA.GetProperty("modulosConcluidos").GetInt32(), daA.GetProperty("totalModulos").GetInt32(), daA.GetProperty("moduloAtual").ValueKind, daA.GetProperty("emFeriasAte").ValueKind));
@@ -167,6 +182,12 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
         var concluido = await SemearAsync(api, $"{p} concluido", "EM_ANDAMENTO", obrigatorio: true, emite: true);
         await ModuloAsync(api, concluido, 1);
         await LinhaAsync(api, concluido, a, "CONCLUIDO", "2026-08-10", "2026-08-21");
+        var semCertificado = await SemearAsync(api, $"{p} sem emissao", "EM_ANDAMENTO", obrigatorio: true, emite: false);
+        await ModuloAsync(api, semCertificado, 1);
+        await LinhaAsync(api, semCertificado, a, "CONCLUIDO", "2026-08-11", "2026-08-22");
+        var comecaHoje = await SemearAsync(api, $"{p} hoje", "EM_ANDAMENTO", obrigatorio: true);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE TREINAMENTOS SET DATA_INICIO = '2026-10-07' WHERE ID_TREINAMENTO = {comecaHoje}"); // liberado hoje já vale pendência
+        await LinhaAsync(api, comecaHoje, a, "INSCRITO");
         var pendente = await SemearAsync(api, $"{p} pendente", "EM_ANDAMENTO", obrigatorio: true);
         await ModuloAsync(api, pendente, 1);
         await ModuloAsync(api, pendente, 2);
@@ -195,10 +216,13 @@ public class EquipeETreinamentosTests(MySqlFixture mysql)
         await rh.AfirmarConformeAoContratoAsync("listarTreinamentosDeFuncionario");
         await doGestor.AfirmarConformeAoContratoAsync("listarTreinamentosDePessoaDaEquipe");
         var meus = Itens(corpoRh, p);
-        Assert.Equal(["concluido", "em andamento", "pendente", "opcional"], meus.Select(i => i.GetProperty("titulo").GetString()![(p.Length + 1)..])); // obrigatórios (o mesmo dia: por título), depois o opcional
+        Assert.Equal(["concluido", "em andamento", "pendente", "sem emissao", "hoje", "opcional"], meus.Select(i => i.GetProperty("titulo").GetString()![(p.Length + 1)..])); // obrigatórios (o mesmo dia: por título; o de hoje por último), depois o opcional
         var resumoRh = corpoRh.GetProperty("resumo");
-        Assert.Equal(2, resumoRh.GetProperty("pendentes").GetInt32()); // "pendente" (INSCRITO) e "em andamento" (EM_ANDAMENTO): só obrigatório em andamento; opcional, agendado, encerrado e REPROVADO fora
-        Assert.Equal((1, 1), (resumoRh.GetProperty("emAndamento").GetInt32(), resumoRh.GetProperty("concluidos").GetInt32()));
+        Assert.Equal(3, resumoRh.GetProperty("pendentes").GetInt32()); // "pendente" (INSCRITO), "em andamento" (EM_ANDAMENTO) e "hoje" (INSCRITO, liberado hoje): só obrigatório em andamento; opcional, agendado, encerrado e REPROVADO fora
+        Assert.Equal((1, 2), (resumoRh.GetProperty("emAndamento").GetInt32(), resumoRh.GetProperty("concluidos").GetInt32()));
+        var semCertificadoRh = meus.Single(i => i.GetProperty("treinamentoId").GetInt32() == semCertificado);
+        Assert.Equal(("CONCLUIDO", false), (semCertificadoRh.GetProperty("situacao").GetString(), semCertificadoRh.GetProperty("certificadoDisponivel").GetBoolean())); // concluiu, mas o treinamento não emite
+        Assert.False(meus.Single(i => i.GetProperty("treinamentoId").GetInt32() == emAndamento).GetProperty("certificadoDisponivel").GetBoolean()); // emite, mas não concluiu
         var concluidoRh = meus.Single(i => i.GetProperty("treinamentoId").GetInt32() == concluido);
         Assert.Equal(("CONCLUIDO", "2026-08-10", 1, true), (concluidoRh.GetProperty("situacao").GetString(), concluidoRh.GetProperty("iniciadoEm").GetString(), concluidoRh.GetProperty("totalModulos").GetInt32(), concluidoRh.GetProperty("certificadoDisponivel").GetBoolean()));
         Assert.Equal(corpoRh.GetProperty("resumo").GetProperty("pendentes").GetInt32(), corpoGestor.GetProperty("resumo").GetProperty("pendentes").GetInt32());

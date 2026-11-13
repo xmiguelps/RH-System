@@ -47,6 +47,8 @@ public class OnboardingTests(MySqlFixture mysql)
         var andamento = await OnboardingAsync(api, $"{p} em andamento");
         var agendado = await OnboardingAsync(api, $"{p} agendado", "AGENDADO");
         _ = await OnboardingAsync(api, $"{p} encerrado", "ENCERRADO");
+        var semData = await OnboardingAsync(api, $"{p} sem data");
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE TREINAMENTOS SET DATA_INICIO = NULL WHERE ID_TREINAMENTO = {semData}");
         _ = await SemearAsync(api, $"{p} rascunho", obrigatorio: true, onboarding: true);
         _ = await SemearAsync(api, $"{p} comum", "EM_ANDAMENTO", obrigatorio: true);
 
@@ -55,7 +57,7 @@ public class OnboardingTests(MySqlFixture mysql)
 
         Assert.Equal(200, (int)resposta.StatusCode);
         await resposta.AfirmarConformeAoContratoAsync("listarTreinamentosDeOnboarding");
-        Assert.Equal([andamento, agendado], corpo.GetProperty("itens").EnumerateArray().Select(i => i.GetProperty("id").GetInt32())); // 01/10 antes de 20/10; só os em vigor
+        Assert.Equal([andamento, agendado, semData], corpo.GetProperty("itens").EnumerateArray().Select(i => i.GetProperty("id").GetInt32())); // 01/10 antes de 20/10 e sem data por último; só os em vigor
         Assert.Equal(($"{p} em andamento", "2026-10-01"), (corpo.GetProperty("itens")[0].GetProperty("titulo").GetString(), corpo.GetProperty("itens")[0].GetProperty("comecaEm").GetString()));
     }
 
