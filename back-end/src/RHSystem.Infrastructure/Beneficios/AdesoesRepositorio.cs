@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Beneficios.Adesoes;
 using RHSystem.Application.Beneficios.Adesoes.Regras;
+using RHSystem.Application.Comunicacao.Regras;
 using RHSystem.Domain.Beneficios;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Gestao;
@@ -38,6 +39,132 @@ public sealed class AdesoesRepositorio(AppDbContext db) : IAdesoesRepositorio
                where l.Id == adesaoId && l.FuncionarioId == funcionarioId
                select new AdesaoParaFilho(l.Id, l.FuncionarioId, l.BeneficioId, b.Nome, b.AceitaDependentes, b.AceitaTrajeto, l.Status, l.Ativo))
             .FirstOrDefaultAsync(ct);
+
+    public async Task<AdesaoParaDecidir?> AdesaoParaDecidirAsync(int adesaoId, CancellationToken ct) =>
+        await (from l in db.BeneficiosDosFuncionarios.AsNoTracking()
+               join b in db.Beneficios.AsNoTracking() on l.BeneficioId equals b.Id
+               where l.Id == adesaoId
+               select new AdesaoParaDecidir(l.Id, l.FuncionarioId, b.Nome, l.Status, l.Ativo))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<FilhoParaDecidir?> DependenteParaDecidirAsync(int adesaoId, int dependenteId, CancellationToken ct) =>
+        await db.Dependentes.AsNoTracking()
+            .Where(d => d.Id == dependenteId && d.AdesaoId == adesaoId)
+            .Select(d => new FilhoParaDecidir(d.Id, d.AdesaoId, d.Status))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<FilhoParaDecidir?> TrajetoParaDecidirAsync(int adesaoId, int trajetoId, CancellationToken ct) =>
+        await db.TrajetosDeValeTransporte.AsNoTracking()
+            .Where(t => t.Id == trajetoId && t.AdesaoId == adesaoId)
+            .Select(t => new FilhoParaDecidir(t.Id, t.AdesaoId, t.Status))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> AprovarAdesaoAsync(int adesaoId, int funcionarioRhId, DateTime agoraUtc, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+        string? semMotivo = null;
+
+        // AUDITORIA-OK: a aprovação é auditada à mão pelo caso de uso (evento Aprovou, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF. Status, ativo, quem respondeu e quando (o CHECK exige as duas colunas de resposta juntas) vão no mesmo UPDATE.
+        var linhas = await db.BeneficiosDosFuncionarios.Where(l => l.Id == adesaoId && l.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(l => l.Status, StatusDoPedidoDeBeneficio.Aprovado)
+                .SetProperty(l => l.Ativo, true)
+                .SetProperty(l => l.FuncionarioRhId, rh)
+                .SetProperty(l => l.RespondidoEmUtc, agora)
+                .SetProperty(l => l.MotivoDaRecusa, semMotivo),
+            ct);
+        if (linhas != 1)
+        {
+            return false;
+        }
+
+        // AUDITORIA-OK: os dependentes pendentes da adesão são aprovados junto, com o mesmo RH e a mesma data; o evento da adesão é o registro e o ExecuteUpdate não passa pelo interceptor do EF.
+        await db.Dependentes.Where(d => d.AdesaoId == adesaoId && d.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Aprovado).SetProperty(d => d.FuncionarioRhId, rh).SetProperty(d => d.RespondidoEmUtc, agora),
+            ct);
+
+        // AUDITORIA-OK: idem para o trajeto pendente da adesão: o evento da adesão é o registro e o ExecuteUpdate não passa pelo interceptor do EF.
+        await db.TrajetosDeValeTransporte.Where(t => t.AdesaoId == adesaoId && t.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Aprovado).SetProperty(t => t.FuncionarioRhId, rh).SetProperty(t => t.RespondidoEmUtc, agora),
+            ct);
+        return true;
+    }
+
+    public async Task<bool> RecusarAdesaoAsync(int adesaoId, int funcionarioRhId, DateTime agoraUtc, string motivo, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+        string? motivoDaRecusa = motivo;
+
+        // AUDITORIA-OK: a recusa é auditada à mão pelo caso de uso (evento Recusou, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF. Status, motivo, quem respondeu e quando vão no mesmo UPDATE (CHECK).
+        var linhas = await db.BeneficiosDosFuncionarios.Where(l => l.Id == adesaoId && l.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(l => l.Status, StatusDoPedidoDeBeneficio.Recusado)
+                .SetProperty(l => l.FuncionarioRhId, rh)
+                .SetProperty(l => l.RespondidoEmUtc, agora)
+                .SetProperty(l => l.MotivoDaRecusa, motivoDaRecusa),
+            ct);
+        if (linhas != 1)
+        {
+            return false;
+        }
+
+        // AUDITORIA-OK: os dependentes pendentes da adesão recusada viram CANCELADO sem resposta (nem RH nem data); o evento da adesão é o registro e o ExecuteUpdate não passa pelo interceptor do EF.
+        await db.Dependentes.Where(d => d.AdesaoId == adesaoId && d.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
+
+        // AUDITORIA-OK: idem para o trajeto pendente: CANCELADO sem resposta; o evento da adesão é o registro e o ExecuteUpdate não passa pelo interceptor do EF.
+        await db.TrajetosDeValeTransporte.Where(t => t.AdesaoId == adesaoId && t.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
+        return true;
+    }
+
+    public async Task<bool> AprovarDependenteAsync(int adesaoId, int dependenteId, int funcionarioRhId, DateTime agoraUtc, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+
+        // AUDITORIA-OK: a aprovação do dependente é auditada à mão pelo caso de uso (evento Aprovou, sem dado do dependente), e o ExecuteUpdate não passa pelo interceptor do EF.
+        var linhas = await db.Dependentes.Where(d => d.Id == dependenteId && d.AdesaoId == adesaoId && d.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Aprovado).SetProperty(d => d.FuncionarioRhId, rh).SetProperty(d => d.RespondidoEmUtc, agora),
+            ct);
+        return linhas == 1;
+    }
+
+    public async Task<bool> RecusarDependenteAsync(int adesaoId, int dependenteId, int funcionarioRhId, DateTime agoraUtc, string motivo, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+        string? motivoDaRecusa = motivo;
+
+        // AUDITORIA-OK: a recusa do dependente é auditada à mão pelo caso de uso (evento Recusou, sem dado do dependente), e o ExecuteUpdate não passa pelo interceptor do EF. Status, motivo, RH e data vão juntos (CHECK).
+        var linhas = await db.Dependentes.Where(d => d.Id == dependenteId && d.AdesaoId == adesaoId && d.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Recusado).SetProperty(d => d.FuncionarioRhId, rh).SetProperty(d => d.RespondidoEmUtc, agora).SetProperty(d => d.MotivoDaRecusa, motivoDaRecusa),
+            ct);
+        return linhas == 1;
+    }
+
+    public async Task<bool> AprovarTrajetoAsync(int adesaoId, int trajetoId, int funcionarioRhId, DateTime agoraUtc, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+
+        // AUDITORIA-OK: a aprovação do trajeto é auditada à mão pelo caso de uso (evento Aprovou, sem origem nem destino), e o ExecuteUpdate não passa pelo interceptor do EF.
+        var linhas = await db.TrajetosDeValeTransporte.Where(t => t.Id == trajetoId && t.AdesaoId == adesaoId && t.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Aprovado).SetProperty(t => t.FuncionarioRhId, rh).SetProperty(t => t.RespondidoEmUtc, agora),
+            ct);
+        return linhas == 1;
+    }
+
+    public async Task<bool> RecusarTrajetoAsync(int adesaoId, int trajetoId, int funcionarioRhId, DateTime agoraUtc, string motivo, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        int? rh = funcionarioRhId;
+        string? motivoDaRecusa = motivo;
+
+        // AUDITORIA-OK: a recusa do trajeto é auditada à mão pelo caso de uso (evento Recusou, sem origem nem destino), e o ExecuteUpdate não passa pelo interceptor do EF. Status, motivo, RH e data vão juntos (CHECK).
+        var linhas = await db.TrajetosDeValeTransporte.Where(t => t.Id == trajetoId && t.AdesaoId == adesaoId && t.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(
+            s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Recusado).SetProperty(t => t.FuncionarioRhId, rh).SetProperty(t => t.RespondidoEmUtc, agora).SetProperty(t => t.MotivoDaRecusa, motivoDaRecusa),
+            ct);
+        return linhas == 1;
+    }
 
     public async Task<int> CriarAdesaoAsync(NovaAdesao dados, CancellationToken ct)
     {

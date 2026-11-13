@@ -1,4 +1,6 @@
 using RHSystem.Application.Beneficios.Adesoes.Regras;
+using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Domain.Beneficios;
 
 namespace RHSystem.Application.Beneficios.Adesoes;
@@ -31,6 +33,28 @@ public sealed record TrajetoDaPessoa(
     DateTime? RespondidoEmUtc,
     string? MotivoRecusa);
 
+/// <summary>Uma adesão como o RH a lê: a pessoa e o benefício já identificados, quem respondeu e os filhos (dependentes e trajetos) de qualquer situação.</summary>
+public sealed record AdesaoLidaPeloRh(
+    int AdesaoId,
+    FuncionarioResumo Funcionario,
+    ItemDoCatalogo Beneficio,
+    StatusDoPedidoDeBeneficio Status,
+    bool Ativo,
+    DateTime? PedidoEmUtc,
+    DateOnly? DataInicioDesejada,
+    bool AutorizaDescontoEmFolha,
+    FuncionarioResumo? RespondidoPor,
+    DateTime? RespondidoEmUtc,
+    string? MotivoRecusa,
+    IReadOnlyList<DependenteDaPessoa> Dependentes,
+    IReadOnlyList<TrajetoDaPessoa> Trajetos);
+
+/// <summary>O mínimo de uma adesão que quem decide precisa saber ANTES de travar a pessoa: de quem é e o nome do benefício (para o log).</summary>
+public sealed record AdesaoParaDecidir(int AdesaoId, int FuncionarioId, string NomeDoBeneficio, StatusDoPedidoDeBeneficio Status, bool Ativo);
+
+/// <summary>Um dependente ou trajeto que o RH vai decidir: a que adesão pertence e em que situação está.</summary>
+public sealed record FilhoParaDecidir(int Id, int AdesaoId, StatusDoPedidoDeBeneficio Status);
+
 /// <summary>O que um pedido de adesão grava: a linha e, junto, os dependentes e o trajeto pedidos com ela.</summary>
 public sealed record NovaAdesao(int FuncionarioId, int BeneficioId, DateOnly DataInicioDesejada, bool AutorizaDescontoEmFolha, IReadOnlyList<DadosDoDependente> Dependentes, DadosDoTrajeto? Trajeto, DateTime AgoraUtc);
 
@@ -46,6 +70,14 @@ public interface IConsultaDeAdesoes
     Task<IReadOnlyList<DependenteDaPessoa>> DependentesDaPessoaAsync(int funcionarioId, CancellationToken ct);
 
     Task<IReadOnlyList<TrajetoDaPessoa>> TrajetosDaPessoaAsync(int funcionarioId, CancellationToken ct);
+
+    /// <summary>
+    /// A lista do RH, uma linha por ADESÃO. <c>PENDENTE</c> traz as adesões pendentes e as já aprovadas que têm dependente ou trajeto <c>PENDENTE</c>, a mais antiga primeira pela menor data pendente; os outros valores filtram a adesão e saem pela data do pedido (a concedida direto, sem pedido, por último).
+    /// A busca procura no nome da pessoa.
+    /// </summary>
+    Task<(IReadOnlyList<AdesaoLidaPeloRh> Itens, int Total)> ListarParaORhAsync(StatusDoPedidoDeBeneficio situacao, int? beneficioId, ParametrosDeLista parametros, CancellationToken ct);
+
+    Task<AdesaoLidaPeloRh?> ObterParaORhAsync(int adesaoId, CancellationToken ct);
 }
 
 /// <summary>
@@ -72,6 +104,30 @@ public interface IAdesoesRepositorio
     /// A MESMA linha volta a ser pedido <c>PENDENTE</c> (a chave única recusa uma segunda): resposta, data e motivo se limpam juntos, os dependentes e trajetos <c>PENDENTE</c> antigos viram <c>CANCELADO</c> (sem resposta) e os novos entram.
     /// </summary>
     Task ReabrirAdesaoAsync(int adesaoId, NovaAdesao dados, CancellationToken ct);
+
+    /// <summary>A adesão de qualquer pessoa para o RH decidir, ou <c>null</c> se não existe.</summary>
+    Task<AdesaoParaDecidir?> AdesaoParaDecidirAsync(int adesaoId, CancellationToken ct);
+
+    /// <summary>O dependente SE for da adesão; de outra adesão ou inexistente, <c>null</c>.</summary>
+    Task<FilhoParaDecidir?> DependenteParaDecidirAsync(int adesaoId, int dependenteId, CancellationToken ct);
+
+    Task<FilhoParaDecidir?> TrajetoParaDecidirAsync(int adesaoId, int trajetoId, CancellationToken ct);
+
+    /// <summary>
+    /// As decisões do RH, cada uma UM <c>UPDATE</c> condicional ao pedido continuar <c>PENDENTE</c> (a corrida de dois RHs): <c>false</c> = outra decisão chegou antes e o chamador responde o 409. Aprovar a adesão a deixa <c>APROVADO</c> e ATIVA e aprova junto os dependentes e trajetos <c>PENDENTE</c> dela, com o
+    /// mesmo RH e a mesma data; recusar a adesão grava o motivo e CANCELA (sem resposta) os filhos <c>PENDENTE</c>. O RH e a data de resposta vão sempre juntos (<c>CHECK</c>).
+    /// </summary>
+    Task<bool> AprovarAdesaoAsync(int adesaoId, int funcionarioRhId, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> RecusarAdesaoAsync(int adesaoId, int funcionarioRhId, DateTime agoraUtc, string motivo, CancellationToken ct);
+
+    Task<bool> AprovarDependenteAsync(int adesaoId, int dependenteId, int funcionarioRhId, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> RecusarDependenteAsync(int adesaoId, int dependenteId, int funcionarioRhId, DateTime agoraUtc, string motivo, CancellationToken ct);
+
+    Task<bool> AprovarTrajetoAsync(int adesaoId, int trajetoId, int funcionarioRhId, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> RecusarTrajetoAsync(int adesaoId, int trajetoId, int funcionarioRhId, DateTime agoraUtc, string motivo, CancellationToken ct);
 
     /// <summary>O pedido de um dependente numa adesão. Devolve o id.</summary>
     Task<int> CriarDependenteAsync(int adesaoId, DadosDoDependente dependente, DateTime agoraUtc, CancellationToken ct);
