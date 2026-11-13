@@ -108,6 +108,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<PedidoDeFerias> PedidosDeFerias => Set<PedidoDeFerias>();
 
+    public DbSet<Dependente> Dependentes => Set<Dependente>();
+
+    public DbSet<TrajetoDeValeTransporte> TrajetosDeValeTransporte => Set<TrajetoDeValeTransporte>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 }

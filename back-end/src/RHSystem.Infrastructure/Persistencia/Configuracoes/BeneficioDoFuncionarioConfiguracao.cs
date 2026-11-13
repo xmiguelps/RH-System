@@ -20,8 +20,14 @@ public class BeneficioDoFuncionarioConfiguracao : IEntityTypeConfiguration<Benef
         builder.Property(b => b.Ativo).HasColumnName("BENEFICIO_ATIVO").ValueGeneratedNever();
         builder.Property(b => b.Status).HasColumnName("STATUS_PEDIDO").ValueGeneratedNever().HasConversion(new EnumComoTextoMaiusculo<StatusDoPedidoDeBeneficio>());
 
-        // As colunas do pedido (DATA_PEDIDO, DATA_INICIO_DESEJADA, AUTORIZA_DESCONTO_FOLHA, ID_FUNCIONARIO_RH, DATA_RESPOSTA, MOTIVO_RECUSA) ficam fora do modelo: aceitam
-        // NULL ou têm padrão. A fatia 7 as acrescenta a esta entidade.
+        // As colunas do pedido (fatia 7): datas em -03:00 com o relógio da aplicação; AUTORIZA_DESCONTO_FOLHA tem DEFAULT FALSE no banco e o padrão NÃO é declarado (o EF sempre manda o valor). Nulas na concessão direta da fatia 1.
+        builder.Property(b => b.PedidoEmUtc).HasColumnName("DATA_PEDIDO").HasConversion(ConversoresDeTempo.Brasil);
+        builder.Property(b => b.DataInicioDesejada).HasColumnName("DATA_INICIO_DESEJADA");
+        builder.Property(b => b.AutorizaDescontoNaFolha).HasColumnName("AUTORIZA_DESCONTO_FOLHA").ValueGeneratedNever();
+        builder.Property(b => b.FuncionarioRhId).HasColumnName("ID_FUNCIONARIO_RH");
+        builder.Property(b => b.RespondidoEmUtc).HasColumnName("DATA_RESPOSTA").HasConversion(ConversoresDeTempo.Brasil);
+        builder.Property(b => b.MotivoDaRecusa).HasColumnName("MOTIVO_RECUSA");
+        builder.HasOne<Funcionario>().WithMany().HasForeignKey(b => b.FuncionarioRhId);
         builder.HasOne(b => b.Beneficio).WithMany().HasForeignKey(b => b.BeneficioId);
         builder.HasOne<Funcionario>().WithMany().HasForeignKey(b => b.FuncionarioId);
     }
