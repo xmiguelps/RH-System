@@ -1,3 +1,4 @@
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Treinamentos.Regras;
 using RHSystem.Domain.Treinamentos;
 
@@ -41,6 +42,15 @@ public interface IConsultaDeTreinamentos
 
     /// <summary>Quantas pessoas o público alcança: só <b>ativas com a admissão já ocorrida</b> (<paramref name="hoje"/> inclusive); <c>TODOS</c> ignora as listas, <c>SETORES</c> usa os setores e <c>PESSOAS</c> as pessoas (número que não existe não conta).</summary>
     Task<int> ContarPublicoAsync(PublicoDoTreinamento publico, IReadOnlyList<int> setorIds, IReadOnlyList<int> funcionarioIds, DateOnly hoje, CancellationToken ct);
+
+    /// <summary>
+    /// A página da lista do RH. A situação (filtro, contagens e linha) sai do MESMO predicado por data com <paramref name="hoje"/>: encerrado = <c>ENCERRADO_EM</c> preenchido; rascunho = não publicado; agendado = publicado com a data de início depois de hoje; em andamento = o resto dos publicados. <c>Busca</c> procura no título; as contagens
+    /// ignoram a <paramref name="situacao"/> e respeitam a busca.
+    /// </summary>
+    Task<(IReadOnlyList<TreinamentoRhResumo> Itens, int Total, TreinamentoRhContagens Contagens)> ListarAsync(SituacaoDoTreinamento? situacao, ParametrosDeLista parametros, DateOnly hoje, CancellationToken ct);
+
+    /// <summary>Os números do topo da tela 22 (ver <see cref="TreinamentoRhIndicadores"/>).</summary>
+    Task<TreinamentoRhIndicadores> IndicadoresAsync(DateOnly hoje, CancellationToken ct);
 
     /// <summary>As pessoas ATIVAS com linha <c>EM_ANDAMENTO</c> ou <c>INSCRITO</c> no treinamento (inativa nunca conta como pendência).</summary>
     Task<PendentesDoTreinamento> ContarPendentesAsync(int treinamentoId, CancellationToken ct);

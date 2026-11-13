@@ -1,5 +1,7 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Treinamentos.Construtor;
 using RHSystem.Application.Treinamentos.Regras;
 using RHSystem.Domain.Treinamentos;
@@ -12,6 +14,77 @@ namespace RHSystem.Infrastructure.Treinamentos;
 /// </summary>
 public sealed class ConsultaDeTreinamentos(AppDbContext db) : IConsultaDeTreinamentos
 {
+    private static readonly MapaDeOrdenacao<Treinamento> Ordem = new MapaDeOrdenacao<Treinamento>("COMECA_EM", DirecaoDeOrdenacao.Desc, t => t.Id)
+        .Por("COMECA_EM", t => t.ComecaEm)
+        .Por("TITULO", t => t.Titulo);
+
+    /// <summary>A situação por data como predicado de banco (a mesma conta de <see cref="RegraDaSituacaoDoTreinamento"/>): encerrado vale mais que tudo, depois rascunho, agendado (data depois de hoje) e em andamento.</summary>
+    private static Expression<Func<Treinamento, bool>> DaSituacao(SituacaoDoTreinamento situacao, DateOnly hoje) => situacao switch
+    {
+        SituacaoDoTreinamento.Encerrado => t => t.EncerradoEmUtc != null,
+        SituacaoDoTreinamento.Rascunho => t => t.EncerradoEmUtc == null && !t.Publicado,
+        SituacaoDoTreinamento.Agendado => t => t.EncerradoEmUtc == null && t.Publicado && t.ComecaEm != null && t.ComecaEm > hoje,
+        _ => t => t.EncerradoEmUtc == null && t.Publicado && (t.ComecaEm == null || t.ComecaEm <= hoje),
+    };
+
+    public async Task<(IReadOnlyList<TreinamentoRhResumo> Itens, int Total, TreinamentoRhContagens Contagens)> ListarAsync(SituacaoDoTreinamento? situacao, ParametrosDeLista parametros, DateOnly hoje, CancellationToken ct)
+    {
+        var todos = db.Treinamentos.AsNoTracking();
+        if (parametros.Busca is { } busca)
+        {
+            var like = BuscaLike.Contem(busca);
+            todos = todos.Where(t => EF.Functions.Like(t.Titulo, like));
+        }
+
+        var contagens = new TreinamentoRhContagens(
+            await todos.CountAsync(ct),
+            await todos.Where(DaSituacao(SituacaoDoTreinamento.Rascunho, hoje)).CountAsync(ct),
+            await todos.Where(DaSituacao(SituacaoDoTreinamento.Agendado, hoje)).CountAsync(ct),
+            await todos.Where(DaSituacao(SituacaoDoTreinamento.EmAndamento, hoje)).CountAsync(ct),
+            await todos.Where(DaSituacao(SituacaoDoTreinamento.Encerrado, hoje)).CountAsync(ct));
+
+        var filtrada = situacao is { } aba ? todos.Where(DaSituacao(aba, hoje)) : todos;
+        var total = await filtrada.CountAsync(ct);
+        var linhas = await Ordem.Aplicar(filtrada, parametros).Skip(parametros.Pular).Take(parametros.TamanhoPagina)
+            .Select(t => new
+            {
+                t.Id,
+                t.Titulo,
+                t.Obrigatorio,
+                t.Onboarding,
+                t.EmiteCertificado,
+                t.Publicado,
+                t.ComecaEm,
+                t.EncerradoEmUtc,
+                t.Publico,
+                Modulos = db.TreinamentosModulos.Count(m => m.TreinamentoId == t.Id),
+                Participantes = db.TreinamentosFuncionarios.Count(l => l.TreinamentoId == t.Id),
+                Concluidos = db.TreinamentosFuncionarios.Count(l => l.TreinamentoId == t.Id && l.Situacao == SituacaoNoTreinamento.Concluido),
+            })
+            .ToListAsync(ct);
+        IReadOnlyList<TreinamentoRhResumo> itens =
+        [
+            .. linhas.Select(l => new TreinamentoRhResumo(l.Id, l.Titulo, l.Obrigatorio, l.Onboarding, l.EmiteCertificado, RegraDaSituacaoDoTreinamento.De(l.Publicado, l.ComecaEm, l.EncerradoEmUtc, hoje), l.ComecaEm, l.EncerradoEmUtc, l.Publico, l.Modulos, l.Participantes, l.Concluidos, l.EmiteCertificado ? l.Concluidos : 0)),
+        ];
+        return (itens, total, contagens);
+    }
+
+    public async Task<TreinamentoRhIndicadores> IndicadoresAsync(DateOnly hoje, CancellationToken ct)
+    {
+        var treinamentos = db.Treinamentos.AsNoTracking();
+        var emAndamento = await treinamentos.Where(DaSituacao(SituacaoDoTreinamento.EmAndamento, hoje)).CountAsync(ct);
+        var obrigatorios = await treinamentos.CountAsync(t => t.Publicado && t.Obrigatorio, ct);
+        var inicioDoAno = new DateOnly(hoje.Year, 1, 1);
+        var fimDoAno = new DateOnly(hoje.Year, 12, 31);
+        var certificados = await db.TreinamentosCertificados.AsNoTracking()
+            .CountAsync(c => c.EmitidoEm >= inicioDoAno && c.EmitidoEm <= fimDoAno && db.Treinamentos.Any(t => t.Id == c.TreinamentoId && t.EmiteCertificado), ct);
+        var obrigatoriosEmAndamento = await treinamentos.Where(DaSituacao(SituacaoDoTreinamento.EmAndamento, hoje)).Where(t => t.Obrigatorio).Select(t => t.Id).ToListAsync(ct);
+        var pendentes = await db.TreinamentosFuncionarios.AsNoTracking()
+            .Where(l => obrigatoriosEmAndamento.Contains(l.TreinamentoId) && (l.Situacao == SituacaoNoTreinamento.Inscrito || l.Situacao == SituacaoNoTreinamento.EmAndamento) && db.Funcionarios.Any(f => f.Id == l.FuncionarioId && f.Ativo))
+            .Select(l => l.FuncionarioId).Distinct().CountAsync(ct);
+        return new TreinamentoRhIndicadores(emAndamento, obrigatorios, certificados, hoje.Year, pendentes);
+    }
+
     public async Task<TreinamentoLido?> ObterAsync(int treinamentoId, CancellationToken ct)
     {
         var t = await db.Treinamentos.AsNoTracking().Where(x => x.Id == treinamentoId).SingleOrDefaultAsync(ct);

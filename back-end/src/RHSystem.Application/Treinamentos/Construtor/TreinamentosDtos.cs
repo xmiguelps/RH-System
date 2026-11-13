@@ -55,5 +55,17 @@ public sealed record TreinamentoRh(
     DateOnly? ComecaEm = null,
     PublicoDoTreinamento? Publico = null);
 
+/// <summary>Uma linha da lista do RH (<c>TreinamentoRhResumo</c>). <c>Concluidos</c> são as pessoas com <c>CONCLUIDO</c>; <c>CertificadosEmitidos</c> é igual a <c>Concluidos</c> quando o treinamento emite certificado e 0 quando não emite.</summary>
+public sealed record TreinamentoRhResumo(int Id, string Titulo, bool Obrigatorio, bool Onboarding, bool EmiteCertificado, SituacaoDoTreinamento Situacao, DateOnly? ComecaEm, DateTime? EncerradoEmUtc, PublicoDoTreinamento? Publico, int TotalModulos, int TotalParticipantes, int Concluidos, int CertificadosEmitidos);
+
+/// <summary>O número de cada aba da lista (<c>TreinamentoRhContagens</c>).</summary>
+public sealed record TreinamentoRhContagens(int Todos, int Rascunhos, int Agendados, int EmAndamento, int Encerrados);
+
+/// <summary>A lista do RH (<c>TreinamentoRhLista</c>): a página e as contagens das abas.</summary>
+public sealed record TreinamentoRhLista(IReadOnlyList<TreinamentoRhResumo> Itens, int Pagina, int TamanhoPagina, int Total, int TotalPaginas, TreinamentoRhContagens Contagens);
+
+/// <summary>Os números do topo da tela 22 (<c>TreinamentoRhIndicadores</c>); <c>Ano</c> é o ano de <c>CertificadosEmitidosNoAno</c>.</summary>
+public sealed record TreinamentoRhIndicadores(int EmAndamento, int Obrigatorios, int CertificadosEmitidosNoAno, int Ano, int PessoasComObrigatorioPendente);
+
 /// <summary>A contagem do passo Publicação (<c>TreinamentoPublicoContagem</c>).</summary>
 public sealed record TreinamentoPublicoContagem(int Total);

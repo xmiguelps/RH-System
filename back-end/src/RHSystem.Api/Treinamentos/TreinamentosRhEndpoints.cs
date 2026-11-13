@@ -10,6 +10,9 @@ namespace RHSystem.Api.Treinamentos;
 /// <summary>Os parâmetros de <c>GET /api/rh/treinamentos/publico/contagem</c>. <c>Publico</c> chega como texto (o caso de uso o lê pelo nome do contrato e devolve todos os erros juntos num 400 só); as duas listas se repetem na consulta (<c>setorIds=1&amp;setorIds=2</c>).</summary>
 public sealed record FiltrosDaContagemDoPublico(string? Publico = null, int[]? SetorIds = null, int[]? FuncionarioIds = null);
 
+/// <summary>Os parâmetros de <c>GET /api/rh/treinamentos</c>; <c>Situacao</c>, <c>OrdenarPor</c> e <c>Direcao</c> chegam como texto (o caso de uso os lê e devolve todos os erros juntos num 400 só).</summary>
+public sealed record FiltrosDaListaDeTreinamentos(int Pagina = 1, int TamanhoPagina = 20, string? Busca = null, string? Direcao = null, string? Situacao = null, string? OrdenarPor = null);
+
 /// <summary>
 /// Os treinamentos pelo RH (<c>/api/rh/treinamentos</c>). Os <c>operationId</c> e os códigos de resposta são os de <c>contrato/fontes/60-fatia-6-tad.yaml</c>. Esta parte: criar, obter, atualizar e contar o público; as demais rotas do construtor entram nas tarefas seguintes da fatia.
 /// </summary>
@@ -19,6 +22,8 @@ public static class TreinamentosRhEndpoints
 
     public static IServiceCollection AdicionarCasosDeUsoDosTreinamentosDoRh(this IServiceCollection servicos)
     {
+        servicos.AddScoped<ListarTreinamentosCasoDeUso>();
+        servicos.AddScoped<ObterIndicadoresDeTreinamentosCasoDeUso>();
         servicos.AddScoped<CriarTreinamentoCasoDeUso>();
         servicos.AddScoped<ObterTreinamentoRhCasoDeUso>();
         servicos.AddScoped<AtualizarTreinamentoCasoDeUso>();
@@ -36,6 +41,16 @@ public static class TreinamentosRhEndpoints
     public static IEndpointRouteBuilder MapTreinamentosRh(this IEndpointRouteBuilder rotas)
     {
         var rh = rotas.GrupoRh().WithTags(Etiqueta);
+
+        rh.MapGet("/treinamentos", Listar)
+            .WithName("listarTreinamentos")
+            .Produces<TreinamentoRhLista>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status500InternalServerError);
+
+        rh.MapGet("/treinamentos/resumo", Indicadores)
+            .WithName("obterIndicadoresDeTreinamentos")
+            .Produces<TreinamentoRhIndicadores>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status500InternalServerError);
 
         rh.MapPost("/treinamentos", Criar)
             .WithName("criarTreinamento")
@@ -99,6 +114,11 @@ public static class TreinamentosRhEndpoints
 
         return rotas;
     }
+
+    private static async Task<TreinamentoRhLista> Listar([AsParameters] FiltrosDaListaDeTreinamentos f, ListarTreinamentosCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(f.Pagina, f.TamanhoPagina, f.Busca, f.Situacao, f.OrdenarPor, f.Direcao, ct);
+
+    private static async Task<TreinamentoRhIndicadores> Indicadores(ObterIndicadoresDeTreinamentosCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(ct);
 
     private static async Task<IResult> Criar(TreinamentoComando corpo, CriarTreinamentoCasoDeUso casoDeUso, CancellationToken ct) => Results.Json(await casoDeUso.ExecutarAsync(corpo, ct), statusCode: StatusCodes.Status201Created);
 

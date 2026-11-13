@@ -10,6 +10,7 @@ using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Ponto;
+using RHSystem.Application.Treinamentos.Regras;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Colaboradores;
 using RHSystem.Domain.Comunicacao;
@@ -69,6 +70,8 @@ public static class EnumsDeParametrosDoContrato
         [("listarFormulariosRh", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("listarRespondentesFormulario", "situacao")] = typeof(SituacaoDoRespondente),
         [("contarPublicoDeTreinamento", "publico")] = typeof(PublicoDoTreinamento),
+        [("listarTreinamentos", "situacao")] = typeof(SituacaoDoTreinamento),
+        [("listarTreinamentos", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };
@@ -85,6 +88,7 @@ public static class EnumsDeParametrosDoContrato
     private static readonly Dictionary<(string Operacao, string Parametro), (string[] Valores, string Padrao)> Literais = new()
     {
         [("listarFormulariosRh", "ordenarPor")] = (["criadoEm", "titulo", "prazo"], "criadoEm"),
+        [("listarTreinamentos", "ordenarPor")] = (["TITULO", "COMECA_EM"], "COMECA_EM"),
     };
 
     /// <summary>Tem de vir DEPOIS de <see cref="NomesDeParametrosDoContrato"/>: a chave usa o nome já em camelCase.</summary>
