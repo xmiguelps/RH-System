@@ -132,6 +132,9 @@ public class PainelDoRhTests(MySqlFixture mysql)
         Assert.Equal(painel.GetProperty("pendencias").EnumerateArray().ToDictionary(p => Texto(p, "tipo"), p => p.GetProperty("quantidade").GetInt32()), itens.GroupBy(i => Texto(i, "tipo")).ToDictionary(g => g.Key, g => g.Count()));
         var daAdmissao = itens.Single(i => Texto(i, "tipo") == "ADMISSAO_COM_DOCUMENTOS_PENDENTES");
         Assert.Equal(("2026-10-13T03:00:00Z", "Começa em 13/10 e ainda não enviou o formulário de admissão"), (daAdmissao.GetProperty("desdeEmUtc").GetDateTime().ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"), Texto(daAdmissao, "descricao")));
+        Assert.Equal(
+            ["Atestado de 01/10 a 02/10", "Atestado de 06/10"],
+            itens.Where(i => Texto(i, "tipo") == "ATESTADO").Select(i => Texto(i, "descricao")).Order(StringComparer.Ordinal));
         Assert.DoesNotContain(itens, i => i.GetProperty("funcionario").GetProperty("id").GetInt32() == tarde || i.GetProperty("funcionario").GetProperty("id").GetInt32() == semFormulario || i.GetProperty("funcionario").GetProperty("id").GetInt32() == inativa.FuncionarioId);
         Assert.Contains(itens, i => Texto(i, "tipo") == "BENEFICIOS" && i.GetProperty("referenciaId").GetInt32() == adesaoPendente && Texto(i, "descricao") == "Adesão ao plano odontológico do painel");
         Assert.Contains(itens, i => Texto(i, "tipo") == "BENEFICIOS" && i.GetProperty("referenciaId").GetInt32() == adesaoComFilho && Texto(i, "descricao") == "Inclusão de dependente no plano de saúde do painel");
@@ -271,6 +274,7 @@ public class PainelDoRhTests(MySqlFixture mysql)
         _ = await PessoaAsync(api, "Sem registro agora");
         _ = await PessoaAsync(api, "Inativa agora", ativo: false);
         _ = await PessoaAsync(api, "Admitida amanha", admissao: new DateOnly(2026, 10, 8));
+        _ = await PessoaAsync(api, "Admitida hoje", admissao: new DateOnly(2026, 10, 7)); // o primeiro dia de casa já conta: está sem registro depois do limite
         await PontoDeTeste.BaterEmAsync(api.Conexao, trabalhando, new DateOnly(2026, 10, 7), (TipoDeMarcacao.Entrada, "2026-10-07 11:00:00"));
         await PontoDeTeste.NovasFeriasAsync(api.Conexao, deFerias, "2026-10-05", "2026-10-09", "APROVADA");
         await PontoDeTeste.NovoAtestadoAsync(api.Conexao, comAtestado, "2026-10-07", "2026-10-07", "VALIDADO", api.Elenco.Rh.FuncionarioId);
@@ -278,8 +282,8 @@ public class PainelDoRhTests(MySqlFixture mysql)
         var presenca = (await GetAsync(api, Rota)).GetProperty("presencaAgora");
 
         var c = presenca.GetProperty("contagensHoje");
-        Assert.Equal((1, 1, 1, base0 + 1, 0, 0), (c.GetProperty("trabalhando").GetInt32(), c.GetProperty("ferias").GetInt32(), c.GetProperty("atestado").GetInt32(), c.GetProperty("semRegistro").GetInt32(), c.GetProperty("aindaNaoComecou").GetInt32(), c.GetProperty("semExpediente").GetInt32()));
-        Assert.Equal((true, base0 + 4), (presenca.GetProperty("diaUtil").GetBoolean(), presenca.GetProperty("total").GetInt32()));
+        Assert.Equal((1, 1, 1, base0 + 2, 0, 0), (c.GetProperty("trabalhando").GetInt32(), c.GetProperty("ferias").GetInt32(), c.GetProperty("atestado").GetInt32(), c.GetProperty("semRegistro").GetInt32(), c.GetProperty("aindaNaoComecou").GetInt32(), c.GetProperty("semExpediente").GetInt32()));
+        Assert.Equal((true, base0 + 5), (presenca.GetProperty("diaUtil").GetBoolean(), presenca.GetProperty("total").GetInt32()));
     }
 
     [Fact]
@@ -316,6 +320,7 @@ public class PainelDoRhTests(MySqlFixture mysql)
         var zeca = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Zeca sem registro", Perfil.Funcionario, setor);
         var anaB = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Ana sem registro", Perfil.Funcionario, setor);
         var anaA = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Ana sem registro", Perfil.Funcionario, setor);
+        var anaMinuscula = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "ana sem registro", Perfil.Funcionario, setor); // só a caixa difere: a ordem alfabética não liga para ela e o empate vai pelo id
         var presente = await PessoaAsync(api, "Presente");
         await PontoDeTeste.BaterEmAsync(api.Conexao, presente, new DateOnly(2026, 10, 7), (TipoDeMarcacao.Entrada, "2026-10-07 11:00:00"));
 
@@ -325,12 +330,12 @@ public class PainelDoRhTests(MySqlFixture mysql)
 
         var itens = tudo.GetProperty("itens").EnumerateArray().ToList();
         Assert.Equal(painel, tudo.GetProperty("total").GetInt32());
-        Assert.Equal(elenco + 3, painel);
+        Assert.Equal(elenco + 4, painel);
         Assert.All(itens, i => Assert.Equal("SEM_REGISTRO", Texto(i, "situacaoHoje")));
         Assert.DoesNotContain(itens, i => i.GetProperty("id").GetInt32() == presente);
         Assert.Equal(itens.Select(i => Texto(i, "nome")).OrderBy(n => n, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), ignoreCase: true)), itens.Select(i => Texto(i, "nome")));
-        var daSetor = itens.Where(i => new[] { zeca, anaA, anaB }.Contains(i.GetProperty("id").GetInt32())).Select(i => i.GetProperty("id").GetInt32()).ToList();
-        Assert.Equal([Math.Min(anaA, anaB), Math.Max(anaA, anaB), zeca], daSetor);
+        var daSetor = itens.Where(i => new[] { zeca, anaA, anaB, anaMinuscula }.Contains(i.GetProperty("id").GetInt32())).Select(i => i.GetProperty("id").GetInt32()).ToList();
+        Assert.Equal([Math.Min(anaA, anaB), Math.Max(anaA, anaB), anaMinuscula, zeca], daSetor);
         Assert.Equal((2, painel), (pagina2.GetProperty("itens").GetArrayLength(), pagina2.GetProperty("total").GetInt32()));
         var primeiro = itens[0];
         Assert.True(primeiro.TryGetProperty("cargo", out _) && primeiro.TryGetProperty("setor", out _) && primeiro.TryGetProperty("ativo", out _));
@@ -370,6 +375,89 @@ public class PainelDoRhTests(MySqlFixture mysql)
         Assert.Equal("2026-10-08T06:03:00Z", alteracoes[0].GetProperty("quandoUtc").GetDateTime().ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"));
     }
 
+    // ---------------------------------------------------------------- desde, admissão e benefícios (os números das bordas)
+
+    [Fact]
+    public async Task O_desde_das_ferias_e_a_aprovacao_do_gestor_a_resposta_que_aceitou_a_sugestao_ou_a_solicitacao()
+    {
+        var api = await ApiAsync(nameof(O_desde_das_ferias_e_a_aprovacao_do_gestor_a_resposta_que_aceitou_a_sugestao_ou_a_solicitacao));
+        var (setor, _, gestorId) = await FeriasDeTeste.SetorComGestorAsync(api, "Desde das ferias");
+        var ana = await FeriasDeTeste.PessoaAsync(api, "Ana do desde", new DateOnly(2022, 3, 14), setor);
+        var bia = await FeriasDeTeste.PessoaAsync(api, "Bia do desde", new DateOnly(2022, 3, 14), setor);
+        var caio = await FeriasDeTeste.PessoaAsync(api, "Caio do desde", new DateOnly(2022, 3, 14), setor);
+        var aprovadaPeloGestor = await FeriasDeTeste.SemearAsync(api, ana.FuncionarioId, "2025-03-14", "2026-03-13", "2026-11-09", "2026-11-23", "SOLICITADA", "2026-09-29 09:00:00", gestorId, gestorAprovou: true);
+        var sugestaoAceita = await FeriasDeTeste.SemearAsync(api, bia.FuncionarioId, "2025-03-14", "2026-03-13", "2026-12-07", "2026-12-21", "SOLICITADA", "2026-09-20 09:00:00", gestorId, resultadoDoGestor: "SUGERIU_DATA", sugestaoInicio: "2026-12-14", sugestaoFim: "2026-12-28", respostaDaSugestao: "ACEITOU");
+        var semEtapaDoGestor = await FeriasDeTeste.SemearAsync(api, caio.FuncionarioId, "2025-03-14", "2026-03-13", "2027-01-11", "2027-01-25", "SOLICITADA", "2026-10-03 09:00:00");
+
+        var itens = (await GetAsync(api, $"{Rota}/pendencias?tipo=FERIAS")).GetProperty("itens").EnumerateArray().ToList();
+
+        // 09:00 em Brasília = 12:00 UTC; a aprovação é um dia depois da solicitação e a resposta à sugestão, dois dias depois
+        Assert.Equal(
+            [(sugestaoAceita, "2026-09-22T12:00:00Z"), (aprovadaPeloGestor, "2026-09-30T12:00:00Z"), (semEtapaDoGestor, "2026-10-03T12:00:00Z")],
+            itens.Select(i => (i.GetProperty("referenciaId").GetInt32(), i.GetProperty("desdeEmUtc").GetDateTime().ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))));
+    }
+
+    [Fact]
+    public async Task A_admissao_entra_de_hoje_a_7_dias_so_com_formulario_de_admissao_publicado_atribuido_e_ainda_sem_resposta()
+    {
+        var api = await ApiAsync(nameof(A_admissao_entra_de_hoje_a_7_dias_so_com_formulario_de_admissao_publicado_atribuido_e_ainda_sem_resposta));
+        var admissao = await FormulariosDeTeste.SemearAsync(api, FormulariosDeTeste.Titulo("Admissão das bordas"), "PUBLICADO", tipo: "ADMISSAO", alvo: "PESSOAS");
+        var pergunta = await FormulariosDeTeste.PerguntaAsync(api, admissao, "Dados");
+        var pesquisa = await FormulariosDeTeste.SemearAsync(api, FormulariosDeTeste.Titulo("Pesquisa das bordas"), "PUBLICADO", tipo: "PESQUISA", alvo: "PESSOAS");
+        _ = await FormulariosDeTeste.PerguntaAsync(api, pesquisa, "Como foi?");
+        var hoje = await PessoaAsync(api, "Admitida hoje com formulario", admissao: new DateOnly(2026, 10, 7));
+        var noLimite = await PessoaAsync(api, "Admitida em 7 dias", admissao: new DateOnly(2026, 10, 14));
+        var depoisDoLimite = await PessoaAsync(api, "Admitida em 8 dias", admissao: new DateOnly(2026, 10, 15));
+        var ontem = await PessoaAsync(api, "Admitida ontem", admissao: new DateOnly(2026, 10, 6));
+        var jaRespondeu = await PessoaAsync(api, "Admitida que ja respondeu", admissao: new DateOnly(2026, 10, 10));
+        var soPesquisa = await PessoaAsync(api, "Admitida so com pesquisa", admissao: new DateOnly(2026, 10, 9));
+        await RespostasDeTeste.EscolherPessoasAsync(api, admissao, hoje, noLimite, depoisDoLimite, ontem, jaRespondeu);
+        await RespostasDeTeste.EscolherPessoasAsync(api, pesquisa, soPesquisa);
+        await Sql.ExecutarAsync(api.Conexao, $"INSERT INTO FORMULARIOS_RESPOSTAS (ID_FORMULARIO_PERGUNTA, ID_FORMULARIO, ID_FUNCIONARIO, ID_AVALIADO, RESPOSTA, DATA_RESPOSTA, ANONIMO) VALUES ({pergunta}, {admissao}, {jaRespondeu}, NULL, 'Enviado', '2026-10-06 10:00:00', 0)");
+
+        var itens = (await GetAsync(api, $"{Rota}/pendencias?tipo=ADMISSAO_COM_DOCUMENTOS_PENDENTES")).GetProperty("itens").EnumerateArray().ToList();
+
+        Assert.Equal([hoje, noLimite], itens.Select(i => i.GetProperty("funcionario").GetProperty("id").GetInt32())); // por data de início: a de hoje e a de 7 dias
+    }
+
+    [Fact]
+    public async Task Beneficio_so_conta_adesao_pendente_ou_aprovada_com_filho_pendente_e_o_desde_e_o_do_pedido_pendente_mais_antigo()
+    {
+        var api = await ApiAsync(nameof(Beneficio_so_conta_adesao_pendente_ou_aprovada_com_filho_pendente_e_o_desde_e_o_do_pedido_pendente_mais_antigo));
+        var comDependentes = await BeneficiosDeTeste.ItemAsync(api, "Plano de saúde das bordas", opcional: false, dependentes: true);
+        var comTrajeto = await BeneficiosDeTeste.ItemAsync(api, "Vale-transporte das bordas", trajeto: true);
+        var simples = await BeneficiosDeTeste.ItemAsync(api, "Seguro das bordas");
+        var semNada = await PessoaAsync(api, "Aprovada sem nada pendente");
+        _ = await BeneficiosDeTeste.AdesaoAsync(api, semNada, simples); // aprovada e ativa, sem filho pendente: não é pendência
+        var comFilhos = await PessoaAsync(api, "Aprovada com dependente pendente");
+        var adesaoDosFilhos = await BeneficiosDeTeste.AdesaoAsync(api, comFilhos, comDependentes);
+        _ = await BeneficiosDeTeste.DependenteAsync(api, adesaoDosFilhos, "Ana Filha", status: "APROVADO", pedidoEm: "2026-01-10 08:00:00", respondidoEm: "2026-01-11 08:00:00"); // o pedido antigo já decidido não conta
+        _ = await BeneficiosDeTeste.DependenteAsync(api, adesaoDosFilhos, "Bia Filha", pedidoEm: "2026-10-02 08:00:00");
+        var comViagem = await PessoaAsync(api, "Aprovada com trajeto pendente");
+        var adesaoDaViagem = await BeneficiosDeTeste.AdesaoAsync(api, comViagem, comTrajeto);
+        _ = await BeneficiosDeTeste.TrajetoAsync(api, adesaoDaViagem, status: "APROVADO", pedidoEm: "2025-08-03 09:00:00", respondidoEm: "2025-08-04 09:00:00");
+        _ = await BeneficiosDeTeste.TrajetoAsync(api, adesaoDaViagem, origem: "Rua Nova, 10, São Paulo", pedidoEm: "2026-10-01 08:00:00");
+
+        var itens = (await GetAsync(api, $"{Rota}/pendencias?tipo=BENEFICIOS")).GetProperty("itens").EnumerateArray().ToList();
+
+        Assert.Equal(
+            [(adesaoDaViagem, "Atualização do trajeto do vale-transporte das bordas", "2026-10-01"), (adesaoDosFilhos, "Inclusão de dependente no plano de saúde das bordas", "2026-10-02")],
+            itens.Select(i => (i.GetProperty("referenciaId").GetInt32(), Texto(i, "descricao"), i.GetProperty("desdeEmUtc").GetDateTime().ToUniversalTime().ToString("yyyy-MM-dd"))));
+    }
+
+    [Fact]
+    public async Task Aniversarios_no_mesmo_dia_saem_em_ordem_alfabetica_sem_ligar_para_a_caixa_e_o_empate_vai_pela_ordem_de_cadastro()
+    {
+        var api = await ApiAsync(nameof(Aniversarios_no_mesmo_dia_saem_em_ordem_alfabetica_sem_ligar_para_a_caixa_e_o_empate_vai_pela_ordem_de_cadastro));
+        var maiuscula = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Duda do mesmo dia", Perfil.Funcionario, null, true, null);
+        var minuscula = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "duda do mesmo dia", Perfil.Funcionario, null, true, null);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_NASCIMENTO = '1991-10-16' WHERE ID_FUNCIONARIO IN ({maiuscula}, {minuscula})");
+
+        var dias = (await GetAsync(api, Rota)).GetProperty("proximosDias").EnumerateArray().ToList();
+
+        Assert.Equal(["Duda do mesmo dia", "duda do mesmo dia"], dias.Where(d => Texto(d, "tipo") == "ANIVERSARIO").Select(d => Texto(d, "titulo")));
+    }
+
     // ---------------------------------------------------------------- falhas e permissão
 
     [Fact]
@@ -393,7 +481,7 @@ public class PainelDoRhTests(MySqlFixture mysql)
         var semRegistro = await cliente.GetAsync($"{Rota}/presenca/sem-registro");
 
         Assert.Equal(0, painel.GetProperty("totalPendencias").GetInt32());
-        Assert.Equal(0, painel.GetProperty("presencaAgora").GetProperty("total").GetInt32());
+        Assert.Equal((0, true), (painel.GetProperty("presencaAgora").GetProperty("total").GetInt32(), painel.GetProperty("presencaAgora").GetProperty("diaUtil").GetBoolean()));
         Assert.Equal(200, (int)lista.StatusCode);
         Assert.Equal(500, (int)semRegistro.StatusCode); // a lista de nomes não tem o que mostrar sem a fonte: erro de servidor honesto, nunca uma lista errada
         var avisos = coletor.Mensagens.Where(m => m.StartsWith("[Warning]", StringComparison.Ordinal) && m.Contains("falhou", StringComparison.Ordinal)).ToList();

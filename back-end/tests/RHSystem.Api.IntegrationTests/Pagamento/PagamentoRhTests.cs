@@ -269,13 +269,31 @@ public class PagamentoRhTests(MySqlFixture mysql)
     public async Task Dois_PUT_do_mesmo_mes_ao_mesmo_tempo_nao_dao_500_e_deixam_uma_linha_so()
     {
         var api = await ApiAsync();
+        await Excecao(api, 2031, 3, "2031-03-18"); // o mesmo ano e o mesmo mês de outras linhas, com id MENOR: quem perde a corrida acha a linha certa, nunca uma vizinha
+        await Excecao(api, 2032, 12, "2032-12-18");
         var rh = await api.ClienteDoRhAgoraAsync();
 
         var respostas = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => rh.PutAsJsonAsync(Rota(2031, 12), new { dataPagamento = $"2031-12-{10 + i:00}" })));
 
         Assert.All(respostas, r => Assert.Equal(200, (int)r.StatusCode));
-        Assert.Equal(1, Linhas(api));
+        Assert.Equal(3, Linhas(api));
         Assert.Contains(Data(api, 2031, 12), Enumerable.Range(0, 8).Select(i => $"2031-12-{10 + i:00}"));
+        Assert.Equal(("2031-03-18", "2032-12-18"), (Data(api, 2031, 3), Data(api, 2032, 12)));
+    }
+
+    [Theory]
+    [InlineData(1, "2031-01-20")]
+    [InlineData(12, "2031-12-20")]
+    public async Task Janeiro_e_dezembro_valem_no_PUT_e_no_DELETE(int mes, string data)
+    {
+        var api = await ApiAsync();
+        var rh = await api.ClienteDoRhAgoraAsync();
+
+        var grava = await rh.PutAsJsonAsync(Rota(2031, mes), new { dataPagamento = data });
+        var remove = await rh.DeleteAsync(Rota(2031, mes));
+
+        Assert.Equal((200, 204), ((int)grava.StatusCode, (int)remove.StatusCode));
+        Assert.Equal(0, Linhas(api));
     }
 
     // ---------------------------------------------------------------- removerExcecaoDePagamento

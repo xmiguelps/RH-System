@@ -126,6 +126,7 @@ public class PainelDoGestorTests(MySqlFixture mysql)
         var anaB = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Ana do painel", Perfil.Funcionario, setor.SetorId);
         var anaA = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Ana do painel", Perfil.Funcionario, setor.SetorId);
         var bruno = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "bruno do painel", Perfil.Funcionario, setor.SetorId);
+        var anaMinuscula = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "ana do painel", Perfil.Funcionario, setor.SetorId); // só a caixa difere: empata com as outras Ana e vai pelo id
         _ = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Inativo do painel", Perfil.Funcionario, setor.SetorId, ativo: false);
         _ = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "De outro setor do painel", Perfil.Funcionario, (await AdvertenciasDeTeste.NovoSetorAsync(api)).SetorId);
 
@@ -135,7 +136,7 @@ public class PainelDoGestorTests(MySqlFixture mysql)
         Assert.Equal(equipe.GetProperty("total").GetInt32(), painel.GetProperty("totalPessoas").GetInt32());
         Assert.Equal(equipe.GetProperty("itens").EnumerateArray().Select(i => i.GetProperty("id").GetInt32()).Order(), painel.GetProperty("pessoas").EnumerateArray().Select(p => p.GetProperty("funcionario").GetProperty("id").GetInt32()).Order());
         var ordem = painel.GetProperty("pessoas").EnumerateArray().Select(p => (p.GetProperty("funcionario").GetProperty("nome").GetString()!, p.GetProperty("funcionario").GetProperty("id").GetInt32())).ToList();
-        Assert.Equal([("Ana do painel", Math.Min(anaA, anaB)), ("Ana do painel", Math.Max(anaA, anaB)), ("bruno do painel", bruno), ("Zeca do painel", zeca)], ordem);
+        Assert.Equal([("Ana do painel", Math.Min(anaA, anaB)), ("Ana do painel", Math.Max(anaA, anaB)), ("ana do painel", anaMinuscula), ("bruno do painel", bruno), ("Zeca do painel", zeca)], ordem);
     }
 
     // ---------------------------------------------------------------- as colunas
@@ -274,6 +275,42 @@ public class PainelDoGestorTests(MySqlFixture mysql)
         var painel = await PainelAsync(gestor);
 
         Assert.Equal((perto, "Avaliação do semestre " + longe), (painel.GetProperty("avaliacao").GetProperty("formularioId").GetInt32(), painel.GetProperty("avaliacao").GetProperty("ciclo").GetString()!));
+    }
+
+    [Fact]
+    public async Task Titulo_que_comeca_com_a_palavra_ciclo_leva_so_o_que_vem_depois_dela()
+    {
+        var api = await ApiAsync();
+        var (setor, gestor) = await SetorAsync(api);
+        _ = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Membro do ciclo no inicio", Perfil.Funcionario, setor.SetorId);
+        var unico = FormulariosDeTeste.Titulo("2028.1");
+        var formulario = await FormulariosDeTeste.SemearAsync(api, $"Ciclo {unico}", "PUBLICADO", tipo: "AVALIACAO", alvo: "PESSOAS", sentido: "GESTOR_AVALIA_EQUIPE");
+        await FormulariosDeTeste.PerguntaAsync(api, formulario, "Nota");
+        await RespostasDeTeste.EscolherPessoasAsync(api, formulario, setor.GestorFuncionarioId);
+
+        var painel = await PainelAsync(gestor);
+
+        Assert.Equal((formulario, unico), (painel.GetProperty("avaliacao").GetProperty("formularioId").GetInt32(), painel.GetProperty("avaliacao").GetProperty("ciclo").GetString()!));
+    }
+
+    [Fact]
+    public async Task So_a_avaliacao_publicada_em_que_o_gestor_avalia_a_equipe_vira_o_botao_mesmo_com_prazo_mais_perto_em_outras()
+    {
+        var api = await ApiAsync();
+        var (setor, gestor) = await SetorAsync(api);
+        _ = await ApoioDeTeste.CriarPessoaAsync(api.Conexao, "Membro dos sentidos", Perfil.Funcionario, setor.SetorId);
+        var certa = await FormulariosDeTeste.SemearAsync(api, $"{FormulariosDeTeste.Titulo("Avaliação da equipe")}, ciclo 2027.1", "PUBLICADO", tipo: "AVALIACAO", alvo: "PESSOAS", sentido: "GESTOR_AVALIA_EQUIPE", prazo: "2027-01-31");
+        var deOutroSentido = await FormulariosDeTeste.SemearAsync(api, FormulariosDeTeste.Titulo("A equipe avalia o gestor"), "PUBLICADO", tipo: "AVALIACAO", alvo: "PESSOAS", sentido: "EQUIPE_AVALIA_GESTOR", prazo: "2026-10-20");
+        var encerrada = await FormulariosDeTeste.SemearAsync(api, $"{FormulariosDeTeste.Titulo("Avaliação encerrada")}, ciclo 2025.1", "ENCERRADO", tipo: "AVALIACAO", alvo: "PESSOAS", sentido: "GESTOR_AVALIA_EQUIPE", prazo: "2026-10-10");
+        foreach (var id in new[] { certa, deOutroSentido, encerrada })
+        {
+            await FormulariosDeTeste.PerguntaAsync(api, id, "Nota");
+            await RespostasDeTeste.EscolherPessoasAsync(api, id, setor.GestorFuncionarioId);
+        }
+
+        var painel = await PainelAsync(gestor);
+
+        Assert.Equal((certa, "2027.1"), (painel.GetProperty("avaliacao").GetProperty("formularioId").GetInt32(), painel.GetProperty("avaliacao").GetProperty("ciclo").GetString()!));
     }
 
     // ---------------------------------------------------------------- privacidade, consultas e falhas
