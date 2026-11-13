@@ -17,6 +17,7 @@ public static class FeriasEuEndpoints
         servicos.AddScoped<ObterMinhasFeriasCasoDeUso>();
         servicos.AddScoped<ConferirPedidoDeFeriasCasoDeUso>();
         servicos.AddScoped<PedirFeriasCasoDeUso>();
+        servicos.AddScoped<ResponderASugestaoDeFeriasCasoDeUso>();
         return servicos;
     }
 
@@ -39,8 +40,22 @@ public static class FeriasEuEndpoints
             .Produces<FeriasConferencia>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status500InternalServerError);
 
+        grupo.MapPost("/ferias/{feriasId:int}/sugestao/aceitar", Aceitar)
+            .WithName("aceitarSugestaoDeDataDasFerias")
+            .Produces<FeriasPedido>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        grupo.MapPost("/ferias/{feriasId:int}/sugestao/recusar", RecusarSugestao)
+            .WithName("recusarSugestaoDeDataDasFerias")
+            .Produces<FeriasPedido>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
+
+    private static async Task<FeriasPedido> Aceitar(int feriasId, ResponderASugestaoDeFeriasCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.AceitarAsync(feriasId, ct);
+
+    private static async Task<FeriasPedido> RecusarSugestao(int feriasId, ResponderASugestaoDeFeriasCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.RecusarAsync(feriasId, ct);
 
     private static async Task<FeriasEuResposta> Obter(ObterMinhasFeriasCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(ct);
 

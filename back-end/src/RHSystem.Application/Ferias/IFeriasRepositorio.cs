@@ -23,4 +23,14 @@ public interface IFeriasRepositorio
     Task<bool> RecusarComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, string motivo, CancellationToken ct);
 
     Task<bool> SugerirComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, DateOnly inicio, DateOnly fim, CancellationToken ct);
+
+    /// <summary>
+    /// A resposta da PESSOA à sugestão do gestor, cada uma UM <c>UPDATE</c> condicional ao pedido do dono continuar esperando a resposta (<c>SOLICITADA</c>, <c>SUGERIU_DATA</c> e sem resposta). Aceitar copia as datas sugeridas para as do pedido (as sugeridas ficam: o <c>CHECK</c> exige) e grava <c>ACEITOU</c>;
+    /// recusar e expirar viram <c>CANCELADA</c> com <c>RECUSOU</c> ou <c>EXPIROU</c> no mesmo <c>UPDATE</c>. <c>false</c>: outra resposta (ou a tarefa) chegou antes.
+    /// </summary>
+    Task<bool> AceitarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> RecusarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> ExpirarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct);
 }

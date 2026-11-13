@@ -61,6 +61,41 @@ public sealed class FeriasRepositorio(AppDbContext db) : IFeriasRepositorio
         return linhas == 1;
     }
 
+    public async Task<bool> AceitarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        RespostaDaSugestao? aceitou = RespostaDaSugestao.Aceitou;
+
+        // AUDITORIA-OK: o aceite é auditado à mão pelo caso de uso (evento Alterou, com as datas de antes e de depois, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF. As datas sugeridas ficam gravadas (CHECK).
+        var linhas = await EsperandoARespostaDe(feriasId, funcionarioId).ExecuteUpdateAsync(
+            s => s.SetProperty(p => p.DataInicio, p => p.SugestaoDataInicio ?? p.DataInicio)
+                .SetProperty(p => p.DataFim, p => p.SugestaoDataFim ?? p.DataFim)
+                .SetProperty(p => p.RespostaDaSugestao, aceitou)
+                .SetProperty(p => p.RespostaDaSugestaoEmUtc, agora),
+            ct);
+        return linhas == 1;
+    }
+
+    public Task<bool> RecusarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct) => CancelarPorRespostaAsync(feriasId, funcionarioId, agoraUtc, RespostaDaSugestao.Recusou, ct);
+
+    public Task<bool> ExpirarSugestaoAsync(int feriasId, int funcionarioId, DateTime agoraUtc, CancellationToken ct) => CancelarPorRespostaAsync(feriasId, funcionarioId, agoraUtc, RespostaDaSugestao.Expirou, ct);
+
+    private async Task<bool> CancelarPorRespostaAsync(int feriasId, int funcionarioId, DateTime agoraUtc, RespostaDaSugestao resposta, CancellationToken ct)
+    {
+        DateTime? agora = InstanteAoSegundo.De(agoraUtc);
+        RespostaDaSugestao? daPessoa = resposta;
+
+        // AUDITORIA-OK: recusar ou deixar expirar a sugestão é auditado à mão pelo caso de uso (evento Alterou, na mesma transação), e o ExecuteUpdate não passa pelo interceptor do EF. Status e resposta vão no mesmo UPDATE (CHECK).
+        var linhas = await EsperandoARespostaDe(feriasId, funcionarioId).ExecuteUpdateAsync(
+            s => s.SetProperty(p => p.Status, StatusDasFerias.Cancelada).SetProperty(p => p.RespostaDaSugestao, daPessoa).SetProperty(p => p.RespostaDaSugestaoEmUtc, agora),
+            ct);
+        return linhas == 1;
+    }
+
+    /// <summary>O pedido do dono esperando a resposta dele à sugestão: <c>SOLICITADA</c>, <c>SUGERIU_DATA</c> e sem resposta ainda.</summary>
+    private IQueryable<PedidoDeFerias> EsperandoARespostaDe(int feriasId, int funcionarioId) =>
+        db.PedidosDeFerias.Where(p => p.Id == feriasId && p.FuncionarioId == funcionarioId && p.Status == StatusDasFerias.Solicitada && p.ResultadoDoGestor == ResultadoDoGestorNasFerias.SugeriuData && p.RespostaDaSugestao == null);
+
     /// <summary>O pedido ainda <c>SOLICITADA</c>, com o <c>ID_GESTOR</c> do gestor e sem resultado dele: o estado de partida das três decisões.</summary>
     private IQueryable<PedidoDeFerias> NaEtapaDoGestor(int feriasId, int gestorId) =>
         db.PedidosDeFerias.Where(p => p.Id == feriasId && p.Status == StatusDasFerias.Solicitada && p.GestorId == gestorId && p.ResultadoDoGestor == null);
