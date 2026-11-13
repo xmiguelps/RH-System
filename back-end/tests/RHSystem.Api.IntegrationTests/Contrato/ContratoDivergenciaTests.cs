@@ -62,6 +62,7 @@ public class ContratoDivergenciaTests(MySqlFixture mysql)
         "definirExcecaoDePagamento",
         "removerExcecaoDePagamento",
         "obterProximoPagamento",
+        "obterPainelDoFuncionario",
         "solicitarRedefinicaoDeSenha",
         "validarLinkDeSenha",
         "definirSenhaPeloLink",
