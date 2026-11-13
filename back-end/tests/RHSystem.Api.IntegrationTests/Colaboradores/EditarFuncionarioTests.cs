@@ -205,6 +205,32 @@ public class EditarFuncionarioTests(MySqlFixture mysql)
         Assert.Equal(new[] { fica, entra }.Order(), ficha.GetProperty("beneficios").EnumerateArray().Select(b => b.GetProperty("beneficioId").GetInt32()).Order());
     }
 
+    [Fact]
+    public async Task Editar_tirando_o_beneficio_cancela_os_pedidos_de_dependente_e_de_trajeto_pendentes_dele_e_deixa_os_ja_aprovados()
+    {
+        var api = await ApiAsync();
+        var pessoa = await PessoaAsync(api, "editar tira com filhos");
+        var sai = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Sai com filhos");
+        await SementeDoCadastro.BeneficioDoColaboradorAsync(api.Conexao, pessoa.Id, sai);
+        var adesao = (int)(await LinhaAsync(api, pessoa.Id, sai))!.Value.Id;
+        var pendente = await Beneficios.BeneficiosDeTeste.DependenteAsync(api, adesao, "Zyx Pendente", pedidoEm: "2026-10-06 08:00:00");
+        var aprovado = await Beneficios.BeneficiosDeTeste.DependenteAsync(api, adesao, "Zyx Aprovado", status: "APROVADO", pedidoEm: "2026-08-01 09:00:00", respondidoEm: "2026-08-02 10:00:00");
+        var trajetoPendente = await Beneficios.BeneficiosDeTeste.TrajetoAsync(api, adesao, pedidoEm: "2026-10-06 08:00:00");
+        var trajetoAprovado = await Beneficios.BeneficiosDeTeste.TrajetoAsync(api, adesao, status: "APROVADO", pedidoEm: "2025-08-03 09:00:00", respondidoEm: "2025-08-05 12:00:00");
+
+        var resposta = await EditarAsync(api, pessoa.Id, Corpo(pessoa, beneficios: []));
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal((false, "APROVADO"), ((await LinhaAsync(api, pessoa.Id, sai))!.Value.Ativo, (await LinhaAsync(api, pessoa.Id, sai))!.Value.Status));
+        // o pedido pendente de um benefício que saiu não pode ficar sem quem o decida (a adesão não está mais ativa: aprovar ou recusar daria 409)
+        Assert.Equal("CANCELADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM DEPENDENTES WHERE ID_DEPENDENTE = {pendente}") as string);
+        Assert.Equal("CANCELADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM TRAJETOS_VALE_TRANSPORTE WHERE ID_TRAJETO = {trajetoPendente}") as string);
+        Assert.Equal("APROVADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM DEPENDENTES WHERE ID_DEPENDENTE = {aprovado}") as string); // o já respondido não muda (Reativar traz de volta)
+        Assert.Equal("APROVADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM TRAJETOS_VALE_TRANSPORTE WHERE ID_TRAJETO = {trajetoAprovado}") as string);
+        var fila = await CorpoAsync(await api.Api.ClienteComo(api.Elenco.Rh).GetAsync($"/api/rh/beneficios-adesoes?beneficioId={sai}"));
+        Assert.Empty(fila.GetProperty("itens").EnumerateArray());
+    }
+
     [Theory]
     [InlineData("PENDENTE")]
     [InlineData("RECUSADO")]

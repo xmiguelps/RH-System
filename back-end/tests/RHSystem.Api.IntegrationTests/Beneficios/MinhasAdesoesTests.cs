@@ -400,6 +400,26 @@ public class MinhasAdesoesTests(MySqlFixture mysql)
             evento.Mudancas.OrderBy(m => m.Ordem).Where(m => !m.ValorOculto).Select(m => (m.Campo, m.ValorAntes!, m.ValorDepois!)));
     }
 
+    [Fact]
+    public async Task Pedir_de_novo_o_que_o_RH_tirou_cancela_tambem_o_dependente_e_o_trajeto_aprovados_da_adesao_antiga()
+    {
+        var api = await ApiAsync();
+        var eu = await NovaAsync(api, "Reabre com aprovados");
+        var item = await ItemAsync(api, dependentes: true, trajeto: true);
+        var adesao = await AdesaoAsync(api, eu.FuncionarioId, item, "APROVADO", ativo: false); // o RH tirou o benefício: a linha continua aprovada e desativada
+        await DependenteAsync(api, adesao, "Antiga Aprovada", status: "APROVADO", respondidoEm: "2026-02-01 09:00:00");
+        await TrajetoAsync(api, adesao, status: "APROVADO", pedidoEm: "2025-08-03 09:00:00", respondidoEm: "2025-08-05 12:00:00");
+
+        var resposta = await PostAsync(api, eu, RotaDosPedidos, PedidoDeAdesao(item, "2026-11-10", autoriza: true, dependentes: [Helena]));
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        // o filho antigo só volta se o RH aprovar de novo: o que não faz parte do pedido novo é cancelado (V001, "ao refazer um pedido na mesma linha")
+        Assert.Equal("CANCELADO,PENDENTE", SituacaoDosFilhos(api, "DEPENDENTES", "ID_DEPENDENTE", adesao));
+        Assert.Equal("CANCELADO", SituacaoDosFilhos(api, "TRAJETOS_VALE_TRANSPORTE", "ID_TRAJETO", adesao));
+        var meus = await CorpoAsync(await (await api.ClienteAgoraAsync(eu.UsuarioId)).GetAsync(RotaEu));
+        Assert.Empty(meus.GetProperty("dependentesCadastrados").EnumerateArray());
+    }
+
     [Theory]
     [InlineData("CANCELADO", false, "Cancelado")]
     [InlineData("APROVADO", false, "Aprovado")]

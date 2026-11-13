@@ -204,12 +204,32 @@ public sealed class EdicaoDeFuncionarios(
             }
         }
 
-        foreach (var linha in linhas.Where(l => l.Ativo && l.Status == StatusDoPedidoDeBeneficio.Aprovado && !conjunto.Contains(l.BeneficioId)))
+        var desativadas = linhas.Where(l => l.Ativo && l.Status == StatusDoPedidoDeBeneficio.Aprovado && !conjunto.Contains(l.BeneficioId)).ToList();
+        foreach (var linha in desativadas)
         {
             linha.Desativar();
         }
 
+        await CancelarPedidosPendentesDosFilhosAsync([.. desativadas.Select(l => l.Id)], ct);
         await RegistrarMudancaDeBeneficiosAsync(funcionario, antes, conjunto, ct);
+    }
+
+    /// <summary>
+    /// Um benefício tirado deixa de aceitar resposta (a adesão não está mais ativa: aprovar ou recusar o filho daria 409), então o dependente e o trajeto que ainda esperavam o RH viram <c>CANCELADO</c>, sem resposta e sem evento próprio (o evento "Benefícios de ..." já diz que o benefício saiu).
+    /// O que já foi respondido não muda: reativar o benefício traz o filho aprovado de volta; pedir de novo cancela os aprovados (<c>ReabrirAdesaoAsync</c>).
+    /// </summary>
+    private async Task CancelarPedidosPendentesDosFilhosAsync(List<int> adesaoIds, CancellationToken ct)
+    {
+        if (adesaoIds.Count == 0)
+        {
+            return;
+        }
+
+        // AUDITORIA-OK: o cancelamento dos pedidos pendentes de um benefício que saiu não tem evento próprio (o evento da mudança de benefícios é o registro) e o ExecuteUpdate não passa pelo interceptor do EF.
+        await db.Dependentes.Where(d => adesaoIds.Contains(d.AdesaoId) && d.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
+
+        // AUDITORIA-OK: idem para os trajetos pendentes.
+        await db.TrajetosDeValeTransporte.Where(t => adesaoIds.Contains(t.AdesaoId) && t.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
     }
 
     /// <summary>

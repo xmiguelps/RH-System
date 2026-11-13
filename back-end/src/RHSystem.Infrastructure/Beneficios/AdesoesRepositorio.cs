@@ -181,11 +181,13 @@ public sealed class AdesoesRepositorio(AppDbContext db) : IAdesoesRepositorio
         linha.Reabrir(dados.DataInicioDesejada, dados.AutorizaDescontoEmFolha, dados.AgoraUtc);
         await SalvarTraduzindoAsync(ct);
 
+        // O que não faz parte do pedido novo é cancelado, pendente ou aprovado (V001, "ao refazer um pedido na mesma linha"): senão o dependente ou o trajeto de uma adesão antiga reaparece aprovado numa adesão que o RH ainda nem decidiu. Recusados e cancelados ficam como histórico.
+
         // AUDITORIA-OK: o cancelamento dos filhos pendentes não tem evento próprio: o evento da reabertura da adesão, escrito à mão pelo caso de uso na mesma transação, já diz que o pedido recomeçou; o ExecuteUpdate não passa pelo interceptor do EF. Sem resposta (RH e data ficam nulos juntos, CHECK).
-        await db.Dependentes.Where(d => d.AdesaoId == adesaoId && d.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
+        await db.Dependentes.Where(d => d.AdesaoId == adesaoId && (d.Status == StatusDoPedidoDeBeneficio.Pendente || d.Status == StatusDoPedidoDeBeneficio.Aprovado)).ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
 
         // AUDITORIA-OK: idem para o trajeto pendente anterior: o evento da reabertura é o registro; o ExecuteUpdate não passa pelo interceptor do EF.
-        await db.TrajetosDeValeTransporte.Where(t => t.AdesaoId == adesaoId && t.Status == StatusDoPedidoDeBeneficio.Pendente).ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
+        await db.TrajetosDeValeTransporte.Where(t => t.AdesaoId == adesaoId && (t.Status == StatusDoPedidoDeBeneficio.Pendente || t.Status == StatusDoPedidoDeBeneficio.Aprovado)).ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, StatusDoPedidoDeBeneficio.Cancelado), ct);
 
         await GravarOsFilhosAsync(adesaoId, dados, ct);
     }
