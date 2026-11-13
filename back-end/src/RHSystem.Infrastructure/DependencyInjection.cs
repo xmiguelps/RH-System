@@ -26,6 +26,8 @@ using RHSystem.Application.Formularios.Equipe;
 using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Lembretes;
 using RHSystem.Application.Formularios.Publico;
+using RHSystem.Application.Treinamentos.Construtor;
+using RHSystem.Infrastructure.Treinamentos;
 using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
@@ -271,6 +273,8 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeAcompanhamento, ConsultaDeAcompanhamento>();
         services.AddScoped<IConsultaDeResultado, ConsultaDeResultado>();
         services.AddScoped<ICandidatosRepositorio, CandidatosRepositorio>();
+        services.AddScoped<ITreinamentosRepositorio, TreinamentosRepositorio>();
+        services.AddScoped<IConsultaDeTreinamentos, ConsultaDeTreinamentos>();
         services.AddScoped<IConsultaDeLembretes, ConsultaDeLembretes>();
         services.AddScoped<IConsultaDeEquipeDoFormulario, ConsultaDeEquipeDoFormulario>();
         services.AddScoped<LembretesDoFormulario>();

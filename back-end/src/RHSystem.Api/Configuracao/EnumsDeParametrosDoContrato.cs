@@ -15,6 +15,7 @@ using RHSystem.Domain.Colaboradores;
 using RHSystem.Domain.Comunicacao;
 using RHSystem.Domain.Formularios;
 using RHSystem.Domain.Ponto;
+using RHSystem.Domain.Treinamentos;
 
 namespace RHSystem.Api.Configuracao;
 
@@ -67,9 +68,18 @@ public static class EnumsDeParametrosDoContrato
         [("listarFormulariosRh", "situacao")] = typeof(SituacaoDoFormulario),
         [("listarFormulariosRh", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("listarRespondentesFormulario", "situacao")] = typeof(SituacaoDoRespondente),
+        [("contarPublicoDeTreinamento", "publico")] = typeof(PublicoDoTreinamento),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
     };
+
+    /// <summary>
+    /// Os filtros de enum que o contrato declara OBRIGATÓRIOS na consulta. A API os liga como texto anulável (o caso de uso devolve o 400 com <c>errors.&lt;campo&gt;</c> junto com os outros erros, em vez de o binder recusar sozinho); o documento gerado os marca como obrigatórios como o contrato.
+    /// </summary>
+    private static readonly HashSet<(string Operacao, string Parametro)> Obrigatorios =
+    [
+        ("contarPublicoDeTreinamento", "publico"),
+    ];
 
     /// <summary>Os valores que o contrato escreve em camelCase (não em MAIÚSCULAS_COM_SUBLINHADO), com o padrão, por <c>operationId</c> e nome do parâmetro.</summary>
     private static readonly Dictionary<(string Operacao, string Parametro), (string[] Valores, string Padrao)> Literais = new()
@@ -109,6 +119,10 @@ public static class EnumsDeParametrosDoContrato
                     Type = JsonSchemaType.String,
                     Enum = [.. Enum.GetNames(tipo).Select(n => (JsonNode)JsonValue.Create(JsonNamingPolicy.SnakeCaseUpper.ConvertName(n))!)],
                 };
+                if (Obrigatorios.Contains((operacao.OperationId ?? string.Empty, nome)))
+                {
+                    concreto.Required = true;
+                }
             }
         }
     }
