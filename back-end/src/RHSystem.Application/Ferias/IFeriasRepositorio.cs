@@ -13,4 +13,14 @@ public interface IFeriasRepositorio
 
     /// <summary>Grava o pedido novo e devolve o id. A recusa de trigger do banco (pessoa inativa) sobe já traduzida em 422.</summary>
     Task<int> CriarAsync(PedidoDeFerias pedido, CancellationToken ct);
+
+    /// <summary>
+    /// As três decisões da etapa do gestor: cada uma é UM <c>UPDATE</c> condicional ao pedido continuar <c>SOLICITADA</c>, com o <c>ID_GESTOR</c> dele e sem resultado dele ainda. <c>false</c>: outra decisão chegou antes (o mesmo clique, o gestor ausente, o RH, a inativação); o chamador relê o estado e responde o 409 certo.
+    /// Nenhuma toca na <c>OBSERVACAO</c> (a mensagem da pessoa).
+    /// </summary>
+    Task<bool> AprovarComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, CancellationToken ct);
+
+    Task<bool> RecusarComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, string motivo, CancellationToken ct);
+
+    Task<bool> SugerirComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, DateOnly inicio, DateOnly fim, CancellationToken ct);
 }

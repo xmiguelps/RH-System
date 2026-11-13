@@ -7,6 +7,7 @@ using RHSystem.Application.Colaboradores;
 using RHSystem.Application.Comunicacao.Avisos;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comum.Consultas;
+using RHSystem.Application.Ferias.Regras;
 using RHSystem.Application.Formularios.Acompanhar;
 using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Ponto;
@@ -51,6 +52,7 @@ public static class EnumsDeParametrosDoContrato
         [("listarPedidosDeAjusteParaRh", "etapa")] = typeof(EtapaDoPedido),
         [("listarPedidosDeAjusteParaRh", "ordenarPor")] = typeof(PontoPedidoOrdenarPor),
         [("listarPedidosDeAjusteParaRh", "direcao")] = typeof(DirecaoDeOrdenacao),
+        [("listarFeriasDaEquipe", "situacao")] = typeof(SituacaoDasFerias),
         [("listarMeusAtestados", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestadosDaEquipe", "situacao")] = typeof(SituacaoDoAtestado),
         [("listarAtestados", "situacao")] = typeof(SituacaoDoAtestado),

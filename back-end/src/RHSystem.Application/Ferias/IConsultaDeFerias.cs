@@ -1,4 +1,6 @@
 using RHSystem.Application.Colaboradores;
+using RHSystem.Application.Comum.Consultas;
+using RHSystem.Application.Escopo;
 using RHSystem.Application.Ferias.Regras;
 using RHSystem.Domain.Ferias;
 
@@ -56,4 +58,18 @@ public interface IConsultaDeFerias
 
     /// <summary>A pessoa da linha de <c>GESTORES</c> (<c>ID_GESTOR</c>), como resumo.</summary>
     Task<FuncionarioResumo?> ResumoDoGestorAsync(int gestorId, CancellationToken ct);
+
+    /// <summary>
+    /// A página dos pedidos da EQUIPE do gestor (os que têm o <c>ID_GESTOR</c> dele e são de pessoas da equipe de hoje), na situação pedida, do mais antigo ao mais novo. O pedido do próprio gestor, o de outro gestor e o de outro setor não entram.
+    /// </summary>
+    Task<(IReadOnlyList<FeriasLida> Itens, int Total)> ListarDaEquipeAsync(EquipeDoGestor equipe, SituacaoDasFerias situacao, ParametrosDeLista parametros, CancellationToken ct);
+
+    /// <summary>Um pedido da equipe do gestor; fora do escopo (ou que não existe) volta <c>null</c>: o mesmo 404.</summary>
+    Task<FeriasLida?> ObterDaEquipeAsync(int feriasId, EquipeDoGestor equipe, CancellationToken ct);
+
+    /// <summary>Os conflitos e a equipe disponível de cada pedido (por <c>id</c>), em poucas consultas para a lista inteira.</summary>
+    Task<IReadOnlyDictionary<int, ContextoDoPedidoDaEquipe>> ContextoDaEquipeAsync(IReadOnlyList<FeriasLida> pedidos, CancellationToken ct);
+
+    /// <summary>O e-mail corporativo da pessoa (<c>null</c> quando não tem: nada entra na fila).</summary>
+    Task<string?> EmailCorporativoAsync(int funcionarioId, CancellationToken ct);
 }

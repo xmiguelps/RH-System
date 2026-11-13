@@ -2,11 +2,39 @@ using System.Globalization;
 using RHSystem.Api.IntegrationTests.Acesso;
 using RHSystem.Api.IntegrationTests.Comunicacao;
 using RHSystem.Api.IntegrationTests.Infra;
+using RHSystem.Application.Ferias;
+using RHSystem.Domain.Ferias;
 using RHSystem.Domain.Autenticacao;
 
 namespace RHSystem.Api.IntegrationTests.Ferias;
 
 internal sealed record PessoaDeFerias(int FuncionarioId, int UsuarioId, string Nome);
+
+/// <summary>
+/// O repositório de férias de verdade com um gancho antes de cada gravação (os testes de corrida seguram dois pedidos no ponto entre conferir e gravar: com a pessoa travada só um chega lá). Cada método novo do <see cref="IFeriasRepositorio"/> ganha uma linha aqui.
+/// </summary>
+internal sealed class RepositorioDeFeriasComGancho(IFeriasRepositorio real) : IFeriasRepositorio
+{
+    public Func<Task>? AntesDeCriar { get; init; }
+
+    public Task<PessoaParaFerias?> TravarPessoaAsync(int funcionarioId, CancellationToken ct) => real.TravarPessoaAsync(funcionarioId, ct);
+
+    public async Task<int> CriarAsync(PedidoDeFerias pedido, CancellationToken ct)
+    {
+        if (AntesDeCriar is { } gancho)
+        {
+            await gancho();
+        }
+
+        return await real.CriarAsync(pedido, ct);
+    }
+
+    public Task<bool> AprovarComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, CancellationToken ct) => real.AprovarComoGestorAsync(feriasId, gestorId, agoraUtc, ct);
+
+    public Task<bool> RecusarComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, string motivo, CancellationToken ct) => real.RecusarComoGestorAsync(feriasId, gestorId, agoraUtc, motivo, ct);
+
+    public Task<bool> SugerirComoGestorAsync(int feriasId, int gestorId, DateTime agoraUtc, DateOnly inicio, DateOnly fim, CancellationToken ct) => real.SugerirComoGestorAsync(feriasId, gestorId, agoraUtc, inicio, fim, ct);
+}
 
 /// <summary>
 /// O apoio dos testes de férias: pessoas novas COM login e a data de admissão pedida (o elenco foi admitido em 02/01/2026 e ainda não tem período fechado), setores com gestor, e linhas de <c>FERIAS</c> semeadas direto no banco já no estado pedido (o histórico do Bruno do contrato).
@@ -119,6 +147,21 @@ internal static class FeriasDeTeste
             ? await SemearAsync(api, pessoaId, "2025-03-14", "2026-03-13", "2026-11-16", "2026-11-30", "SOLICITADA", "2026-10-07 09:20:00", gestorId, observacao: "Queria emendar com o feriado de 20/11.")
             : 0;
     }
+
+    /// <summary>Um setor novo com gestor e dois membros (admitidos em 2022-03-14: quatro períodos fechados, o de 2025 a 2026 é o mais recente), todos com login.</summary>
+    public static async Task<(int SetorId, PessoaDeFerias Gestor, int GestorId, PessoaDeFerias Membro1, PessoaDeFerias Membro2)> EquipeAsync(ApiDeAcesso api, string nome)
+    {
+        var (setor, gestor, gestorId) = await SetorComGestorAsync(api, nome);
+        var membro1 = await PessoaAsync(api, $"Membro 1 de {nome}", new DateOnly(2022, 3, 14), setor);
+        var membro2 = await PessoaAsync(api, $"Membro 2 de {nome}", new DateOnly(2022, 3, 14), setor);
+        return (setor, gestor, gestorId, membro1, membro2);
+    }
+
+    /// <summary>Um pedido <c>SOLICITADA</c> esperando o gestor (o <c>COM_O_GESTOR</c>), de 15 dias no período de 2025 a 2026 do membro.</summary>
+    public static Task<int> PedidoComOGestorAsync(ApiDeAcesso api, int pessoaId, int gestorId, string inicio = "2026-11-16", string fim = "2026-11-30", string solicitadaEm = "2026-10-07 09:20:00", string? observacao = null) =>
+        SemearAsync(api, pessoaId, "2025-03-14", "2026-03-13", inicio, fim, "SOLICITADA", solicitadaEm, gestorId, observacao: observacao);
+
+    public static long EmailsDoPedido(ApiDeAcesso api, int feriasId) => Contar(api, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'FERIAS_DECIDIDAS' AND REFERENCIA_ID = {feriasId}");
 
     public static long Contar(ApiDeAcesso api, string sql) => Sql.ContarAsync(api.Conexao, sql).GetAwaiter().GetResult();
 

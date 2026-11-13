@@ -412,17 +412,6 @@ public class MinhasFeriasTests(MySqlFixture mysql)
         }
     }
 
-    private sealed class RepositorioComBarreira(IFeriasRepositorio real, Barreira barreira) : IFeriasRepositorio
-    {
-        public Task<PessoaParaFerias?> TravarPessoaAsync(int funcionarioId, CancellationToken ct) => real.TravarPessoaAsync(funcionarioId, ct);
-
-        public async Task<int> CriarAsync(PedidoDeFerias pedido, CancellationToken ct)
-        {
-            await barreira.AguardarAsync();
-            return await real.CriarAsync(pedido, ct);
-        }
-    }
-
     [Fact]
     public async Task Dois_pedidos_ao_mesmo_tempo_nunca_reservam_mais_de_30_dias_e_nenhum_da_500()
     {
@@ -433,7 +422,7 @@ public class MinhasFeriasTests(MySqlFixture mysql)
         {
             s.RemoveAll<IFeriasRepositorio>();
             s.AddScoped<FeriasRepositorio>();
-            s.AddScoped<IFeriasRepositorio>(sp => new RepositorioComBarreira(sp.GetRequiredService<FeriasRepositorio>(), barreira));
+            s.AddScoped<IFeriasRepositorio>(sp => new RepositorioDeFeriasComGancho(sp.GetRequiredService<FeriasRepositorio>()) { AntesDeCriar = barreira.AguardarAsync });
         }));
         var cliente = fabrica.CreateClient();
         cliente.DefaultRequestHeaders.Authorization = (await api.ClienteAgoraAsync(pessoa.UsuarioId)).DefaultRequestHeaders.Authorization;

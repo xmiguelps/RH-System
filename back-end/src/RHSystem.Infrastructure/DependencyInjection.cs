@@ -265,6 +265,7 @@ public static class DependencyInjection
         services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
         // Férias (fatia 7): a consulta e o repositório (a conferência das regras e os casos de uso são registrados pela API).
         services.AddScoped<IConsultaDeFerias, ConsultaDeFerias>();
+        services.AddSingleton<IRenderizadorDeEmail, ResultadoFeriasRenderizador>();
         services.AddScoped<IFeriasRepositorio, FeriasRepositorio>();
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();

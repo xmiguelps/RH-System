@@ -56,6 +56,73 @@ public sealed record FeriasPedido(
     DecisaoDeEtapa? DecisaoRh,
     FeriasSugestao? Sugestao);
 
+/// <summary>Um pedido para o gestor ou o RH analisar: o pedido mais o contexto da equipe (<c>conflitos</c> e <c>equipeDisponivel</c>).</summary>
+public sealed record FeriasPedidoAnalise(
+    int Id,
+    FuncionarioResumo Funcionario,
+    FeriasPeriodoDatas PeriodoAquisitivo,
+    DateOnly DataInicio,
+    DateOnly DataFim,
+    int Dias,
+    bool AbonoPecuniario,
+    int DiasAbono,
+    bool Adiantar13Salario,
+    StatusDasFerias Status,
+    EtapaDoPedido Etapa,
+    bool PodeDecidir,
+    string? MotivoNaoPodeDecidir,
+    SituacaoDasFerias Situacao,
+    DateTime SolicitadaEmUtc,
+    string? Observacao,
+    FuncionarioResumo? GestorResponsavel,
+    DecisaoDeEtapa? DecisaoGestor,
+    DecisaoDeEtapa? DecisaoRh,
+    FeriasSugestao? Sugestao,
+    IReadOnlyList<FeriasConflito> Conflitos,
+    int? EquipeDisponivel)
+{
+    /// <summary>
+    /// Os mesmos campos do <see cref="FeriasPedido"/> mais o contexto da equipe, num tipo só (a herança faria o gerador de OpenAPI marcar como obrigatórios só os campos novos).
+    /// </summary>
+    public static FeriasPedidoAnalise De(FeriasPedido p, IReadOnlyList<FeriasConflito> conflitos, int? equipeDisponivel) => new(
+        p.Id,
+        p.Funcionario,
+        p.PeriodoAquisitivo,
+        p.DataInicio,
+        p.DataFim,
+        p.Dias,
+        p.AbonoPecuniario,
+        p.DiasAbono,
+        p.Adiantar13Salario,
+        p.Status,
+        p.Etapa,
+        p.PodeDecidir,
+        p.MotivoNaoPodeDecidir,
+        p.Situacao,
+        p.SolicitadaEmUtc,
+        p.Observacao,
+        p.GestorResponsavel,
+        p.DecisaoGestor,
+        p.DecisaoRh,
+        p.Sugestao,
+        conflitos,
+        equipeDisponivel);
+}
+
+/// <summary>O corpo da recusa (gestor ou RH): o motivo, de 5 a 500 caracteres; a pessoa o vê.</summary>
+public sealed record FeriasRecusarComando
+{
+    public required string Motivo { get; init; }
+}
+
+/// <summary>O corpo de "sugerir outra data": as duas datas.</summary>
+public sealed record FeriasSugerirComando
+{
+    public required DateOnly DataInicio { get; init; }
+
+    public required DateOnly DataFim { get; init; }
+}
+
 /// <summary>Uma verificação da lista de "vistos" do pedido (<c>FeriasRegraConferida</c>).</summary>
 public sealed record FeriasRegraConferida(RegraDeFerias Codigo, bool Atendida, string Mensagem);
 
