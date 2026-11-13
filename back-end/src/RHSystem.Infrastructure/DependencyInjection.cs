@@ -38,6 +38,7 @@ using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
 using RHSystem.Application.Beneficios.Adesoes;
 using RHSystem.Application.Ferias;
+using RHSystem.Application.Pagamento;
 using RHSystem.Application.Ponto;
 using RHSystem.Application.Ponto.Atestados;
 using RHSystem.Application.Ponto.Feriados;
@@ -62,6 +63,7 @@ using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
 using RHSystem.Infrastructure.Beneficios;
 using RHSystem.Infrastructure.Ferias;
+using RHSystem.Infrastructure.Pagamento;
 using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Infrastructure;
@@ -276,6 +278,7 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeAdesoes, ConsultaDeAdesoes>(); // "Benefícios" da própria pessoa (fatia 7)
         services.AddScoped<IAdesoesRepositorio, AdesoesRepositorio>(); // os três pedidos: adesão, dependente e trajeto
         services.AddScoped<IAoEfetivarDesligamento, CancelaPedidosDeBeneficioAoDesligar>(); // desligar cancela os pedidos de benefício pendentes
+        services.AddScoped<IExcecoesDePagamentoRepositorio, ExcecoesDePagamentoRepositorio>(); // as exceções de pagamento do RH (fatia 7)
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();
