@@ -260,6 +260,30 @@ Sem `ConexaoBlob` a API **sobe** e a primeira rota que usa arquivo responde 500,
 
 **Perguntas em aberto ao dono.** (1) **Proteção do link público:** hoje só limite por IP (30/min e 10/h), sem captcha. (2) **Retenção de candidato:** 180 dias é um valor de partida; o aceite do aviso de privacidade é exigido mas **não fica registrado** (o banco não tem coluna: pedir ao responsável pelo esquema). (3) **Recorrência:** a reabertura só acontece com o formulário encerrado e o por link não pode ser recorrente. (4) **Sem rota** para mudar o prazo de um publicado nem devolver um agendado a rascunho (o RH exclui e refaz). (5) **Avaliação da equipe anônima** proibida. (6) Um **OLE2 que não é Word** (`.xls`, `.ppt` renomeados) passa como `.doc`. (7) Os textos de erro sem exemplo no contrato foram escritos pelo executor (lista no ledger da fatia). (8) O gestor de uma equipe de **uma só pessoa** num anônimo encerrado vê se ela participou (a regra do contrato fala em "quantas pessoas da equipe" e não trata esse caso). (9) O código 422 `FORMULARIO_JA_RESPONDIDO` (pessoa que já respondeu) não existe no contrato: o front precisa tratar o código desconhecido pelo texto `detail`.
 
+### Treinamentos (fatia 6)
+
+As 31 rotas de `contrato/fontes/60-fatia-6-tad.yaml` (todas em `contrato/STATUS.md`, cada uma com o que o código faz). Resumo do que é decisão e não está no contrato:
+
+- **A situação é calculada pelas datas, sem agendador para liberar ou encerrar**: rascunho (não publicado), agendado (publicado e `comecaEm` depois de hoje), em andamento (publicado, `comecaEm` hoje ou antes, sem `ENCERRADO_EM`) e encerrado (`ENCERRADO_EM` preenchido vale mais que tudo). Hoje é o dia de Brasília e toda data gravada pela aplicação vem do `IRelogio` (nunca o `CURDATE()` do banco).
+- **O RH monta e publica**: só o título é obrigatório no rascunho; módulos de texto, vídeo por **link** (não há upload de vídeo) e PDF (até 10 MiB, o tipo pelo conteúdo) só mudam de estrutura em rascunho; depois de publicado só título, descrição, a caixa de admitidos e a data enquanto agendado (e a correção do conteúdo do módulo, também no encerrado). Publicar cria a linha `INSCRITO` de cada pessoa ativa admitida do público no treinamento obrigatório; **nenhum e-mail sai**. Encerrar e excluir pedem confirmação (`confirmar=true`) quando há pessoa **ativa** pendente; excluir é físico e **nunca** apaga um treinamento com certificado emitido (422, só se encerra).
+- **A pessoa** vê o que tem linha e os opcionais do público dela; faz os módulos em qualquer ordem; ao concluir o último, a linha vira `CONCLUIDO`, o trigger do banco cria a linha do certificado e a aplicação **troca na mesma transação** o código (UUID v1 do trigger) por um **UUID v4** e a data de emissão pelo relógio dela. O PDF (uma página A4 em paisagem, Noto Sans embutida) sai **depois do commit**; se falhar, o primeiro download o gera, uma vez. Toda conclusão trava a linha do treinamento (a mesma trava de publicar, módulos, encerrar e excluir): sem deadlock nem 1451/1452 cru.
+- **Conferência pública** (`/api/publico/certificados/{codigo}`): 10 consultas por minuto por IP (`Certificados:LimiteConferenciaPorMinuto`), o mesmo 404 para código inexistente, de treinamento que não emite, de quem não concluiu e de código que não é v4; só quatro campos; o código nunca vai para log (o tratador global escreve `/api/publico/certificados/{codigo}`).
+- **Gestor**: só a equipe de hoje (ativos, admissão começada, do setor, sem ele) e **nunca** certificado, código ou conteúdo de módulo. `treinamentosPendentes` da ficha do colaborador é o mesmo número de `resumo.pendentes` (só pessoa ativa; obrigatório em andamento; opcional nunca).
+- **Onboarding**: a caixa `onboarding` do treinamento marca `TIPO_TREINAMENTO = 'ONBOARDING'`; a pessoa entra em **todos** os que estão em vigor (publicado e não encerrado; o agendado entra) qualquer que seja o público. A caixa do cadastro, da readmissão e da importação usa a mesma regra por dentro.
+- **Tarefa diária `INCLUIR_ADMITIDOS_NO_TREINAMENTO`**: para todo treinamento obrigatório, publicado, não encerrado e com `incluiAdmitidos`, inscreve quem for admitido (ou entrar no público) e ainda não tem linha; um evento por treinamento e dia, só com a contagem.
+- **Ferramentas**: `ferramentas-rh/suite-treinamentos.sh` roda o namespace `Treinamentos` em grupos; a suíte inteira é a paralela, a de formulários, a de treinamentos, a de comunicação e a de ponto.
+
+**Perguntas em aberto ao dono (decididas por padrão, cada uma com o custo no ledger):**
+
+1. O título do treinamento continua editável depois de emitido: o PDF mostra o título do dia da emissão e a conferência pública o título de hoje. É isso mesmo?
+2. A conferência pública mostra o nome de quem já saiu da empresa (o código continua válido). Quer esconder o nome nesses casos?
+3. Vídeo só por link externo (sem upload): a fatia de upload de vídeo (tipo de arquivo, limite, custo de armazenamento) fica para depois?
+4. Pode haver mais de um treinamento de onboarding em vigor e a pessoa entra em todos; é isso, ou só no mais recente?
+5. A frase de conferência no PDF só aparece com `App:UrlDoFront` preenchida e não cita um caminho (o front ainda não tem a página de conferência).
+6. Concluir o treinamento grava um evento de auditoria; baixar o próprio certificado e arquivo de módulo não; o RH baixando o de outra pessoa grava `Baixou`. O rastro está no nível certo?
+7. O link temporário do download é a URL assinada do blob (contém o caminho do blob na URL, nunca num campo do JSON). Se quiser URL opaca é preciso um endereço de redirecionamento.
+8. O limite da conferência pública é 10 por minuto por IP; atrás de um proxy reverso vale o IP que o proxy repassa (como nas outras rotas públicas).
+
 ## Front-end
 
 O front-end (React 19, TypeScript, Vite) está em `front-end/`, feito por Lucas num repositório à parte e trazido para cá (fatias 0 a 6 prontas; a fatia 7 começou e não está completa). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.

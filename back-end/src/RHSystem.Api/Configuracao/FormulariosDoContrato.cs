@@ -6,6 +6,7 @@ using RHSystem.Application.Comum.Consultas;
 using RHSystem.Application.Documentos;
 using RHSystem.Application.Importacoes;
 using RHSystem.Domain.Documentos;
+using RHSystem.Domain.Treinamentos;
 
 namespace RHSystem.Api.Configuracao;
 
@@ -27,6 +28,8 @@ public static class FormulariosDoContrato
     public const string ValidarPlanilhaDeImportacao = "validarPlanilhaDeImportacao";
     public const string ResponderFormulario = "responderFormulario";
     public const string ResponderFormularioPublico = "responderFormularioPublico";
+    public const string AdicionarModuloDeTreinamento = "adicionarModuloDeTreinamento";
+    public const string AtualizarModuloDeTreinamento = "atualizarModuloDeTreinamento";
 
     public static OpenApiOptions UsarFormulariosDoContrato(this OpenApiOptions opcoes) =>
         opcoes.AddOperationTransformer((operacao, _, _) =>
@@ -135,6 +138,17 @@ public static class FormulariosDoContrato
                     },
                 }),
                 ("arquivos", new OpenApiSchema { Type = JsonSchemaType.Array, Items = Binario() }));
+        }
+        else if (operacao.OperationId is AdicionarModuloDeTreinamento or AtualizarModuloDeTreinamento)
+        {
+            operacao.RequestBody = Multipart(
+                obrigatorios: ["titulo", "tipo"],
+                ("titulo", new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 1, MaxLength = 200 }),
+                ("tipo", Enum<TipoDeModulo>()),
+                ("duracaoMinutos", new OpenApiSchema { Type = JsonSchemaType.Integer | JsonSchemaType.Null, Minimum = "1", Maximum = "32767" }),
+                ("urlExterna", new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null, MaxLength = 500, Pattern = "^https?://" }),
+                ("conteudoTexto", new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null, MaxLength = 50000 }),
+                ("arquivo", Binario()));
         }
         else if (operacao.OperationId == ResponderFormularioPublico)
         {

@@ -11,6 +11,13 @@ public partial class EnumComoTextoMaiusculo<TEnum>()
     : ValueConverter<TEnum, string>(v => NomesDeEnum<TEnum>.ParaTexto(v), t => NomesDeEnum<TEnum>.DoTexto(t))
     where TEnum : struct, Enum;
 
+/// <summary>
+/// O mesmo que <see cref="EnumComoTextoMaiusculo{TEnum}"/> para uma coluna anulável cujo banco aceita MAIS valores do que o enum do C# conhece (<c>STATUS_TREINAMENTO</c> aceita <c>REPROVADO</c> e <c>CANCELADO</c>, que a API nunca usa): o texto que o enum não conhece lê como <c>null</c> ("sem situação"), e a linha some das listas em vez de derrubar a leitura.
+/// </summary>
+public class EnumComoTextoMaiusculoTolerante<TEnum>()
+    : ValueConverter<TEnum?, string?>(v => v.HasValue ? NomesDeEnum<TEnum>.ParaTexto(v.Value) : null, t => NomesDeEnum<TEnum>.DoTextoOuNulo(t))
+    where TEnum : struct, Enum;
+
 internal static partial class NomesDeEnum<TEnum>
     where TEnum : struct, Enum
 {
@@ -24,6 +31,8 @@ internal static partial class NomesDeEnum<TEnum>
         ParaTextoMapa.TryGetValue(valor, out var texto)
             ? texto
             : throw new InvalidOperationException($"O valor {valor} não é um membro de {typeof(TEnum).Name}.");
+
+    internal static TEnum? DoTextoOuNulo(string? texto) => texto is not null && DoTextoMapa.TryGetValue(texto, out var valor) ? valor : null;
 
     internal static TEnum DoTexto(string texto) =>
         DoTextoMapa.TryGetValue(texto, out var valor)

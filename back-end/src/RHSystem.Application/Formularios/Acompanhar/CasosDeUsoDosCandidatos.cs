@@ -18,24 +18,7 @@ public static class NomeDoCurriculo
 {
     private const string Prefixo = "curriculo-";
 
-    public static string De(string nomeDoCandidato, string extensao)
-    {
-        var nome = nomeDoCandidato.Replace('/', '-').Replace('\\', '-');
-        var limpo = NomeParaDownload.Limpar(nome, string.Empty);
-        var cabe = Math.Max(1, NomeParaDownload.TamanhoMaximo - Prefixo.Length - extensao.Length);
-        if (limpo.Length > cabe)
-        {
-            limpo = limpo[..cabe];
-            if (char.IsHighSurrogate(limpo[^1]))
-            {
-                limpo = limpo[..^1]; // não deixa um par substituto cortado ao meio
-            }
-
-            limpo = limpo.TrimEnd();
-        }
-
-        return Prefixo + limpo + extensao;
-    }
+    public static string De(string nomeDoCandidato, string extensao) => NomeParaDownload.Montar(Prefixo, nomeDoCandidato, extensao);
 }
 
 /// <summary>

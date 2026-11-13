@@ -218,6 +218,7 @@ public sealed class ApiFactory(string conexao) : WebApplicationFactory<Program>
         builder.UseSetting("Autenticacao:LimiteSenhaAtualPorMinuto", "1000");
         builder.UseSetting("Formularios:LimiteConsultaPorMinuto", "100000"); // só PaginaPublicaTests usa o limite de verdade
         builder.UseSetting("Formularios:LimiteEnvioPorHora", "100000"); // idem: só CandidaturaTests
+        builder.UseSetting("Certificados:LimiteConferenciaPorMinuto", "100000"); // idem: só ConferirCertificadoTests usa os 10 de verdade
         builder.UseSetting("Database:AplicarScriptsAoIniciar", "false"); // o banco já vem com os scripts
         builder.UseSetting("Agendador:Ativo", "false"); // sem o servico em segundo plano do agendador: os testes chamam o ciclo direto
         builder.UseSetting("Email:EnvioAtivo", "false"); // sem o serviço em segundo plano: os testes chamam o ciclo de envio direto

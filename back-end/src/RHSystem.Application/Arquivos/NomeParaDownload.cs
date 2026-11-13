@@ -45,6 +45,28 @@ public static class NomeParaDownload
         return nome.All(letra => letra == '.' || char.IsWhiteSpace(letra)) ? "documento" + extensao : nome;
     }
 
+    /// <summary>
+    /// <c>&lt;prefixo&gt;&lt;texto&gt;&lt;extensão&gt;</c> para o arquivo gerado pela aplicação (o currículo, o certificado): barra e contrabarra do texto viram <c>-</c> (não viram diretório), o resto passa pela limpeza e o texto é cortado ANTES de juntar a extensão, então o total nunca passa de
+    /// <see cref="TamanhoMaximo"/> caracteres e a extensão nunca se perde. Texto vazio vira <c>documento</c>.
+    /// </summary>
+    public static string Montar(string prefixo, string texto, string extensao)
+    {
+        var limpo = Limpar(texto.Replace('/', '-').Replace('\\', '-'), string.Empty);
+        var cabe = Math.Max(1, TamanhoMaximo - prefixo.Length - extensao.Length);
+        if (limpo.Length > cabe)
+        {
+            limpo = limpo[..cabe];
+            if (char.IsHighSurrogate(limpo[^1]))
+            {
+                limpo = limpo[..^1]; // não deixa um par substituto cortado ao meio
+            }
+
+            limpo = limpo.TrimEnd();
+        }
+
+        return prefixo + limpo + extensao;
+    }
+
     private static bool Proibido(char letra) =>
         char.GetUnicodeCategory(letra) is UnicodeCategory.Control or UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator;
 }
