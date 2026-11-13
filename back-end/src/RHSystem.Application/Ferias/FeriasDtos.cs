@@ -142,6 +142,17 @@ public record FeriasConferenciaComando
     public int DiasAbono { get; init; }
 }
 
+/// <summary>A aba Férias da ficha de uma pessoa (do RH ou do gestor): os números, os períodos aquisitivos e os pedidos, do mais novo ao mais antigo.</summary>
+public sealed record FeriasFicha(FuncionarioResumo Funcionario, FeriasResumo Resumo, IReadOnlyList<FeriasPeriodoAquisitivo> PeriodosAquisitivos, IReadOnlyList<FeriasPedido> Ferias);
+
+/// <summary>O corpo do registro de férias do RH: a conferência mais o 13º adiantado e a observação (até 500, texto).</summary>
+public sealed record FeriasRegistrarComando : FeriasConferenciaComando
+{
+    public bool Adiantar13Salario { get; init; }
+
+    public string? Observacao { get; init; }
+}
+
 /// <summary>O corpo do pedido de férias da própria pessoa: a conferência mais o 13º adiantado e a mensagem (até 500, texto).</summary>
 public sealed record FeriasPedirComando : FeriasConferenciaComando
 {

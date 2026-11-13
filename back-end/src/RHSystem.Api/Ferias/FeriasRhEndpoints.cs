@@ -19,6 +19,9 @@ public static class FeriasRhEndpoints
     {
         servicos.AddScoped<ListarFeriasParaORhCasoDeUso>();
         servicos.AddScoped<DecidirFeriasComoRhCasoDeUso>();
+        servicos.AddScoped<ObterFeriasDaFichaDoFuncionarioCasoDeUso>();
+        servicos.AddScoped<ConferirRegistroDeFeriasCasoDeUso>();
+        servicos.AddScoped<RegistrarFeriasPeloRhCasoDeUso>();
         return servicos;
     }
 
@@ -41,8 +44,34 @@ public static class FeriasRhEndpoints
             .Produces<FeriasPedidoAnalise>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        // O prefixo /api/rh/funcionarios/{funcionarioId}/ é de várias fatias: as rotas são registradas com o literal "ferias" e o :int.
+        grupo.MapGet("/funcionarios/{funcionarioId:int}/ferias", ObterDaFicha)
+            .WithName("obterFeriasDaFichaDoFuncionario")
+            .Produces<FeriasFicha>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
+        grupo.MapPost("/funcionarios/{funcionarioId:int}/ferias", Registrar)
+            .WithName("registrarFeriasPeloRh")
+            .Produces<FeriasPedido>(StatusCodes.Status201Created)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        grupo.MapPost("/funcionarios/{funcionarioId:int}/ferias/conferencia", ConferirRegistro)
+            .WithName("conferirRegistroDeFerias")
+            .Produces<FeriasConferencia>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
+
+    private static async Task<FeriasFicha> ObterDaFicha(int funcionarioId, ObterFeriasDaFichaDoFuncionarioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(funcionarioId, ct);
+
+    private static async Task<IResult> Registrar(int funcionarioId, FeriasRegistrarComando corpo, RegistrarFeriasPeloRhCasoDeUso casoDeUso, CancellationToken ct)
+    {
+        var pedido = await casoDeUso.ExecutarAsync(funcionarioId, corpo, ct);
+        return Results.Created($"/api/rh/funcionarios/{funcionarioId}/ferias", pedido);
+    }
+
+    private static async Task<FeriasConferencia> ConferirRegistro(int funcionarioId, FeriasConferenciaComando corpo, ConferirRegistroDeFeriasCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(funcionarioId, corpo, ct);
 
     private static async Task<RespostaPaginada<FeriasPedidoAnalise>> Listar([AsParameters] FiltrosDaListaDeFeriasDoRh f, ListarFeriasParaORhCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(f.Pagina, f.TamanhoPagina, f.Busca, f.Situacao, f.SetorId, ct);

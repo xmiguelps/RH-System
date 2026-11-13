@@ -10,6 +10,23 @@ namespace RHSystem.Api.IntegrationTests.Ferias;
 
 internal sealed record PessoaDeFerias(int FuncionarioId, int UsuarioId, string Nome);
 
+/// <summary>Segura dois pedidos no ponto entre conferir e gravar: com a pessoa travada só um chega lá (o outro espera o commit); sem a trava os dois chegam juntos e os dois gravam.</summary>
+internal sealed class BarreiraDeTeste
+{
+    private readonly TaskCompletionSource _aberta = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _chegaram;
+
+    public async Task AguardarAsync()
+    {
+        if (Interlocked.Increment(ref _chegaram) >= 2)
+        {
+            _aberta.TrySetResult();
+        }
+
+        await Task.WhenAny(_aberta.Task, Task.Delay(1500));
+    }
+}
+
 /// <summary>
 /// O repositório de férias de verdade com um gancho antes de cada gravação (os testes de corrida seguram dois pedidos no ponto entre conferir e gravar: com a pessoa travada só um chega lá). Cada método novo do <see cref="IFeriasRepositorio"/> ganha uma linha aqui.
 /// </summary>

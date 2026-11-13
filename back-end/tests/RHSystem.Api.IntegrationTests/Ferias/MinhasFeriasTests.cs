@@ -395,29 +395,12 @@ public class MinhasFeriasTests(MySqlFixture mysql)
         Assert.DoesNotContain("assunto pessoal", evento.Descricao, StringComparison.Ordinal);
     }
 
-    /// <summary>Segura os dois pedidos no ponto entre conferir e gravar: com a pessoa travada só um chega lá e o outro espera o commit; sem a trava os dois chegam juntos e os dois gravam.</summary>
-    private sealed class Barreira
-    {
-        private readonly TaskCompletionSource _aberta = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _chegaram;
-
-        public async Task AguardarAsync()
-        {
-            if (Interlocked.Increment(ref _chegaram) >= 2)
-            {
-                _aberta.TrySetResult();
-            }
-
-            await Task.WhenAny(_aberta.Task, Task.Delay(1500));
-        }
-    }
-
     [Fact]
     public async Task Dois_pedidos_ao_mesmo_tempo_nunca_reservam_mais_de_30_dias_e_nenhum_da_500()
     {
         var api = await ApiAsync();
         var pessoa = await PessoaAsync(api, "Corrida", new DateOnly(2025, 3, 14), api.Elenco.SetorComercialId); // um período fechado com 30 dias
-        var barreira = new Barreira();
+        var barreira = new BarreiraDeTeste();
         using var fabrica = api.Api.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
         {
             s.RemoveAll<IFeriasRepositorio>();

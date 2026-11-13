@@ -21,6 +21,7 @@ public static class FeriasGestorEndpoints
         servicos.AddScoped<ListarFeriasDaEquipeCasoDeUso>();
         servicos.AddScoped<DecidirFeriasComoGestorCasoDeUso>();
         servicos.AddScoped<SugerirOutraDataDasFeriasCasoDeUso>();
+        servicos.AddScoped<ObterFeriasDaPessoaDaEquipeCasoDeUso>();
         return servicos;
     }
 
@@ -48,8 +49,16 @@ public static class FeriasGestorEndpoints
             .Produces<FeriasPedidoAnalise>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        // O prefixo /api/gestor/equipe/{funcionarioId}/ é de várias fatias: a rota é registrada com o literal "ferias" e o :int.
+        grupo.MapGet("/equipe/{funcionarioId:int}/ferias", ObterDaPessoa)
+            .WithName("obterFeriasDaPessoaDaEquipe")
+            .Produces<FeriasFicha>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
+
+    private static async Task<FeriasFicha> ObterDaPessoa(int funcionarioId, ObterFeriasDaPessoaDaEquipeCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(funcionarioId, ct);
 
     private static async Task<RespostaPaginada<FeriasPedidoAnalise>> Listar([AsParameters] FiltrosDaListaDeFeriasDaEquipe f, ListarFeriasDaEquipeCasoDeUso casoDeUso, CancellationToken ct) =>
         await casoDeUso.ExecutarAsync(f.Pagina, f.TamanhoPagina, f.Situacao, ct);

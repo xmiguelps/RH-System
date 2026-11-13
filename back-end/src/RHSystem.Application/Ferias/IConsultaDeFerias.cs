@@ -79,6 +79,12 @@ public interface IConsultaDeFerias
     /// <summary>A linha de <c>GESTORES</c> da pessoa (<c>null</c> se ela não está lá): o banco a exige na decisão final de um pedido sem etapa do gestor.</summary>
     Task<int?> GestorIdDaPessoaAsync(int funcionarioId, CancellationToken ct);
 
+    /// <summary>A pessoa como resumo (nome, cargo, setor); <c>null</c> se não existe.</summary>
+    Task<FuncionarioResumo?> ResumoAsync(int funcionarioId, CancellationToken ct);
+
+    /// <summary>A pessoa é da equipe de hoje do gestor (ativa, do setor dele, sem ele e sem outros gestores)?</summary>
+    Task<bool> EhDaEquipeAsync(int funcionarioId, EquipeDoGestor equipe, CancellationToken ct);
+
     /// <summary>O e-mail corporativo da pessoa (<c>null</c> quando não tem: nada entra na fila).</summary>
     Task<string?> EmailCorporativoAsync(int funcionarioId, CancellationToken ct);
 }

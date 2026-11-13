@@ -115,6 +115,15 @@ public sealed class ConsultaDeFerias(AppDbContext db) : IConsultaDeFerias
     public async Task<int?> GestorIdDaPessoaAsync(int funcionarioId, CancellationToken ct) =>
         await db.Gestores.AsNoTracking().Where(g => g.FuncionarioId == funcionarioId).Select(g => (int?)g.Id).FirstOrDefaultAsync(ct);
 
+    public async Task<FuncionarioResumo?> ResumoAsync(int funcionarioId, CancellationToken ct) =>
+        await db.Funcionarios.AsNoTracking()
+            .Where(f => f.Id == funcionarioId)
+            .Select(f => new FuncionarioResumo(f.Id, f.Nome, f.Ativo, f.Cargo != null ? f.Cargo.Nome : null, f.Setor != null ? f.Setor.Nome : null))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> EhDaEquipeAsync(int funcionarioId, EquipeDoGestor equipe, CancellationToken ct) =>
+        await db.Funcionarios.DaEquipe(equipe).AnyAsync(f => f.Id == funcionarioId, ct);
+
     public async Task<string?> EmailCorporativoAsync(int funcionarioId, CancellationToken ct) =>
         await db.Funcionarios.AsNoTracking().Where(f => f.Id == funcionarioId).Select(f => f.EmailCorporativo).FirstOrDefaultAsync(ct);
 
