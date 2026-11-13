@@ -311,4 +311,20 @@ public class CriarFuncionarioTests(MySqlFixture mysql)
         await (await rh.PostAsJsonAsync(Rota, Corpo(cargo, setor, onboarding: true))).AfirmarConformeAoContratoAsync("criarFuncionario"); // o 422 SEM_TREINAMENTO_DE_ONBOARDING
         await (await rh.PostAsJsonAsync(Rota, Corpo(cargo, setor, formulario: 11))).AfirmarConformeAoContratoAsync("criarFuncionario"); // o 400 em formularioAdmissaoId
     }
+
+    [Fact]
+    public async Task Criar_com_beneficioIds_grava_quem_concedeu_e_quando_e_continua_sem_data_de_pedido()
+    {
+        var api = await ApiAsync();
+        var (cargo, setor) = await CargoESetorAsync(api, "criar-concede");
+        var beneficio = await SementeDoCadastro.BeneficioAsync(api.Conexao, "Beneficio direto criar");
+
+        var resposta = await api.Api.ClienteComo(api.Elenco.Rh).PostAsJsonAsync(Rota, Corpo(cargo, setor, beneficios: [beneficio]));
+
+        Assert.Equal(201, (int)resposta.StatusCode);
+        var id = (await CorpoAsync(resposta)).GetProperty("id").GetInt32();
+        Assert.Equal(
+            $"APROVADO|1|{api.Elenco.Rh.FuncionarioId}|2026-10-07 09:42:00|-",
+            await Sql.EscalarAsync(api.Conexao, $"SELECT CONCAT_WS('|', STATUS_PEDIDO, BENEFICIO_ATIVO, IFNULL(ID_FUNCIONARIO_RH, '-'), IFNULL(DATE_FORMAT(DATA_RESPOSTA, '%Y-%m-%d %H:%i:%s'), '-'), IFNULL(DATE_FORMAT(DATA_PEDIDO, '%Y-%m-%d'), '-')) FROM BENEFICIOS_FUNCIONARIOS WHERE ID_FUNCIONARIO = {id} AND ID_BENEFICIO = {beneficio}"));
+    }
 }

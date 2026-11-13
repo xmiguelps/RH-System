@@ -275,6 +275,7 @@ public static class DependencyInjection
         services.AddScoped<IFeriasRepositorio, FeriasRepositorio>();
         services.AddScoped<IConsultaDeAdesoes, ConsultaDeAdesoes>(); // "Benefícios" da própria pessoa (fatia 7)
         services.AddScoped<IAdesoesRepositorio, AdesoesRepositorio>(); // os três pedidos: adesão, dependente e trajeto
+        services.AddScoped<IAoEfetivarDesligamento, CancelaPedidosDeBeneficioAoDesligar>(); // desligar cancela os pedidos de benefício pendentes
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();

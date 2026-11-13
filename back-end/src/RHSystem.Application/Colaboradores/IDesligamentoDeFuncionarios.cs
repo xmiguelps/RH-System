@@ -40,3 +40,12 @@ public interface ICondicaoParaEfetivarDesligamento
 {
     Task<bool> PodeEfetivarAsync(int funcionarioId, DateOnly ultimoDiaDeTrabalho, CancellationToken ct);
 }
+
+/// <summary>
+/// O que cada fatia faz quando a efetivação inativa a pessoa (na hora ou pela tarefa): roda DENTRO da transação da efetivação, com a pessoa travada e já inativada, e grava pelo mesmo contexto (quem chama salva). A fatia 7 cancela os pedidos de benefício pendentes dela. Sem evento próprio: a inativação já tem o
+/// dela.
+/// </summary>
+public interface IAoEfetivarDesligamento
+{
+    Task AposEfetivarAsync(int funcionarioId, CancellationToken ct);
+}

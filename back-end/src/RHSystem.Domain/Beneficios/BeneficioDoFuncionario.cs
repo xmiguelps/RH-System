@@ -84,24 +84,46 @@ public class BeneficioDoFuncionario
         return new DateTime(instanteUtc.Ticks - (instanteUtc.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
     }
 
-    /// <summary>Uma linha nova: ativa e aprovada.</summary>
-    public static BeneficioDoFuncionario Conceder(int funcionarioId, int beneficioId) =>
-        new()
+    /// <summary>
+    /// Uma linha nova: ativa e aprovada. A concessão direta do RH não é pedido (<c>DATA_PEDIDO</c> fica nula), mas registra QUEM concedeu e QUANDO (as duas colunas andam juntas, <c>CHECK</c>); sem ator (<paramref name="respondidoPorId"/> nulo) as duas ficam nulas.
+    /// </summary>
+    public static BeneficioDoFuncionario Conceder(int funcionarioId, int beneficioId, int? respondidoPorId = null, DateTime? agoraUtc = null)
+    {
+        var linha = new BeneficioDoFuncionario
         {
             FuncionarioId = funcionarioId,
             BeneficioId = beneficioId,
             Ativo = true,
             Status = StatusDoPedidoDeBeneficio.Aprovado,
         };
+        linha.RegistrarQuemRespondeu(respondidoPorId, agoraUtc);
+        return linha;
+    }
 
     /// <summary>
     /// O RH concede um benefício que já tem linha para a pessoa (pendente, recusado, cancelado ou aprovado e desativado): a chave única
     /// <c>(ID_FUNCIONARIO, ID_BENEFICIO)</c> impede uma segunda linha, então a mesma é atualizada para ativa e aprovada.
     /// </summary>
-    public void Reconceder()
+    public void Reconceder(int? respondidoPorId = null, DateTime? agoraUtc = null)
     {
         Status = StatusDoPedidoDeBeneficio.Aprovado;
         Ativo = true;
+        MotivoDaRecusa = null;
+        RegistrarQuemRespondeu(respondidoPorId, agoraUtc);
+    }
+
+    /// <summary>Quem do RH respondeu e quando, juntos: sem ator a resposta anterior (se houve) é limpa JUNTA, para o <c>CHECK</c> nunca ver uma coluna sem a outra.</summary>
+    private void RegistrarQuemRespondeu(int? respondidoPorId, DateTime? agoraUtc)
+    {
+        if (respondidoPorId is null)
+        {
+            FuncionarioRhId = null;
+            RespondidoEmUtc = null;
+            return;
+        }
+
+        FuncionarioRhId = respondidoPorId;
+        RespondidoEmUtc = AoSegundo(agoraUtc ?? throw new ArgumentNullException(nameof(agoraUtc), "Quem respondeu precisa de quando."));
     }
 
     public void Desativar() => Ativo = false;

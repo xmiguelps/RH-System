@@ -192,11 +192,11 @@ public sealed class EdicaoDeFuncionarios(
             var linha = linhas.FirstOrDefault(l => l.BeneficioId == beneficioId);
             if (linha is null)
             {
-                db.BeneficiosDosFuncionarios.Add(BeneficioDoFuncionario.Conceder(funcionarioId, beneficioId));
+                db.BeneficiosDosFuncionarios.Add(BeneficioDoFuncionario.Conceder(funcionarioId, beneficioId, ator.FuncionarioId, relogio.AgoraUtc));
             }
             else if (linha.Status != StatusDoPedidoDeBeneficio.Aprovado)
             {
-                linha.Reconceder();
+                linha.Reconceder(ator.FuncionarioId, relogio.AgoraUtc);
             }
             else if (!linha.Ativo)
             {
