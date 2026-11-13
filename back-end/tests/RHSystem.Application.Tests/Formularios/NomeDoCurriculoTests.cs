@@ -50,6 +50,16 @@ public class NomeDoCurriculoTests
     }
 
     [Fact]
+    public void Nome_que_enche_exatamente_o_limite_nao_e_cortado_nem_perde_o_ultimo_caractere()
+    {
+        var metadeDeUmPar = (char)0xD83D; // sozinho: parece a primeira metade de um par, e o corte o tiraria
+        var nome = NomeDoCurriculo.De(new string('n', 85) + metadeDeUmPar, ".pdf"); // 85 + 1 = 86 = o que cabe: não precisa cortar
+
+        Assert.Equal(100, nome.Length);
+        Assert.EndsWith(metadeDeUmPar + ".pdf", nome, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Nome_so_de_pontos_ou_espacos_vira_documento_com_o_prefixo()
     {
         Assert.Equal("curriculo-documento.pdf", NomeDoCurriculo.De("  ..  ", ".pdf"));

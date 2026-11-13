@@ -269,4 +269,20 @@ public class CandidaturaTests(MySqlFixture mysql)
         Assert.Equal([201, 201], new[] { semLogin, comLogin }.Select(r => (int)r.StatusCode));
         _ = JsonSerializer.Deserialize<JsonElement>(await semLogin.Content.ReadAsStringAsync());
     }
+
+    [Fact]
+    public async Task Nome_e_email_com_exatamente_150_caracteres_valem_e_com_151_sao_400()
+    {
+        var api = await ApiAsync();
+        var e = await EntrevistaAsync(api, "ZCand10");
+        var email150 = new string('a', 137) + "@email.com.br";
+        var email151 = new string('a', 138) + "@email.com.br";
+
+        var nome150 = await EnviarAsync(api.Api.ClienteAnonimo(), e.Token, Candidatura(RespostasOk(e), nome: new string('n', 150), email: "nome150@email.com.br"));
+        var email150Valido = await EnviarAsync(api.Api.ClienteAnonimo(), e.Token, Candidatura(RespostasOk(e), email: email150));
+        var email151Recusado = await EnviarAsync(api.Api.ClienteAnonimo(), e.Token, Candidatura(RespostasOk(e), email: email151));
+
+        Assert.Equal([201, 201, 400], new[] { nome150, email150Valido, email151Recusado }.Select(r => (int)r.StatusCode));
+        Assert.True((await ErrosAsync(email151Recusado)).TryGetProperty("email", out _));
+    }
 }

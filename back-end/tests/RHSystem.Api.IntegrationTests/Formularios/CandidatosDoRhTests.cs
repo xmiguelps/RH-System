@@ -284,4 +284,19 @@ public class CandidatosDoRhTests(MySqlFixture mysql)
         Assert.All(linhas.Skip(1).Where(l => l.Contains("formula@email.com.br", StringComparison.Ordinal)), l => Assert.Contains("'=HYPERLINK", l, StringComparison.Ordinal)); // a fórmula virou texto
         Assert.DoesNotContain(linhas, l => l.Contains("formularios/", StringComparison.Ordinal)); // nenhum caminho de armazenamento
     }
+
+    [Fact]
+    public async Task As_respostas_de_um_candidato_nao_trazem_as_de_outro_do_mesmo_formulario()
+    {
+        var api = await ApiAsync();
+        var e = await EntrevistaAsync(api, "ZCl12");
+        Task<HttpResponseMessage> Enviar(string nome, string email, string texto) => EnviarAsync(api.Api.ClienteAnonimo(), e.Token, Candidatura(Json(new { perguntaId = e.Multipla, alternativaIds = new[] { e.Sim } }, new { perguntaId = e.Longa, texto }), nome, email));
+        await Enviar("ZCl12 Primeiro", "primeiro@email.com.br", "Texto do primeiro candidato.");
+        await Enviar("ZCl12 Segundo", "segundo@email.com.br", "Texto do segundo candidato.");
+        var segundo = (int)await ContarAsync(api, $"SELECT ID_FORMULARIO_CANDIDATO FROM FORMULARIOS_CANDIDATOS WHERE ID_FORMULARIO = {e.Id} AND EMAIL = 'segundo@email.com.br'");
+
+        var corpo = await CorpoAsync(await (await api.ClienteDoRhAgoraAsync()).GetAsync($"/api/rh/formularios/{e.Id}/respostas/candidatos/{segundo}"));
+
+        Assert.Equal("Texto do segundo candidato.", corpo.GetProperty("respostas")[1].GetProperty("texto").GetString()); // o primeiro candidato respondeu antes: as linhas dele não entram
+    }
 }

@@ -206,4 +206,21 @@ public class RetencaoDeCandidatosTests(MySqlFixture mysql)
         Assert.Equal(2L, await ContarAsync(api, $"SELECT COUNT(*) FROM TAREFAS_AGENDADAS WHERE TIPO = '{Tarefa}' AND SITUACAO = 'PENDENTE'"));
         Assert.Equal($"{Tarefa}:dia=2026-10-07", await TextoAsync(api, $"SELECT MIN(CHAVE_IDEMPOTENCIA) FROM TAREFAS_AGENDADAS WHERE TIPO = '{Tarefa}'"));
     }
+
+    [Fact]
+    public async Task Na_mesma_rodada_o_de_180_dias_exatos_fica_inteiro_com_respostas_e_arquivos_e_so_o_mais_velho_some()
+    {
+        var api = await ApiAsync();
+        var e = await EntrevistaAsync(api, "ZRet8");
+        var velho = await CandidatarEmAsync(api, e, "ZRet8 Velho", "velho@email.com.br", ElencoDeTeste.Hoje.AddDays(-10));
+        var noLimite = await CandidatarEmAsync(api, e, "ZRet8 No Limite", "limite@email.com.br", ElencoDeTeste.Hoje);
+        api.Api.Relogio.Fixar(ElencoDeTeste.Hoje.AddDays(180));
+
+        await RodarAsync(api);
+
+        Assert.Equal((1L, (long)noLimite.Id), (await CandidatosAsync(api, e.Id), await ContarAsync(api, $"SELECT ID_FORMULARIO_CANDIDATO FROM FORMULARIOS_CANDIDATOS WHERE ID_FORMULARIO = {e.Id}")));
+        Assert.Equal(3L, await RespostasDeCandidatosAsync(api, e.Id)); // as respostas do que ficou
+        Assert.All(new[] { noLimite.Curriculo!, noLimite.Arquivo! }, caminho => Assert.True(api.Api.Armazenamento.Existe(caminho)));
+        Assert.All(new[] { velho.Curriculo!, velho.Arquivo! }, caminho => Assert.False(api.Api.Armazenamento.Existe(caminho)));
+    }
 }
