@@ -3,6 +3,7 @@ using RHSystem.Domain.Agendamento;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Domain.Beneficios;
+using RHSystem.Domain.Ferias;
 using RHSystem.Domain.Colaboradores;
 using RHSystem.Domain.Comunicacao;
 using RHSystem.Domain.Formularios;
@@ -104,6 +105,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TreinamentoFuncionario> TreinamentosFuncionarios => Set<TreinamentoFuncionario>();
 
     public DbSet<TreinamentoCertificado> TreinamentosCertificados => Set<TreinamentoCertificado>();
+
+    public DbSet<PedidoDeFerias> PedidosDeFerias => Set<PedidoDeFerias>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
