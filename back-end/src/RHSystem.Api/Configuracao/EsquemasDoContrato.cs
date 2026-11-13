@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using RHSystem.Application.Comum;
 using RHSystem.Application.Empresa;
 using RHSystem.Domain.Empresa;
 
@@ -19,7 +21,9 @@ public static class EsquemasDoContrato
         opcoes.AddSchemaTransformer((esquema, contexto, _) =>
         {
             Aplicar(esquema, contexto.JsonTypeInfo.Type);
+            TirarNullDeParametroDeData(esquema, contexto);
             AplicarUfDaEmpresa(esquema, contexto.JsonPropertyInfo);
+            AplicarInteiroSemNull(esquema, contexto.JsonPropertyInfo);
             return Task.CompletedTask;
         });
 
@@ -32,6 +36,25 @@ public static class EsquemasDoContrato
     /// A UF da empresa é texto no C# (o caso de uso a confere e responde 400 em <c>errors.uf</c>, o que um enum no corpo não daria), mas o contrato a declara como o enum das 27 siglas: o schema da propriedade
     /// <c>uf</c> de <see cref="EmpresaConfiguracao"/> leva essa lista, a MESMA que o domínio usa para validar.
     /// </summary>
+    /// <summary>Um parâmetro de consulta <c>DateTime?</c> é opcional (não vem na URL), não "nulo": o contrato o declara <c>type: string</c>, sem <c>null</c> (o <c>null</c> é só das propriedades dos corpos).</summary>
+    private static void TirarNullDeParametroDeData(OpenApiSchema esquema, OpenApiSchemaTransformerContext contexto)
+    {
+        if (contexto.ParameterDescription is { Source: { } fonte } && fonte == BindingSource.Query && contexto.JsonPropertyInfo is null && Nullable.GetUnderlyingType(contexto.JsonTypeInfo.Type) == typeof(DateTime) && esquema.Type is { } tipo)
+        {
+            esquema.Type = tipo & ~JsonSchemaType.Null;
+        }
+    }
+
+    /// <summary>A propriedade que usa o <see cref="InteiroOpcionalSemNullConversor"/> é um inteiro opcional que NÃO aceita null (o contrato diz <c>type: integer</c>): o esquema dela perde o <c>null</c> que o <c>int?</c> do C# acrescentaria.</summary>
+    private static void AplicarInteiroSemNull(OpenApiSchema esquema, System.Text.Json.Serialization.Metadata.JsonPropertyInfo? propriedade)
+    {
+        if (propriedade?.CustomConverter is InteiroOpcionalSemNullConversor)
+        {
+            esquema.Type = JsonSchemaType.Integer;
+            esquema.Format = "int32";
+        }
+    }
+
     private static void AplicarUfDaEmpresa(OpenApiSchema esquema, System.Text.Json.Serialization.Metadata.JsonPropertyInfo? propriedade)
     {
         if (propriedade is { Name: "uf" } && propriedade.DeclaringType == typeof(EmpresaConfiguracao))

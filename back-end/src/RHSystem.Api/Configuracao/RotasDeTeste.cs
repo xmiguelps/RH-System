@@ -3,6 +3,7 @@ using RHSystem.Api.Autorizacao;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
+using RHSystem.Application.Formularios.Mensagens;
 using RHSystem.Domain.Auditoria;
 using RHSystem.Domain.Autenticacao;
 using RHSystem.Infrastructure.Persistencia;
@@ -188,6 +189,9 @@ internal static class RotasDeTeste
                     ["outra"] = 5,
                 });
         });
+        // O 409 de confirmação dos formulários: o título próprio e o pendentes no corpo, com número ou nulo (que tem de sair no JSON).
+        erros.MapGet("/problema-confirmacao/{pendentes:int}", (int pendentes) => { throw MensagensDosFormularios.ConfirmacaoNecessaria(pendentes); });
+        erros.MapGet("/problema-confirmacao-anonima", () => { throw MensagensDosFormularios.ConfirmacaoNecessaria(null); });
         erros.MapGet("/problema-429", () =>
         {
             throw new ProblemaDeApiException(

@@ -20,6 +20,13 @@ using RHSystem.Application.Documentos;
 using RHSystem.Application.Emails;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Escopo;
+using RHSystem.Application.Formularios.Construtor;
+using RHSystem.Application.Formularios.Destinatarios;
+using RHSystem.Application.Formularios.Equipe;
+using RHSystem.Application.Formularios.Acompanhar;
+using RHSystem.Application.Formularios.Lembretes;
+using RHSystem.Application.Formularios.Publico;
+using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
@@ -38,6 +45,7 @@ using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Comunicacao;
 using RHSystem.Infrastructure.Documentos;
 using RHSystem.Infrastructure.Emails;
+using RHSystem.Infrastructure.Formularios;
 using RHSystem.Infrastructure.Empresa;
 using RHSystem.Infrastructure.Escopo;
 using RHSystem.Infrastructure.Esquema;
@@ -189,7 +197,7 @@ public static class DependencyInjection
         // As caixas "Depois de salvar" do cadastro dependem das fatias 5 e 6: as versões padrão dizem a verdade (indisponível) e ficam registradas ANTES de qualquer outra, para as fatias donas
         // registrarem as delas depois (AddScoped: o último registro vale).
         services.AddScoped<IInclusaoNoOnboarding, OnboardingIndisponivel>();
-        services.AddScoped<IEnvioDoFormularioDeAdmissao, FormularioDeAdmissaoIndisponivel>();
+        services.AddScoped<IEnvioDoFormularioDeAdmissao, EnvioDoFormularioDeAdmissao>(); // a caixa "Enviar o formulario de admissao" do cadastro, da readmissao e da importacao
         services.AddScoped<IGestorDoFuncionario, GestorDoFuncionario>();
         services.AddScoped<ICadastroDeFuncionarios, CadastroDeFuncionarios>();
         services.AddScoped<IEdicaoDeFuncionarios, EdicaoDeFuncionarios>();
@@ -231,6 +239,7 @@ public static class DependencyInjection
         services.AddSingleton<IRenderizadorDeEmail, HoleritePublicadoRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, AdvertenciaRegistradaRenderizador>();
         services.AddSingleton<IRenderizadorDeEmail, AdvertenciaRespondidaRenderizador>();
+        services.AddSingleton<IRenderizadorDeEmail, FormularioLembreteRenderizador>();
         // As bolinhas do menu do gestor (a mesma conta serve às duas): os pedidos de ajuste que aguardam a etapa dele.
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PedidosDeAjusteDePontoDoGestor));
         services.AddScoped<IFonteDeContadorDoMenu>(sp => new FonteDePedidosParaOGestor(sp.GetRequiredService<AppDbContext>(), ContadorDoMenu.PendenciasDaEquipe));
@@ -253,6 +262,27 @@ public static class DependencyInjection
         services.AddScoped<IConsultaDeAvisosDaPessoa, ConsultaDeAvisosDaPessoa>();
         services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeAvisos>(); // a bolinha Avisos do menu
         services.AddScoped<IAgendamentoDoAviso, AgendamentoDoAviso>();
+        services.AddScoped<IFormulariosRepositorio, FormulariosRepositorio>();
+        services.AddScoped<IConsultaDeFormularios, ConsultaDeFormularios>();
+        services.AddScoped<IDestinatariosDoFormulario, DestinatariosDoFormulario>();
+        services.AddScoped<IAgendamentoDoFormulario, AgendamentoDoFormulario>();
+        services.AddScoped<IConsultaDeMeusFormularios, ConsultaDeMeusFormularios>();
+        services.AddScoped<IFormulariosRespostasRepositorio, FormulariosRespostasRepositorio>();
+        services.AddScoped<IConsultaDeAcompanhamento, ConsultaDeAcompanhamento>();
+        services.AddScoped<IConsultaDeResultado, ConsultaDeResultado>();
+        services.AddScoped<ICandidatosRepositorio, CandidatosRepositorio>();
+        services.AddScoped<IConsultaDeLembretes, ConsultaDeLembretes>();
+        services.AddScoped<IConsultaDeEquipeDoFormulario, ConsultaDeEquipeDoFormulario>();
+        services.AddScoped<LembretesDoFormulario>();
+        services.AddScoped<IFonteDeReferenciasDeArquivo, FonteDeReferenciasDosFormularios>(); // sem ela as sobras e, pior, os arquivos de resposta de formularios/ nunca seriam tratados pela limpeza de sobras
+        services.AddScoped<EnvioDeArquivosDeFormulario>();
+        services.AddScoped<IFonteDeContadorDoMenu, FonteDeContadorDeFormularios>(); // a bolinha "formulariosPendentes" do menu
+        services.AddScoped<ITarefaAgendada, PublicarFormularioTarefa>(); // o agendado vira publicado no dia, uma vez
+        services.AddScoped<ITarefaAgendada, EncerrarFormularioTarefa>(); // o prazo encerra o formulario no instante nominal
+        services.AddScoped<ITarefaAgendada, ReabrirFormularioTarefa>(); // a rodada nova do formulario recorrente
+        services.AddScoped<ITarefaAgendada, ApagarCandidatosVencidosTarefa>(); // diaria: a retencao dos dados de candidato (LGPD)
+        services.AddScoped<ITarefaAgendada, LembreteDeFormularioTarefa>(); // o lembrete automatico 7 dias antes do prazo e o envio do manual do anonimo
+        services.AddScoped<IPerguntasDoFormularioRepositorio, PerguntasDoFormularioRepositorio>();
         services.AddScoped<IProximoPagamento, ProximoPagamento>();
         services.AddScoped<IHoleritesRepositorio, HoleritesRepositorio>();
         services.AddScoped<IConsultaDeHolerites, ConsultaDeHolerites>();
