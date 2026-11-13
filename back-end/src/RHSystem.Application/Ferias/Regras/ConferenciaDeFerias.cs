@@ -1,13 +1,21 @@
+using System.Text.Json.Serialization;
+
 namespace RHSystem.Application.Ferias.Regras;
 
-/// <summary>Os códigos das regras (<c>FeriasRegraCodigo</c>), na ordem em que aparecem na conferência.</summary>
+/// <summary>
+/// Os códigos das regras (<c>FeriasRegraCodigo</c>), na ordem em que aparecem na conferência. O JSON escreve o nome em MAIÚSCULAS_COM_SUBLINHADO, mas a política do .NET não separa o número ("PARTE_DE14_DIAS"): os quatro que têm número no nome levam o texto do contrato.
+/// </summary>
 public enum RegraDeFerias
 {
     DuracaoDaParte,
     CabeNoSaldo,
+    [JsonStringEnumMemberName("PARTE_DE_14_DIAS")]
     ParteDe14Dias,
+    [JsonStringEnumMemberName("MAXIMO_DE_3_PARTES")]
     MaximoDe3Partes,
+    [JsonStringEnumMemberName("ABONO_ATE_10_DIAS")]
     AbonoAte10Dias,
+    [JsonStringEnumMemberName("ANTECEDENCIA_DE_30_DIAS")]
     AntecedenciaDe30Dias,
     NaoComecaPertoDeFeriadoOuDescanso,
     SemSobreposicao,

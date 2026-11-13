@@ -50,6 +50,39 @@ public static class MapeadorDoPedidoDeFerias
         return new SugestaoDeFerias(inicio, fim, fim.DayNumber - inicio.DayNumber + 1, gestor, sugeridaEm, linha.Resposta, linha.RespostaEmUtc, ExpiraEm(sugeridaEm, inicio));
     }
 
+    /// <summary>
+    /// O gestor da etapa só aparece como <c>gestorResponsavel</c> se o pedido TEM etapa do gestor: já tem resultado dele, ou tem o <c>ID_GESTOR</c> e o RH ainda não decidiu. No pedido sem etapa do gestor, o RH grava em <c>ID_GESTOR</c> a linha de quem decidiu (o trigger exige) e isso NÃO é o gestor responsável.
+    /// </summary>
+    public static bool TemEtapaDoGestor(LinhaDoPedidoDeFerias linha) => linha.ResultadoDoGestor is not null || (linha.GestorId is not null && linha.FuncionarioRhId is null);
+
+    private const string SufixoDaInativacao = "Cancelada automaticamente: funcionario inativado";
+
+    /// <summary>A mensagem da pessoa sem o texto que o trigger de inativação acrescenta à <c>OBSERVACAO</c> (" | Cancelada automaticamente: funcionario inativado", sem acento): tira o sufixo e, se só havia ele, a observação some.</summary>
+    public static string? ObservacaoDaPessoa(string? gravada)
+    {
+        if (string.IsNullOrEmpty(gravada))
+        {
+            return gravada;
+        }
+
+        var texto = gravada;
+        while (true)
+        {
+            if (texto.EndsWith(" | " + SufixoDaInativacao, StringComparison.Ordinal))
+            {
+                texto = texto[..^(3 + SufixoDaInativacao.Length)];
+            }
+            else if (texto == SufixoDaInativacao)
+            {
+                return null;
+            }
+            else
+            {
+                return texto;
+            }
+        }
+    }
+
     /// <summary>O último dia para a pessoa responder: o menor entre 5 dias corridos depois do dia (de Brasília) da sugestão e 2 dias antes do início sugerido.</summary>
     public static DateOnly ExpiraEm(DateTime sugeridaEmUtc, DateOnly inicioSugerido)
     {

@@ -173,6 +173,33 @@ public class SituacaoEDecisoesDasFeriasTests
         Assert.Equal(new DateOnly(ea, em, ed), MapeadorDoPedidoDeFerias.ExpiraEm(sugeridaEm, new DateOnly(ia, im, id)));
     }
 
+    [Theory]
+    [InlineData(StatusDasFerias.Solicitada, 8, null, null, true)] // esperando o gestor: ele é o responsável
+    [InlineData(StatusDasFerias.Solicitada, 8, ResultadoDoGestorNasFerias.Aprovou, null, true)]
+    [InlineData(StatusDasFerias.Solicitada, null, null, null, false)] // nasceu sem etapa do gestor
+    [InlineData(StatusDasFerias.Aprovada, 8, ResultadoDoGestorNasFerias.Aprovou, 1, true)] // o gestor aprovou e o RH confirmou
+    [InlineData(StatusDasFerias.Aprovada, 9, null, 1, false)] // sem etapa do gestor: o ID_GESTOR é o da linha de quem do RH decidiu
+    [InlineData(StatusDasFerias.Rejeitada, 9, null, 1, false)]
+    [InlineData(StatusDasFerias.Aprovada, null, null, null, false)] // o registro direto do RH
+    [InlineData(StatusDasFerias.Cancelada, 8, null, null, true)] // vencido ainda com o gestor: ele era o responsável
+    public void O_gestor_so_e_responsavel_quando_o_pedido_tem_etapa_do_gestor(StatusDasFerias status, int? gestorId, ResultadoDoGestorNasFerias? resultado, int? rhId, bool tem)
+    {
+        var linha = Linha(status, gestorId, resultado: resultado, rhId: rhId);
+
+        Assert.Equal(tem, MapeadorDoPedidoDeFerias.TemEtapaDoGestor(linha));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", "")]
+    [InlineData("Queria emendar com o feriado.", "Queria emendar com o feriado.")]
+    [InlineData("Queria emendar. | Cancelada automaticamente: funcionario inativado", "Queria emendar.")]
+    [InlineData("Cancelada automaticamente: funcionario inativado", null)]
+    [InlineData("Cancelada automaticamente: funcionario inativado | Cancelada automaticamente: funcionario inativado", null)]
+    [InlineData("A tarefa diz: Cancelada automaticamente: funcionario inativado e outras coisas", "A tarefa diz: Cancelada automaticamente: funcionario inativado e outras coisas")]
+    public void O_sufixo_que_o_trigger_de_inativacao_acrescenta_nao_aparece_para_a_pessoa(string? gravada, string? mostrada) =>
+        Assert.Equal(mostrada, MapeadorDoPedidoDeFerias.ObservacaoDaPessoa(gravada));
+
     private static readonly PedidoParaDecisao DaMaria = new(EtapaDoPedido.Gestor, 12, 8);
 
     [Fact]

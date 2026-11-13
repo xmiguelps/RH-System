@@ -36,6 +36,7 @@ using RHSystem.Application.Formularios.Responder;
 using RHSystem.Application.Gestores;
 using RHSystem.Application.Importacoes;
 using RHSystem.Application.Painel;
+using RHSystem.Application.Ferias;
 using RHSystem.Application.Ponto;
 using RHSystem.Application.Ponto.Atestados;
 using RHSystem.Application.Ponto.Feriados;
@@ -58,6 +59,7 @@ using RHSystem.Infrastructure.Esquema;
 using RHSystem.Infrastructure.Gestores;
 using RHSystem.Infrastructure.Importacoes;
 using RHSystem.Infrastructure.Persistencia;
+using RHSystem.Infrastructure.Ferias;
 using RHSystem.Infrastructure.Ponto;
 
 namespace RHSystem.Infrastructure;
@@ -261,6 +263,9 @@ public static class DependencyInjection
         services.AddScoped<ICondicaoParaEfetivarDesligamento, CondicaoDoBancoDeHorasParaDesligamento>(); // o desligamento espera o último dia da pessoa estar consolidado
         // Os pedidos parados quando o gestor muda, some ou se ausenta: a fatia do ponto registra a dela na porta (o composto soma as das fatias).
         services.AddScoped<IPedidosParadosNoGestorDaFatia, PedidosParadosNoGestorDoPonto>();
+        // Férias (fatia 7): a consulta e o repositório (a conferência das regras e os casos de uso são registrados pela API).
+        services.AddScoped<IConsultaDeFerias, ConsultaDeFerias>();
+        services.AddScoped<IFeriasRepositorio, FeriasRepositorio>();
         services.AddScoped<IAtestadosRepositorio, AtestadosRepositorio>();
         services.AddScoped<IFeriadosRepositorio, FeriadosRepositorio>();
         services.AddScoped<IAvisosRepositorio, AvisosRepositorio>();
