@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Mvc;
 using RHSystem.Api.Autorizacao;
+using RHSystem.Api.Comum;
 using RHSystem.Api.Configuracao;
+using RHSystem.Application.Documentos;
 using RHSystem.Application.Treinamentos.Construtor;
 
 namespace RHSystem.Api.Treinamentos;
@@ -20,6 +23,10 @@ public static class TreinamentosRhEndpoints
         servicos.AddScoped<ObterTreinamentoRhCasoDeUso>();
         servicos.AddScoped<AtualizarTreinamentoCasoDeUso>();
         servicos.AddScoped<ContarPublicoDoTreinamentoCasoDeUso>();
+        servicos.AddScoped<AdicionarModuloDeTreinamentoCasoDeUso>();
+        servicos.AddScoped<ReordenarModulosDeTreinamentoCasoDeUso>();
+        servicos.AddScoped<AtualizarModuloDeTreinamentoCasoDeUso>();
+        servicos.AddScoped<ExcluirModuloDeTreinamentoCasoDeUso>();
         return servicos;
     }
 
@@ -47,6 +54,31 @@ public static class TreinamentosRhEndpoints
             .Produces<TreinamentoRh>(StatusCodes.Status200OK)
             .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
 
+        // O corpo do módulo é multipart (escrito à mão no documento por FormulariosDoContrato); o handler lê o formulário de HttpRequest e responde 415 se o corpo não é multipart.
+        rh.MapPost("/treinamentos/{treinamentoId:int}/modulos", AdicionarModulo)
+            .WithName("adicionarModuloDeTreinamento")
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(LimitesDoModulo.TetoDaRequisicaoBytes), new RequestFormLimitsAttribute { MultipartBodyLengthLimit = LimitesDoModulo.TetoDaRequisicaoBytes })
+            .Produces<TreinamentoModuloRh>(StatusCodes.Status201Created)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        rh.MapPut("/treinamentos/{treinamentoId:int}/modulos/ordem", ReordenarModulos)
+            .WithName("reordenarModulosDeTreinamento")
+            .Produces<TreinamentoModulosRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        rh.MapPut("/treinamentos/{treinamentoId:int}/modulos/{moduloId:int}", AtualizarModulo)
+            .WithName("atualizarModuloDeTreinamento")
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(LimitesDoModulo.TetoDaRequisicaoBytes), new RequestFormLimitsAttribute { MultipartBodyLengthLimit = LimitesDoModulo.TetoDaRequisicaoBytes })
+            .Produces<TreinamentoModuloRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
+        rh.MapDelete("/treinamentos/{treinamentoId:int}/modulos/{moduloId:int}", ExcluirModulo)
+            .WithName("excluirModuloDeTreinamento")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProduzProblemas(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity, StatusCodes.Status500InternalServerError);
+
         return rotas;
     }
 
@@ -56,6 +88,31 @@ public static class TreinamentosRhEndpoints
         await casoDeUso.ExecutarAsync(f.Publico, f.SetorIds, f.FuncionarioIds, ct);
 
     private static async Task<TreinamentoRh> Obter(int treinamentoId, ObterTreinamentoRhCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(treinamentoId, ct);
+
+    private static async Task<IResult> AdicionarModulo(int treinamentoId, HttpRequest requisicao, AdicionarModuloDeTreinamentoCasoDeUso casoDeUso, CancellationToken ct) =>
+        Results.Json(await casoDeUso.ExecutarAsync(treinamentoId, await LerModuloAsync(requisicao, ct), ct), statusCode: StatusCodes.Status201Created);
+
+    private static async Task<TreinamentoModulosRh> ReordenarModulos(int treinamentoId, TreinamentoModulosOrdemComando corpo, ReordenarModulosDeTreinamentoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(treinamentoId, corpo, ct);
+
+    private static async Task<TreinamentoModuloRh> AtualizarModulo(int treinamentoId, int moduloId, HttpRequest requisicao, AtualizarModuloDeTreinamentoCasoDeUso casoDeUso, CancellationToken ct) =>
+        await casoDeUso.ExecutarAsync(treinamentoId, moduloId, await LerModuloAsync(requisicao, ct), ct);
+
+    private static async Task<IResult> ExcluirModulo(int treinamentoId, int moduloId, ExcluirModuloDeTreinamentoCasoDeUso casoDeUso, CancellationToken ct)
+    {
+        await casoDeUso.ExecutarAsync(treinamentoId, moduloId, ct);
+        return Results.NoContent();
+    }
+
+    /// <summary>O módulo como chegou: os campos de texto crus e o arquivo (a parte <c>arquivo</c>); outro corpo que não é multipart é 415.</summary>
+    private static async Task<NovoModulo> LerModuloAsync(HttpRequest requisicao, CancellationToken ct)
+    {
+        var formulario = await LeituraDeFormulario.LerAsync(requisicao, ct);
+        var enviado = formulario.Files.GetFile("arquivo");
+        var arquivo = enviado is null ? null : new ArquivoRecebido(enviado.FileName, enviado.Length, enviado.OpenReadStream);
+        return new NovoModulo(Texto(formulario, "titulo"), Texto(formulario, "tipo"), Texto(formulario, "duracaoMinutos"), Texto(formulario, "urlExterna"), Texto(formulario, "conteudoTexto"), arquivo, formulario.Files.Count);
+    }
+
+    private static string? Texto(IFormCollection formulario, string campo) => formulario.TryGetValue(campo, out var valor) ? valor.ToString() : null;
 
     private static async Task<TreinamentoRh> Atualizar(int treinamentoId, TreinamentoComando corpo, AtualizarTreinamentoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(treinamentoId, corpo, ct);
 }
