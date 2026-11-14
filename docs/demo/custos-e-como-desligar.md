@@ -9,7 +9,7 @@
 | Peça | Para quê | Cobra parada? | Como parar |
 |---|---|---|---|
 | **App Service** (nível pago, com **Always On**) | roda a API e o agendador em segundo plano. Sem Always On o app dorme e **nada agendado roda** | **Sim**, enquanto o plano existir, mesmo sem acesso | **parar o app não basta**: o plano (App Service Plan) continua cobrando. Apague o plano ou reduza para o nível gratuito |
-| **MySQL Flexible Server** | o banco (MySQL 8.4) | **Sim**: o armazenamento e o backup continuam; a computação só deixa de cobrar com o servidor **parado** (o Azure religa sozinho depois de alguns dias parado) | `az mysql flexible-server stop` para a pausa curta; `delete` para acabar |
+| **MySQL Flexible Server** | o banco (MySQL 8.4) | **Sim**: o armazenamento e o backup continuam; a computação só deixa de cobrar com o servidor **parado** (o Azure religa sozinho um servidor parado depois de até 30 dias: confira o prazo na documentação atual) | `az mysql flexible-server stop` para a pausa curta; `delete` para acabar |
 | **Storage Account** (Blob) | arquivos: holerite, atestado, documentos, certificado, PDF de módulo | **Sim**, pelo que está guardado | apague o container ou a conta |
 | **Envio de e-mail** (provedor configurado em `Email:*`) | e-mails da lista fechada | só quando envia | deixe `Email:EnvioAtivo=false` e nada é enviado nem cobrado |
 | **Front-end** (arquivos estáticos) | as telas | conforme onde for hospedado | apague junto com o grupo de recursos |
@@ -24,7 +24,7 @@ Tudo no **mesmo grupo de recursos** facilita: um comando apaga tudo.
 
 ## Como desligar
 
-Troque `<grupo>`, `<servidor>` e `<plano>` pelos nomes reais. Os comandos são do Azure CLI (`az`).
+Troque `<grupo>`, `<servidor>` e `<app>` pelos nomes reais. Os comandos são do Azure CLI (`az`).
 
 **Pausar (volta depois):**
 ```

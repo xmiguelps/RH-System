@@ -2,10 +2,10 @@
 -- SEED FICTICIO DA DEMO (banca do TCC)
 --
 -- NAO E UM SCRIPT DE VERSAO: fica fora de "Banco de Dados/Scripts" de proposito (a API aplica sozinha so o que esta la). Rode DEPOIS que a API
--- aplicou os scripts V001 a V005, num banco SEM nenhum colaborador (o primeiro INSERT usa e-mails unicos: uma segunda rodada falha logo no
+-- aplicou os scripts V001 a V005, num banco SEM nenhum colaborador (o primeiro INSERT de verdade e a configuracao da empresa, que so tem uma linha: uma segunda rodada falha logo no
 -- comeco, sem deixar nada pela metade que importe). Tudo e inventado: nomes, CPFs (digitos validos, de ninguem), telefones e e-mails.
 --
--- Como rodar (uma sessao so, porque o script usa variaveis de usuario; veja o LEIA-ME.md desta pasta):
+-- Como rodar (uma sessao so, porque o script usa variaveis de usuario; veja o LEIA-ME.md desta pasta; no PowerShell o operador < nao existe: use o Git Bash ou cmd /c):
 --   mysql --default-character-set=utf8mb4 -h <servidor> -u <usuario> -p <banco> < seed_demo.sql
 --
 -- Variaveis que quem roda pode definir ANTES (SET @nome = ...; na mesma sessao), todas com padrao:
@@ -27,6 +27,11 @@ SET @hoje = COALESCE(@hoje, CURDATE());
 -- O CONVERT fixa a collation da variavel (a mesma das tabelas); sem ele, quem rodou com outro SET NAMES teria "Illegal mix of collations" nas comparacoes.
 SET @dominio = CONVERT(COALESCE(@dominio, 'rhsystem-demo.example') USING utf8mb4) COLLATE utf8mb4_unicode_ci;
 SET @senha = 'AQAAAAIAAYagAAAAEOAXtDJhauBe0zfvR32StdDwBKwnFoBQSqIaziI+VOLdgnA4+xaQKwMPWBk8z2JjxA==';
+
+-- Guarda: @hoje nao pode ser depois do dia de hoje do servidor (o trigger do banco de horas e outros recusam data futura, e a falha viria no meio do script, com
+-- coisas ja gravadas). Se o proximo comando falhar com CHK_SEQUENCIAS_ULTIMO_VALOR, e isto: corrija o @hoje. Nada foi gravado ainda.
+INSERT INTO SEQUENCIAS (NOME, ULTIMO_VALOR) VALUES ('DEMO_GUARDA', IF(@hoje > CURDATE(), -1, 0));
+DELETE FROM SEQUENCIAS WHERE NOME = 'DEMO_GUARDA';
 
 -- ------------------------------------------------------------
 -- 1. Empresa, cargos e setores
@@ -50,7 +55,7 @@ INSERT INTO SETORES (NOME_SETOR, DESCRICAO) VALUES
     ('Administrativo', 'Recursos humanos e rotinas administrativas.');
 
 -- ------------------------------------------------------------
--- 2. Pessoas (uma tabela temporaria resume o elenco; as linhas reais saem dela)
+-- 2. Pessoas (uma tabela de apoio resume o elenco; as linhas reais saem dela)
 -- ------------------------------------------------------------
 -- Tabelas de apoio (comuns, nao temporarias: o usuario do banco no Azure pode nao ter CREATE TEMPORARY TABLES). Saem no fim do script.
 DROP TABLE IF EXISTS TMP_DEMO_PESSOAS;
@@ -71,18 +76,18 @@ CREATE TABLE TMP_DEMO_PESSOAS (
 );
 
 INSERT INTO TMP_DEMO_PESSOAS (ORDEM, CHAVE, NOME, EMAIL_LOCAL, CARGO, SETOR, NIVEL, ADMISSAO, NASCIMENTO, CPF, TELEFONE) VALUES
-    (1, 'helena',   'Helena Martins',    'helena.martins',    'Analista de RH',           'Administrativo', 'RH',                 DATE_SUB(@hoje, INTERVAL 52 MONTH), '1988-03-14', '30000000035', '11981110001'),
-    (2, 'rafael',   'Rafael Costa',      'rafael.costa',      'Gerente de Tecnologia',    'Tecnologia',     'Funcionario Gestor', DATE_SUB(@hoje, INTERVAL 60 MONTH), '1985-07-02', '30000791903', '11981110002'),
-    (3, 'beatriz',  'Beatriz Nogueira',  'beatriz.nogueira',  'Gerente Comercial',        'Comercial',      'Funcionario Gestor', DATE_SUB(@hoje, INTERVAL 48 MONTH), '1987-11-23', '30001583832', '11981110003'),
-    (4, 'lucas',    'Lucas Pereira',     'lucas.pereira',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 30 MONTH), '1994-05-09', '30002375770', '11981110004'),
-    (5, 'camila',   'Camila Duarte',     'camila.duarte',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 20 MONTH), '1996-01-30', '30003167607', '11981110005'),
-    (6, 'diego',    'Diego Farias',      'diego.farias',      'Analista de Suporte',      'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 14 MONTH), '1992-09-17', '30003959546', '11981110006'),
-    (7, 'thiago',   'Thiago Mello',      'thiago.mello',      'Vendedor',                 'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 26 MONTH), '1990-12-05', '30004751418', '11981110007'),
-    (8, 'vanessa',  'Vanessa Lima',      'vanessa.lima',      'Vendedor',                 'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 18 MONTH), '1993-04-21', '30005543355', '11981110008'),
-    (9, 'patricia', 'Patrícia Gomes',    'patricia.gomes',    'Assistente Comercial',     'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 9 MONTH),  '1998-08-12', '30006335292', '11981110009'),
-    (10, 'carla',   'Carla Mendes',      'carla.mendes',      'Assistente Administrativo', 'Administrativo', 'Funcionario',        DATE_SUB(@hoje, INTERVAL 40 MONTH), '1991-02-27', '30007127120', '11981110010'),
-    (11, 'bruno',   'Bruno Azevedo',     'bruno.azevedo',     'Assistente Administrativo', 'Administrativo', 'Funcionario',        DATE_SUB(@hoje, INTERVAL 6 MONTH),  '1999-06-03', '30007919069', '11981110011'),
-    (12, 'julia',   'Júlia Andrade',     'julia.andrade',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_ADD(@hoje, INTERVAL 5 DAY),    '1997-10-19', '30008710988', '11981110012');
+    (1, 'helena',   'Helena Martins',    'helena.martins',    'Analista de RH',           'Administrativo', 'RH',                 DATE_SUB(@hoje, INTERVAL 52 MONTH), '1988-03-14', '30000000035', '11900000001'),
+    (2, 'rafael',   'Rafael Costa',      'rafael.costa',      'Gerente de Tecnologia',    'Tecnologia',     'Funcionario Gestor', DATE_SUB(@hoje, INTERVAL 60 MONTH), '1985-07-02', '30000791903', '11900000002'),
+    (3, 'beatriz',  'Beatriz Nogueira',  'beatriz.nogueira',  'Gerente Comercial',        'Comercial',      'Funcionario Gestor', DATE_SUB(@hoje, INTERVAL 48 MONTH), '1987-11-23', '30001583832', '11900000003'),
+    (4, 'lucas',    'Lucas Pereira',     'lucas.pereira',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 30 MONTH), '1994-05-09', '30002375770', '11900000004'),
+    (5, 'camila',   'Camila Duarte',     'camila.duarte',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 20 MONTH), '1996-01-30', '30003167607', '11900000005'),
+    (6, 'diego',    'Diego Farias',      'diego.farias',      'Analista de Suporte',      'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 14 MONTH), '1992-09-17', '30003959546', '11900000006'),
+    (7, 'thiago',   'Thiago Mello',      'thiago.mello',      'Vendedor',                 'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 26 MONTH), '1990-12-05', '30004751418', '11900000007'),
+    (8, 'vanessa',  'Vanessa Lima',      'vanessa.lima',      'Vendedor',                 'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 18 MONTH), '1993-04-21', '30005543355', '11900000008'),
+    (9, 'patricia', 'Patrícia Gomes',    'patricia.gomes',    'Assistente Comercial',     'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 9 MONTH),  '1998-08-12', '30006335292', '11900000009'),
+    (10, 'carla',   'Carla Mendes',      'carla.mendes',      'Assistente Administrativo', 'Administrativo', 'Funcionario',        DATE_SUB(@hoje, INTERVAL 40 MONTH), '1991-02-27', '30007127120', '11900000010'),
+    (11, 'bruno',   'Bruno Azevedo',     'bruno.azevedo',     'Assistente Administrativo', 'Administrativo', 'Funcionario',        DATE_SUB(@hoje, INTERVAL 6 MONTH),  '1999-06-03', '30007919069', '11900000011'),
+    (12, 'julia',   'Júlia Andrade',     'julia.andrade',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_ADD(@hoje, INTERVAL 5 DAY),    '1997-10-19', '30008710988', '11900000012');
 
 INSERT INTO FUNCIONARIOS (NOME, DATA_NASCIMENTO, DATA_ADMISSAO, ATIVO, EMAIL_CORPORATIVO, ID_CARGO, ID_SETOR, ID_NIVEL_ACESSO, MATRICULA, TIPO_CONTRATO)
 SELECT p.NOME, p.NASCIMENTO, p.ADMISSAO, TRUE, CONCAT(p.EMAIL_LOCAL, '@', @dominio), c.ID_CARGO, s.ID_SETOR, n.ID_NIVEL_ACESSO, LPAD(p.ORDEM, 5, '0'), 'CLT'
@@ -127,7 +132,7 @@ UPDATE FUNCIONARIOS m
  WHERE g.ID_FUNCIONARIO <> m.ID_FUNCIONARIO;
 
 -- ------------------------------------------------------------
--- 3. Ponto dos ultimos 14 dias (dias uteis, sem feriado, de quem ja era admitido) e banco de horas
+-- 3. Ponto dos ultimos 62 dias (dias uteis, sem feriado, de quem ja era admitido): cobre o mes atual e o anterior inteiros (o espelho e mensal e todo dia util sem batida vira falta)
 --    Entrada entre 08:00 e 08:09 (dentro da tolerancia); saida do almoco 12:00; volta 13:00; saida entre 17:00 e 17:11. O Diego chega atrasado em
 --    dois dias, o Thiago falta em um (sem ponto) e a Vanessa esta de ferias hoje (sem ponto nos dias do gozo).
 -- ------------------------------------------------------------
@@ -137,7 +142,7 @@ INSERT INTO TMP_DEMO_DIAS (DIA, N)
 WITH RECURSIVE dias (n, d) AS (
     SELECT 1, DATE_SUB(@hoje, INTERVAL 1 DAY)
     UNION ALL
-    SELECT n + 1, DATE_SUB(d, INTERVAL 1 DAY) FROM dias WHERE n < 14
+    SELECT n + 1, DATE_SUB(d, INTERVAL 1 DAY) FROM dias WHERE n < 62
 )
 SELECT d, ROW_NUMBER() OVER (ORDER BY d DESC) FROM dias WHERE WEEKDAY(d) < 5 AND NOT EXISTS (SELECT 1 FROM FERIADOS fe WHERE fe.DATA_FERIADO = dias.d AND fe.ATIVO = TRUE AND fe.TIPO_FERIADO = 'NACIONAL');
 
@@ -176,22 +181,16 @@ SELECT p.ID_PONTO, m.INSTANTE, m.TIPO, 'SISTEMA'
         UNION ALL SELECT ID_FUNCIONARIO, DIA, SAIDA, 'SAIDA' FROM TMP_DEMO_PONTOS
        ) m ON m.ID_FUNCIONARIO = t.ID_FUNCIONARIO AND m.DIA = t.DIA;
 
--- Banco de horas: lancamentos do RH (credito e debito) com o motivo escrito.
-INSERT INTO BANCOS_HORAS (ID_FUNCIONARIO, DATA_LANCAMENTO, TIPO_LANCAMENTO, QUANTIDADE, OBSERVACAO, DIA_REFERENCIA)
-SELECT f.ID_FUNCIONARIO, DATE_SUB(@hoje, INTERVAL x.dias DAY), x.tipo, x.horas, x.obs, DATE_SUB(@hoje, INTERVAL x.dias DAY)
-  FROM (
-        SELECT 'lucas.pereira' AS local_, 6 AS dias, 'CREDITO' AS tipo, 3.50 AS horas, 'Hora extra no fechamento do projeto.' AS obs
-        UNION ALL SELECT 'camila.duarte', 9, 'CREDITO', 2.00, 'Plantão de suporte no sábado.'
-        UNION ALL SELECT 'diego.farias', 4, 'DEBITO', 1.50, 'Saída antecipada autorizada pelo gestor.'
-        UNION ALL SELECT 'thiago.mello', 7, 'DEBITO', 8.00, 'Falta sem justificativa.'
-       ) x
-  JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = CONCAT(x.local_, '@', @dominio);
+-- Banco de horas: o seed NAO lanca nada. O dominio so cria lancamento pelo calculo automatico (o agendador consolida cada dia a partir das batidas, a falta do Thiago
+-- vira debito e as saidas depois do horario viram credito); lancamento gravado aqui seria reescrito ou apagado no primeiro recalculo. O saldo aparece alguns minutos depois
+-- de a API estar no ar com o seed (o agendador recupera os ultimos 60 dias a cada ciclo).
 
--- Hoje: se ja passou das 09:30, parte da equipe ja bateu a entrada (a demo comeca com "quem esta trabalhando agora").
+-- Hoje: se @hoje e o dia de hoje do servidor e ja passou das 09:30, parte da equipe ja bateu a entrada (a demo comeca com "quem esta trabalhando agora"). Com @hoje no
+-- passado nao cria nada: a hora do servidor nao decide o ponto de um dia que ja acabou.
 INSERT INTO PONTOS (ID_FUNCIONARIO, DATA, HORAS_TRABALHADAS, CARGA_HORARIA)
 SELECT f.ID_FUNCIONARIO, @hoje, NULL, 8.00
   FROM FUNCIONARIOS f
- WHERE WEEKDAY(@hoje) < 5 AND TIME(NOW()) >= '09:30:00' AND f.ATIVO = TRUE AND f.DATA_ADMISSAO <= @hoje
+ WHERE @hoje = CURDATE() AND WEEKDAY(@hoje) < 5 AND TIME(NOW()) >= '09:30:00' AND f.ATIVO = TRUE AND f.DATA_ADMISSAO <= @hoje
    AND f.EMAIL_CORPORATIVO IN (CONCAT('lucas.pereira@', @dominio), CONCAT('camila.duarte@', @dominio), CONCAT('rafael.costa@', @dominio), CONCAT('beatriz.nogueira@', @dominio), CONCAT('carla.mendes@', @dominio), CONCAT('helena.martins@', @dominio))
    AND NOT EXISTS (SELECT 1 FROM FERIADOS fe WHERE fe.DATA_FERIADO = @hoje AND fe.ATIVO = TRUE AND fe.TIPO_FERIADO = 'NACIONAL');
 
@@ -201,14 +200,14 @@ SELECT p.ID_PONTO, TIMESTAMP(@hoje, SEC_TO_TIME(8 * 3600 + MOD(p.ID_FUNCIONARIO 
  WHERE p.DATA = @hoje;
 
 -- ------------------------------------------------------------
--- 4. Avisos
+-- 4. Avisos (publicados ha 8 a 10 dias: a recuperacao do agendador so reenfileira o e-mail de aviso dos ultimos 7 dias, e o seed nao deve mandar e-mail)
 -- ------------------------------------------------------------
 INSERT INTO AVISOS (ID_FUNCIONARIO, TITULO, CONTEUDO, DATA_PUBLICACAO, DATA_EXPIRACAO, TIPO_AVISO, FIXADO, ENVIADO)
 SELECT f.ID_FUNCIONARIO, a.titulo, a.conteudo, TIMESTAMP(DATE_SUB(@hoje, INTERVAL a.dias DAY), '09:00:00'), a.expira, a.tipo, a.fixado, a.enviado
   FROM (
-        SELECT 'Bem-vindos à demonstração do RH System' AS titulo, 'Esta é uma demonstração com dados fictícios. Explore o ponto, as férias, os benefícios, os formulários e os treinamentos. Nada aqui é de pessoas reais.' AS conteudo, 3 AS dias, NULL AS expira, 'DETALHADO' AS tipo, TRUE AS fixado, TRUE AS enviado
-        UNION ALL SELECT 'Confraternização de fim de ano', 'Reserve a data: a confraternização da empresa será na última sexta-feira do ano, a partir das 18h.', 2, DATE_ADD(@hoje, INTERVAL 60 DAY), 'SIMPLES', FALSE, TRUE
-        UNION ALL SELECT 'Atualização do cadastro', 'Confira seus dados na ficha e avise o RH se algo estiver diferente. O prazo é o fim do mês.', 1, DATE_ADD(@hoje, INTERVAL 20 DAY), 'DETALHADO', FALSE, TRUE
+        SELECT 'Bem-vindos à demonstração do RH System' AS titulo, 'Esta é uma demonstração com dados fictícios. Explore o ponto, as férias, os benefícios, os formulários e os treinamentos. Nada aqui é de pessoas reais.' AS conteudo, 10 AS dias, NULL AS expira, 'DETALHADO' AS tipo, TRUE AS fixado, TRUE AS enviado
+        UNION ALL SELECT 'Confraternização de fim de ano', 'Reserve a data: a confraternização da empresa será na última sexta-feira do ano, a partir das 18h.', 9, DATE_ADD(@hoje, INTERVAL 60 DAY), 'SIMPLES', FALSE, TRUE
+        UNION ALL SELECT 'Atualização do cadastro', 'Confira seus dados na ficha e avise o RH se algo estiver diferente. O prazo é o fim do mês.', 8, DATE_ADD(@hoje, INTERVAL 20 DAY), 'DETALHADO', FALSE, TRUE
        ) a
   JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = CONCAT('helena.martins@', @dominio);
 
@@ -225,7 +224,7 @@ UPDATE AVISOS_VISUALIZACOES v
 -- ------------------------------------------------------------
 -- 5. Ferias (uma em gozo, uma esperando o gestor, uma esperando o RH, uma ja concluida)
 -- ------------------------------------------------------------
--- O periodo aquisitivo e o ano que termina antes do inicio: aqui, o primeiro ano de cada pessoa (ou o segundo, para quem tem mais de dois anos de casa).
+-- O periodo aquisitivo e o primeiro ano de cada pessoa (o mais antigo em que o pedido cabe, como a aplicacao escolhe).
 INSERT INTO FERIAS (ID_FUNCIONARIO, DATA_INICIO_PERIODO_AQUISITIVO, DATA_FIM_PERIODO_AQUISITIVO, DATA_INICIO, DATA_FIM, ABONO_PECUNIARIO, DIAS_ABONO, STATUS_FERIAS,
                     DATA_SOLICITACAO, DATA_ANALISE, ID_GESTOR, RESULTADO_GESTOR, DATA_ETAPA_GESTOR, ID_FUNCIONARIO_RH, DATA_CONFIRMACAO_RH)
 SELECT f.ID_FUNCIONARIO, f.DATA_ADMISSAO, DATE_SUB(DATE_ADD(f.DATA_ADMISSAO, INTERVAL 1 YEAR), INTERVAL 1 DAY),
@@ -240,7 +239,7 @@ SELECT f.ID_FUNCIONARIO, f.DATA_ADMISSAO, DATE_SUB(DATE_ADD(f.DATA_ADMISSAO, INT
 
 -- Lucas: pediu 15 dias e espera o gestor (aparece em "Esperando sua aprovação" do Rafael).
 INSERT INTO FERIAS (ID_FUNCIONARIO, DATA_INICIO_PERIODO_AQUISITIVO, DATA_FIM_PERIODO_AQUISITIVO, DATA_INICIO, DATA_FIM, ABONO_PECUNIARIO, DIAS_ABONO, STATUS_FERIAS, DATA_SOLICITACAO, ID_GESTOR)
-SELECT f.ID_FUNCIONARIO, DATE_ADD(f.DATA_ADMISSAO, INTERVAL 1 YEAR), DATE_SUB(DATE_ADD(f.DATA_ADMISSAO, INTERVAL 2 YEAR), INTERVAL 1 DAY),
+SELECT f.ID_FUNCIONARIO, f.DATA_ADMISSAO, DATE_SUB(DATE_ADD(f.DATA_ADMISSAO, INTERVAL 1 YEAR), INTERVAL 1 DAY),
        DATE_ADD(@hoje, INTERVAL 45 DAY), DATE_ADD(@hoje, INTERVAL 59 DAY), FALSE, 0, 'SOLICITADA', TIMESTAMP(DATE_SUB(@hoje, INTERVAL 1 DAY), '15:30:00'), g.ID_GESTOR
   FROM FUNCIONARIOS f
   JOIN FUNCIONARIOS gf ON gf.EMAIL_CORPORATIVO = CONCAT('rafael.costa@', @dominio)
@@ -337,8 +336,8 @@ SELECT bf.ID_BENEFICIO_FUNCIONARIOS, 'Rua Nova, 10, Mooca, São Paulo', 'Avenida
 INSERT INTO FUNCIONARIOS_DOCUMENTOS (ID_FUNCIONARIO, TIPO_DOCUMENTO, DESCRICAO, STATUS_DOCUMENTO, DATA_PEDIDO)
 SELECT f.ID_FUNCIONARIO, d.tipo, d.descricao, 'PENDENTE', TIMESTAMP(DATE_SUB(@hoje, INTERVAL 2 DAY), '11:00:00')
   FROM (
-        SELECT 'bruno.azevedo' AS local_, 'COMPROVANTE_RESIDENCIA' AS tipo, 'Comprovante de residência dos últimos 3 meses.' AS descricao
-        UNION ALL SELECT 'patricia.gomes', 'CARTEIRA_TRABALHO', 'Cópia da carteira de trabalho (página da foto e do contrato).'
+        SELECT 'bruno.azevedo' AS local_, 'COMPROVANTE_DE_RESIDENCIA' AS tipo, 'Comprovante de residência dos últimos 3 meses.' AS descricao
+        UNION ALL SELECT 'patricia.gomes', 'CARTEIRA_DE_TRABALHO', 'Cópia da carteira de trabalho (página da foto e do contrato).'
        ) d
   JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = CONCAT(d.local_, '@', @dominio);
 

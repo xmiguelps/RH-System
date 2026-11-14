@@ -11,7 +11,7 @@ using static RHSystem.Api.IntegrationTests.Demo.DemoDeTeste;
 namespace RHSystem.Api.IntegrationTests.Demo;
 
 /// <summary>
-/// O ensaio do roteiro da demo (<c>docs/roteiro-da-demo.md</c>): cada teste é um passo do roteiro, feito pela API de verdade sobre o banco que o seed da demo montou, entrando pelo login e usando só o que a tela usaria. Se o seed ou uma rota mudar e o roteiro deixar de funcionar, o teste que
+/// O ensaio do roteiro da demo (<c>docs/demo/roteiro-da-demo.md</c>): cada teste é um passo do roteiro, feito pela API de verdade sobre o banco que o seed da demo montou, entrando pelo login e usando só o que a tela usaria. Se o seed ou uma rota mudar e o roteiro deixar de funcionar, o teste que
 /// cobre aquele passo cai. O relógio é o do dia do seed (quarta, 2026-10-07, 09:42 em Brasília) e anda quando o fluxo precisa.
 /// </summary>
 [Collection(MySqlCollection.Nome)]
@@ -45,9 +45,11 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
         Assert.Equal(201, (int)(await (await EntrarComoAsync(api, "bruno.azevedo")).PostAsJsonAsync("/api/eu/ponto/marcacoes", new { tipoEsperado = "SAIDA" })).StatusCode);
 
         Assert.Equal(4L, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM PONTOS_MARCACOES m JOIN PONTOS p ON p.ID_PONTO = m.ID_PONTO WHERE p.ID_FUNCIONARIO = {bruno} AND p.DATA = '2026-10-07'"));
-        var espelho = await GetAsync(await EntrarComoAsync(api, "bruno.azevedo"), "/api/eu/ponto/espelho");
-        Assert.True(espelho.ValueKind == JsonValueKind.Object);
-        _ = antes;
+        var espelho = await GetAsync(await EntrarComoAsync(api, "bruno.azevedo"), "/api/eu/ponto/espelho?ano=2026&mes=10");
+        var dias = espelho.GetProperty("dias").EnumerateArray().ToDictionary(d => d.GetProperty("data").GetString()!, d => d.GetProperty("situacao").GetString()!);
+        Assert.Equal("NORMAL", dias["2026-10-06"]); // os dias anteriores do seed têm as quatro batidas e as horas somadas
+        Assert.DoesNotContain("FALTA", dias.Where(d => string.CompareOrdinal(d.Key, "2026-10-07") < 0).Select(d => d.Value)); // nenhum dia útil do mês virou falta
+        Assert.Equal(JsonValueKind.Object, antes.ValueKind);
     }
 
     // ---------------------------------------------------------------- passo 2: pedir e aprovar férias
@@ -80,10 +82,28 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
         Assert.Equal(2L, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE TIPO = 'FERIAS_DECIDIDAS' AND REFERENCIA_ID = {id}")); // o gestor e o RH decidiram: um e-mail por decisão
     }
 
-    // ---------------------------------------------------------------- passo 3: o RH envia o holerite e a pessoa baixa
+    // ---------------------------------------------------------------- passo 3: o RH decide o pedido de benefício
 
     [Fact]
-    public async Task Passo_3_o_RH_envia_o_holerite_da_pessoa_e_ela_recebe_o_link_do_arquivo()
+    public async Task Passo_3_o_RH_aprova_o_pedido_de_beneficio_e_a_pendencia_sai_da_fila_e_do_painel()
+    {
+        var api = await ApiAsync(mysql);
+        var rh = await EntrarComoAsync(api, "helena.martins");
+        var adesao = (int)await Sql.ContarAsync(api.Conexao, $"SELECT bf.ID_BENEFICIO_FUNCIONARIOS FROM BENEFICIOS_FUNCIONARIOS bf JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = bf.ID_FUNCIONARIO WHERE f.EMAIL_CORPORATIVO = '{Email("diego.farias")}' AND bf.STATUS_PEDIDO = 'PENDENTE'");
+        static int Beneficios(JsonElement painel) => painel.GetProperty("pendencias").EnumerateArray().Single(p => p.GetProperty("tipo").GetString() == "BENEFICIOS").GetProperty("quantidade").GetInt32();
+        Assert.Equal(2, Beneficios(await GetAsync(rh, "/api/rh/painel"))); // o plano do Diego e a troca de trajeto da Vanessa
+
+        var resposta = await rh.PostAsJsonAsync($"/api/rh/beneficios-adesoes/{adesao}/aprovar", new { });
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(1, Beneficios(await GetAsync(rh, "/api/rh/painel")));
+        Assert.Equal("APROVADO", await Sql.EscalarAsync(api.Conexao, $"SELECT STATUS_PEDIDO FROM BENEFICIOS_FUNCIONARIOS WHERE ID_BENEFICIO_FUNCIONARIOS = {adesao}") as string);
+    }
+
+    // ---------------------------------------------------------------- passo 4: o RH envia o holerite e a pessoa baixa
+
+    [Fact]
+    public async Task Passo_4_o_RH_envia_o_holerite_da_pessoa_e_ela_recebe_o_link_do_arquivo()
     {
         var api = await ApiAsync(mysql);
         var lucas = IdDe(api, "lucas.pereira");
@@ -111,7 +131,7 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- passo 4: atestado
 
     [Fact]
-    public async Task Passo_4_a_pessoa_envia_o_atestado_e_o_RH_valida()
+    public async Task Passo_5_a_pessoa_envia_o_atestado_e_o_RH_valida()
     {
         var api = await ApiAsync(mysql);
         var carla = await EntrarComoAsync(api, "carla.mendes");
@@ -130,7 +150,7 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- passo 5: importar a planilha
 
     [Fact]
-    public async Task Passo_5_o_RH_importa_a_planilha_confere_a_previa_confirma_e_as_pessoas_aparecem_no_cadastro()
+    public async Task Passo_6_o_RH_importa_a_planilha_confere_a_previa_confirma_e_as_pessoas_aparecem_no_cadastro()
     {
         var api = await ApiAsync(mysql);
         var rh = await EntrarComoAsync(api, "helena.martins");
@@ -158,7 +178,7 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- passo 6: treinamento e certificado
 
     [Fact]
-    public async Task Passo_6_a_pessoa_conclui_o_treinamento_e_o_certificado_de_quem_concluiu_vale_na_conferencia_publica()
+    public async Task Passo_7_a_pessoa_conclui_o_treinamento_e_o_certificado_de_quem_concluiu_vale_na_conferencia_publica()
     {
         var api = await ApiAsync(mysql);
         var lucas = await EntrarComoAsync(api, "lucas.pereira");
@@ -183,7 +203,7 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- passo 7: o formulário de admissão da pessoa que vai começar
 
     [Fact]
-    public async Task Passo_7_quem_vai_comecar_responde_o_formulario_de_admissao_e_a_pendencia_some_do_painel_do_RH()
+    public async Task Passo_8_quem_vai_comecar_responde_o_formulario_de_admissao_e_a_pendencia_some_do_painel_do_RH()
     {
         var api = await ApiAsync(mysql);
         var julia = await EntrarComoAsync(api, "julia.andrade");
@@ -205,7 +225,7 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- passo 8: o gestor acompanha a equipe e o RH, o log
 
     [Fact]
-    public async Task Passo_8_o_RH_ve_o_log_de_auditoria_do_que_foi_feito_na_demo()
+    public async Task Passo_9_o_RH_ve_o_log_de_auditoria_do_que_foi_feito_na_demo()
     {
         var api = await ApiAsync(mysql);
         var diego = await EntrarComoAsync(api, "diego.farias");

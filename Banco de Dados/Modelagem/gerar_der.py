@@ -100,7 +100,7 @@ def gerar() -> str:
     ]
     for nome in sorted(tabelas):
         t = tabelas[nome]
-        fk_colunas = {c for c, _, _ in t["fks"]}
+        fk_colunas = {c.strip() for cols, _, _ in t["fks"] for c in cols.split(",")}  # chave composta: cada coluna recebe a marca FK
         linhas.append(f"    {nome} {{")
         for coluna, tipo in t["colunas"]:
             marca = " PK" if coluna in t["pks"] else (" FK" if coluna in fk_colunas else "")
