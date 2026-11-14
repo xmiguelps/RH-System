@@ -21,6 +21,7 @@ O esquema vem dos scripts `Banco de Dados/Scripts/Vnnn__descricao.sql`. A API os
 - **Nunca edite um script já aplicado.** Até o primeiro deploy no Azure, um script só se edita avisando o dono, e os bancos locais são recriados; depois do primeiro deploy, todo script aplicado fica congelado e qualquer mudança é um script novo (`ALTER` para tabela; `DROP` e `CREATE` para trigger e função).
 - Os números de versão (`Vnnn`) são do dono: o grupo envia o conteúdo e o dono numera, para não haver duas versões com o mesmo número.
 - Para recriar o banco local do zero: `docker compose down -v` e depois `docker compose up -d --wait`.
+- **DER/MER** do banco, em texto e sempre em dia com os scripts: [`Banco de Dados/Modelagem/DER_gerado.md`](Banco%20de%20Dados/Modelagem/DER_gerado.md). **Dados fictícios para a demonstração:** [`Banco de Dados/Demo/LEIA-ME.md`](Banco%20de%20Dados/Demo/LEIA-ME.md).
 
 ### MySQL local
 
@@ -313,6 +314,24 @@ As 41 rotas de `contrato/fontes/70-fatia-7-gestao.yaml` (todas em `contrato/STAT
 11. Painel do gestor: "não se aplica" na coluna de avaliação vale para quem não é avaliado pelo gestor naquele formulário **e** para quem está de férias hoje (a pessoa já avaliada continua "respondida"); o rótulo do ciclo vem do que está depois de "ciclo " no título do formulário.
 12. `gestorQueAnalisa` continua sendo o gestor do setor quando ele está ausente (o contrato só põe nulo nos outros três casos). Prefere nulo também aí?
 13. Admissão com documentos pendentes no painel do RH: só quem começa em até 7 dias, tem formulário de admissão publicado atribuído e ainda não respondeu. A janela de 7 dias está certa?
+
+### Demonstração e fechamento (fatia 8)
+
+Nesta fatia não há rota nova: ela deixa o sistema **pronto para a banca**.
+
+- **DER/MER em texto** gerado dos scripts: `Banco de Dados/Modelagem/DER_gerado.md` (Mermaid, 48 tabelas e 71 chaves estrangeiras), escrito por `python3 "Banco de Dados/Modelagem/gerar_der.py"`; o teste `DerGeradoTests` confere que as tabelas e as chaves estão em dia com os scripts. O desenho do grupo (`DER.png`, `MER_RHSystem.drawio`) fica como estava.
+- **Seed fictício da demo:** `Banco de Dados/Demo/seed_demo.sql` e o `LEIA-ME.md` da pasta (como rodar, quem entra, o que não cria, e-mails que não geram devolução). Uma empresa inventada com RH, dois gestores, oito funcionários e uma pessoa que ainda vai começar, com ponto, banco de horas, férias em quatro situações, benefícios, avisos, formulários, treinamentos (um com certificado) e pendências para os painéis. Todas as datas saem de `@hoje`, então a demo nunca fica velha. Senha de todos: `Demo#RH2026` (trocar antes de abrir numa URL pública).
+- **Ensaio automático do roteiro:** `SeedDaDemoTests` roda o seed inteiro num MySQL novo (em 4 dias diferentes) e confere pelo login de verdade; `FluxosDaDemoTests` faz os passos do roteiro pela API (entrar e bater o ponto, pedir e aprovar férias em duas etapas, holerite, atestado, importar planilha, treinamento e certificado, formulário de admissão, auditoria).
+- **Documentos:** `docs/demo/roteiro-da-demo.md` (roteiro de cerca de 15 minutos, preparação e plano B), `docs/demo/limitacoes.md` (conformidade legal do ponto, sem relógio físico, só desktop e as regras por hipótese) e `docs/demo/custos-e-como-desligar.md` (o que cobra parado e como apagar o ambiente; sem preços inventados).
+
+**Perguntas em aberto ao dono (decididas por padrão):**
+
+1. **Quais fluxos entram no roteiro** e o que mostrar como trabalhos futuros (a lista do roteiro é uma sugestão, cada passo é independente).
+2. **E-mails da demo:** o domínio padrão dos e-mails do seed (`rhsystem-demo.example`) não existe, então, com o envio ligado, o servidor de destino devolve. O padrão é **deixar o envio desligado**; se for ligar, escolha uma das três saídas do `LEIA-ME.md` do seed.
+3. **Holerites, atestados e documentos enviados não vêm no seed**, porque dependem de arquivo no armazenamento; o roteiro os envia ao vivo. Aceita, ou prefere um passo a mais que envie PDFs de exemplo pela API depois do seed?
+4. **A senha pública `Demo#RH2026`** só serve para a demo com dados fictícios; trocar antes de qualquer URL aberta.
+5. **Onde roda a demo:** local (compose, custo zero) ou no Azure (a Task 14 da fatia 0 ainda não foi feita; ver `custos-e-como-desligar.md`).
+6. **Revisão dos scripts finais com o grupo:** o roadmap pede que os scripts finais sejam revisados com o grupo; o arquivo de procedures SQL recebido continua com o veredito "não aplicar como está" (contradiz o contrato) e fica pendente.
 
 ## Front-end
 
