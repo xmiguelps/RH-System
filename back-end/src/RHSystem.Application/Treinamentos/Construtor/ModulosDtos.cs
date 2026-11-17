@@ -9,7 +9,8 @@ public static class LimitesDoModulo
 {
     public const long TamanhoMaximoBytes = 10L * 1024 * 1024;
 
-    public const long TetoDaRequisicaoBytes = TamanhoMaximoBytes + (1024 * 1024);
+    /// <summary>O teto da requisição das rotas de módulo é o do VÍDEO (100 MiB, decisão do dono de 2026-11-17) mais 1 MiB de folga para os outros campos; o PDF segue com o limite dele (<see cref="TamanhoMaximoBytes"/>), conferido pelo caso de uso.</summary>
+    public const long TetoDaRequisicaoBytes = Regras.ValidacaoDoVideoDoModulo.TamanhoMaximoBytes + (1024 * 1024);
 
     public const string Pasta = "treinamentos";
 }

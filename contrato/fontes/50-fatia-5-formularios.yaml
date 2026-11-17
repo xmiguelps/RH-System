@@ -2461,7 +2461,12 @@ paths:
 
         O candidato nunca vê o `id` interno do formulário nem dado de outro candidato. Perguntas de arquivo aceitam PDF
         ou Word, até 5 MB. Formulário anônimo nunca é público.
-      x-provisorio: "Proteção do link público (decisão do dono pendente: limite simples ou captcha) e retenção dos dados de candidato (prazo e apagamento). Hipótese mais simples usada aqui: só limite por IP (30 consultas por minuto e 10 envios por hora, valores de partida configuráveis) e retenção de 180 dias (retencaoDias). Se for captcha, o envio ganha um campo de prova do captcha; se o dono quiser limite de respostas por link, a publicação ganha limiteDeRespostas (a coluna LINK_PUBLICO_LIMITE_RESPOSTAS já existe); se o prazo de retenção mudar, só o valor muda."
+
+        **Captcha (decisão do dono de 2026-11-17):** além do limite por IP, a página traz `captcha`. Objeto com `chaveDoSite`: o captcha está
+        ligado e o front desenha o widget; `null`: desligado. **A política de segurança do site (CSP, `front-end/public/staticwebapp.config.json`, hoje
+        `default-src 'self'`) precisa liberar o Cloudflare Turnstile:** `script-src` e `frame-src` com `https://challenges.cloudflare.com`. Sem isso o widget não carrega e, com o captcha ligado,
+        nenhuma candidatura entra.
+      x-provisorio: "Retenção dos dados de candidato (prazo e apagamento). Hipótese usada aqui: 180 dias (retencaoDias), valor de partida; se o prazo de retenção mudar, só o valor muda. Se o dono quiser limite de respostas por link, a publicação ganha limiteDeRespostas (a coluna LINK_PUBLICO_LIMITE_RESPOSTAS já existe)."
       x-perfis: [Publico]
       security: []
       parameters:
@@ -2479,6 +2484,7 @@ paths:
                 prazo: '2026-10-31'
                 avisoDePrivacidade: "Usamos seu nome, e-mail, telefone, currículo e respostas só para avaliar a sua candidatura. Só o RH da empresa acessa esses dados. Guardamos por até 180 dias e depois apagamos. Se quiser que apaguemos antes, fale com o RH."
                 retencaoDias: 180
+                captcha: { chaveDoSite: 1x00000000000000000000AA }
                 perguntas:
                   - id: 501
                     ordem: 1
@@ -2527,10 +2533,15 @@ paths:
         arquivo errado: 400 com o campo
         (`curriculo` ou `arquivos`). **Limite de 10 envios por hora por IP** (429, cabeçalho `Retry-After`).
 
+        **Captcha (decisão do dono de 2026-11-17):** com o captcha ligado (`captcha` da página é um objeto), o envio traz `captchaToken`. A conferência vem
+        **antes de qualquer outra regra** (depois do limite por IP), até do 404 do código do link: é a conferência mais barata e roda antes de ler os arquivos e
+        de consultar o banco (a página, `obterFormularioPublico`, continua respondendo 404 ou 200 sem captcha, só com o limite por IP): sem o campo, 400 em `errors.captchaToken`; com um token que o provedor não confirma (ou se o provedor não responde a tempo), 422
+        `CAPTCHA_INVALIDO`. Nada é gravado quando ela recusa. Desligado, o campo é ignorado.
+
         O arquivo enviado é servido só como anexo, por link temporário, e só ao RH (`baixarCurriculoDeCandidato`,
         `baixarArquivoDeResposta`). A auditoria não grava o valor dos dados do candidato (roadmap, decisão 13). O
         candidato é apagado pelo job de retenção depois de `retencaoDias`.
-      x-provisorio: "Mesma decisão pendente de obterFormularioPublico: proteção do link público (limite simples ou captcha) e retenção dos dados de candidato."
+      x-provisorio: "Mesma decisão pendente de obterFormularioPublico: a retenção dos dados de candidato."
       x-perfis: [Publico]
       security: []
       parameters:
@@ -2886,13 +2897,22 @@ components:
       description: |
         O formulário não pode ser respondido (ou aberto) agora. `codigo`: `FORMULARIO_AINDA_NAO_ABERTO` (agendado),
         `FORMULARIO_ENCERRADO` (encerrado ou prazo vencido), `AVALIADO_INVALIDO`, `FUNCIONARIO_INATIVO` e, só na página
-        pública, `EMPRESA_NAO_CONFIGURADA` (os dois com o mesmo código de todas as fatias). Pode trazer `regraDoBanco`
+        pública, `EMPRESA_NAO_CONFIGURADA` (os dois com o mesmo código de todas as fatias) e, só no envio da candidatura pública
+        (`responderFormularioPublico`), `CAPTCHA_INVALIDO` (o provedor do captcha não confirmou o token). Pode trazer `regraDoBanco`
         com a mensagem original do trigger ("Pergunta obrigatoria: informe a resposta.", "Formulario inativo nao aceita
         respostas.", "Funcionario inativo nao pode responder formularios.").
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
           examples:
+            captchaInvalido:
+              summary: Captcha não confirmado (só em responderFormularioPublico)
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: Não foi possível confirmar que você não é um robô. Tente de novo.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: CAPTCHA_INVALIDO
             encerrado:
               summary: Formulário encerrado ou com o prazo vencido
               value:
@@ -3828,7 +3848,7 @@ components:
     FormularioPaginaPublica:
       type: object
       description: O que a página pública do candidato mostra. Sem `id` interno do formulário.
-      required: [empresaNome, titulo, descricao, prazo, avisoDePrivacidade, retencaoDias, perguntas]
+      required: [empresaNome, titulo, descricao, prazo, avisoDePrivacidade, retencaoDias, perguntas, captcha]
       properties:
         empresaNome: { type: string, description: Nome da empresa (configuração da empresa) para o cabeçalho. }
         titulo: { type: string }
@@ -3845,6 +3865,17 @@ components:
         perguntas:
           type: array
           items: { $ref: '#/components/schemas/PerguntaFormulario' }
+        captcha:
+          description: |
+            O captcha da candidatura (decisão do dono de 2026-11-17; Cloudflare Turnstile). **Presente quando o captcha está ligado**: a página desenha o widget
+            com `chaveDoSite` (a chave PÚBLICA) e manda o token que ele gera em `captchaToken` de `responderFormularioPublico`. **`null` quando está desligado**: a
+            página não mostra o widget e o envio não exige nada.
+          oneOf:
+            - type: object
+              required: [chaveDoSite]
+              properties:
+                chaveDoSite: { type: string, description: A chave pública do widget (a secreta nunca sai do servidor). }
+            - { type: 'null' }
     CandidatoEnvio:
       type: object
       description: Corpo `multipart/form-data` de `responderFormularioPublico`.
@@ -3873,6 +3904,13 @@ components:
           type: array
           description: Os arquivos das perguntas `ARQUIVO` (PDF ou Word, até 5 MB cada), na ordem de `arquivoIndice`.
           items: { type: string, format: binary }
+        captchaToken:
+          type: string
+          maxLength: 2048
+          description: |
+            O token que o widget do captcha gerou (decisão do dono de 2026-11-17). **Obrigatório quando `captcha` da página é um objeto** (captcha ligado): sem ele,
+            400 em `errors.captchaToken` ("Confirme que você não é um robô."); com um que o provedor não confirma (vencido, repetido ou falso), 422 `CAPTCHA_INVALIDO`.
+            Ignorado quando o captcha está desligado. Cada token vale uma só tentativa e uns 5 minutos: o front pede outro depois de um erro.
     CandidatoRecibo:
       type: object
       required: [mensagem]

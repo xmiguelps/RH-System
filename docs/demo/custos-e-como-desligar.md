@@ -10,7 +10,7 @@
 |---|---|---|---|
 | **App Service** (nível pago, com **Always On**) | roda a API e o agendador em segundo plano. Sem Always On o app dorme e **nada agendado roda** | **Sim**, enquanto o plano existir, mesmo sem acesso | **parar o app não basta**: o plano (App Service Plan) continua cobrando. Apague o plano ou reduza para o nível gratuito |
 | **MySQL Flexible Server** | o banco (MySQL 8.4) | **Sim**: o armazenamento e o backup continuam; a computação só deixa de cobrar com o servidor **parado** (o Azure religa sozinho um servidor parado depois de até 30 dias: confira o prazo na documentação atual) | `az mysql flexible-server stop` para a pausa curta; `delete` para acabar |
-| **Storage Account** (Blob) | arquivos: holerite, atestado, documentos, certificado, PDF de módulo | **Sim**, pelo que está guardado | apague o container ou a conta |
+| **Storage Account** (Blob) | arquivos: holerite, atestado, documentos, certificado, PDF e **vídeo** de módulo (MP4 ou WebM de até 100 MB cada; um vídeo é o arquivo que mais ocupa espaço e o que mais gera tráfego de saída quando é assistido) | **Sim**, pelo que está guardado e, no vídeo, pelo que é assistido | apague o container ou a conta |
 | **Envio de e-mail** (provedor configurado em `Email:*`) | e-mails da lista fechada | só quando envia | deixe `Email:EnvioAtivo=false` e nada é enviado nem cobrado |
 | **Front-end** (arquivos estáticos) | as telas | conforme onde for hospedado | apague junto com o grupo de recursos |
 
@@ -48,3 +48,4 @@ Antes, **tire uma cópia do que quiser guardar**: o seed recria a demo em minuto
 3. Alerta de orçamento ligado e o e-mail dele certo?
 4. Chaves e senhas do ambiente (JWT, banco, armazenamento) **trocadas ou apagadas**; a senha de demonstração `Demo#RH2026` **nunca** fica numa URL pública depois da banca.
 5. O repositório não tem segredo: confira o `.env` (o git o ignora) e os `user-secrets`.
+6. Antes de ligar o captcha ou liberar o vídeo por arquivo no ambiente hospedado: a política de segurança do site precisa liberar `https://challenges.cloudflare.com` (`script-src` e `frame-src`) e o endereço do armazenamento (`media-src`); sem isso o widget e o vídeo não funcionam (veja `docs/plano-front-end/MUDANCAS-DO-BACKEND-2026-11-17.md`).

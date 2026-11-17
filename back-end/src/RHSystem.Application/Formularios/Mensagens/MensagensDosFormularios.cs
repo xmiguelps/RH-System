@@ -120,6 +120,9 @@ public static class MensagensDosFormularios
     /// O formulário recorrente (com próxima reabertura) não muda o prazo por <c>alterarPrazoDoFormulario</c>: a rodada nova avança o MESMO número de dias que a anterior tinha entre a publicação e o prazo, então prorrogar ou encurtar uma rodada mudaria a duração de todas as seguintes (e uma
     /// prorrogação que alcança a próxima reabertura faria o formulário ser pulado, mês sim, mês não). Achado da revisão independente.
     /// </summary>
+    /// <summary>O captcha da candidatura pública não foi confirmado pelo provedor (token vencido, repetido, falso, ou o provedor fora do ar: a conferência nunca deixa passar por defeito).</summary>
+    public static MensagemDoFormulario CaptchaInvalido { get; } = new(422, Recusada, "Não foi possível confirmar que você não é um robô. Tente de novo.", "CAPTCHA_INVALIDO");
+
     public static MensagemDoFormulario FormularioRecorrente { get; } = new(422, Recusada, "Formulário recorrente não muda o prazo por aqui: cada rodada nova repete a duração da anterior. Para mudar, encerre o formulário e crie outro.", "FORMULARIO_RECORRENTE");
 
     public static MensagemDoFormulario FormularioNaoEstaAgendado { get; } = new(422, Recusada, "Só um formulário agendado volta para rascunho.", "FORMULARIO_NAO_ESTA_AGENDADO");
@@ -205,7 +208,7 @@ public static class MensagensDosFormularios
     public static IReadOnlyList<MensagemDoFormulario> Todas { get; } =
     [
         AnonimatoFixoAposPublicar, AnonimoPerguntasFixas, AnonimoSemNovosDestinatarios, ResultadoAnonimoIndisponivel, JaRespondidoPeloFuncionario, JaRespondidoPeloCandidato,
-        FormularioEncerradoParaEditar, FormularioEncerradoParaResponder, FormularioDeAdmissaoEncerrado, FormularioNaoPublicadoParaLembrar, FormularioNaoPublicadoParaEncerrar, FormularioNaoPublicadoParaPrazo, FormularioRecorrente, FormularioNaoEstaAgendado, FormularioJaPublicado, FormularioAindaNaoAberto,
+        FormularioEncerradoParaEditar, FormularioEncerradoParaResponder, FormularioDeAdmissaoEncerrado, FormularioNaoPublicadoParaLembrar, FormularioNaoPublicadoParaEncerrar, FormularioNaoPublicadoParaPrazo, FormularioRecorrente, CaptchaInvalido, FormularioNaoEstaAgendado, FormularioJaPublicado, FormularioAindaNaoAberto,
         FormularioJaRespondido, EmpresaNaoConfigurada, PerguntaJaRespondidaParaEditar, PerguntaJaRespondidaParaExcluir, AnonimoSemArquivo, AnonimoSemLink, LinkSoParaEntrevista, AnonimoPequeno(4), VerificacaoComBloqueio,
         PessoaInativaNoPublico, PessoaInativaParaResponder, FormularioPorLinkNaLista, FormularioPorLinkNoLembrete, FormularioSemLink, FormularioNaoEPorPessoas, FormularioNaoEAvaliacao, FormularioAnonimo, SugestaoNoLembrete,
         SugestaoNasMinhasRespostas, ResultadoSemRespostasNaExportacao, ResultadoSemRespostasDoAvaliado, AvaliadoInvalido,

@@ -50,7 +50,7 @@ public static class FormulariosPublicoEndpoints
         var formulario = await LeituraDeFormulario.LerAsync(requisicao, ct);
         var curriculo = formulario.Files.GetFile("curriculo") is { } enviado ? new ArquivoRecebido(enviado.FileName, enviado.Length, enviado.OpenReadStream) : null;
         var arquivos = formulario.Files.GetFiles("arquivos").Select(f => new ArquivoRecebido(f.FileName, f.Length, f.OpenReadStream)).ToList();
-        var novo = new NovaCandidatura(Texto(formulario, "nome"), Texto(formulario, "email"), Texto(formulario, "telefone"), Texto(formulario, "aceitouAvisoDePrivacidade"), Texto(formulario, "respostas"), curriculo, arquivos, formulario.Files.Count);
+        var novo = new NovaCandidatura(Texto(formulario, "nome"), Texto(formulario, "email"), Texto(formulario, "telefone"), Texto(formulario, "aceitouAvisoDePrivacidade"), Texto(formulario, "respostas"), curriculo, arquivos, formulario.Files.Count, Texto(formulario, "captchaToken"));
         return Results.Json(await casoDeUso.ExecutarAsync(token, novo, ct), statusCode: StatusCodes.Status201Created);
     }
 

@@ -18,13 +18,14 @@ public sealed class RegistradorDeAdvertencia(IAdvertenciasRepositorio advertenci
     public const string TipoDoEmail = "ADVERTENCIA_REGISTRADA";
 
     /// <param name="gestorId">A linha de <c>GESTORES</c> de quem aplicou; <c>null</c> é o RH.</param>
+    /// <param name="registradaPorRhId">A pessoa do RH que registrou (só o detalhe do RH a mostra); <c>null</c> quando o gestor registra pela tela dele.</param>
     /// <param name="gestorNome">O nome de quem aplicou, quando foi o gestor (vai na cópia ao RH).</param>
     /// <param name="copiaParaORh">Só quando o gestor registra.</param>
-    public async Task<int> RegistrarAsync(PessoaParaAdvertencia pessoa, int? gestorId, string? gestorNome, DateOnly data, TipoDeAdvertencia tipo, CamposDaAdvertencia campos, bool copiaParaORh, CancellationToken ct) =>
+    public async Task<int> RegistrarAsync(PessoaParaAdvertencia pessoa, int? gestorId, int? registradaPorRhId, string? gestorNome, DateOnly data, TipoDeAdvertencia tipo, CamposDaAdvertencia campos, bool copiaParaORh, CancellationToken ct) =>
         await unidade.ExecutarEmTransacaoAsync(
             async () =>
             {
-                var advertencia = Advertencia.Registrar(pessoa.Id, gestorId, data, tipo, campos.Motivo, campos.Descricao);
+                var advertencia = Advertencia.Registrar(pessoa.Id, gestorId, registradaPorRhId, data, tipo, campos.Motivo, campos.Descricao);
                 var id = await advertencias.AdicionarAsync(advertencia, ct);
                 auditor.Registrar(new EventoDeAuditoriaNovo(
                     AuditoriaArea.Advertencias,

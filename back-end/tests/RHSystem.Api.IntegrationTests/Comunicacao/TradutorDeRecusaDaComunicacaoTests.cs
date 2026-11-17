@@ -90,7 +90,7 @@ public class TradutorDeRecusaDaComunicacaoTests(MySqlFixture mysql)
         var pessoa = await NovaPessoaAsync(conexao);
         await Sql.ExecutarAsync(conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE WHERE ID_FUNCIONARIO = {pessoa}");
         await using var db = ContextoDeTeste.Novo(conexao);
-        db.Advertencias.Add(Advertencia.Registrar(pessoa, null, new DateOnly(2026, 10, 5), TipoDeAdvertencia.Verbal, "Atraso", "Descrição"));
+        db.Advertencias.Add(Advertencia.Registrar(pessoa, null, null, new DateOnly(2026, 10, 5), TipoDeAdvertencia.Verbal, "Atraso", "Descrição"));
         var erro = await ExcecaoDeAsync(() => db.SaveChangesAsync());
 
         var problema = TradutorDeRecusaDaComunicacao.Traduzir(erro, new ContextoDaComunicacao(OperacaoDaComunicacao.RegistrarAdvertencia))!;

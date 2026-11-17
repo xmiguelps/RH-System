@@ -579,7 +579,7 @@ PNG: `Figma/telas/57-gestor-formularios-da-equipe.png`.
 
 **Anonimato e segurança nesta tela**
 - **Formulário anônimo nunca é público**: a página nunca abre um. O candidato não é anônimo (dá nome e e-mail); o aviso de privacidade diz isso.
-- Esta página **não usa a sessão do site**: chame a API **sem** `Authorization` e **sem** o ciclo de renovação de sessão (rotas `Publico` têm `security: []`). Não guarde nada no navegador (o refresh token do site fica em `localStorage`; esta página nunca o toca). Não use nenhum recurso externo (política `default-src 'self'`): fonte e ícones do próprio site.
+- Esta página **não usa a sessão do site**: chame a API **sem** `Authorization` e **sem** o ciclo de renovação de sessão (rotas `Publico` têm `security: []`). Não guarde nada no navegador (o refresh token do site fica em `localStorage`; esta página nunca o toca). Não use nenhum recurso externo (política `default-src 'self'`): fonte e ícones do próprio site. **Única exceção (decisão do dono de 2026-11-17): o widget do captcha (Cloudflare Turnstile)**, quando `captcha` da página é um objeto: carrega script e iframe de `https://challenges.cloudflare.com`, e a política do site precisa liberar isso. Veja `docs/plano-front-end/MUDANCAS-DO-BACKEND-2026-11-17.md`.
 - O candidato nunca vê o `id` interno do formulário nem dado de outro candidato.
 
 **Perguntas abertas (`x-provisorio`)**

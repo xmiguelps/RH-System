@@ -108,7 +108,7 @@ public class MapeamentoDaComunicacaoTests(MySqlFixture mysql)
     {
         var conexao = await mysql.NovoBancoComScriptsAsync();
         var (db, pessoa) = await NovaPessoaAsync(conexao, "advertencia1@teste.com");
-        var advertencia = Advertencia.Registrar(pessoa.Id, null, new DateOnly(2026, 10, 5), TipoDeAdvertencia.Escrita, "Atrasos repetidos", "Três atrasos de mais de 20 minutos na mesma semana.");
+        var advertencia = Advertencia.Registrar(pessoa.Id, null, null, new DateOnly(2026, 10, 5), TipoDeAdvertencia.Escrita, "Atrasos repetidos", "Três atrasos de mais de 20 minutos na mesma semana.");
         db.Advertencias.Add(advertencia);
 
         await db.SaveChangesAsync();

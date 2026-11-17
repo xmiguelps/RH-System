@@ -1,4 +1,5 @@
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Captcha;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Empresa;
 using RHSystem.Application.Formularios.Construtor;
@@ -19,20 +20,20 @@ public sealed class OpcoesDoFormularioPublico
 }
 
 /// <summary>O que a página pública do candidato mostra (<c>FormularioPaginaPublica</c>): o nome da empresa, o formulário, o aviso de privacidade com o prazo de retenção e as perguntas. <b>Sem o <c>id</c> do formulário</b>, sem o código do link e sem nada do RH.</summary>
-public sealed record FormularioPaginaPublica(string EmpresaNome, string Titulo, string? Descricao, DateOnly? Prazo, string AvisoDePrivacidade, int RetencaoDias, IReadOnlyList<PerguntaFormulario> Perguntas);
+public sealed record FormularioPaginaPublica(string EmpresaNome, string Titulo, string? Descricao, DateOnly? Prazo, string AvisoDePrivacidade, int RetencaoDias, IReadOnlyList<PerguntaFormulario> Perguntas, CaptchaDaPagina? Captcha);
 
 /// <summary>
 /// <c>GET /api/publico/formularios/{token}</c> (sem login; o limite de 30 consultas por minuto por IP roda ANTES de tudo): abre o formulário do candidato pelo código do link. Código fora do padrão, inexistente, de rascunho ou de um formulário que não é por link: o MESMO 404 (nunca 400, para ninguém varrer o formato).
 /// Agendado: 422 <c>FORMULARIO_AINDA_NAO_ABERTO</c>; encerrado, inclusive o prazo vencido com a tarefa de encerrar parada: 422 <c>FORMULARIO_ENCERRADO</c>; empresa ainda sem configuração: 422 <c>EMPRESA_NAO_CONFIGURADA</c> (o nome dela vai no cabeçalho). O código do link nunca vai a log nem a auditoria.
 /// </summary>
-public sealed class ObterFormularioPublicoCasoDeUso(IConsultaDeFormularios consulta, IConfiguracaoDaEmpresa empresa, OpcoesDoFormularioPublico opcoes, IRelogio relogio)
+public sealed class ObterFormularioPublicoCasoDeUso(IConsultaDeFormularios consulta, IConfiguracaoDaEmpresa empresa, OpcoesDoFormularioPublico opcoes, IRelogio relogio, IVerificadorDeCaptcha captcha)
 {
     public async Task<FormularioPaginaPublica> ExecutarAsync(string token, CancellationToken ct)
     {
         var lido = await AcessoPublico.ObterAsync(consulta, token, relogio.AgoraUtc, ct);
         var configuracao = await empresa.ObterAsync(ct) ?? throw MensagensDosFormularios.EmpresaNaoConfigurada.ComoProblema();
         var retencao = opcoes.RetencaoDeCandidatosDias;
-        return new FormularioPaginaPublica(configuracao.NomeEmpresa, lido.Titulo, lido.Descricao, lido.Prazo, AvisoDePrivacidade(retencao), retencao, [.. lido.Perguntas.OrderBy(p => p.Ordem).Select(MapeadorDoFormulario.Pergunta)]);
+        return new FormularioPaginaPublica(configuracao.NomeEmpresa, lido.Titulo, lido.Descricao, lido.Prazo, AvisoDePrivacidade(retencao), retencao, [.. lido.Perguntas.OrderBy(p => p.Ordem).Select(MapeadorDoFormulario.Pergunta)], captcha.Ativo ? new CaptchaDaPagina(captcha.ChaveDoSite!) : null);
     }
 
     /// <summary>O texto (markdown) que o candidato aceita antes de enviar: o que é guardado, quem vê e por quanto tempo.</summary>

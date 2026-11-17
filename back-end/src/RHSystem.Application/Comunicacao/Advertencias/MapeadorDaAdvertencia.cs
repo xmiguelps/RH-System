@@ -8,7 +8,7 @@ internal static class MapeadorDaAdvertencia
     public static AdvertenciaItem Item(AdvertenciaLida l) => new(l.Id, l.Data, l.Funcionario, l.Tipo, l.Motivo, RegrasDaAdvertencia.AplicadaPor(l.GestorNome), l.Situacao);
 
     public static AdvertenciaDetalheRh DetalheRh(AdvertenciaLida l) =>
-        new(l.Id, l.Data, l.Funcionario, l.Tipo, l.Motivo, RegrasDaAdvertencia.AplicadaPor(l.GestorNome), l.Situacao, l.Descricao, l.CienciaEmUtc, l.TextoContestacao, l.ContestacaoEmUtc, RegrasDaAdvertencia.Desfecho(l.Situacao, l.TextoContestacao));
+        new(l.Id, l.Data, l.Funcionario, l.Tipo, l.Motivo, RegrasDaAdvertencia.AplicadaPor(l.GestorNome), l.Situacao, l.Descricao, l.CienciaEmUtc, l.TextoContestacao, l.ContestacaoEmUtc, RegrasDaAdvertencia.Desfecho(l.Situacao, l.TextoContestacao), l.RegistradaPor);
 
     public static AdvertenciaDetalheGestor DetalheGestor(AdvertenciaLida l) =>
         new(l.Id, l.Data, l.Funcionario, l.Tipo, l.Motivo, RegrasDaAdvertencia.AplicadaPor(l.GestorNome), l.Situacao, l.Descricao, l.CienciaEmUtc);

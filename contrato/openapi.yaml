@@ -288,7 +288,7 @@ tags:
 
       **Banco: o que é novo** (scripts já escritos em `Banco de Dados/Scripts`): a coluna `TREINAMENTOS.ENCERRADO_EM` (`V001`;
       instante do encerramento; dela dependem a situação `ENCERRADO` e `encerradoEmUtc`); a coluna
-      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V001`; alimenta `nomeArquivo` do módulo de PDF); a mudança do padrão de
+      `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (`V001`; alimenta `nomeArquivo` do módulo de PDF e do vídeo por arquivo); a mudança do padrão de
       `AVISA_POR_EMAIL` e `LEMBRA_ANTES_DO_FIM` para `FALSE` (`V001`); e a **auditoria**, que é tabela nova da aplicação (`V001`) e
       recebe os eventos de publicar (criação das linhas em lote), encerrar e excluir. A `description` de cada operação que
       depende de uma delas diz isso.
@@ -10154,6 +10154,12 @@ paths:
                 textoContestacao: Troquei o plantão de 12/09 com a colega Júlia por mensagem e avisei o gestor na sexta; posso mostrar a conversa.
                 dataContestacaoUtc: 2026-09-17T13:05:00Z
                 desfechoDaContestacao: null
+                registradaPor:
+                  id: 2
+                  nome: Sofia Ramos
+                  cargo: Analista de RH
+                  setor: Recursos Humanos
+                  ativo: true
         "401":
           $ref: "#/components/responses/Erro401NaoAutenticado"
         "403":
@@ -10217,6 +10223,12 @@ paths:
                 textoContestacao: Troquei o plantão de 12/09 com a colega Júlia por mensagem e avisei o gestor na sexta; posso mostrar a conversa.
                 dataContestacaoUtc: 2026-09-17T13:05:00Z
                 desfechoDaContestacao: ACATADA
+                registradaPor:
+                  id: 2
+                  nome: Sofia Ramos
+                  cargo: Analista de RH
+                  setor: Recursos Humanos
+                  ativo: true
         "400":
           $ref: "#/components/responses/Erro400Validacao"
         "401":
@@ -10358,6 +10370,12 @@ paths:
                 textoContestacao: null
                 dataContestacaoUtc: null
                 desfechoDaContestacao: null
+                registradaPor:
+                  id: 2
+                  nome: Sofia Ramos
+                  cargo: Analista de RH
+                  setor: Recursos Humanos
+                  ativo: true
         "400":
           $ref: "#/components/responses/Erro400Validacao"
         "401":
@@ -14138,7 +14156,10 @@ paths:
 
         O candidato nunca vê o `id` interno do formulário nem dado de outro candidato. Perguntas de arquivo aceitam PDF
         ou Word, até 5 MB. Formulário anônimo nunca é público.
-      x-provisorio: "Proteção do link público (decisão do dono pendente: limite simples ou captcha) e retenção dos dados de candidato (prazo e apagamento). Hipótese mais simples usada aqui: só limite por IP (30 consultas por minuto e 10 envios por hora, valores de partida configuráveis) e retenção de 180 dias (retencaoDias). Se for captcha, o envio ganha um campo de prova do captcha; se o dono quiser limite de respostas por link, a publicação ganha limiteDeRespostas (a coluna LINK_PUBLICO_LIMITE_RESPOSTAS já existe); se o prazo de retenção mudar, só o valor muda."
+
+        **Captcha (decisão do dono de 2026-11-17):** além do limite por IP, a página traz `captcha`. Objeto com `chaveDoSite`: o captcha está
+        ligado e o front desenha o widget; `null`: desligado.
+      x-provisorio: "Retenção dos dados de candidato (prazo e apagamento). Hipótese usada aqui: 180 dias (retencaoDias), valor de partida; se o prazo de retenção mudar, só o valor muda. Se o dono quiser limite de respostas por link, a publicação ganha limiteDeRespostas (a coluna LINK_PUBLICO_LIMITE_RESPOSTAS já existe)."
       x-perfis:
         - Publico
       security: []
@@ -14158,6 +14179,8 @@ paths:
                 prazo: 2026-10-31
                 avisoDePrivacidade: Usamos seu nome, e-mail, telefone, currículo e respostas só para avaliar a sua candidatura. Só o RH da empresa acessa esses dados. Guardamos por até 180 dias e depois apagamos. Se quiser que apaguemos antes, fale com o RH.
                 retencaoDias: 180
+                captcha:
+                  chaveDoSite: 1x00000000000000000000AA
                 perguntas:
                   - id: 501
                     ordem: 1
@@ -14214,10 +14237,15 @@ paths:
         arquivo errado: 400 com o campo
         (`curriculo` ou `arquivos`). **Limite de 10 envios por hora por IP** (429, cabeçalho `Retry-After`).
 
+        **Captcha (decisão do dono de 2026-11-17):** com o captcha ligado (`captcha` da página é um objeto), o envio traz `captchaToken`. A conferência vem
+        **antes de qualquer outra regra** (depois do limite por IP), até do 404 do código do link, para quem não resolve o captcha nunca descobrir se um código
+        existe: sem o campo, 400 em `errors.captchaToken`; com um token que o provedor não confirma (ou se o provedor não responde a tempo), 422
+        `CAPTCHA_INVALIDO`. Nada é gravado quando ela recusa. Desligado, o campo é ignorado.
+
         O arquivo enviado é servido só como anexo, por link temporário, e só ao RH (`baixarCurriculoDeCandidato`,
         `baixarArquivoDeResposta`). A auditoria não grava o valor dos dados do candidato (roadmap, decisão 13). O
         candidato é apagado pelo job de retenção depois de `retencaoDias`.
-      x-provisorio: "Mesma decisão pendente de obterFormularioPublico: proteção do link público (limite simples ou captcha) e retenção dos dados de candidato."
+      x-provisorio: "Mesma decisão pendente de obterFormularioPublico: a retenção dos dados de candidato."
       x-perfis:
         - Publico
       security: []
@@ -15092,14 +15120,21 @@ paths:
         Passo Conteúdo, botões "Vídeo", "Arquivo PDF", "Texto" e "Link" (o botão "Aula presencial" não existe). Envio em
         `multipart/form-data`. O módulo entra no fim (`ordem` = último + 1). O que cada `tipo` exige (o banco confere, V001,
         `CHK_TREINAMENTOS_MODULOS_CONTEUDO`) e o que recusa com 400 em `errors`:
-        `VIDEO`: `urlExterna`; `TEXTO`: `conteudoTexto` (texto ou markdown, nunca HTML);
+        `VIDEO`: `urlExterna` **ou** `arquivo` (um só dos dois: decisão do dono de 2026-11-17; o arquivo é um vídeo MP4 ou WebM de até 100 MB,
+        conferido pelo conteúdo e não só pela extensão); `TEXTO`: `conteudoTexto` (texto ou markdown, nunca HTML);
         `LINK`: `urlExterna`; `PDF`: `arquivo` (PDF de até 10 MB, conferido pelo conteúdo e não só pela extensão).
         Campo que não pertence ao tipo é recusado. `urlExterna` precisa começar com `http://` ou `https://`.
         Só em **rascunho**: depois de publicado (inclusive o encerrado), 422 `TREINAMENTO_MODULOS_TRAVADOS` (a conclusão é
         por módulo e `CONCLUIDO` é definitivo; um módulo novo não reabriria quem já concluiu). O arquivo só é gravado no
-        Blob depois de o banco aceitar o módulo. No módulo `PDF`, a API grava `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
+        Blob depois de o banco aceitar o módulo. No módulo `PDF` e no `VIDEO` por arquivo, a API grava `CAMINHO_ARQUIVO` e `NOME_ARQUIVO_ORIGINAL`
         juntos (o nome que a pessoa deu ao arquivo, `V001`) e devolve só o nome, em `nomeArquivo`.
-      x-provisorio: "Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (roadmap, fatia 6): o contrato supõe a hipótese mais simples, só link externo; se o dono escolher o Blob, `VIDEO` passa a aceitar `arquivo` (a coluna `CAMINHO_ARQUIVO` já existe em V001). (2) Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta."
+
+        **Vídeo por arquivo (decisão do dono de 2026-11-17):** além do link externo, o RH pode enviar o vídeo. `VIDEO` com `urlExterna` e `arquivo`
+        juntos: 400 em `errors.arquivo` ("Escolha um só: o link ou o arquivo de vídeo."); sem nenhum dos dois: 400 em `errors.urlExterna`
+        ("Informe o endereço do vídeo ou envie o arquivo."); arquivo que não é MP4 nem WebM: 400 ("Envie um vídeo MP4 ou WebM."); acima de 100 MB: 400
+        ("O vídeo pode ter até 100 MB."). O teto da requisição desta rota (e de `atualizarModuloDeTreinamento`) é o do vídeo, 101 MB; o PDF segue com o limite
+        dele, de 10 MB. A pessoa assiste pelo link temporário de `baixarArquivoDeModulo` (veja `obterConteudoDeModulo`).
+      x-provisorio: "Acrescentar módulo depois de publicado: hoje proibido; o dono pode preferir permitir, avisando o RH de que quem concluiu não volta."
       x-perfis:
         - RH
       parameters:
@@ -15112,7 +15147,7 @@ paths:
               $ref: "#/components/schemas/TreinamentoModuloComando"
             encoding:
               arquivo:
-                contentType: application/pdf
+                contentType: application/pdf, video/mp4, video/webm
             example:
               titulo: Canais de denúncia da empresa
               tipo: PDF
@@ -15225,11 +15260,13 @@ paths:
       summary: Edita um módulo (botão "Editar" do passo Conteúdo).
       description: |
         Mesmo formato e mesmas regras de `adicionarModuloDeTreinamento`; substitui o módulo todo, sem mudar a `ordem`.
-        Sem `arquivo` num módulo `PDF`, o arquivo atual fica. Em rascunho, o `tipo` pode mudar (o arquivo que deixa de
-        valer é apagado). **Depois de publicado** só se corrige o conteúdo (`titulo`, `duracaoMinutos`, `urlExterna`,
+        Sem `arquivo` num módulo `PDF`, o arquivo atual fica. **No `VIDEO` que já tem arquivo**: sem `arquivo` e sem `urlExterna` o arquivo atual fica; com
+        `arquivo` novo ele é trocado; com `urlExterna` o vídeo vira link e o arquivo sai. Um módulo que era `PDF` não vira `VIDEO` sem um endereço ou um arquivo
+        de vídeo novo, nem o `VIDEO` de arquivo vira `PDF` sem um PDF novo (o arquivo de um tipo não serve ao outro). Em rascunho, o `tipo` pode mudar (o arquivo
+        que deixa de valer é apagado, depois do commit). **Depois de publicado** só se corrige o conteúdo (`titulo`, `duracaoMinutos`, `urlExterna`,
         `conteudoTexto`, `arquivo`): o `tipo` não muda (422 `TREINAMENTO_CAMPO_TRAVADO`, o mesmo código de
         `atualizarTreinamento`: é um campo que não muda depois de publicado).
-      x-provisorio: Duas decisões abertas. (1) Onde ficam os vídeos, arquivo no Blob ou link externo (hoje, só link externo). (2) O que se pode mexer nos módulos depois de publicado (hoje, só corrigir o conteúdo).
+      x-provisorio: O que se pode mexer nos módulos depois de publicado (hoje, só corrigir o conteúdo).
       x-perfis:
         - RH
       parameters:
@@ -15243,7 +15280,7 @@ paths:
               $ref: "#/components/schemas/TreinamentoModuloComando"
             encoding:
               arquivo:
-                contentType: application/pdf
+                contentType: application/pdf, video/mp4, video/webm
             example:
               titulo: O que é assédio moral e sexual
               tipo: VIDEO
@@ -16072,13 +16109,12 @@ paths:
       operationId: obterConteudoDeModulo
       summary: Mostra o conteúdo de um módulo.
       description: |
-        `TEXTO`: o `conteudoTexto` (texto ou markdown, nunca HTML) é mostrado na tela. `VIDEO` e `LINK`: o front mostra um
-        botão que abre `urlExterna` em nova aba, com `rel="noopener noreferrer"` (a política de segurança do site não deixa
-        incorporar). `PDF`: o front chama
-        `baixarArquivoDeModulo` e abre o link. Os módulos podem ser feitos **em qualquer ordem**. Vale também para "Rever
+        `TEXTO`: o `conteudoTexto` (texto ou markdown, nunca HTML) é mostrado na tela. `LINK` e o `VIDEO` por link (`urlExterna`
+        preenchido): o front mostra um botão que abre `urlExterna` em nova aba, com `rel="noopener noreferrer"` (a política de segurança do
+        site não deixa incorporar). `PDF` e o `VIDEO` por arquivo (`temArquivo` verdadeiro, `urlExterna` nulo; decisão do dono de 2026-11-17): o front
+        chama `baixarArquivoDeModulo` e abre o link (o vídeo pode ir como `src` de um `<video controls>`). Os módulos podem ser feitos **em qualquer ordem**. Vale também para "Rever
         conteúdo" depois de concluído e com o treinamento encerrado (para quem começou ou concluiu). Pessoa sem linha no
         treinamento: 404; opcional sem inscrição: 422 `INSCRICAO_PENDENTE`.
-      x-provisorio: Onde ficam os vídeos, arquivo no Blob ou link externo (hoje, só link externo; se for Blob, o vídeo passa a vir por `baixarArquivoDeModulo`).
       x-perfis:
         - Funcionario
         - Gestor
@@ -16117,11 +16153,11 @@ paths:
       tags:
         - Treinamentos
       operationId: baixarArquivoDeModulo
-      summary: Dá um link temporário para abrir o arquivo PDF de um módulo.
+      summary: Dá um link temporário para abrir o arquivo de um módulo (o PDF ou o vídeo por arquivo).
       description: |
-        Só módulo com arquivo (`temArquivo` verdadeiro); outro módulo: 404. Mesmas regras de acesso de
-        `obterConteudoDeModulo`. O arquivo vem pelo link temporário, como anexo, nunca por endereço público.
-      x-provisorio: Onde ficam os vídeos, arquivo no Blob ou link externo (hoje, só o PDF tem arquivo).
+        Só módulo com arquivo (`temArquivo` verdadeiro): o `PDF` e o `VIDEO` enviado como arquivo; outro módulo: 404. Mesmas regras de acesso de
+        `obterConteudoDeModulo`. O arquivo vem pelo link temporário, como anexo, nunca por endereço público. O vídeo é guardado com o tipo
+        `video/mp4` ou `video/webm` e o armazenamento aceita pedidos de trecho (o `<video>` do navegador avança e volta sem baixar tudo).
       x-perfis:
         - Funcionario
         - Gestor
@@ -24987,11 +25023,13 @@ components:
         - ACATADA
     AdvertenciaAplicadaPor:
       type: object
-      description: Quem aplicou a advertência.
+      description: |
+        Quem aplicou a advertência, como o colaborador e o gestor veem: o gestor (com o nome) ou o RH (`tipo` `RH` e `nome` `null`, a tela mostra "RH").
+        Decisão do dono de 2026-11-17: quem do RH registrou fica em `ADVERTENCIAS.ID_FUNCIONARIO_RH` (`V006`) e só o **detalhe do RH** o mostra, em
+        `registradaPor` (`AdvertenciaDetalheRh`); aqui o nome do RH nunca aparece.
       required:
         - tipo
         - nome
-      x-provisorio: 'O banco só guarda o gestor (`ADVERTENCIAS.ID_GESTOR`); não guarda qual pessoa do RH registrou. Hipótese: quando o RH registra, `tipo` é `RH` e `nome` é `null` (a tela mostra "RH"). Se o dono quiser o nome da pessoa do RH na coluna "Aplicada por", falta uma coluna nova (pedir ao Kauan) e `nome` passa a vir preenchido.'
       properties:
         tipo:
           type: string
@@ -25056,10 +25094,19 @@ components:
             - textoContestacao
             - dataContestacaoUtc
             - desfechoDaContestacao
+            - registradaPor
           properties:
             descricao:
               type: string
               description: O que aconteceu, quando e qual regra foi descumprida.
+            registradaPor:
+              description: |
+                A pessoa do RH que registrou a advertência (decisão do dono de 2026-11-17), nos dois jeitos de registrar (`aplicadaPor` `GESTOR_DO_COLABORADOR`
+                ou `RH`). `null` quando o gestor registrou pela tela dele e nas advertências de antes desta informação existir. **Só o RH vê**: a lista do RH,
+                o gestor e a própria pessoa nunca recebem este campo.
+              oneOf:
+                - $ref: "#/components/schemas/FuncionarioResumo"
+                - type: "null"
             dataCienciaUtc:
               type:
                 - string
@@ -26866,6 +26913,7 @@ components:
         - avisoDePrivacidade
         - retencaoDias
         - perguntas
+        - captcha
       properties:
         empresaNome:
           type: string
@@ -26893,6 +26941,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PerguntaFormulario"
+        captcha:
+          description: |
+            O captcha da candidatura (decisão do dono de 2026-11-17; Cloudflare Turnstile). **Presente quando o captcha está ligado**: a página desenha o widget
+            com `chaveDoSite` (a chave PÚBLICA) e manda o token que ele gera em `captchaToken` de `responderFormularioPublico`. **`null` quando está desligado**: a
+            página não mostra o widget e o envio não exige nada.
+          oneOf:
+            - type: object
+              required:
+                - chaveDoSite
+              properties:
+                chaveDoSite:
+                  type: string
+                  description: A chave pública do widget (a secreta nunca sai do servidor).
+            - type: "null"
     CandidatoEnvio:
       type: object
       description: Corpo `multipart/form-data` de `responderFormularioPublico`.
@@ -26934,6 +26996,13 @@ components:
           items:
             type: string
             format: binary
+        captchaToken:
+          type: string
+          maxLength: 2048
+          description: |
+            O token que o widget do captcha gerou (decisão do dono de 2026-11-17). **Obrigatório quando `captcha` da página é um objeto** (captcha ligado): sem ele,
+            400 em `errors.captchaToken` ("Confirme que você não é um robô."); com um que o provedor não confirma (vencido, repetido ou falso), 422 `CAPTCHA_INVALIDO`.
+            Ignorado quando o captcha está desligado. Cada token vale uma só tentativa e uns 5 minutos: o front pede outro depois de um erro.
     CandidatoRecibo:
       type: object
       required:
@@ -27107,7 +27176,7 @@ components:
           type:
             - string
             - "null"
-          description: Nome que a pessoa deu ao PDF enviado, guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V001`); `null` em módulo sem arquivo (vídeo, texto e link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.
+          description: Nome que a pessoa deu ao arquivo enviado (o PDF, ou o vídeo por arquivo), guardado em `TREINAMENTOS_MODULOS.NOME_ARQUIVO_ORIGINAL` (script `V001`); `null` em módulo sem arquivo (texto, link e vídeo por link). Não vem do `CAMINHO_ARQUIVO`, que é interno e nunca é devolvido.
     TreinamentoModulosRh:
       type: object
       required:
@@ -27120,8 +27189,9 @@ components:
     TreinamentoModuloComando:
       type: object
       description: |
-        Corpo `multipart/form-data` de um módulo. O que cada `tipo` pede: `VIDEO` e `LINK` pedem `urlExterna`; `TEXTO`
-        pede `conteudoTexto`; `PDF` pede `arquivo` (PDF de até 10 MB). Campo de outro tipo é recusado com 400.
+        Corpo `multipart/form-data` de um módulo. O que cada `tipo` pede: `LINK` pede `urlExterna`; `VIDEO` pede `urlExterna` **ou**
+        `arquivo` (um vídeo MP4 ou WebM de até 100 MB), nunca os dois; `TEXTO` pede `conteudoTexto`; `PDF` pede `arquivo` (PDF de até 10 MB).
+        Campo de outro tipo é recusado com 400.
       required:
         - titulo
         - tipo
@@ -27154,7 +27224,7 @@ components:
         arquivo:
           type: string
           format: binary
-          description: PDF de até 10 MB.
+          description: O PDF (até 10 MB) do módulo `PDF`, ou o vídeo MP4 ou WebM (até 100 MB) do módulo `VIDEO` por arquivo.
     TreinamentoModulosOrdemComando:
       type: object
       required:
@@ -27881,7 +27951,7 @@ components:
           description: Só em `VIDEO` e `LINK`; abre em nova aba.
         temArquivo:
           type: boolean
-          description: Verdadeiro em `PDF`; o arquivo vem por `baixarArquivoDeModulo`.
+          description: Verdadeiro no `PDF` e no `VIDEO` por arquivo; o arquivo vem por `baixarArquivoDeModulo`.
         concluido:
           type: boolean
         concluidoEmUtc:
@@ -30316,7 +30386,8 @@ components:
       description: |
         O formulário não pode ser respondido (ou aberto) agora. `codigo`: `FORMULARIO_AINDA_NAO_ABERTO` (agendado),
         `FORMULARIO_ENCERRADO` (encerrado ou prazo vencido), `AVALIADO_INVALIDO`, `FUNCIONARIO_INATIVO` e, só na página
-        pública, `EMPRESA_NAO_CONFIGURADA` (os dois com o mesmo código de todas as fatias). Pode trazer `regraDoBanco`
+        pública, `EMPRESA_NAO_CONFIGURADA` (os dois com o mesmo código de todas as fatias) e, só no envio da candidatura pública
+        (`responderFormularioPublico`), `CAPTCHA_INVALIDO` (o provedor do captcha não confirmou o token). Pode trazer `regraDoBanco`
         com a mensagem original do trigger ("Pergunta obrigatoria: informe a resposta.", "Formulario inativo nao aceita
         respostas.", "Funcionario inativo nao pode responder formularios.").
       content:
@@ -30324,6 +30395,14 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemaDeRegraDeNegocio"
           examples:
+            captchaInvalido:
+              summary: Captcha não confirmado (só em responderFormularioPublico)
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: Não foi possível confirmar que você não é um robô. Tente de novo.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: CAPTCHA_INVALIDO
             encerrado:
               summary: Formulário encerrado ou com o prazo vencido
               value:
