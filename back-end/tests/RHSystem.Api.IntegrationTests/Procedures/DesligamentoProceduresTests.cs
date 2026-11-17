@@ -99,6 +99,40 @@ public class DesligamentoProceduresTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task A_efetivacao_na_mesma_chamada_do_agendamento_faz_tudo_o_que_a_efetivacao_faz_pedidos_do_gestor_ao_RH_e_pedidos_de_beneficio_cancelados()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var ontem = await DiaAsync(conexao, -1);
+        var rh = await FuncionarioAsync(conexao, nivel: "RH");
+        var setor = await SetorAsync(conexao);
+        var chefe = await FuncionarioAsync(conexao, nivel: "Funcionario Gestor", setorId: setor);
+        var gestor = await GestorDoSetorAsync(conexao, chefe, setor);
+        var pessoa = await FuncionarioAsync(conexao, setorId: setor, gestorId: gestor);
+        await Sql.ExecutarAsync(conexao, $"INSERT INTO FERIAS (ID_FUNCIONARIO, DATA_INICIO_PERIODO_AQUISITIVO, DATA_FIM_PERIODO_AQUISITIVO, DATA_INICIO, DATA_FIM, ID_GESTOR) VALUES ({pessoa}, '2025-01-06', '2026-01-05', CURDATE() + INTERVAL 30 DAY, CURDATE() + INTERVAL 39 DAY, {gestor})");
+        await Sql.ExecutarAsync(conexao, $"INSERT INTO PONTOS (ID_FUNCIONARIO, DATA) VALUES ({pessoa}, '2026-01-05')");
+        await Sql.ExecutarAsync(conexao, $"INSERT INTO PONTOS_MANUTENCOES (ID_PONTO, ID_FUNCIONARIO, JUSTIFICATIVA, ID_GESTOR) SELECT ID_PONTO, ID_FUNCIONARIO, 'parado no gestor', {gestor} FROM PONTOS WHERE ID_FUNCIONARIO = {pessoa}");
+        var aprovada = await AdesaoAsync(conexao, chefe, rh, aprovada: true);
+        var pendente = await AdesaoAsync(conexao, chefe, rh, aprovada: false);
+        await Sql.ExecutarAsync(conexao, $"INSERT INTO DEPENDENTES (ID_BENEFICIO_FUNCIONARIOS, NOME, PARENTESCO, DATA_NASCIMENTO) VALUES ({aprovada}, 'Dependente pendente', 'FILHO', '2015-03-04')");
+        await Sql.ExecutarAsync(conexao, $"INSERT INTO TRAJETOS_VALE_TRANSPORTE (ID_BENEFICIO_FUNCIONARIOS, ORIGEM, DESTINO, LINHAS_MEIOS) VALUES ({aprovada}, 'Casa', 'Empresa', 'Onibus 10')");
+        await ConsolidarBancoDeHorasAsync(conexao, ontem);
+
+        var id = await AgendarAsync(conexao, chefe, ontem);
+
+        Assert.Equal($"EFETIVADO|{Iso(ontem)}|efetivado|sem cancelamento|sem reversao", await DesligamentoAsync(conexao, id));
+        Assert.Equal($"inativa|{Iso(ontem)}", await PessoaAsync(conexao, chefe));
+        var efeitos = string.Join(
+            "; ",
+            "ferias da equipe " + await TextoAsync(conexao, $"SELECT CONCAT_WS(' com ', STATUS_FERIAS, COALESCE(ID_GESTOR, 'RH')) FROM FERIAS WHERE ID_FUNCIONARIO = {pessoa}"),
+            "ajuste da equipe " + await TextoAsync(conexao, $"SELECT CONCAT_WS(' com ', STATUS_SOLICITACAO, COALESCE(ID_GESTOR, 'RH')) FROM PONTOS_MANUTENCOES WHERE ID_FUNCIONARIO = {pessoa}"),
+            "dependente " + await TextoAsync(conexao, $"SELECT STATUS_PEDIDO FROM DEPENDENTES WHERE ID_BENEFICIO_FUNCIONARIOS = {aprovada}"),
+            "trajeto " + await TextoAsync(conexao, $"SELECT STATUS_PEDIDO FROM TRAJETOS_VALE_TRANSPORTE WHERE ID_BENEFICIO_FUNCIONARIOS = {aprovada}"),
+            "adesao pendente " + await TextoAsync(conexao, $"SELECT STATUS_PEDIDO FROM BENEFICIOS_FUNCIONARIOS WHERE ID_BENEFICIO_FUNCIONARIOS = {pendente}"),
+            "adesao aprovada " + await TextoAsync(conexao, $"SELECT CONCAT_WS(' ', IF(BENEFICIO_ATIVO, 'ativa', 'desativada'), STATUS_PEDIDO) FROM BENEFICIOS_FUNCIONARIOS WHERE ID_BENEFICIO_FUNCIONARIOS = {aprovada}"));
+        Assert.Equal("ferias da equipe SOLICITADA com RH; ajuste da equipe PENDENTE com RH; dependente CANCELADO; trajeto CANCELADO; adesao pendente CANCELADO; adesao aprovada desativada APROVADO", efeitos);
+    }
+
+    [Fact]
     public async Task Com_o_ultimo_dia_ja_passado_mas_sem_o_banco_de_horas_dele_consolidado_o_desligamento_fica_agendado()
     {
         var conexao = await NovoBancoAsync(mysql);
