@@ -177,7 +177,8 @@ public static class FormulariosDoContrato
                         },
                     },
                 }),
-                ("arquivos", new OpenApiSchema { Type = JsonSchemaType.Array, Items = Binario() }));
+                ("arquivos", new OpenApiSchema { Type = JsonSchemaType.Array, Items = Binario() }),
+                ("captchaToken", new OpenApiSchema { Type = JsonSchemaType.String, MaxLength = 2048 }));
         }
         else if (operacao.OperationId == BaixarModeloDeImportacao)
         {

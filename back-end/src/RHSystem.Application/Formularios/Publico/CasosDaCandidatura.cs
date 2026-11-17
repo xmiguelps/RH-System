@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using RHSystem.Application.Arquivos;
 using RHSystem.Application.Autenticacao;
+using RHSystem.Application.Captcha;
 using RHSystem.Application.Comum;
 using RHSystem.Application.Comunicacao.Regras;
 using RHSystem.Application.Documentos;
@@ -12,7 +13,7 @@ using RHSystem.Domain.Formularios;
 namespace RHSystem.Application.Formularios.Publico;
 
 /// <summary>A candidatura como chegou (<c>multipart/form-data</c>), em texto cru: o caso de uso valida tudo e devolve os erros juntos num 400 só.</summary>
-public sealed record NovaCandidatura(string? Nome, string? Email, string? Telefone, string? Aceitou, string? Respostas, ArquivoRecebido? Curriculo, IReadOnlyList<ArquivoRecebido> Arquivos, int ArquivosRecebidos);
+public sealed record NovaCandidatura(string? Nome, string? Email, string? Telefone, string? Aceitou, string? Respostas, ArquivoRecebido? Curriculo, IReadOnlyList<ArquivoRecebido> Arquivos, int ArquivosRecebidos, string? CaptchaToken = null);
 
 /// <summary>O agradecimento da tela de confirmação (<c>CandidatoRecibo</c>).</summary>
 public sealed record CandidatoRecibo(string Mensagem);
@@ -44,12 +45,14 @@ public sealed partial class ResponderFormularioPublicoCasoDeUso(
     ICandidatosRepositorio candidatos,
     EnvioDeArquivosDeFormulario envio,
     IUnidadeDeTrabalho unidade,
-    IRelogio relogio)
+    IRelogio relogio,
+    IVerificadorDeCaptcha captcha)
 {
     public const string Agradecimento = "Recebemos as suas respostas. Obrigado por se candidatar.";
 
     public async Task<CandidatoRecibo> ExecutarAsync(string token, NovaCandidatura novo, CancellationToken ct)
     {
+        await ConferenciaDoCaptcha.ExigirAsync(captcha, novo.CaptchaToken, ct);
         var agora = relogio.AgoraUtc;
         var lido = await AcessoPublico.ObterAsync(consulta, token, agora, ct);
         var erros = new ColetorDeErros();

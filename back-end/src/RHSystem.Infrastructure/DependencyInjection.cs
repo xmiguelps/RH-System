@@ -53,6 +53,8 @@ using RHSystem.Infrastructure.Cadastros;
 using RHSystem.Infrastructure.Colaboradores;
 using RHSystem.Infrastructure.Comunicacao;
 using RHSystem.Infrastructure.Documentos;
+using RHSystem.Application.Captcha;
+using RHSystem.Infrastructure.Captcha;
 using RHSystem.Infrastructure.Emails;
 using RHSystem.Infrastructure.Formularios;
 using RHSystem.Infrastructure.Empresa;
@@ -135,6 +137,16 @@ public static class DependencyInjection
         services.AddScoped<IFilaDeEmails, FilaDeEmails>();
         services.AddScoped<IProcessadorDeEmails, ProcessadorDeEmails>();
         services.AddHostedService<EnvioDeEmailsHostedService>();
+
+        // Captcha da candidatura publica (Cloudflare Turnstile). Desligado (o padrao do appsettings.json) nada e exigido; ligado, a chave secreta so vem de user-secrets, variavel de ambiente ou configuracao do App Service.
+        var captcha = new OpcoesDoCaptcha();
+        configuration.GetSection(OpcoesDoCaptcha.Secao).Bind(captcha);
+        captcha.Validar();
+        services.AddSingleton(captcha);
+        services.AddSingleton<IVerificadorDeCaptcha>(provedor => new VerificadorDeCaptcha(
+            captcha,
+            new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }),
+            provedor.GetRequiredService<ILogger<VerificadorDeCaptcha>>()));
 
         // Agendador: o que roda depois, com recuperacao e idempotencia. Cada fatia acrescenta a sua ITarefaAgendada (AddScoped); aqui entram as duas limpezas.
         var agendador = new OpcoesDoAgendador();

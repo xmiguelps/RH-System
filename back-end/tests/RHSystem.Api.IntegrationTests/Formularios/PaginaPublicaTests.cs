@@ -53,7 +53,7 @@ public class PaginaPublicaTests(MySqlFixture mysql)
         var perguntas = corpo.GetProperty("perguntas").EnumerateArray().ToList();
         Assert.Equal(["MULTIPLA_ESCOLHA", "RESPOSTA_LONGA", "ARQUIVO"], perguntas.Select(p => p.GetProperty("tipo").GetString()));
         Assert.Equal(["Sim", "Não"], perguntas[0].GetProperty("alternativas").EnumerateArray().Select(a => a.GetProperty("texto").GetString()));
-        Assert.Equal(["avisoDePrivacidade", "descricao", "empresaNome", "perguntas", "prazo", "retencaoDias", "titulo"], corpo.EnumerateObject().Select(p => p.Name).Order());
+        Assert.Equal(["avisoDePrivacidade", "captcha", "descricao", "empresaNome", "perguntas", "prazo", "retencaoDias", "titulo"], corpo.EnumerateObject().Select(p => p.Name).Order());
         var texto = await resposta.Content.ReadAsStringAsync();
         Assert.DoesNotContain(token, texto, StringComparison.Ordinal);
     }
