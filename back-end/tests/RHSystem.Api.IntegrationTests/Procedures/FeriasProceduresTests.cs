@@ -397,6 +397,21 @@ public class FeriasProceduresTests(MySqlFixture mysql)
         Assert.Equal(Inativo, await RecusaAoRegistrarAsync(c, c.Pessoa, c.Inicio, 10));
     }
 
+    [Fact]
+    public async Task O_registro_no_passado_so_usa_os_periodos_aquisitivos_que_terminam_antes_do_inicio_das_ferias()
+    {
+        var c = await CenarioAsync(diasDeCasa: 800); // dois períodos fechados: o primeiro terminou há uns 435 dias e o segundo há uns 70
+
+        var noPrimeiro = await RegistrarAsync(c, c.Pessoa, Segunda(c.Hoje.AddDays(-200)), 20);
+        await ConfereAsync(c.Conexao, noPrimeiro, $"DATA_INICIO_PERIODO_AQUISITIVO = '{Iso(c.PeriodoInicio)}' AND DATA_FIM_PERIODO_AQUISITIVO = '{Iso(c.PeriodoFim)}'");
+
+        // O segundo período tem os 30 dias, mas só fechou depois destas datas: não entra. No primeiro só sobram 10.
+        Assert.Equal("Passa do saldo disponivel: faltam 10 dias.", await RecusaAoRegistrarAsync(c, c.Pessoa, Segunda(c.Hoje.AddDays(-150)), 20));
+
+        var noSegundo = await RegistrarAsync(c, c.Pessoa, Segunda(c.Hoje.AddDays(-40)), 20);
+        await ConfereAsync(c.Conexao, noSegundo, $"DATA_INICIO_PERIODO_AQUISITIVO = '{Iso(c.Admissao.AddYears(1))}'");
+    }
+
     // ---------------------------------------------------------------- SP_DECIDIR_FERIAS_GESTOR
 
     [Fact]
