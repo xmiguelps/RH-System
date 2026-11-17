@@ -72,6 +72,9 @@ DELIMITER $$
 -- Horarios: o banco guarda DATETIME no relogio de Brasilia (-03:00) e os horarios que entram por parametro tambem sao de Brasilia. O "agora"
 -- das duas e UTC_TIMESTAMP() - INTERVAL 3 HOUR (o mesmo deslocamento fixo da API, FusoBrasil): com o servidor em default-time-zone=-03:00 e
 -- igual a NOW(), e continua certo se a sessao ou o servidor estiverem em outro fuso (um MySQL gerenciado costuma vir em UTC).
+-- Collation: toda comparacao de texto que envolve variavel, parametro ou coluna de JSON_TABLE leva COLLATE utf8mb4_unicode_ci explicito (a das
+-- tabelas). A variavel carrega a collation do BANCO e a do valor que recebeu; num banco criado em utf8mb4_0900_ai_ci (padrao do MySQL 8) a
+-- comparacao sem COLLATE falha com "Illegal mix of collations".
 
 -- ------------------------------------------------------------
 -- SP_REGISTRAR_MARCACAO_PONTO: a pessoa bate o ponto AGORA.
@@ -132,7 +135,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Informe o funcionario.';
     END IF;
 
-    IF P_TIPO_MARCACAO IS NULL OR P_TIPO_MARCACAO NOT IN ('ENTRADA', 'SAIDA') THEN
+    IF P_TIPO_MARCACAO IS NULL OR P_TIPO_MARCACAO COLLATE utf8mb4_unicode_ci NOT IN ('ENTRADA', 'SAIDA') THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tipo de marcacao invalido: informe ENTRADA ou SAIDA.';
     END IF;
 
@@ -194,19 +197,19 @@ BEGIN
       INTO V_ULTIMO_TIPO_ONTEM, V_ULTIMA_HORA_ONTEM;
 
     IF V_ULTIMO_TIPO_HOJE IS NULL
-       AND V_ULTIMO_TIPO_ONTEM = 'ENTRADA'
+       AND V_ULTIMO_TIPO_ONTEM COLLATE utf8mb4_unicode_ci = 'ENTRADA'
        AND TIMESTAMPDIFF(SECOND, V_ULTIMA_HORA_ONTEM, V_AGORA) < 12 * 3600 THEN
         -- A jornada que atravessou a meia-noite: a SAIDA entra no dia da ENTRADA.
         SET V_PROXIMO_TIPO = 'SAIDA';
         SET V_DIA = V_HOJE - INTERVAL 1 DAY;
         SET V_ID_PONTO = V_ID_PONTO_ONTEM;
     ELSE
-        SET V_PROXIMO_TIPO = IF(COALESCE(V_ULTIMO_TIPO_HOJE, '') = 'ENTRADA', 'SAIDA', 'ENTRADA');
+        SET V_PROXIMO_TIPO = IF(COALESCE(V_ULTIMO_TIPO_HOJE, '') COLLATE utf8mb4_unicode_ci = 'ENTRADA', 'SAIDA', 'ENTRADA');
         SET V_DIA = V_HOJE;
         SET V_ID_PONTO = V_ID_PONTO_HOJE;
     END IF;
 
-    IF P_TIPO_MARCACAO <> V_PROXIMO_TIPO THEN
+    IF P_TIPO_MARCACAO COLLATE utf8mb4_unicode_ci <> V_PROXIMO_TIPO COLLATE utf8mb4_unicode_ci THEN
         SET V_MENSAGEM = CONCAT('A sequencia do ponto mudou: a proxima marcacao e ', V_PROXIMO_TIPO, '.');
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = V_MENSAGEM;
     END IF;
@@ -306,7 +309,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A justificativa deve ter de 5 a 500 caracteres.';
     END IF;
 
-    IF P_ITENS IS NULL OR JSON_TYPE(P_ITENS) <> 'ARRAY' OR JSON_LENGTH(P_ITENS) NOT BETWEEN 1 AND 10 THEN
+    IF P_ITENS IS NULL OR JSON_TYPE(P_ITENS) COLLATE utf8mb4_unicode_ci <> 'ARRAY' OR JSON_LENGTH(P_ITENS) NOT BETWEEN 1 AND 10 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Informe de 1 a 10 marcacoes em P_ITENS (lista JSON).';
     END IF;
 
@@ -318,9 +321,9 @@ BEGIN
                DATA_HORA DATETIME(6) PATH '$.dataHora',
                TIPO VARCHAR(10) PATH '$.tipo'
            )) AS J
-     WHERE J.TIPO IS NULL OR J.TIPO NOT IN ('ENTRADA', 'SAIDA')
+     WHERE J.TIPO IS NULL OR J.TIPO COLLATE utf8mb4_unicode_ci NOT IN ('ENTRADA', 'SAIDA')
         OR J.DATA_HORA IS NULL
-        OR (J.ID_MARCACAO IS NULL AND J.ID_INFORMADO IS NOT NULL AND JSON_TYPE(J.ID_INFORMADO) <> 'NULL');
+        OR (J.ID_MARCACAO IS NULL AND J.ID_INFORMADO IS NOT NULL AND JSON_TYPE(J.ID_INFORMADO) COLLATE utf8mb4_unicode_ci <> 'NULL');
 
     IF V_QTD > 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ha item com tipo, dataHora ou idMarcacao invalido.';
@@ -405,7 +408,7 @@ BEGIN
     WITH ITENS AS (
         SELECT J.ID_MARCACAO,
                J.DATA_HORA - INTERVAL MICROSECOND(J.DATA_HORA) MICROSECOND AS DATA_HORA,
-               IF(J.TIPO = 'ENTRADA', 'ENTRADA', 'SAIDA') AS TIPO
+               IF(J.TIPO COLLATE utf8mb4_unicode_ci = 'ENTRADA', 'ENTRADA', 'SAIDA') AS TIPO
           FROM JSON_TABLE(P_ITENS, '$[*]' COLUMNS (
                    ID_MARCACAO INT PATH '$.idMarcacao',
                    DATA_HORA DATETIME(6) PATH '$.dataHora',
@@ -427,7 +430,7 @@ BEGIN
     )
     SELECT COUNT(*),
            COUNT(DISTINCT E.DATA_HORA),
-           COALESCE(SUM(E.TIPO <> IF(E.POSICAO % 2 = 1, 'ENTRADA', 'SAIDA')), 0)
+           COALESCE(SUM(E.TIPO COLLATE utf8mb4_unicode_ci <> IF(E.POSICAO % 2 = 1, 'ENTRADA', 'SAIDA')), 0)
       INTO V_TOTAL, V_HORARIOS, V_FORA_DE_ORDEM
       FROM EM_ORDEM E;
 
@@ -444,7 +447,7 @@ BEGIN
     SELECT EXISTS (SELECT 1
                      FROM GESTORES G
                     WHERE G.ID_FUNCIONARIO = P_ID_FUNCIONARIO
-                      AND (COALESCE(V_NIVEL, '') = 'RH'
+                      AND (COALESCE(V_NIVEL, '') COLLATE utf8mb4_unicode_ci = 'RH'
                            OR EXISTS (SELECT 1 FROM SETORES S WHERE S.ID_GESTOR = G.ID_GESTOR)))
       INTO V_E_GESTOR;
 
@@ -480,7 +483,7 @@ BEGIN
            V_ID_PONTO,
            J.ID_MARCACAO,
            J.DATA_HORA - INTERVAL MICROSECOND(J.DATA_HORA) MICROSECOND,
-           IF(J.TIPO = 'ENTRADA', 'ENTRADA', 'SAIDA')
+           IF(J.TIPO COLLATE utf8mb4_unicode_ci = 'ENTRADA', 'ENTRADA', 'SAIDA')
       FROM JSON_TABLE(P_ITENS, '$[*]' COLUMNS (
                ORDEM FOR ORDINALITY,
                ID_MARCACAO INT PATH '$.idMarcacao',
