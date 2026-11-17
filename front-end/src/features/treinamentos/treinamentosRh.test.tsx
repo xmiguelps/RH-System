@@ -1,10 +1,10 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Esquema } from '../../shared/api/tipos'
 import { exemploDoContrato } from '../../shared/teste/exemploDoContrato'
 import { capturar, problema } from '../../test/capturar'
 import { renderizarTela } from '../../test/telas'
-import { adicionarModulo } from './enviarModulo'
+import { adicionarModulo, atualizarModulo } from './enviarModulo'
 
 vi.mock('./enviarModulo', () => ({ adicionarModulo: vi.fn(), atualizarModulo: vi.fn() }))
 
@@ -270,6 +270,140 @@ describe('Assistente do treinamento (telas 23 a 26)', { timeout: 20000 }, () => 
     await user.click(within(editor).getByRole('button', { name: 'Salvar módulo' }))
     expect(await within(editor).findByText('Escolha o PDF.')).toBeInTheDocument()
     expect(adicionarModulo).not.toHaveBeenCalled()
+  })
+
+  describe('Conteudo: modulo de video por link ou por arquivo (contrato 0.3.0)', () => {
+    const mp4 = (nome = 'boas-vindas.mp4') => new File(['....'], nome, { type: 'video/mp4' })
+    const comPrimeiroModuloEmArquivo = () =>
+      capturar('obterTreinamento', {
+        corpo: {
+          ...TREINAMENTO,
+          modulos: TREINAMENTO.modulos.map((m, i) =>
+            i === 0
+              ? {
+                  ...m,
+                  tipo: 'VIDEO' as const,
+                  urlExterna: null,
+                  conteudoTexto: null,
+                  nomeArquivo: 'aula.mp4',
+                }
+              : m,
+          ),
+        },
+      })
+    async function novoVideo() {
+      const tela = await abrirAssistente('/rh/treinamentos/6/editar?etapa=conteudo')
+      await within(tela.janela).findByRole('list', { name: 'Módulos do treinamento' })
+      await tela.user.click(within(tela.janela).getByRole('button', { name: 'Vídeo' }))
+      const editor = within(tela.janela).getByRole('region', { name: 'Novo módulo' })
+      await tela.user.type(
+        within(editor).getByRole('textbox', { name: 'Título do módulo' }),
+        'Boas-vindas',
+      )
+      return { ...tela, editor }
+    }
+
+    it('comeca no link; "Arquivo de vídeo" troca o campo do endereco pelo envio de MP4 ou WebM de ate 100 MB', async () => {
+      const { user, editor } = await novoVideo()
+      expect(within(editor).getByRole('textbox', { name: 'Endereço do vídeo' })).toBeInTheDocument()
+      expect(within(editor).queryByLabelText('Escolher arquivo')).toBeNull()
+      await user.click(within(editor).getByRole('radio', { name: /Arquivo de vídeo/ }))
+      expect(within(editor).queryByRole('textbox', { name: 'Endereço do vídeo' })).toBeNull()
+      expect(within(editor).getByLabelText('Escolher arquivo')).toHaveAttribute(
+        'accept',
+        'video/mp4,video/webm',
+      )
+      expect(within(editor).getByText('Só MP4 ou WebM, até 100 MB')).toBeInTheDocument()
+    })
+
+    it('com o arquivo escolhido, salvar manda o arquivo e nenhum endereco', async () => {
+      const { user, editor } = await novoVideo()
+      await user.click(within(editor).getByRole('radio', { name: /Arquivo de vídeo/ }))
+      const arquivo = mp4()
+      await user.upload(within(editor).getByLabelText('Escolher arquivo'), arquivo)
+      await user.click(within(editor).getByRole('button', { name: 'Salvar módulo' }))
+      await waitFor(() => expect(adicionarModulo).toHaveBeenCalledTimes(1))
+      expect(adicionarModulo).toHaveBeenCalledWith(6, {
+        titulo: 'Boas-vindas',
+        tipo: 'VIDEO',
+        duracaoMinutos: null,
+        urlExterna: null,
+        conteudoTexto: null,
+        arquivo,
+      })
+    })
+
+    it('arquivo de mais de 100 MB e arquivo que nao e video sao recusados na hora', async () => {
+      const { user, editor } = await novoVideo()
+      await user.click(within(editor).getByRole('radio', { name: /Arquivo de vídeo/ }))
+      const grande = mp4('grande.mp4')
+      Object.defineProperty(grande, 'size', { value: 100 * 1024 * 1024 + 1 })
+      await user.upload(within(editor).getByLabelText('Escolher arquivo'), grande)
+      expect(await within(editor).findByText('O arquivo passa de 100 MB.')).toBeInTheDocument()
+      // o seletor do navegador ja filtra pelo accept; arrastar um PDF para a area passa por cima disso
+      fireEvent.change(within(editor).getByLabelText('Escolher arquivo'), {
+        target: { files: [new File(['%PDF'], 'a.pdf', { type: 'application/pdf' })] },
+      })
+      expect(
+        await within(editor).findByText('Esse tipo de arquivo não é aceito.'),
+      ).toBeInTheDocument()
+    })
+
+    it('salvar sem o endereco (modo link) ou sem o arquivo (modo arquivo) avisa e nao envia', async () => {
+      const { user, editor } = await novoVideo()
+      await user.click(within(editor).getByRole('button', { name: 'Salvar módulo' }))
+      expect(
+        await within(editor).findByText('O endereço precisa começar com http:// ou https://.'),
+      ).toBeInTheDocument()
+      await user.click(within(editor).getByRole('radio', { name: /Arquivo de vídeo/ }))
+      await user.click(within(editor).getByRole('button', { name: 'Salvar módulo' }))
+      expect(await within(editor).findByText('Escolha o arquivo de vídeo.')).toBeInTheDocument()
+      expect(adicionarModulo).not.toHaveBeenCalled()
+    })
+
+    it('editar um video que ja e arquivo abre no modo arquivo e, sem arquivo novo, o atual fica (nada de arquivo nem endereco)', async () => {
+      comPrimeiroModuloEmArquivo()
+      vi.mocked(atualizarModulo).mockResolvedValue(TREINAMENTO.modulos[0]!)
+      const { user, janela } = await abrirAssistente('/rh/treinamentos/6/editar?etapa=conteudo')
+      await within(janela).findByRole('list', { name: 'Módulos do treinamento' })
+      await user.click(within(janela).getByRole('button', { name: 'Editar o módulo 1' }))
+      const editor = within(janela).getByRole('region', { name: 'Editar módulo' })
+      expect(
+        within(editor).getByText('Arquivo atual: aula.mp4. Sem arquivo novo, ele fica.'),
+      ).toBeInTheDocument()
+      expect(within(editor).getByRole('radio', { name: /Arquivo de vídeo/ })).toBeChecked()
+      await user.click(within(editor).getByRole('button', { name: 'Salvar módulo' }))
+      await waitFor(() => expect(atualizarModulo).toHaveBeenCalledTimes(1))
+      expect(atualizarModulo).toHaveBeenCalledWith(
+        6,
+        TREINAMENTO.modulos[0]!.id,
+        expect.objectContaining({ tipo: 'VIDEO', urlExterna: null, arquivo: null }),
+      )
+    })
+
+    it('trocar o video de arquivo por link manda so o endereco', async () => {
+      comPrimeiroModuloEmArquivo()
+      vi.mocked(atualizarModulo).mockResolvedValue(TREINAMENTO.modulos[0]!)
+      const { user, janela } = await abrirAssistente('/rh/treinamentos/6/editar?etapa=conteudo')
+      await within(janela).findByRole('list', { name: 'Módulos do treinamento' })
+      await user.click(within(janela).getByRole('button', { name: 'Editar o módulo 1' }))
+      const editor = within(janela).getByRole('region', { name: 'Editar módulo' })
+      await user.click(within(editor).getByRole('radio', { name: /Endereço \(link\)/ }))
+      await user.type(
+        within(editor).getByRole('textbox', { name: 'Endereço do vídeo' }),
+        'https://videos.exemplo.com.br/novo',
+      )
+      await user.click(within(editor).getByRole('button', { name: 'Salvar módulo' }))
+      await waitFor(() => expect(atualizarModulo).toHaveBeenCalledTimes(1))
+      expect(atualizarModulo).toHaveBeenCalledWith(
+        6,
+        TREINAMENTO.modulos[0]!.id,
+        expect.objectContaining({
+          urlExterna: 'https://videos.exemplo.com.br/novo',
+          arquivo: null,
+        }),
+      )
+    })
   })
 
   it('Conteudo: reordenar manda todos os ids na nova ordem; excluir chama excluirModuloDeTreinamento', async () => {

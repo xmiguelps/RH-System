@@ -29,6 +29,7 @@ import {
   linhaDoModulo,
   ROTULO_DO_MODULO,
   TAMANHO_DO_PDF_MB,
+  TAMANHO_DO_VIDEO_MB,
   TIPOS_DE_MODULO,
 } from './rotulosDosTreinamentos'
 
@@ -118,7 +119,18 @@ type EdicaoDoModulo = {
   conteudoTexto: string
   arquivo: File | null
   nomeArquivo: string | null
+  /** Só no vídeo: o endereço de fora ou o arquivo enviado (um só dos dois, contrato 0.3.0). */
+  entrega: 'LINK' | 'ARQUIVO'
 }
+
+const OPCOES_DE_ENTREGA_DO_VIDEO = [
+  { valor: 'LINK', titulo: 'Endereço (link)', descricao: 'O vídeo abre em outra aba.' },
+  {
+    valor: 'ARQUIVO',
+    titulo: 'Arquivo de vídeo',
+    descricao: 'MP4 ou WebM, toca na página do treinamento.',
+  },
+] as const
 
 function EditorDeModulo({
   treinamentoId,
@@ -144,8 +156,14 @@ function EditorDeModulo({
     if (salvando) return
     const novos: Erros = {}
     if (!v.titulo.trim()) novos.titulo = 'Escreva o título do módulo.'
-    if ((v.tipo === 'VIDEO' || v.tipo === 'LINK') && !/^https?:\/\//.test(v.urlExterna.trim()))
+    const videoPorArquivo = v.tipo === 'VIDEO' && v.entrega === 'ARQUIVO'
+    if (
+      (v.tipo === 'LINK' || (v.tipo === 'VIDEO' && !videoPorArquivo)) &&
+      !/^https?:\/\//.test(v.urlExterna.trim())
+    )
       novos.urlExterna = 'O endereço precisa começar com http:// ou https://.'
+    if (videoPorArquivo && !v.arquivo && !v.nomeArquivo)
+      novos.arquivo = 'Escolha o arquivo de vídeo.'
     if (v.tipo === 'TEXTO' && !v.conteudoTexto.trim())
       novos.conteudoTexto = 'Escreva o texto do módulo.'
     if (v.tipo === 'PDF' && !v.arquivo && !v.nomeArquivo) novos.arquivo = 'Escolha o PDF.'
@@ -159,9 +177,10 @@ function EditorDeModulo({
       titulo: v.titulo.trim(),
       tipo: v.tipo,
       duracaoMinutos: duracao,
-      urlExterna: v.urlExterna.trim() || null,
+      // vídeo por arquivo: nenhum endereço; vídeo por link: nenhum arquivo (o servidor tira o arquivo antigo)
+      urlExterna: videoPorArquivo ? null : v.urlExterna.trim() || null,
       conteudoTexto: v.conteudoTexto.trim() || null,
-      arquivo: v.arquivo,
+      arquivo: v.tipo === 'VIDEO' && !videoPorArquivo ? null : v.arquivo,
     }
     try {
       if (v.id === undefined) await adicionarModulo(treinamentoId, campos)
@@ -215,14 +234,17 @@ function EditorDeModulo({
           />
         </Campo>
       </div>
-      {(v.tipo === 'VIDEO' || v.tipo === 'LINK') && (
+      {v.tipo === 'VIDEO' && (
+        <OpcoesEmCartao
+          rotulo="Como o vídeo chega até quem faz o treinamento"
+          opcoes={OPCOES_DE_ENTREGA_DO_VIDEO}
+          valor={v.entrega}
+          aoMudar={(entrega) => setV({ ...v, entrega })}
+        />
+      )}
+      {(v.tipo === 'LINK' || (v.tipo === 'VIDEO' && v.entrega === 'LINK')) && (
         <Campo
           rotulo={v.tipo === 'VIDEO' ? 'Endereço do vídeo' : 'Endereço do link'}
-          dica={
-            v.tipo === 'VIDEO'
-              ? 'O vídeo abre em outra aba, para quem faz o treinamento.'
-              : undefined
-          }
           erro={erros.urlExterna}
         >
           <Entrada
@@ -260,6 +282,29 @@ function EditorDeModulo({
           />
         </div>
       )}
+      {v.tipo === 'VIDEO' && v.entrega === 'ARQUIVO' && (
+        <div className="flex flex-col gap-2">
+          {v.nomeArquivo && !v.arquivo && (
+            <p className="text-pequeno text-texto-suave">
+              Arquivo atual: {v.nomeArquivo}. Sem arquivo novo, ele fica.
+            </p>
+          )}
+          <SeletorDeArquivo
+            arquivo={v.arquivo}
+            aoMudar={(arquivo) => setV({ ...v, arquivo })}
+            tiposAceitos={['video/mp4', 'video/webm']}
+            tamanhoMaximoMb={TAMANHO_DO_VIDEO_MB}
+            titulo="Arraste o vídeo aqui"
+            textoDeAjuda="Só MP4 ou WebM, até 100 MB"
+            erro={erros.arquivo}
+          />
+        </div>
+      )}
+      {salvando && v.tipo === 'VIDEO' && v.entrega === 'ARQUIVO' && v.arquivo && (
+        <p role="status" className="text-pequeno text-texto-suave">
+          Enviando o vídeo. Isso pode levar alguns minutos; não feche esta janela.
+        </p>
+      )}
       {erros.geral && <Aviso tom="erro">{erros.geral}</Aviso>}
       <div className="flex flex-wrap justify-between gap-3">
         <div>
@@ -292,6 +337,7 @@ function edicaoDe(m: Modulo): EdicaoDoModulo {
     conteudoTexto: m.conteudoTexto ?? '',
     arquivo: null,
     nomeArquivo: m.nomeArquivo,
+    entrega: m.tipo === 'VIDEO' && m.nomeArquivo && !m.urlExterna ? 'ARQUIVO' : 'LINK',
   }
 }
 
@@ -412,6 +458,7 @@ export function EtapaConteudoDoTreinamento({ treinamento }: { treinamento: Trein
                     conteudoTexto: '',
                     arquivo: null,
                     nomeArquivo: null,
+                    entrega: 'LINK',
                   })
                 }
               >

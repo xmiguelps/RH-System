@@ -15,15 +15,20 @@ export type CamposDoModulo = {
   arquivo?: File | null
 }
 
-/** Só o campo do tipo vai (campo que não é do tipo é recusado com 400). */
+/**
+ * Só o campo do tipo vai (campo que não é do tipo é recusado com 400). O `VIDEO` é link **ou** arquivo (um só dos dois):
+ * com arquivo novo vai o arquivo; sem arquivo vai o endereço, se houver; sem nenhum dos dois, na edição, o arquivo atual fica.
+ */
 function corpoDoModulo(c: CamposDoModulo) {
+  const videoPorArquivo = c.tipo === 'VIDEO' && !!c.arquivo
   return multipart<Esquema<'TreinamentoModuloComando'>>({
     titulo: c.titulo,
     tipo: c.tipo,
     duracaoMinutos: c.duracaoMinutos ?? undefined,
-    urlExterna: c.tipo === 'VIDEO' || c.tipo === 'LINK' ? c.urlExterna : undefined,
+    urlExterna:
+      (c.tipo === 'VIDEO' && !videoPorArquivo) || c.tipo === 'LINK' ? c.urlExterna : undefined,
     conteudoTexto: c.tipo === 'TEXTO' ? c.conteudoTexto : undefined,
-    arquivo: c.tipo === 'PDF' ? (c.arquivo ?? undefined) : undefined,
+    arquivo: c.tipo === 'PDF' || videoPorArquivo ? (c.arquivo ?? undefined) : undefined,
   })
 }
 
@@ -44,7 +49,7 @@ export async function adicionarModulo(
   return data ?? semResposta()
 }
 
-/** Salvar o editor de um módulo (multipart). Sem arquivo novo num PDF, o arquivo atual fica. */
+/** Salvar o editor de um módulo (multipart). Sem arquivo novo num PDF (ou num vídeo que já é arquivo), o arquivo atual fica. */
 export async function atualizarModulo(
   treinamentoId: number,
   moduloId: number,

@@ -204,6 +204,62 @@ describe('Fazer o treinamento (sem print)', { timeout: 20000 }, () => {
     expect(pdf.quantas()).toBeGreaterThan(0)
   })
 
+  describe('video enviado como arquivo (contrato 0.3.0)', () => {
+    const doArquivo: Esquema<'TreinamentoModuloConteudo'> = {
+      id: 11,
+      ordem: 1,
+      titulo: 'O que é a LGPD',
+      tipo: 'VIDEO',
+      duracaoMinutos: 15,
+      conteudoTexto: null,
+      urlExterna: null,
+      temArquivo: true,
+      concluido: false,
+      concluidoEmUtc: null,
+    }
+    async function abrirModulo() {
+      capturar('obterConteudoDeModulo', { corpo: doArquivo })
+      capturar('obterMeuTreinamento', { corpo: EM_ANDAMENTO })
+      const tela = renderizarTela('/eu/treinamentos/2', { perfil: 'Funcionario' })
+      await screen.findByRole('heading', { level: 1, name: 'LGPD na prática' })
+      await tela.user.click(screen.getByRole('button', { name: /1\. O que é a LGPD/ }))
+      return tela
+    }
+
+    it('toca na propria pagina: pede o link temporario e poe num video com controles (sem iframe)', async () => {
+      const arquivo = capturar('baixarArquivoDeModulo')
+      await abrirModulo()
+      const video = await waitFor(() => {
+        const achado = document.querySelector('video')
+        expect(achado).not.toBeNull()
+        return achado!
+      })
+      expect(video).toHaveAttribute('src', ex<{ url: string }>('baixarArquivoDeModulo').url)
+      expect(video).toHaveAttribute('controls')
+      expect(video).toHaveAttribute('aria-label', 'Vídeo: O que é a LGPD')
+      expect(video).toHaveAttribute('preload', 'metadata')
+      expect(document.querySelector('iframe')).toBeNull()
+      expect(screen.queryByRole('link', { name: /Abrir vídeo/ })).toBeNull()
+      expect(arquivo.ultima().parametrosDoCaminho).toEqual({ treinamentoId: '2', moduloId: '11' })
+      arquivo.conforme()
+    })
+
+    it('se o link temporario falha, mostra o erro com "Tentar de novo" que pede o link outra vez', async () => {
+      const arquivo = capturar(
+        'baixarArquivoDeModulo',
+        problema(500, { title: 'Erro interno.', status: 500 }),
+      )
+      const { user } = await abrirModulo()
+      expect(
+        await screen.findByText('Erro no servidor. Tente novamente em instantes.'),
+      ).toBeInTheDocument()
+      expect(document.querySelector('video')).toBeNull()
+      const antes = arquivo.quantas()
+      await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
+      await waitFor(() => expect(arquivo.quantas()).toBeGreaterThan(antes))
+    })
+  })
+
   it('concluir o ultimo modulo mostra "Voce concluiu" com o numero do certificado (como veio)', async () => {
     capturar('obterMeuTreinamento', { corpo: EM_ANDAMENTO })
     capturar('obterConteudoDeModulo', {

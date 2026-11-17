@@ -30,6 +30,7 @@ export const ROTULO_DO_MODULO: Record<ModuloTipo, string> = {
 export const TIPOS_DE_MODULO = ['VIDEO', 'PDF', 'TEXTO', 'LINK'] as const
 
 export const TAMANHO_DO_PDF_MB = 10
+export const TAMANHO_DO_VIDEO_MB = 100
 
 /** "Obrigatório", "Opcional" ou "Onboarding". */
 export function seloDoTreinamento(t: { obrigatorio: boolean; onboarding: boolean }): string {
