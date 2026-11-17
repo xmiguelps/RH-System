@@ -180,7 +180,7 @@ public class CadastrosProceduresTests(MySqlFixture mysql)
         Assert.Equal("Informe o funcionario e o nivel de acesso.", await RecusaDeNegocioAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", null, rh));
         Assert.Equal("Informe o funcionario e o nivel de acesso.", await RecusaDeNegocioAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", pessoa, null));
         Assert.Equal("Funcionario nao encontrado.", await RecusaDeNegocioAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", 987654, rh));
-        Assert.Equal("Nivel de acesso nao encontrado.", await RecusaDeNegocioAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", pessoa, 987654));
+        Assert.Equal("O nivel de acesso nao existe.", await RecusaDeNegocioAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", pessoa, 987654));
         Assert.Equal("Nivel de acesso desconhecido: use RH, Funcionario ou Funcionario Gestor.", await RecusaDeNegocioAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", pessoa, diretoria));
         Assert.Equal("Funcionario", await NivelDeAsync(conexao, pessoa));
     }
@@ -329,6 +329,49 @@ public class CadastrosProceduresTests(MySqlFixture mysql)
 
         Assert.Single(ids.Distinct());
         Assert.Equal(1L, await Sql.ContarAsync(conexao, $"SELECT COUNT(*) FROM USUARIOS WHERE ID_FUNCIONARIO = {pessoa}"));
+    }
+
+    [Fact]
+    public async Task Usuarios_de_pessoas_diferentes_pedidos_ao_mesmo_tempo_sao_todos_criados_sem_uma_chamada_derrubar_a_outra()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+
+        // Pessoas sem login, com ids maiores que os de todo login existente: uma leitura de USUARIOS com trava (FOR UPDATE) que não acha linha travaria o MESMO intervalo do índice para todas,
+        // e os INSERT esperariam um pelo outro (erro 1213, deadlock). Várias rodadas, com as conexões já abertas, para as chamadas partirem juntas.
+        for (var rodada = 0; rodada < 6; rodada++)
+        {
+            var pessoas = new List<int>();
+            for (var i = 0; i < 8; i++)
+            {
+                pessoas.Add(await FuncionarioAsync(conexao));
+            }
+
+            var sessoes = new List<MySqlConnection>();
+            try
+            {
+                foreach (var _ in pessoas)
+                {
+                    var sessao = new MySqlConnection(conexao);
+                    await sessao.OpenAsync();
+                    sessoes.Add(sessao);
+                }
+
+                var ids = await Task.WhenAll(pessoas.Select((pessoa, i) => Task.Run(async () => Inteiro((await ChamarNaConexaoAsync(sessoes[i], "SP_CRIAR_USUARIO", pessoa, new Saida("id")))["id"]))));
+
+                Assert.Equal(pessoas.Count, ids.Distinct().Count());
+            }
+            finally
+            {
+                foreach (var sessao in sessoes)
+                {
+                    await sessao.DisposeAsync();
+                }
+            }
+
+            Assert.Equal(pessoas.Count, (int)await Sql.ContarAsync(conexao, $"SELECT COUNT(*) FROM USUARIOS WHERE ATIVO AND SENHA_PROVISORIA AND ID_FUNCIONARIO IN ({string.Join(", ", pessoas)})"));
+        }
+
+        Assert.Equal(48L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM USUARIOS"));
     }
 
     [Fact]
