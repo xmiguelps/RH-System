@@ -9,7 +9,7 @@ namespace RHSystem.Api.IntegrationTests.Procedures;
 
 /// <summary>
 /// As procedures de ponto do <c>V007</c> (<c>SP_REGISTRAR_MARCACAO_PONTO</c> e <c>SP_SOLICITAR_AJUSTE_PONTO</c>) contra as regras da API (<c>RegistrarMarcacaoCasoDeUso</c>, <c>CriarPedidoDeAjusteCasoDeUso</c>, <c>GestorAusente</c>).
-/// As procedures leem a hora com <c>NOW()</c>; quase todos os testes fixam o relógio da SESSÃO (<c>SET timestamp</c>, que o <c>NOW()</c> obedece) para provar a meia-noite, a janela de 12 horas e o "mesmo segundo" sem depender da hora em que a suíte roda.
+/// As procedures leem a hora do servidor (<c>UTC_TIMESTAMP()</c> menos 3 horas); quase todos os testes fixam o relógio da SESSÃO (<c>SET timestamp</c>, que o <c>UTC_TIMESTAMP()</c> obedece) para provar a meia-noite, a janela de 12 horas e o "mesmo segundo" sem depender da hora em que a suíte roda.
 /// Os que provam o relógio de verdade (a hora lida depois da trava) dizem isso no nome.
 /// </summary>
 [Collection(MySqlCollection.Nome)]
@@ -301,6 +301,30 @@ public class PontoProceduresTests(MySqlFixture mysql)
         Assert.Equal(
             1L,
             await Sql.ContarAsync(conexao, $"SELECT COUNT(*) FROM PONTOS_MARCACOES M JOIN PONTOS P ON P.ID_PONTO = M.ID_PONTO WHERE TIMESTAMPDIFF(SECOND, '{Texto(antes)}', M.DATA_HORA_MARCACAO) BETWEEN 2 AND 60 AND P.DATA = DATE(M.DATA_HORA_MARCACAO)"));
+    }
+
+    [Fact]
+    public async Task Com_a_sessao_em_outro_fuso_a_batida_e_o_pedido_continuam_no_relogio_de_brasilia()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var pessoa = await FuncionarioAsync(conexao);
+
+        // 01:30 UTC do dia 11 ainda é 22:30 do dia 10 em Brasília.
+        await using (var sessao = await SessaoEmUtcAsync(conexao, "2026-03-11 01:30:00"))
+        {
+            await ChamarNaConexaoAsync(sessao, Registrar, pessoa, "ENTRADA", new Saida("id"));
+        }
+
+        // 02:00 UTC do dia 12 ainda é 23:00 do dia 11 em Brasília: o dia 11 ainda não passou, o dia 10 já.
+        await using (var sessao = await SessaoEmUtcAsync(conexao, "2026-03-12 02:00:00"))
+        {
+            var erro = await Assert.ThrowsAsync<MySqlException>(() => ChamarNaConexaoAsync(sessao, Solicitar, pessoa, new DateOnly(2026, 3, 11), Justificativa, DiaInteiro(new DateOnly(2026, 3, 11)), new Saida("id")));
+            Assert.Equal("So e possivel pedir ajuste de um dia que ja passou.", erro.Message);
+            await ChamarNaConexaoAsync(sessao, Solicitar, pessoa, Dia, Justificativa, Itens((null, "2026-03-10 23:30:00", "SAIDA")), new Saida("id"));
+        }
+
+        Assert.Equal(["2026-03-10|2026-03-10 22:30:00|ENTRADA"], await LinhasAsync(conexao, "P.DATA, M.DATA_HORA_MARCACAO, M.TIPO_MARCACAO", "FROM PONTOS_MARCACOES M JOIN PONTOS P ON P.ID_PONTO = M.ID_PONTO"));
+        Assert.Equal(["2026-03-11 23:00:00"], await LinhasAsync(conexao, "DATA_SOLICITACAO", "FROM PONTOS_MANUTENCOES"));
     }
 
     // ================================================================ SP_SOLICITAR_AJUSTE_PONTO
@@ -779,7 +803,7 @@ public class PontoProceduresTests(MySqlFixture mysql)
         return Itens((null, $"{data} 08:00:00", "ENTRADA"), (null, $"{data} 17:00:00", "SAIDA"));
     }
 
-    /// <summary>Uma sessão com o relógio parado em <paramref name="relogio"/> (o <c>NOW()</c> das procedures obedece); sem ele, o relógio de verdade.</summary>
+    /// <summary>Uma sessão com o relógio parado em <paramref name="relogio"/> (o relógio das procedures obedece); sem ele, o relógio de verdade.</summary>
     private static async Task<MySqlConnection> SessaoAsync(string conexao, DateTime? relogio)
     {
         var sessao = new MySqlConnection(conexao);
@@ -790,6 +814,16 @@ public class PontoProceduresTests(MySqlFixture mysql)
             await comando.ExecuteNonQueryAsync();
         }
 
+        return sessao;
+    }
+
+    /// <summary>Uma sessão em UTC (<c>time_zone = '+00:00'</c>) com o relógio parado no instante UTC dado: o que um servidor fora de -03:00 entregaria.</summary>
+    private static async Task<MySqlConnection> SessaoEmUtcAsync(string conexao, string instanteUtc)
+    {
+        var sessao = new MySqlConnection(conexao);
+        await sessao.OpenAsync();
+        await using var comando = new MySqlCommand($"SET time_zone = '+00:00'; SET timestamp = UNIX_TIMESTAMP('{instanteUtc}')", sessao);
+        await comando.ExecuteNonQueryAsync();
         return sessao;
     }
 

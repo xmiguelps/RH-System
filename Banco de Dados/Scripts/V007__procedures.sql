@@ -16,8 +16,9 @@ DELIMITER $$
 -- (o porque esta no fim desta secao), e as decisoes do pedido de ajuste (gestor e RH) continuam so na API (tambem explicado no fim).
 -- As duas travam primeiro a linha da pessoa em FUNCIONARIOS (FOR UPDATE), a mesma trava que a API usa em tudo o que grava ponto: bater ponto,
 -- pedir ajuste e decidir pedido da mesma pessoa nunca correm entre si, venham da API ou daqui.
--- Horarios: o banco guarda DATETIME no relogio de Brasilia (-03:00). NOW() ja e esse relogio (o servidor roda com default-time-zone=-03:00);
--- os horarios que entram por parametro tambem sao de Brasilia.
+-- Horarios: o banco guarda DATETIME no relogio de Brasilia (-03:00) e os horarios que entram por parametro tambem sao de Brasilia. O "agora"
+-- das duas e UTC_TIMESTAMP() - INTERVAL 3 HOUR (o mesmo deslocamento fixo da API, FusoBrasil): com o servidor em default-time-zone=-03:00 e
+-- igual a NOW(), e continua certo se a sessao ou o servidor estiverem em outro fuso (um MySQL gerenciado costuma vir em UTC).
 
 -- ------------------------------------------------------------
 -- SP_REGISTRAR_MARCACAO_PONTO: a pessoa bate o ponto AGORA.
@@ -25,7 +26,7 @@ DELIMITER $$
 --
 -- Parametros: P_ID_FUNCIONARIO; P_TIPO_MARCACAO = a batida que a pessoa ACHA que esta fazendo ('ENTRADA' ou 'SAIDA', o tipoEsperado da API);
 --             OUT P_ID_MARCACAO = a batida criada.
--- O horario e sempre o do servidor (NOW(), lido depois da trava, sem fracao de segundo); o tipo e o dia do ponto quem calcula e a procedure:
+-- O horario e sempre o do servidor (lido depois da trava, sem fracao de segundo); o tipo e o dia do ponto quem calcula e a procedure:
 --   - sem batida hoje e com a ultima batida de ONTEM sendo uma ENTRADA de menos de 12 horas atras: e a SAIDA dessa jornada e entra no dia de
 --     ONTEM (jornada que atravessa a meia-noite; a janela de 12 horas e a do contrato, x-provisorio);
 --   - senao alterna a ultima batida de hoje (por horario e depois por id): a primeira do dia e ENTRADA, depois de ENTRADA vem SAIDA.
@@ -94,7 +95,7 @@ BEGIN
     END IF;
 
     -- So depois da trava: a segunda de duas chamadas simultaneas ve a batida da primeira e bate com o proprio horario.
-    SET V_AGORA = NOW();
+    SET V_AGORA = UTC_TIMESTAMP() - INTERVAL 3 HOUR;
     SET V_HOJE = DATE(V_AGORA);
 
     IF V_ATIVO = FALSE THEN
@@ -283,7 +284,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Funcionario nao encontrado.';
     END IF;
 
-    SET V_AGORA_EXATO = NOW(6);
+    SET V_AGORA_EXATO = UTC_TIMESTAMP(6) - INTERVAL 3 HOUR;
     SET V_AGORA = V_AGORA_EXATO - INTERVAL MICROSECOND(V_AGORA_EXATO) MICROSECOND;
 
     IF V_ATIVO = FALSE THEN
