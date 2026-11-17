@@ -195,6 +195,39 @@ public class AdvertenciasEOutrosProceduresTests(MySqlFixture mysql)
         Assert.Equal(2L, await TotalAsync(e.Conexao));
     }
 
+    [Fact]
+    public async Task O_tipo_com_acento_e_recusado_e_em_minusculas_e_gravado_no_valor_canonico_que_a_API_le()
+    {
+        var e = await ElencoAsync();
+        const string invalido = "Tipo de advertencia invalido: use VERBAL ou ESCRITA.";
+
+        Assert.Equal(invalido, await RecusaDeNegocioAsync(e.Conexao, Gerar, e.Pessoa, null, e.Rh, e.Hoje, "vérbal", "Atraso", "Chegou atrasado.", new Saida("id"))); // na collation do banco 'vérbal' = 'VERBAL': gravaria 'VÉRBAL' e as listas da API dariam 500
+        Assert.Equal(invalido, await RecusaDeNegocioAsync(e.Conexao, Gerar, e.Pessoa, null, e.Rh, e.Hoje, "ESCRITÁ", "Atraso", "Chegou atrasado.", new Saida("id")));
+        Assert.Equal(0L, await TotalAsync(e.Conexao));
+
+        _ = await ChamarAsync(e.Conexao, Gerar, e.Pessoa, null, e.Rh, e.Hoje, "verbal", "Atraso", "Chegou atrasado.", new Saida("id"));
+        _ = await ChamarAsync(e.Conexao, Gerar, e.Pessoa, null, e.Rh, e.Hoje, " Escrita ", "Atraso", "Chegou atrasado.", new Saida("id"));
+
+        Assert.Equal(["ESCRITA", "VERBAL"], await Sql.ColunaAsync(e.Conexao, "SELECT TIPO_ADVERTENCIA FROM ADVERTENCIAS ORDER BY TIPO_ADVERTENCIA"));
+        Assert.Equal(0L, await Sql.ContarAsync(e.Conexao, "SELECT COUNT(*) FROM ADVERTENCIAS WHERE CAST(TIPO_ADVERTENCIA AS BINARY) NOT IN ('VERBAL', 'ESCRITA')")); // byte a byte: só o valor canônico
+    }
+
+    [Fact]
+    public async Task A_decisao_com_acento_e_recusada_e_a_contestacao_continua_em_aberto()
+    {
+        var e = await ElencoAsync();
+        var id = await PendenteAsync(e);
+        await ChamarAsync(e.Conexao, Contestar, id, e.Pessoa, "Nao concordo com o registro.");
+
+        Assert.Equal("Decisao invalida: use MANTER ou ACATAR.", await RecusaDeNegocioAsync(e.Conexao, Responder, id, "ácatar")); // na collation do banco 'ácatar' = 'ACATAR'
+        Assert.Equal("Decisao invalida: use MANTER ou ACATAR.", await RecusaDeNegocioAsync(e.Conexao, Responder, id, "MANTÉR"));
+        Assert.Equal("CONTESTADA", await TextoAsync(e.Conexao, $"SELECT STATUS_ADVERTENCIA FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id}"));
+
+        await ChamarAsync(e.Conexao, Responder, id, "acatar"); // minúsculas valem, como o tipo
+
+        Assert.Equal("CANCELADA", await TextoAsync(e.Conexao, $"SELECT STATUS_ADVERTENCIA FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id}"));
+    }
+
     // ---------------------------------------------------------------- SP_REGISTRAR_CIENCIA_ADVERTENCIA
 
     [Fact]
@@ -255,13 +288,14 @@ public class AdvertenciasEOutrosProceduresTests(MySqlFixture mysql)
     public async Task Ciencia_e_contestacao_ao_mesmo_tempo_tem_um_efeito_so()
     {
         var e = await ElencoAsync();
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 2; rodada++)
         {
             var id = await PendenteAsync(e);
 
-            var desfechos = await AoMesmoTempoAsync(
-                () => TentarAsync(e.Conexao, Ciencia, id, e.Pessoa),
-                () => TentarAsync(e.Conexao, Contestar, id, e.Pessoa, "Nao concordo com o registro."));
+            var desfechos = await EsperandoATravaAsync(
+                e.Conexao,
+                $"SELECT ID_ADVERTENCIA FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id} FOR UPDATE",
+                [() => TentarAsync(e.Conexao, Ciencia, id, e.Pessoa), () => TentarAsync(e.Conexao, Contestar, id, e.Pessoa, "Nao concordo com o registro.")]);
 
             Assert.Single(desfechos, d => d.Passou);
             var recusa = Assert.Single(desfechos, d => !d.Passou);
@@ -378,12 +412,15 @@ public class AdvertenciasEOutrosProceduresTests(MySqlFixture mysql)
     public async Task Duas_respostas_ao_mesmo_tempo_a_mesma_contestacao_so_uma_vale()
     {
         var e = await ElencoAsync();
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 2; rodada++)
         {
             var id = await PendenteAsync(e);
             await ChamarAsync(e.Conexao, Contestar, id, e.Pessoa, "Nao concordo com o registro.");
 
-            var desfechos = await AoMesmoTempoAsync(() => TentarAsync(e.Conexao, Responder, id, "MANTER"), () => TentarAsync(e.Conexao, Responder, id, "ACATAR"));
+            var desfechos = await EsperandoATravaAsync(
+                e.Conexao,
+                $"SELECT ID_ADVERTENCIA FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id} FOR UPDATE",
+                [() => TentarAsync(e.Conexao, Responder, id, "MANTER"), () => TentarAsync(e.Conexao, Responder, id, "ACATAR")]);
 
             Assert.Single(desfechos, d => d.Passou);
             Assert.Equal(NaoEstaContestada, Assert.Single(desfechos, d => !d.Passou).Mensagem);

@@ -333,14 +333,15 @@ public partial class TreinamentoProceduresTests(MySqlFixture mysql)
         var treinamento = await TreinamentoAsync(conexao);
         var primeiro = await ModuloAsync(conexao, treinamento, 1);
         var segundo = await ModuloAsync(conexao, treinamento, 2);
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 2; rodada++)
         {
             var pessoa = await FuncionarioAsync(conexao);
             await LinhaAsync(conexao, treinamento, pessoa);
 
-            var desfechos = await AoMesmoTempoAsync(
-                () => TentarAsync(conexao, Concluir, primeiro, pessoa, new Saida("concluiu")),
-                () => TentarAsync(conexao, Concluir, segundo, pessoa, new Saida("concluiu")));
+            var desfechos = await EsperandoATravaAsync(
+                conexao,
+                $"SELECT ID_TREINAMENTO FROM TREINAMENTOS WHERE ID_TREINAMENTO = {treinamento} FOR UPDATE",
+                [() => TentarAsync(conexao, Concluir, primeiro, pessoa, new Saida("concluiu")), () => TentarAsync(conexao, Concluir, segundo, pessoa, new Saida("concluiu"))]);
 
             Assert.All(desfechos, d => Assert.True(d.Passou, d.Mensagem));
             Assert.Single(desfechos, d => Inteiro(d.Saidas!["concluiu"]) == 1); // uma das duas fechou o treinamento; sem a trava, cada uma veria só o próprio módulo e nenhuma fecharia
@@ -351,20 +352,64 @@ public partial class TreinamentoProceduresTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task A_procedure_trava_o_treinamento_antes_do_modulo_como_a_API_e_nao_da_impasse_com_o_RH_editando_o_modulo()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var pessoa = await FuncionarioAsync(conexao);
+        var treinamento = await TreinamentoAsync(conexao);
+        var modulo = await ModuloAsync(conexao, treinamento, 1);
+        await LinhaAsync(conexao, treinamento, pessoa);
+
+        // A terceira sessão faz o que a API faz ao editar um módulo: trava o TREINAMENTO e, com a conclusão já esperando, escreve no MÓDULO. Se a procedure segurasse o módulo antes de pedir o treinamento, as duas se esperariam (erro 1213).
+        var desfechos = await EsperandoATravaAsync(
+            conexao,
+            $"SELECT ID_TREINAMENTO FROM TREINAMENTOS WHERE ID_TREINAMENTO = {treinamento} FOR UPDATE",
+            [() => TentarAsync(conexao, Concluir, modulo, pessoa, new Saida("concluiu"))],
+            enquantoEsperam: $"UPDATE TREINAMENTOS_MODULOS SET TITULO = 'Modulo editado pelo RH' WHERE ID_MODULO = {modulo}");
+
+        Assert.True(desfechos[0].Passou, desfechos[0].Mensagem);
+        Assert.Equal(1, Inteiro(desfechos[0].Saidas!["concluiu"]));
+        Assert.StartsWith("CONCLUIDO|", await SituacaoAsync(conexao, treinamento, pessoa), StringComparison.Ordinal);
+        Assert.Equal("Modulo editado pelo RH", await TextoAsync(conexao, $"SELECT TITULO FROM TREINAMENTOS_MODULOS WHERE ID_MODULO = {modulo}"));
+    }
+
+    [Fact]
+    public async Task Um_modulo_excluido_enquanto_a_conclusao_esperava_a_trava_e_recusado_como_modulo_que_nao_existe()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var pessoa = await FuncionarioAsync(conexao);
+        var treinamento = await TreinamentoAsync(conexao);
+        var modulo = await ModuloAsync(conexao, treinamento, 1);
+        _ = await ModuloAsync(conexao, treinamento, 2);
+        await LinhaAsync(conexao, treinamento, pessoa);
+
+        var desfechos = await EsperandoATravaAsync(
+            conexao,
+            $"SELECT ID_TREINAMENTO FROM TREINAMENTOS WHERE ID_TREINAMENTO = {treinamento} FOR UPDATE",
+            [() => TentarAsync(conexao, Concluir, modulo, pessoa, new Saida("concluiu"))],
+            enquantoEsperam: $"DELETE FROM TREINAMENTOS_MODULOS WHERE ID_MODULO = {modulo}");
+
+        Assert.Equal("Modulo de treinamento nao encontrado.", desfechos[0].Mensagem);
+        Assert.Equal("45000", desfechos[0].SqlState);
+        Assert.Equal("INSCRITO|sem inicio|sem conclusao|sem nota", await SituacaoAsync(conexao, treinamento, pessoa));
+    }
+
+    [Fact]
     public async Task O_mesmo_modulo_concluido_duas_vezes_ao_mesmo_tempo_grava_um_progresso_so_e_nenhuma_chamada_falha()
     {
         var conexao = await NovoBancoAsync(mysql);
         var treinamento = await TreinamentoAsync(conexao);
         var primeiro = await ModuloAsync(conexao, treinamento, 1);
         _ = await ModuloAsync(conexao, treinamento, 2);
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 2; rodada++)
         {
             var pessoa = await FuncionarioAsync(conexao);
             await LinhaAsync(conexao, treinamento, pessoa);
 
-            var desfechos = await AoMesmoTempoAsync(
-                () => TentarAsync(conexao, Concluir, primeiro, pessoa, new Saida("concluiu")),
-                () => TentarAsync(conexao, Concluir, primeiro, pessoa, new Saida("concluiu")));
+            var desfechos = await EsperandoATravaAsync(
+                conexao,
+                $"SELECT ID_TREINAMENTO FROM TREINAMENTOS WHERE ID_TREINAMENTO = {treinamento} FOR UPDATE",
+                [() => TentarAsync(conexao, Concluir, primeiro, pessoa, new Saida("concluiu")), () => TentarAsync(conexao, Concluir, primeiro, pessoa, new Saida("concluiu"))]);
 
             Assert.All(desfechos, d => Assert.True(d.Passou, d.Mensagem));
             Assert.Equal(1L, await ProgressoAsync(conexao, treinamento, pessoa));

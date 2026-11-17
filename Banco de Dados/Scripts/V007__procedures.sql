@@ -2476,7 +2476,13 @@ BEGIN
     -- Aparar como a API (espacos, tabulacoes e quebras de linha nas pontas) e contar por caractere.
     SET V_MOTIVO = REGEXP_REPLACE(COALESCE(P_MOTIVO, ''), '^[[:space:]]+|[[:space:]]+$', '');
     SET V_DESCRICAO = REGEXP_REPLACE(COALESCE(P_DESCRICAO, ''), '^[[:space:]]+|[[:space:]]+$', '');
-    SET V_TIPO = UPPER(TRIM(COALESCE(P_TIPO_ADVERTENCIA, '')));
+    -- O tipo vale em qualquer caixa e e gravado SEMPRE no literal canonico. A comparacao e byte a byte (BINARY): na collation do banco
+    -- 'verbal' com acento seria igual a 'VERBAL', a linha nasceria com o acento e a API, que le o tipo por valor exato, nao a leria.
+    SET V_TIPO = CASE CAST(UPPER(TRIM(COALESCE(P_TIPO_ADVERTENCIA, ''))) AS BINARY)
+                     WHEN 'VERBAL' THEN 'VERBAL'
+                     WHEN 'ESCRITA' THEN 'ESCRITA'
+                     ELSE NULL
+                 END;
 
     IF P_ID_FUNCIONARIO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Informe o funcionario advertido.';
@@ -2494,7 +2500,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A data do ocorrido nao pode ser futura.';
     END IF;
 
-    IF V_TIPO NOT IN ('VERBAL', 'ESCRITA') THEN
+    IF V_TIPO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tipo de advertencia invalido: use VERBAL ou ESCRITA.';
     END IF;
 
@@ -2750,13 +2756,18 @@ BEGIN
         RESIGNAL;
     END;
 
-    SET V_DECISAO = UPPER(TRIM(COALESCE(P_DECISAO, '')));
+    -- Como o tipo em D1: qualquer caixa vale, mas a comparacao e byte a byte (BINARY), para a decisao com acento nao passar pela collation.
+    SET V_DECISAO = CASE CAST(UPPER(TRIM(COALESCE(P_DECISAO, ''))) AS BINARY)
+                        WHEN 'MANTER' THEN 'MANTER'
+                        WHEN 'ACATAR' THEN 'ACATAR'
+                        ELSE NULL
+                    END;
 
     IF P_ID_ADVERTENCIA IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Informe a advertencia.';
     END IF;
 
-    IF V_DECISAO NOT IN ('MANTER', 'ACATAR') THEN
+    IF V_DECISAO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Decisao invalida: use MANTER ou ACATAR.';
     END IF;
 
@@ -2792,8 +2803,14 @@ END$$
 -- NAO existe trigger que atualize o status geral a partir do progresso dos modulos (o comentario do arquivo antigo dizia que sim): os
 --   triggers TRG_TREINAMENTOS_FUNCIONARIOS_* so reagem a mudanca de STATUS_TREINAMENTO. Quem muda o status e esta procedure.
 --
--- Regras, na ordem de recusa (a transacao comeca travando a linha do TREINAMENTO, a mesma trava da API: duas conclusoes do mesmo
--- treinamento se enfileiram, e os dois ultimos modulos concluidos ao mesmo tempo dao um so CONCLUIDO e um so certificado):
+-- Travas, na MESMA ORDEM da API (TravarTreinamentoAsync): primeiro a linha de TREINAMENTOS e so depois o modulo e o progresso. O
+--   treinamento do modulo e descoberto por uma leitura SEM trava e FORA da transacao (dentro dela, essa leitura fixaria o instantaneo
+--   antes da espera pela trava e as contagens seguintes sairiam velhas); com o treinamento travado, o modulo e relido (pode ter sido
+--   excluido enquanto a chamada esperava). Travar o modulo antes do treinamento daria impasse (erro 1213) com o RH editando, excluindo
+--   ou reordenando modulos pela API. Duas conclusoes do mesmo treinamento se enfileiram, e os dois ultimos modulos concluidos ao mesmo
+--   tempo dao um so CONCLUIDO e um so certificado.
+--
+-- Regras, na ordem de recusa:
 --   1. entradas: modulo e funcionario;
 --   2. o modulo existe;
 --   3. o treinamento esta liberado: publicado e com a data de inicio ja chegada (ou sem data);
@@ -2827,6 +2844,8 @@ CREATE PROCEDURE SP_CONCLUIR_MODULO_TREINAMENTO(
     OUT P_TREINAMENTO_CONCLUIDO BOOLEAN
 )
 PROC: BEGIN
+    DECLARE V_ID_TREINAMENTO_LIDO INT DEFAULT NULL;
+    DECLARE V_MODULO_CONFERE INT DEFAULT 0;
     DECLARE V_ID_TREINAMENTO INT DEFAULT NULL;
     DECLARE V_PUBLICADO BOOLEAN DEFAULT NULL;
     DECLARE V_DATA_INICIO DATE DEFAULT NULL;
@@ -2856,18 +2875,32 @@ PROC: BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Informe o modulo e o funcionario.';
     END IF;
 
+    -- De que treinamento e o modulo: leitura sem trava e FORA da transacao (ver "Travas" no cabecalho); o modulo e relido depois.
+    SELECT ID_TREINAMENTO INTO V_ID_TREINAMENTO_LIDO
+      FROM TREINAMENTOS_MODULOS
+     WHERE ID_MODULO = P_ID_MODULO;
+
+    IF V_ID_TREINAMENTO_LIDO IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Modulo de treinamento nao encontrado.';
+    END IF;
+
     START TRANSACTION;
 
-    -- Trava a linha do treinamento (e a do modulo). Tem de ser a PRIMEIRA leitura da transacao: as seguintes ja enxergam o que a
-    -- conclusao anterior do mesmo treinamento gravou.
-    SELECT T.ID_TREINAMENTO, T.PUBLICADO, T.DATA_INICIO, T.OBRIGATORIO, T.ENCERRADO_EM, T.PUBLICO
+    -- Trava a linha do TREINAMENTO, antes de qualquer outra (a ordem da API). Tem de ser a PRIMEIRA leitura da transacao: as seguintes
+    -- ja enxergam o que a conclusao anterior do mesmo treinamento, ou a edicao do modulo pelo RH, gravou.
+    SELECT ID_TREINAMENTO, PUBLICADO, DATA_INICIO, OBRIGATORIO, ENCERRADO_EM, PUBLICO
       INTO V_ID_TREINAMENTO, V_PUBLICADO, V_DATA_INICIO, V_OBRIGATORIO, V_ENCERRADO_EM, V_PUBLICO
-      FROM TREINAMENTOS_MODULOS M
-      JOIN TREINAMENTOS T ON T.ID_TREINAMENTO = M.ID_TREINAMENTO
-     WHERE M.ID_MODULO = P_ID_MODULO
+      FROM TREINAMENTOS
+     WHERE ID_TREINAMENTO = V_ID_TREINAMENTO_LIDO
      FOR UPDATE;
 
-    IF V_ID_TREINAMENTO IS NULL THEN
+    -- Com o treinamento travado, o modulo ainda existe e ainda e dele? (o RH pode te-lo excluido, ou o treinamento, durante a espera)
+    SELECT COUNT(*) INTO V_MODULO_CONFERE
+      FROM TREINAMENTOS_MODULOS
+     WHERE ID_MODULO = P_ID_MODULO
+       AND ID_TREINAMENTO = V_ID_TREINAMENTO;
+
+    IF V_ID_TREINAMENTO IS NULL OR V_MODULO_CONFERE = 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Modulo de treinamento nao encontrado.';
     END IF;
 

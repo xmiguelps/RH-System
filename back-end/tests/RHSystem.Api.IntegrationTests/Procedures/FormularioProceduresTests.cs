@@ -106,11 +106,11 @@ public class FormularioProceduresTests(MySqlFixture mysql)
     public async Task Dois_encerramentos_ao_mesmo_tempo_um_vale_e_o_outro_e_recusado()
     {
         var conexao = await NovoBancoAsync(mysql);
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 2; rodada++)
         {
             var id = await PublicadoAsync(conexao);
 
-            var desfechos = await AoMesmoTempoAsync(() => TentarAsync(conexao, Encerrar, id), () => TentarAsync(conexao, Encerrar, id));
+            var desfechos = await EsperandoATravaAsync(conexao, $"SELECT ID_FORMULARIO FROM FORMULARIOS WHERE ID_FORMULARIO = {id} FOR UPDATE", [() => TentarAsync(conexao, Encerrar, id), () => TentarAsync(conexao, Encerrar, id)]);
 
             Assert.Single(desfechos, d => d.Passou);
             var recusa = Assert.Single(desfechos, d => !d.Passou);

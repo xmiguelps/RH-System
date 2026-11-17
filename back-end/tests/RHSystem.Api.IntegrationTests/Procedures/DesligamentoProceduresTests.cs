@@ -203,13 +203,14 @@ public class DesligamentoProceduresTests(MySqlFixture mysql)
     {
         var conexao = await NovoBancoAsync(mysql);
         var futuro = await DiaAsync(conexao, 20);
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 2; rodada++)
         {
             var pessoa = await FuncionarioAsync(conexao);
 
-            var desfechos = await AoMesmoTempoAsync(
-                () => TentarAsync(conexao, Agendar, pessoa, futuro, new Saida("id")),
-                () => TentarAsync(conexao, Agendar, pessoa, futuro.AddDays(1), new Saida("id")));
+            var desfechos = await EsperandoATravaAsync(
+                conexao,
+                $"SELECT ID_FUNCIONARIO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa} FOR UPDATE",
+                [() => TentarAsync(conexao, Agendar, pessoa, futuro, new Saida("id")), () => TentarAsync(conexao, Agendar, pessoa, futuro.AddDays(1), new Saida("id"))]);
 
             Assert.Single(desfechos, d => d.Passou);
             var recusa = Assert.Single(desfechos, d => !d.Passou);
@@ -281,14 +282,14 @@ public class DesligamentoProceduresTests(MySqlFixture mysql)
     {
         var conexao = await NovoBancoAsync(mysql);
         var ontem = await DiaAsync(conexao, -1);
-        for (var rodada = 0; rodada < 6; rodada++)
+        for (var rodada = 0; rodada < 3; rodada++)
         {
             var pessoa = await FuncionarioAsync(conexao);
             var id = await AgendarAsync(conexao, pessoa, ontem); // sem consolidação: fica agendado
             await Sql.ExecutarAsync(conexao, "DELETE FROM TAREFAS_AGENDADAS");
             await ConsolidarBancoDeHorasAsync(conexao, ontem); // agora a efetivação já pode acontecer
 
-            var desfechos = await AoMesmoTempoAsync(() => TentarAsync(conexao, Cancelar, id), () => TentarAsync(conexao, Efetivar, id));
+            var desfechos = await EsperandoATravaAsync(conexao, $"SELECT ID_FUNCIONARIO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa} FOR UPDATE", [() => TentarAsync(conexao, Cancelar, id), () => TentarAsync(conexao, Efetivar, id)]);
 
             Assert.Single(desfechos, d => d.Passou);
             if (desfechos[0].Passou)
@@ -466,7 +467,7 @@ public class DesligamentoProceduresTests(MySqlFixture mysql)
         var conexao = await NovoBancoAsync(mysql);
         var ontem = await DiaAsync(conexao, -1);
         var pessoas = new List<(int Pessoa, int Id)>();
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 2; i++)
         {
             var pessoa = await FuncionarioAsync(conexao);
             pessoas.Add((pessoa, await AgendarAsync(conexao, pessoa, ontem)));
@@ -475,7 +476,7 @@ public class DesligamentoProceduresTests(MySqlFixture mysql)
         await ConsolidarBancoDeHorasAsync(conexao, ontem);
         foreach (var (pessoa, id) in pessoas)
         {
-            var desfechos = await AoMesmoTempoAsync(() => TentarAsync(conexao, Efetivar, id), () => TentarAsync(conexao, Efetivar, id));
+            var desfechos = await EsperandoATravaAsync(conexao, $"SELECT ID_FUNCIONARIO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa} FOR UPDATE", [() => TentarAsync(conexao, Efetivar, id), () => TentarAsync(conexao, Efetivar, id)]);
 
             Assert.All(desfechos, d => Assert.True(d.Passou, d.Mensagem));
             Assert.StartsWith("EFETIVADO|", await DesligamentoAsync(conexao, id), StringComparison.Ordinal);
