@@ -57,6 +57,37 @@ internal static class ApoioDaParteD
         return await Task.WhenAll(tarefas);
     }
 
+    /// <summary>
+    /// Duas (ou mais) chamadas ao mesmo tempo DE VERDADE: uma terceira sessão segura a linha que a procedure trava primeiro (<paramref name="sqlDaTrava"/>, um <c>SELECT ... FOR UPDATE</c>), as chamadas são soltas e o teste confere que TODAS estão esperando (nenhuma terminou) antes de liberar. Uma procedure que
+    /// não trava essa linha termina sem esperar e derruba o teste aqui, sempre, e não só quando o acaso sobrepõe as chamadas. <paramref name="enquantoEsperam"/> roda na sessão da trava, com as chamadas já esperando (o que a API faria com a trava na mão).
+    /// </summary>
+    public static async Task<Desfecho[]> EsperandoATravaAsync(string conexao, string sqlDaTrava, Func<Task<Desfecho>>[] chamadas, string? enquantoEsperam = null)
+    {
+        Task<Desfecho>[] tarefas;
+        await using (var trava = new MySqlConnection(conexao))
+        {
+            await trava.OpenAsync();
+            await using var transacao = await trava.BeginTransactionAsync();
+            await using (var comando = new MySqlCommand(sqlDaTrava, trava, transacao))
+            {
+                Assert.NotNull(await comando.ExecuteScalarAsync()); // a linha a travar existe
+            }
+
+            tarefas = [.. chamadas.Select(chamada => Task.Run(chamada))];
+            await Task.Delay(TimeSpan.FromSeconds(1.5));
+            Assert.All(tarefas, t => Assert.False(t.IsCompleted, "A chamada deveria estar esperando a trava: a procedure nao travou a linha que devia travar primeiro."));
+            if (enquantoEsperam is not null)
+            {
+                await using var escrita = new MySqlCommand(enquantoEsperam, trava, transacao);
+                _ = await escrita.ExecuteNonQueryAsync();
+            }
+
+            await transacao.CommitAsync();
+        }
+
+        return await Task.WhenAll(tarefas);
+    }
+
     /// <summary>A consolidação do banco de horas de um dia já concluída (a tarefa diária da API), como a efetivação do desligamento a procura.</summary>
     public static async Task ConsolidarBancoDeHorasAsync(string conexao, DateOnly dia) =>
         await Sql.ExecutarAsync(conexao, $"INSERT INTO TAREFAS_AGENDADAS (TIPO, CHAVE_IDEMPOTENCIA, DIA_REFERENCIA, SITUACAO, CONCLUIDA_EM) VALUES ('CONSOLIDAR_BANCO_HORAS', 'CONSOLIDAR_BANCO_HORAS:dia={Iso(dia)}', '{Iso(dia)}', 'CONCLUIDA', UTC_TIMESTAMP(6))");
