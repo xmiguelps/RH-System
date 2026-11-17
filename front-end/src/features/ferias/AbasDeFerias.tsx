@@ -97,12 +97,14 @@ function ConteudoDaAba({
           { rotulo: 'Dias disponíveis', valor: r ? textoDeDias(r.diasDisponiveis) : '—' },
           {
             rotulo: 'Período aquisitivo atual',
+            tamanho: 'texto',
             valor: r?.periodoAquisitivoAtual
               ? periodoCompleto(r.periodoAquisitivoAtual.inicio, r.periodoAquisitivoAtual.fim)
               : '—',
           },
           {
             rotulo: 'Prazo para tirar o saldo',
+            tamanho: 'texto',
             valor: r?.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—',
           },
         ]}
@@ -203,12 +205,14 @@ function ModalRegistrarFerias({
             { rotulo: 'Saldo disponível', valor: textoDeDias(r.diasDisponiveis) },
             {
               rotulo: 'Período aquisitivo',
+              tamanho: 'texto',
               valor: r.periodoDoSaldo
                 ? periodoCompleto(r.periodoDoSaldo.inicio, r.periodoDoSaldo.fim)
                 : '—',
             },
             {
               rotulo: 'Prazo para tirar',
+              tamanho: 'texto',
               valor: r.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—',
             },
           ]}

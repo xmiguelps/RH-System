@@ -288,11 +288,19 @@ export function PaginaMinhasFerias() {
         </span>
       ),
     },
-    { chave: 'dias', titulo: 'Dias', celula: (p) => textoDeDias(p.dias) },
+    {
+      chave: 'dias',
+      titulo: 'Dias',
+      largura: 'whitespace-nowrap',
+      celula: (p) => <span className="whitespace-nowrap">{textoDeDias(p.dias)}</span>,
+    },
     {
       chave: 'pedido',
       titulo: 'Pedido em',
-      celula: (p) => formatarDataDoInstante(p.solicitadaEmUtc),
+      largura: 'whitespace-nowrap',
+      celula: (p) => (
+        <span className="whitespace-nowrap">{formatarDataDoInstante(p.solicitadaEmUtc)}</span>
+      ),
     },
     {
       chave: 'situacao',
@@ -336,6 +344,7 @@ export function PaginaMinhasFerias() {
             },
             {
               rotulo: 'Próximas férias',
+              tamanho: 'texto',
               valor: r?.proximasFerias
                 ? periodoCurto(r.proximasFerias.dataInicio, r.proximasFerias.dataFim)
                 : 'Nenhuma',
