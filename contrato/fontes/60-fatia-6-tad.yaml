@@ -1312,7 +1312,9 @@ paths:
         `TEXTO`: o `conteudoTexto` (texto ou markdown, nunca HTML) é mostrado na tela. `LINK` e o `VIDEO` por link (`urlExterna`
         preenchido): o front mostra um botão que abre `urlExterna` em nova aba, com `rel="noopener noreferrer"` (a política de segurança do
         site não deixa incorporar). `PDF` e o `VIDEO` por arquivo (`temArquivo` verdadeiro, `urlExterna` nulo; decisão do dono de 2026-11-17): o front
-        chama `baixarArquivoDeModulo` e abre o link (o vídeo pode ir como `src` de um `<video controls>`). Os módulos podem ser feitos **em qualquer ordem**. Vale também para "Rever
+        chama `baixarArquivoDeModulo` e abre o link (o vídeo pode ir como `src` de um `<video controls>`; para isso a política de segurança do site,
+        `front-end/public/staticwebapp.config.json`, hoje `default-src 'self'`, precisa de `media-src` com o endereço do armazenamento, que só existe depois do deploy;
+        sem isso o navegador bloqueia o vídeo e o botão deve apenas abrir o link, que baixa o arquivo). Os módulos podem ser feitos **em qualquer ordem**. Vale também para "Rever
         conteúdo" depois de concluído e com o treinamento encerrado (para quem começou ou concluiu). Pessoa sem linha no
         treinamento: 404; opcional sem inscrição: 422 `INSCRICAO_PENDENTE`.
       x-perfis: [Funcionario, Gestor, RH]

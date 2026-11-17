@@ -20,8 +20,8 @@ public interface IVerificadorDeCaptcha
 public sealed record CaptchaDaPagina(string ChaveDoSite);
 
 /// <summary>
-/// A regra da candidatura: com o captcha ligado, sem token é 400 em <c>errors.captchaToken</c> e token que o provedor não confirma é 422 <c>CAPTCHA_INVALIDO</c>. Roda ANTES de qualquer outra regra do envio (depois do limite por IP), inclusive do 404 do código do link, para uma pessoa
-/// sem captcha nunca descobrir se um código existe.
+/// A regra da candidatura: com o captcha ligado, sem token é 400 em <c>errors.captchaToken</c> e token que o provedor não confirma é 422 <c>CAPTCHA_INVALIDO</c>. Roda ANTES de qualquer outra regra do envio (depois do limite por IP), inclusive do 404 do código do link: é a conferência mais barata
+/// (antes de consultar o banco e de gravar arquivo). Não esconde se um código existe: a página pública responde 404 ou 200 sem captcha.
 /// </summary>
 public static class ConferenciaDoCaptcha
 {

@@ -48,3 +48,4 @@ Antes, **tire uma cópia do que quiser guardar**: o seed recria a demo em minuto
 3. Alerta de orçamento ligado e o e-mail dele certo?
 4. Chaves e senhas do ambiente (JWT, banco, armazenamento) **trocadas ou apagadas**; a senha de demonstração `Demo#RH2026` **nunca** fica numa URL pública depois da banca.
 5. O repositório não tem segredo: confira o `.env` (o git o ignora) e os `user-secrets`.
+6. Antes de ligar o captcha ou liberar o vídeo por arquivo no ambiente hospedado: a política de segurança do site precisa liberar `https://challenges.cloudflare.com` (`script-src` e `frame-src`) e o endereço do armazenamento (`media-src`); sem isso o widget e o vídeo não funcionam (veja `docs/plano-front-end/MUDANCAS-DO-BACKEND-2026-11-17.md`).

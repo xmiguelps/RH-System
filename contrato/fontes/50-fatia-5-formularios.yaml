@@ -2463,7 +2463,9 @@ paths:
         ou Word, até 5 MB. Formulário anônimo nunca é público.
 
         **Captcha (decisão do dono de 2026-11-17):** além do limite por IP, a página traz `captcha`. Objeto com `chaveDoSite`: o captcha está
-        ligado e o front desenha o widget; `null`: desligado.
+        ligado e o front desenha o widget; `null`: desligado. **A política de segurança do site (CSP, `front-end/public/staticwebapp.config.json`, hoje
+        `default-src 'self'`) precisa liberar o Cloudflare Turnstile:** `script-src` e `frame-src` com `https://challenges.cloudflare.com`. Sem isso o widget não carrega e, com o captcha ligado,
+        nenhuma candidatura entra.
       x-provisorio: "Retenção dos dados de candidato (prazo e apagamento). Hipótese usada aqui: 180 dias (retencaoDias), valor de partida; se o prazo de retenção mudar, só o valor muda. Se o dono quiser limite de respostas por link, a publicação ganha limiteDeRespostas (a coluna LINK_PUBLICO_LIMITE_RESPOSTAS já existe)."
       x-perfis: [Publico]
       security: []
@@ -2532,8 +2534,8 @@ paths:
         (`curriculo` ou `arquivos`). **Limite de 10 envios por hora por IP** (429, cabeçalho `Retry-After`).
 
         **Captcha (decisão do dono de 2026-11-17):** com o captcha ligado (`captcha` da página é um objeto), o envio traz `captchaToken`. A conferência vem
-        **antes de qualquer outra regra** (depois do limite por IP), até do 404 do código do link, para quem não resolve o captcha nunca descobrir se um código
-        existe: sem o campo, 400 em `errors.captchaToken`; com um token que o provedor não confirma (ou se o provedor não responde a tempo), 422
+        **antes de qualquer outra regra** (depois do limite por IP), até do 404 do código do link: é a conferência mais barata e roda antes de ler os arquivos e
+        de consultar o banco (a página, `obterFormularioPublico`, continua respondendo 404 ou 200 sem captcha, só com o limite por IP): sem o campo, 400 em `errors.captchaToken`; com um token que o provedor não confirma (ou se o provedor não responde a tempo), 422
         `CAPTCHA_INVALIDO`. Nada é gravado quando ela recusa. Desligado, o campo é ignorado.
 
         O arquivo enviado é servido só como anexo, por link temporário, e só ao RH (`baixarCurriculoDeCandidato`,

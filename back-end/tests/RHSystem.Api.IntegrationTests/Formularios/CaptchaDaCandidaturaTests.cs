@@ -174,7 +174,7 @@ public class CaptchaDaCandidaturaTests(MySqlFixture mysql)
         var semCaptchaNoCodigoReal = await EnviarAsync(cliente, e.Token, Candidatura(RespostasOk(e)));
         var comCaptcha = await EnviarAsync(cliente, inexistente, ComCaptcha(Candidatura(RespostasOk(e)), "token-bom"));
 
-        Assert.Equal((400, 400, 404), ((int)semCaptcha.StatusCode, (int)semCaptchaNoCodigoReal.StatusCode, (int)comCaptcha.StatusCode)); // quem não resolve o captcha nunca descobre se um código existe
+        Assert.Equal((400, 400, 404), ((int)semCaptcha.StatusCode, (int)semCaptchaNoCodigoReal.StatusCode, (int)comCaptcha.StatusCode)); // o captcha é a primeira conferência, até do 404 (a página pública é que mostra se o código existe)
     }
 
     [Fact]
@@ -232,5 +232,60 @@ public class CaptchaDaCandidaturaTests(MySqlFixture mysql)
 
         Assert.Equal(0L, await ContarAsync(api, "SELECT COUNT(*) FROM AUDITORIA_EVENTOS WHERE DESCRICAO LIKE '%token-bom%'"));
         Assert.Equal(0L, await ContarAsync(api, "SELECT COUNT(*) FROM FILA_EMAILS WHERE CARGA LIKE '%token-bom%'"));
+    }
+
+    // ---------------------------------------------------------------- a configuração de verdade (achado da revisão independente)
+
+    private static HttpClient ClienteComConfiguracao(ApiDeAcesso api, params (string Chave, string Valor)[] ajustes) =>
+        api.Api.WithWebHostBuilder(construtor =>
+        {
+            foreach (var (chave, valor) in ajustes)
+            {
+                construtor.UseSetting(chave, valor);
+            }
+        }).CreateClient();
+
+    [Fact]
+    public async Task Com_Captcha_Ativo_e_as_chaves_na_configuracao_o_verificador_de_verdade_liga_o_captcha()
+    {
+        var api = await ApiAsync();
+        var e = await EntrevistaAsync(api, "ZCap12");
+        var cliente = ClienteComConfiguracao(api, ("Captcha:Ativo", "true"), ("Captcha:ChaveDoSite", "1x00000000000000000000AA"), ("Captcha:ChaveSecreta", "1x0000000000000000000000000000000AA"));
+
+        var pagina = await CorpoAsync(await cliente.GetAsync($"/api/publico/formularios/{e.Token}"));
+        var semToken = await EnviarAsync(cliente, e.Token, Candidatura(RespostasOk(e), email: "configuracao.real@email.com.br"));
+
+        Assert.Equal("1x00000000000000000000AA", pagina.GetProperty("captcha").GetProperty("chaveDoSite").GetString());
+        Assert.Equal(400, (int)semToken.StatusCode); // o verificador real exige o campo (sem ele nem chega ao provedor)
+        Assert.Equal(0L, await Candidatos(api, e.Id));
+        Assert.DoesNotContain("1x0000000000000000000000000000000AA", pagina.GetRawText(), StringComparison.Ordinal); // a chave secreta nunca sai
+    }
+
+    [Fact]
+    public async Task Sem_a_configuracao_o_captcha_vem_desligado_pelo_padrao_do_appsettings()
+    {
+        var api = await ApiAsync();
+        var e = await EntrevistaAsync(api, "ZCap13");
+
+        var pagina = await CorpoAsync(await api.Api.ClienteAnonimo().GetAsync($"/api/publico/formularios/{e.Token}"));
+        var envio = await EnviarAsync(api.Api.ClienteAnonimo(), e.Token, Candidatura(RespostasOk(e), email: "padrao.desligado@email.com.br"));
+
+        Assert.Equal(JsonValueKind.Null, pagina.GetProperty("captcha").ValueKind);
+        Assert.Equal(201, (int)envio.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Captcha:ChaveSecreta")]
+    [InlineData("Captcha:ChaveDoSite")]
+    public async Task Com_Captcha_Ativo_a_API_nao_sobe_sem_uma_das_duas_chaves_e_a_mensagem_cita_a_chave_que_falta(string faltando)
+    {
+        var api = await ApiAsync();
+        var ajustes = new List<(string, string)> { ("Captcha:Ativo", "true"), ("Captcha:ChaveDoSite", "chave-publica"), ("Captcha:ChaveSecreta", "segredo-que-nunca-pode-aparecer") };
+        ajustes.RemoveAll(a => a.Item1 == faltando);
+
+        var erro = Assert.ThrowsAny<Exception>(() => ClienteComConfiguracao(api, [.. ajustes]));
+
+        Assert.Contains(faltando, erro.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("segredo-que-nunca-pode-aparecer", erro.ToString(), StringComparison.Ordinal);
     }
 }
