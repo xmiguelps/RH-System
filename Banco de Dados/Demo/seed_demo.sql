@@ -2,7 +2,7 @@
 -- SEED FICTICIO DA DEMO (banca do TCC)
 --
 -- NAO E UM SCRIPT DE VERSAO: fica fora de "Banco de Dados/Scripts" de proposito (a API aplica sozinha so o que esta la). Rode DEPOIS que a API
--- aplicou os scripts V001 a V005, num banco SEM nenhum colaborador (o primeiro INSERT de verdade e a configuracao da empresa, que so tem uma linha: uma segunda rodada falha logo no
+-- aplicou os scripts V001 a V007, num banco SEM nenhum colaborador (o primeiro INSERT de verdade e a configuracao da empresa, que so tem uma linha: uma segunda rodada falha logo no
 -- comeco, sem deixar nada pela metade que importe). Tudo e inventado: nomes, CPFs (digitos validos, de ninguem), telefones e e-mails, COM UMA EXCECAO COMBINADA: o Miguel Passos (dono do projeto), com nome e e-mail reais.
 --
 -- Como rodar (uma sessao so, porque o script usa variaveis de usuario; veja o LEIA-ME.md desta pasta; no PowerShell o operador < nao existe: use o Git Bash ou cmd /c):

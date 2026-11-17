@@ -14,6 +14,8 @@
 | **Envio de e-mail** (provedor configurado em `Email:*`) | e-mails da lista fechada | só quando envia | deixe `Email:EnvioAtivo=false` e nada é enviado nem cobrado |
 | **Front-end** (arquivos estáticos) | as telas | conforme onde for hospedado | apague junto com o grupo de recursos |
 
+**Parâmetros do servidor MySQL** de que o esquema depende (o `docker-compose.yml` mostra os mesmos, e valem para o Azure): `time_zone = -03:00` (os triggers do `V002` e as procedures do `V007` usam `CURDATE()` e `NOW()` da sessão), `log_bin_trust_function_creators = ON` (sem ele o usuário restrito do banco recebe o erro 1419 ao criar o primeiro trigger ou função) e, de preferência, `collation_server = utf8mb4_unicode_ci` e o banco criado com `utf8mb4_unicode_ci` (as tabelas já a declaram; as procedures do `V007` também funcionam com a collation padrão do MySQL 8, `utf8mb4_0900_ai_ci`, e os testes provam isso). O usuário do banco precisa de `CREATE ROUTINE`, `ALTER ROUTINE` e `TRIGGER`.
+
 Tudo no **mesmo grupo de recursos** facilita: um comando apaga tudo.
 
 ## Para a apresentação: o mínimo que funciona
