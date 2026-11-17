@@ -12,7 +12,7 @@ dotnet test back-end/tests/RHSystem.Api.IntegrationTests --filter "FullyQualifie
 
 ## Preparação (véspera e uma hora antes)
 
-1. **Banco novo e seed:** `docker compose down -v`, `docker compose up -d --wait`, suba a API (ela aplica os scripts `V001` a `V006`) e rode `Banco de Dados/Demo/seed_demo.sql` (`Banco de Dados/Demo/LEIA-ME.md`). Faça isto **no dia da apresentação**: as datas do seed saem de "hoje", então a demo nunca fica velha, e as férias, o ponto e os prazos ficam coerentes com o dia.
+1. **Banco novo e seed:** `docker compose down -v`, `docker compose up -d --wait`, suba a API (ela aplica os scripts `V001` a `V006`) e rode `Banco de Dados/Demo/seed_demo.sql` (`Banco de Dados/Demo/LEIA-ME.md`), e em seguida a ferramenta que manda os **holerites e o atestado de exemplo** (`dotnet run --project back-end/tools/RHSystem.Demo.Exemplos -- --url <endereço da API>`; passo 4 do mesmo `LEIA-ME.md`). Faça isto **no dia da apresentação**: as datas do seed saem de "hoje", então a demo nunca fica velha, e as férias, o ponto e os prazos ficam coerentes com o dia.
 2. **Rode o seed antes das 09:30 ou depois?** (só vale no dia de hoje do servidor, sem `@hoje` no passado e em dia útil) Depois das 09:30, seis pessoas já aparecem com a entrada batida de hoje ("quem está trabalhando agora" no painel do RH). Antes, ninguém: o passo 1 mostra a batida ao vivo. Escolha o que prefere mostrar.
 3. **E-mail:** com o envio desligado (`Email:EnvioAtivo=false`, o padrão do `appsettings.json`) os e-mails ficam na fila e nada sai; em desenvolvimento o envio está ligado e vai para o Mailpit (`http://localhost:8025`), que mostra o que sairia. Se for ligar o envio de verdade, leia a seção "E-mails que não geram devolução" do `LEIA-ME.md` do seed.
 4. **Quatro janelas de navegador (ou perfis) já logadas**, uma por pessoa: `helena.martins` (RH), `rafael.costa` (gestor), `lucas.pereira` e `bruno.azevedo` (funcionários). Senha de todos: `Demo#RH2026` (domínio `rhsystem-demo.example`, ou o que você passou ao seed).
@@ -44,12 +44,12 @@ dotnet test back-end/tests/RHSystem.Api.IntegrationTests --filter "FullyQualifie
 
 ### 4. Holerite (RH envia, pessoa recebe) — 2 min
 *Teste:* `Passo_4_o_RH_envia_o_holerite_...`
-- Como **Helena**, abra a ficha do **Lucas → Holerites → Enviar**: a competência do mês anterior, tipo mensal, o PDF da pasta. (O seed **não** traz holerites de propósito: o arquivo precisa existir no armazenamento.)
-- Como **Lucas**, **Meus holerites**: o novo aparece e o download entrega um link temporário.
+- Como **Helena**, abra a ficha do **Lucas → Holerites**: os dois meses anteriores já estão lá (a ferramenta dos exemplos os enviou depois do seed). Clique em **Enviar** e mande a competência do **mês atual**, tipo mensal, com o PDF da pasta. (Repetir um mês e tipo que já existem dá `HOLERITE_JA_EXISTE`; o seed não grava holerite porque o arquivo precisa existir no armazenamento.)
+- Como **Lucas**, **Meus holerites**: os três aparecem (os dois de exemplo e o novo) e o download entrega um link temporário; o PDF de exemplo traz o nome, o cargo e o setor dele.
 
 ### 5. Atestado — 1 min
 *Teste:* `Passo_5_a_pessoa_envia_o_atestado_...`
-- Como **Carla Mendes**, **Ponto → Atestados → Enviar** (os dois últimos dias úteis, o PDF). Como **Helena**, o cartão de atestados no painel; **validar**.
+- Como **Carla Mendes**, **Ponto → Atestados → Enviar** (os dois últimos dias úteis, o PDF). Como **Helena**, o cartão de atestados no painel; **validar**. (O **Thiago** já tem um atestado validado, enviado pela ferramenta dos exemplos: no espelho de ponto dele o dia da falta aparece como "Falta compensada".)
 
 ### 6. Importar a planilha — 2 min
 *Teste:* `Passo_6_o_RH_importa_a_planilha_...`

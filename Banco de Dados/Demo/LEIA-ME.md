@@ -22,8 +22,25 @@ cmd /c 'docker compose exec -T mysql mysql --default-character-set=utf8mb4 -u ro
 ```
 
 3. Entre na API com `helena.martins@rhsystem-demo.example` (RH) e a senha `Demo#RH2026`.
+4. **Mande os holerites e o atestado de exemplo** (decisão do dono, 2026-11-17). Com a API no ar e o armazenamento de arquivos configurado (Azurite ou Azure Blob), rode a ferramenta, que entra como a Helena pelo login de verdade e usa as mesmas rotas do front:
 
-A segunda rodada **falha logo no primeiro comando** (a configuração da empresa já existe), sem duplicar nada. Para recomeçar: `docker compose down -v` e suba tudo de novo, ou use um banco novo.
+```
+dotnet run --project back-end/tools/RHSystem.Demo.Exemplos -- --url <endereço da API>
+```
+
+   - **O que ela envia:** cada pessoa **ativa** recebe o holerite mensal dos **dois meses anteriores** a hoje (um PDF de exemplo com o nome, o cargo e o setor da pessoa e valores ilustrativos; no seed padrão são 22 holerites); o **Thiago**, que faltou num dia útil recente, envia um atestado desse dia e a Helena o **valida** (o espelho dele passa a mostrar "Falta compensada"). Quem ainda não começou (a Júlia) não recebe; passados os 5 dias para ela entrar, ela já é ativa e a API recusa os dois meses (são anteriores à admissão): saem dois `aviso` na tela, sem problema.
+   - **Opções** (`--ajuda` lista todas): `--dominio` e `--senha`, se você mudou o `@dominio` ou a senha (para a senha, prefira a variável de ambiente `RHSYSTEM_DEMO_SENHA`: um argumento fica no histórico do terminal); `--email-do-rh`; `--hoje aaaa-mm-dd`, se rodou o seed com `@hoje`.
+   - **Pode rodar de novo:** o que já existe é contado e pulado, nada é duplicado. Uma recusa da API (por exemplo, holerite de mês anterior à admissão) vira `aviso` na saída e o resto segue; erro de login, de permissão ou do servidor para tudo e diz o que foi. Os testes `ExemplosDaDemoTests` rodam a ferramenta contra o seed e conferem o banco e o texto dos PDFs.
+   - **Cuidado com o e-mail:** cada holerite publicado **enfileira um e-mail** para a pessoa. Com o envio ligado (`Email:EnvioAtivo=true`) e o domínio fictício, o servidor de destino devolve todos; se o seu provedor de SMTP penaliza devolução, deixe o envio desligado ao rodar a ferramenta, espere a fila encher (as tarefas rodam em segundos) e cancele os pendentes dos e-mails fictícios **antes** de ligar o envio, no banco:
+
+```
+UPDATE FILA_EMAILS SET SITUACAO = 'CANCELADO', CARGA = NULL
+ WHERE SITUACAO = 'PENDENTE' AND SIGILOSO = FALSE AND DESTINATARIO_EMAIL LIKE '%@rhsystem-demo.example';
+```
+
+   (Troque `rhsystem-demo.example` pelo seu `@dominio`, se você mudou. O `SIGILOSO = FALSE` deixa de fora o convite e a redefinição de senha, que o banco não deixa cancelar.)
+
+A segunda rodada **do seed** falha logo no primeiro comando (a configuração da empresa já existe), sem duplicar nada. Para recomeçar: `docker compose down -v` e suba tudo de novo, ou use um banco novo.
 
 ## Variáveis (opcionais, definidas na mesma sessão antes do arquivo)
 
@@ -51,7 +68,7 @@ Os outros: `diego.farias` (atrasos e advertência pendente, pediu o plano odonto
 
 ## O que o seed não cria, de propósito
 
-- **Holerites, atestados e documentos enviados**: todos apontam para um **arquivo** no Blob, e um caminho que não existe lá quebra o download. O roteiro da demo envia esses **ao vivo**, pela própria API (o teste `FluxosDaDemoTests` faz o mesmo).
+- **Holerites, atestados e documentos enviados**: todos apontam para um **arquivo** no Blob, e um caminho que não existe lá quebra o download. Por isso o seed não grava nenhum: os **holerites** dos dois meses anteriores e o **atestado** do Thiago vêm do passo 4 acima (a ferramenta os envia pela API, de verdade); os demais, como o documento que o RH pede ao Bruno, o roteiro da demo envia **ao vivo** (o teste `FluxosDaDemoTests` faz o mesmo).
 - **Eventos de auditoria**: o log nasce das ações feitas na demo.
 - **Lançamentos do banco de horas.** O domínio só lança banco de horas pelo cálculo automático: o agendador consolida cada dia a partir das batidas (a falta do Thiago vira débito; saída depois do horário vira crédito) e recupera os últimos 60 dias a cada ciclo. Com a API no ar, o saldo aparece **alguns minutos depois** do seed; um lançamento gravado pelo seed seria apagado ou reescrito no primeiro recálculo.
 - **O ponto de hoje** só nasce se `@hoje` é o dia de hoje do servidor, não é fim de semana e o script roda depois das 09:30 (seis pessoas já com a entrada batida); senão a demo começa sem ninguém trabalhando, e o roteiro manda bater o ponto ao vivo.

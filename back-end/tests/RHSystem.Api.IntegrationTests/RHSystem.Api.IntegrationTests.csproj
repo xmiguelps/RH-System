@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\RHSystem.Infrastructure\RHSystem.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\RHSystem.Application\RHSystem.Application.csproj" />
     <ProjectReference Include="..\..\src\RHSystem.Domain\RHSystem.Domain.csproj" />
+    <ProjectReference Include="..\..\tools\RHSystem.Demo.Exemplos\RHSystem.Demo.Exemplos.csproj" />
   </ItemGroup>
 
   <ItemGroup>
