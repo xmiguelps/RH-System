@@ -395,6 +395,7 @@ public class FeriasProceduresTests(MySqlFixture mysql)
 
         await Sql.ExecutarAsync(c.Conexao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE WHERE ID_FUNCIONARIO = {c.Pessoa}");
         Assert.Equal(Inativo, await RecusaAoRegistrarAsync(c, c.Pessoa, c.Inicio, 10));
+        Assert.Equal(Inativo, await RecusaAoRegistrarAsync(c, c.Pessoa, c.Inicio.AddDays(3), 3)); // 3 dias numa quinta: sem a regra da procedure a recusa seria a da duração (o trigger só olharia no INSERT)
     }
 
     [Fact]
@@ -675,11 +676,14 @@ public class FeriasProceduresTests(MySqlFixture mysql)
         await DecidirAsync(c, vencido, "SUGERIU_DATA", null, c.Inicio.AddDays(35), c.Inicio.AddDays(39));
         var pertoDoInicio = await SolicitarAsync(c, c.Pessoa, c.Inicio.AddDays(49), 5);
         await DecidirAsync(c, pertoDoInicio, "SUGERIU_DATA", null, c.Inicio.AddDays(56), c.Inicio.AddDays(60));
+        var doisDiasAntes = await SolicitarAsync(c, c.Pessoa, c.Inicio.AddDays(63), 5);
+        await DecidirAsync(c, doisDiasAntes, "SUGERIU_DATA", null, c.Inicio.AddDays(70), c.Inicio.AddDays(74));
 
         // O prazo é o menor entre 5 dias depois do dia da sugestão e 2 dias antes do início sugerido.
         await Sql.ExecutarAsync(c.Conexao, $"UPDATE FERIAS SET DATA_SOLICITACAO = NOW() - INTERVAL 10 DAY, DATA_ETAPA_GESTOR = NOW() - INTERVAL 5 DAY WHERE ID_FERIAS = {noPrazo}");
         await Sql.ExecutarAsync(c.Conexao, $"UPDATE FERIAS SET DATA_SOLICITACAO = NOW() - INTERVAL 10 DAY, DATA_ETAPA_GESTOR = NOW() - INTERVAL 6 DAY WHERE ID_FERIAS = {vencido}");
         await Sql.ExecutarAsync(c.Conexao, $"UPDATE FERIAS SET SUGESTAO_DATA_INICIO = '{Iso(c.Hoje.AddDays(1))}', SUGESTAO_DATA_FIM = '{Iso(c.Hoje.AddDays(5))}' WHERE ID_FERIAS = {pertoDoInicio}");
+        await Sql.ExecutarAsync(c.Conexao, $"UPDATE FERIAS SET SUGESTAO_DATA_INICIO = '{Iso(c.Hoje.AddDays(2))}', SUGESTAO_DATA_FIM = '{Iso(c.Hoje.AddDays(6))}' WHERE ID_FERIAS = {doisDiasAntes}");
 
         Assert.Equal(PrazoTerminou, await RecusaDeNegocioAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", vencido, c.Pessoa, "ACEITOU"));
         Assert.Equal(PrazoTerminou, await RecusaDeNegocioAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", pertoDoInicio, c.Pessoa, "RECUSOU"));
@@ -688,6 +692,10 @@ public class FeriasProceduresTests(MySqlFixture mysql)
         await ConfereAsync(c.Conexao, vencido, $"{Expirado} AND DATA_INICIO = '{Iso(c.Inicio.AddDays(28))}'");
         await ConfereAsync(c.Conexao, pertoDoInicio, Expirado);
         Assert.Equal(JaDecidido, await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", vencido, c.Pessoa, "ACEITOU"));
+
+        // O início sugerido é depois de amanhã: hoje é o último dia do prazo (2 dias antes) e a resposta ainda vale.
+        await ChamarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", doisDiasAntes, c.Pessoa, "RECUSOU");
+        await ConfereAsync(c.Conexao, doisDiasAntes, "STATUS_FERIAS = 'CANCELADA' AND RESPOSTA_SUGESTAO = 'RECUSOU'");
 
         await ChamarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", noPrazo, c.Pessoa, "ACEITOU"); // no quinto dia ainda vale
         await ConfereAsync(c.Conexao, noPrazo, "STATUS_FERIAS = 'SOLICITADA' AND RESPOSTA_SUGESTAO = 'ACEITOU'");
