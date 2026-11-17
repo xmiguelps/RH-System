@@ -13,8 +13,9 @@ namespace RHSystem.Application.Formularios.Construtor;
 
 /// <summary>
 /// <c>PUT /api/rh/formularios/{formularioId}/prazo</c> (decisão do dono, 2026-11-17): muda o prazo de um formulário PUBLICADO. Ordem: 404, 400 (o prazo é obrigatório, não é anterior a hoje; a caixa de sugestões não tem prazo), 422 <c>FORMULARIO_ENCERRADO</c> (inclusive o prazo vencido que a tarefa ainda não encerrou)
-/// e 422 <c>FORMULARIO_NAO_PUBLICADO</c> (rascunho e agendado guardam o prazo na etapa Publicação). O mesmo prazo é 200 sem efeito. Numa transação: troca o prazo (um <c>UPDATE</c> condicionado ao estado lido), cancela a tarefa de encerrar e o lembrete automático do prazo antigo e agenda os do novo (a chave leva o
-/// instante e uma chave cancelada volta, então ir e voltar não cria tarefa a mais). O lembrete do prazo novo só é agendado se o dia dele (7 dias antes) ainda não passou. A próxima reabertura de um formulário recorrente não muda; a rodada seguinte mantém a duração da rodada atual. Evento <c>ALTEROU</c> só com o título e os dias.
+/// e 422 <c>FORMULARIO_NAO_PUBLICADO</c> (rascunho e agendado guardam o prazo na etapa Publicação) e 422 <c>FORMULARIO_RECORRENTE</c> (o formulário com próxima reabertura repete a duração de cada rodada: mudar o prazo de uma mudaria todas as seguintes). O mesmo prazo é 200 sem efeito. Numa transação: troca o prazo (um <c>UPDATE</c> condicionado
+/// ao estado lido), cancela a tarefa de encerrar e o lembrete automático do prazo antigo e agenda os do novo (a chave leva o instante e uma chave cancelada volta, então ir e voltar não cria tarefa a mais). O lembrete do prazo novo segue a MESMA regra da recuperação horária do lembrete (<c>RecuperarAsync</c>): o dia é o do prazo menos 7, contado a partir do dia da publicação, e só se agenda de hoje em diante
+/// (hoje vale: sai logo). Evento <c>ALTEROU</c> só com o título e os dias.
 /// </summary>
 public sealed class AlterarPrazoDoFormularioCasoDeUso(
     IConsultaDeFormularios consulta,
@@ -49,6 +50,11 @@ public sealed class AlterarPrazoDoFormularioCasoDeUso(
                 throw MensagensDosFormularios.FormularioNaoPublicadoParaPrazo.ComoProblema();
             }
 
+            if (lido.ProximaReaberturaEmUtc is not null)
+            {
+                throw MensagensDosFormularios.FormularioRecorrente.ComoProblema();
+            }
+
             if (lido.Prazo == novo)
             {
                 return MapeadorDoFormulario.Detalhe(lido, agora);
@@ -79,23 +85,29 @@ public sealed class AlterarPrazoDoFormularioCasoDeUso(
 
     private async Task TrocarAsTarefasAsync(FormularioLido lido, DateOnly novo, DateOnly hoje, CancellationToken ct)
     {
-        // O lembrete automático existe só para formulário de pessoas ou setores (nunca por link nem a caixa de sugestões) com o lembrete ligado.
-        var comLembrete = lido.LembreteAutomatico && lido.Alvo != AlvoDoFormulario.Link && lido.Tipo != TipoDeFormulario.Outro;
         if (lido.Prazo is { } antigo)
         {
             await agendamento.CancelarEncerramentoAsync(lido.Id, InstantesDoFormulario.EncerramentoNominal(antigo), ct);
-            if (comLembrete && lido.PublicadoEmUtc is { } publicadoEmUtc && RegrasDoLembrete.DiaDoAutomatico(antigo, FusoBrasil.DiaLocalDe(publicadoEmUtc)) is { } diaAntigo)
+            if (DiaDoLembrete(lido, antigo) is { } diaAntigo)
             {
                 await agendamento.CancelarLembreteAutomaticoAsync(lido.Id, diaAntigo, ct);
             }
         }
 
         await agendamento.AgendarEncerramentoAsync(lido.Id, InstantesDoFormulario.EncerramentoNominal(novo), ct);
-        if (comLembrete && RegrasDoLembrete.DiaDoAutomatico(novo, hoje) is { } diaNovo)
+        if (DiaDoLembrete(lido, novo) is { } diaNovo && diaNovo >= hoje)
         {
             await agendamento.AgendarLembreteAutomaticoAsync(lido.Id, diaNovo, ct);
         }
     }
+
+    /// <summary>
+    /// O dia do lembrete automático de um prazo, pela mesma conta da publicação e da recuperação (<c>LembreteDeFormularioTarefa.RecuperarAsync</c>): 7 dias antes do prazo, a partir do dia da publicação. O lembrete existe só para formulário de pessoas ou setores (nunca por link nem a caixa de sugestões) com o lembrete ligado.
+    /// </summary>
+    private static DateOnly? DiaDoLembrete(FormularioLido lido, DateOnly prazo) =>
+        lido.LembreteAutomatico && lido.Alvo != AlvoDoFormulario.Link && lido.Tipo != TipoDeFormulario.Outro && lido.PublicadoEmUtc is { } publicadoEmUtc
+            ? RegrasDoLembrete.DiaDoAutomatico(prazo, FusoBrasil.DiaLocalDe(publicadoEmUtc))
+            : null;
 
     private static string Descricao(string titulo, DateOnly? antigo, DateOnly novo) =>
         antigo is { } dia

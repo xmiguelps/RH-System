@@ -1086,10 +1086,12 @@ paths:
         - `prazo`: obrigatório, um dia que não seja anterior a hoje (400 em `errors.prazo`; hoje vale, e o formulário fecha no fim do dia). Um corpo
           sem `prazo`, ou com `null`, é 400: **não existe jeito de tirar o prazo por aqui** (um corpo vazio nunca o tira sem querer). A caixa de
           sugestões (`OUTRO`) é sempre aberta e não tem prazo (400).
-        - O mesmo prazo que já está é 200 sem efeito. O prazo vale para qualquer formulário publicado, anônimo ou com nome, e para o recorrente: nele,
-          só o prazo da rodada de agora muda, a próxima reabertura continua como estava e a rodada seguinte mantém a duração desta.
-        - O encerramento pelo prazo e o lembrete automático (7 dias antes) acompanham o prazo novo. O lembrete só é agendado se o dia dele ainda não
-          passou. Nenhum e-mail sai por causa da mudança.
+        - O mesmo prazo que já está é 200 sem efeito. O prazo vale para qualquer formulário publicado, anônimo ou com nome. **Não vale para o formulário
+          recorrente que ainda tem próxima reabertura** (422 `FORMULARIO_RECORRENTE`): cada rodada nova repete a duração da anterior (dias entre a
+          publicação e o prazo), então mudar o prazo de uma rodada mudaria todas as seguintes. Quem precisa mudar encerra o formulário e cria outro.
+        - O encerramento pelo prazo e o lembrete automático (7 dias antes do prazo, contados a partir do dia da publicação, a mesma conta da
+          publicação) acompanham o prazo novo. O lembrete só é agendado de hoje em diante: se o dia dele é hoje, sai logo; se já passou, não sai. A
+          mudança em si não manda e-mail.
         - A auditoria registra "Mudou o prazo do formulário" com o título e os dois dias.
       x-perfis: [RH]
       parameters:
@@ -1143,8 +1145,8 @@ paths:
         '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
         '422':
           description: |
-            `FORMULARIO_NAO_PUBLICADO` (rascunho ou agendado: o prazo é guardado na etapa Publicação) ou `FORMULARIO_ENCERRADO` (encerrado, ou com o
-            prazo vencido).
+            `FORMULARIO_NAO_PUBLICADO` (rascunho ou agendado: o prazo é guardado na etapa Publicação), `FORMULARIO_ENCERRADO` (encerrado, ou com o
+            prazo vencido) ou `FORMULARIO_RECORRENTE` (recorrente com próxima reabertura).
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
@@ -1165,6 +1167,14 @@ paths:
                     detail: O formulário está encerrado e não pode mais ser alterado.
                     traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
                     codigo: FORMULARIO_ENCERRADO
+                recorrente:
+                  summary: Formulário recorrente
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: "Formulário recorrente não muda o prazo por aqui: cada rodada nova repete a duração da anterior. Para mudar, encerre o formulário e crie outro."
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_RECORRENTE
         '500': { $ref: '#/components/responses/Erro500Interno' }
 
   /api/rh/formularios/{formularioId}/rascunho:

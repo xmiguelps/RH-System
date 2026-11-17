@@ -6,7 +6,7 @@ Regra de versão: ver `CONVENCOES.md`, seção 14. A versão fica em `fontes/00-
 
 Decisões do dono de 2026-11-17 depois do back-end completo (fatias 0 a 8), parte 1:
 
-- **Rotas novas** (versão menor): `alterarPrazoDoFormulario` (`PUT /api/rh/formularios/{formularioId}/prazo`, muda o prazo de um formulário publicado) e `voltarFormularioParaRascunho` (`POST /api/rh/formularios/{formularioId}/rascunho`, devolve um agendado a rascunho; o código do link agendado deixa de valer). Esquema novo `FormularioPrazoComando`; erro novo `FORMULARIO_NAO_ESTA_AGENDADO`; `FORMULARIO_NAO_PUBLICADO` ganha um texto para o prazo.
+- **Rotas novas** (versão menor): `alterarPrazoDoFormulario` (`PUT /api/rh/formularios/{formularioId}/prazo`, muda o prazo de um formulário publicado) e `voltarFormularioParaRascunho` (`POST /api/rh/formularios/{formularioId}/rascunho`, devolve um agendado a rascunho; o código do link agendado deixa de valer). Esquema novo `FormularioPrazoComando`; erros novos `FORMULARIO_NAO_ESTA_AGENDADO` e `FORMULARIO_RECORRENTE` (o prazo de um formulário recorrente não muda por aqui); `FORMULARIO_NAO_PUBLICADO` ganha um texto para o prazo.
 - **Erro novo** `ADVERTENCIA_ANTES_DA_ADMISSAO` (422) em `registrarAdvertencia` e `registrarAdvertenciaDaEquipe`: o dia do ocorrido não pode ser anterior à admissão da pessoa.
 - **`FORMULARIO_JA_RESPONDIDO`** (422, já devolvido pela API) passa a constar em `editarFormulario`, com exemplo: mudar o tipo ou o sentido de um formulário publicado que já tem respostas.
 - **`gestorQueAnalisa`** de `obterMinhasFerias` também é `null` quando o gestor do setor está ausente hoje (só o RH decide). Só texto.
