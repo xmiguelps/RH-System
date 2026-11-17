@@ -10,7 +10,7 @@ namespace RHSystem.Api.Ponto;
 /// <c>/api/rh/funcionarios/{funcionarioId}/</c> o contrato também tem rotas de outras fatias.
 /// </summary>
 /// <summary>Os parâmetros da exportação para a folha: <c>ano</c> e <c>mes</c> são obrigatórios no contrato (ausentes dão o 400 do vínculo dos parâmetros; fora da faixa, o 400 do caso de uso).</summary>
-public sealed record FiltrosDaFolha(int Ano, int Mes);
+public sealed record FiltrosDaFolha(int Ano, int Mes, string? Colunas = null, string? FormatoHoras = null, string? Separador = null);
 
 public static class PontoRhEndpoints
 {
@@ -63,7 +63,7 @@ public static class PontoRhEndpoints
 
     private static async Task<IResult> ExportarParaFolha([AsParameters] FiltrosDaFolha f, ExportarPontoParaFolhaCasoDeUso casoDeUso, HttpContext http, CancellationToken ct)
     {
-        var arquivo = await casoDeUso.ExecutarAsync(f.Ano, f.Mes, ct);
+        var arquivo = await casoDeUso.ExecutarAsync(f.Ano, f.Mes, f.Colunas, f.FormatoHoras, f.Separador, ct);
         http.Response.Headers.ContentDisposition = $"attachment; filename=\"{arquivo.NomeDoArquivo}\"";
         http.Response.Headers.CacheControl = "no-store"; // nome e horas de todo mundo: nenhum cache guarda o arquivo
         return Results.Bytes(arquivo.Conteudo, "text/csv; charset=utf-8");

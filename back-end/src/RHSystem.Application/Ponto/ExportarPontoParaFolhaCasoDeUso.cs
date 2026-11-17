@@ -35,12 +35,7 @@ public sealed class ExportarPontoParaFolhaCasoDeUso(IConsultaDaFolha consulta, M
     public const int PrimeiroAno = 2000;
     public const int UltimoAno = 2100;
 
-    private static readonly string[] Titulos =
-    [
-        "matricula", "nome", "setor", "cargo", "dias_trabalhados", "horas_trabalhadas_min", "horas_previstas_min", "atrasos", "faltas", "faltas_compensadas", "banco_credito_do_mes_min", "banco_debito_do_mes_min",
-    ];
-
-    public async Task<ArquivoExportado> ExecutarAsync(int? ano, int? mes, CancellationToken ct)
+    public async Task<ArquivoExportado> ExecutarAsync(int? ano, int? mes, string? colunasPedidas, string? formatoPedido, string? separadorPedido, CancellationToken ct)
     {
         var erros = new ColetorDeErros();
         if (ano is null or < PrimeiroAno or > UltimoAno)
@@ -53,6 +48,9 @@ public sealed class ExportarPontoParaFolhaCasoDeUso(IConsultaDaFolha consulta, M
             erros.Adicionar("mes", "Informe o mês, de 1 a 12.");
         }
 
+        var colunas = OpcoesDaFolha.LerColunas(erros, colunasPedidas);
+        var formato = OpcoesDaFolha.LerFormato(erros, formatoPedido);
+        var separador = OpcoesDaFolha.LerSeparador(erros, separadorPedido);
         erros.LancarSeHouver();
 
         var primeiroDia = new DateOnly(ano!.Value, mes!.Value, 1);
@@ -66,27 +64,30 @@ public sealed class ExportarPontoParaFolhaCasoDeUso(IConsultaDaFolha consulta, M
         {
             var dias = (await montador.MontarAsync(pessoa.Pessoa, ano, mes, ct)).Dias;
             var doBanco = banco.GetValueOrDefault(pessoa.Pessoa.Id) ?? new BancoDoMesDaPessoa(0, 0);
-            linhas.Add(
+
+            // Todas as células, na ordem de ColunaDaFolha; a linha leva só as colunas pedidas, na ordem pedida.
+            string[] celulas =
             [
                 CsvSeguro.Texto(pessoa.Matricula),
                 CsvSeguro.Texto(pessoa.Pessoa.Nome),
                 CsvSeguro.Texto(pessoa.Pessoa.Setor),
                 CsvSeguro.Texto(pessoa.Pessoa.Cargo),
                 CsvSeguro.Numero(dias.Count(d => d.Periodos.Any(p => p.Entrada is not null && p.Saida is not null))),
-                CsvSeguro.Numero(dias.Sum(d => d.HorasMinutos ?? 0)),
-                CsvSeguro.Numero(dias.Sum(d => d.CargaMinutos)),
+                OpcoesDaFolha.Horas(dias.Sum(d => d.HorasMinutos ?? 0), formato, separador),
+                OpcoesDaFolha.Horas(dias.Sum(d => d.CargaMinutos), formato, separador),
                 CsvSeguro.Numero(dias.Count(d => d.AtrasoMinutos is not null)),
                 CsvSeguro.Numero(dias.Count(d => d.Data < hoje && d.Situacao == SituacaoDoDiaNoPonto.SemRegistro)),
                 CsvSeguro.Numero(dias.Count(d => d.Situacao == SituacaoDoDiaNoPonto.FaltaCompensada)),
-                CsvSeguro.Numero(doBanco.CreditoMinutos),
-                CsvSeguro.Numero(doBanco.DebitoMinutos),
-            ]);
+                OpcoesDaFolha.Horas(doBanco.CreditoMinutos, formato, separador),
+                OpcoesDaFolha.Horas(doBanco.DebitoMinutos, formato, separador),
+            ];
+            linhas.Add([.. colunas.Select(c => celulas[(int)c])]);
         }
 
         var competencia = string.Create(CultureInfo.InvariantCulture, $"{mes:00}/{ano:0000}");
         await auditor.RegistrarEGravarAsync(
             new EventoDeAuditoriaNovo(AuditoriaArea.Ponto, AuditoriaAcao.Baixou, $"Exportou o ponto de {competencia} para a folha (CSV).", $"Ponto de {competencia} (folha)"),
             ct);
-        return new ArquivoExportado(CsvSeguro.Escrever(Titulos, linhas), string.Create(CultureInfo.InvariantCulture, $"ponto-{ano:0000}-{mes:00}.csv"));
+        return new ArquivoExportado(CsvSeguro.Escrever([.. colunas.Select(c => OpcoesDaFolha.Titulo(c, formato))], linhas, OpcoesDaFolha.Caractere(separador)), string.Create(CultureInfo.InvariantCulture, $"ponto-{ano:0000}-{mes:00}.csv"));
     }
 }

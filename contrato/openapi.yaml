@@ -8172,7 +8172,7 @@ paths:
         separador `;`, com `Content-Disposition: attachment; filename="ponto-AAAA-MM.csv"`), **uma linha por pessoa
         ativa no mês**. O sistema não integra com a folha: gera só este arquivo (spec, seção 9).
 
-        Colunas, nesta ordem: `matricula`, `nome`, `setor`, `cargo`, `dias_trabalhados`, `horas_trabalhadas_min`,
+        Colunas, nesta ordem (a **padrão**, sem `colunas`): `matricula`, `nome`, `setor`, `cargo`, `dias_trabalhados`, `horas_trabalhadas_min`,
         `horas_previstas_min`, `atrasos`, `faltas`, `faltas_compensadas`, `banco_credito_do_mes_min`,
         `banco_debito_do_mes_min`. `dias_trabalhados` conta os dias com batidas fechadas; `horas_previstas_min` é a
         soma de `cargaMinutos` dos dias do mês; `faltas` são os dias `SEM_REGISTRO` já passados;
@@ -8181,7 +8181,20 @@ paths:
         **nenhum número é negativo**, para a regra de segurança do CSV não estragar o valor: células de texto que
         começam com `=`, `+`, `-` ou `@` recebem um apóstrofo na frente (roadmap, decisão 9); como nenhum número
         começa com `-`, a regra vale igual para todas as células.
-      x-provisorio: "Formato do 'exportar para a folha' (decisão aberta do roadmap, fatia 3): quais colunas a folha precisa, separador, horas em minutos ou em decimal, e por pessoa ou por dia. O contrato assume o CSV de uma linha por pessoa descrito aqui. Mudar o formato muda só o arquivo, não as rotas."
+
+        **Personalização (decisão do dono de 2026-11-17).** Três parâmetros opcionais; sem nenhum, o arquivo é o de sempre:
+
+        - `colunas`: os códigos das colunas que o RH quer, **na ordem em que quer**, separados por vírgula (`nome,horas_trabalhadas,banco_credito_do_mes`). Os
+          códigos são os da lista acima **sem a unidade** (`horas_trabalhadas`, `horas_previstas`, `banco_credito_do_mes`, `banco_debito_do_mes`); não diferencia
+          caixa nem espaços. Código desconhecido, repetido ou vazio: 400 em `errors.colunas`.
+        - `formatoHoras`: como saem as quatro colunas de horas. `MINUTOS` (padrão, minutos inteiros), `HORAS_DECIMAIS` (minutos ÷ 60 com duas casas,
+          arredondado para cima no meio: 1041 min = `17,35`) ou `HH_MM` (`17:21`, no mínimo dois dígitos em cada parte e as horas passam de 99: `176:00`).
+          O cabeçalho das colunas de horas leva a unidade: `_min`, `_h` ou `_hhmm`.
+        - `separador`: `PONTO_E_VIRGULA` (padrão) ou `VIRGULA`. Com `VIRGULA` a marca decimal das horas decimais vira **ponto** (`17.35`), para não se confundir com o
+          separador; com `PONTO_E_VIRGULA` ela é a vírgula (`17,35`). A célula que contém o separador vai entre aspas.
+
+        Valor inválido de `formatoHoras` ou `separador`: 400 no campo. Todos os erros (ano, mês e estes) vêm juntos.
+      x-provisorio: "Formato do 'exportar para a folha' (decisão aberta do roadmap, fatia 3): o dono quis que o RH escolha as colunas, o formato das horas e o separador (feito); falta saber o que a folha da empresa pede e se é por pessoa ou por dia. O contrato assume o CSV de uma linha por pessoa. Mudar o formato muda só o arquivo, não as rotas."
       x-perfis:
         - RH
       parameters:
@@ -8199,6 +8212,25 @@ paths:
             type: integer
             minimum: 1
             maximum: 12
+        - name: colunas
+          in: query
+          required: false
+          description: Os códigos das colunas que saem, na ordem pedida, separados por vírgula. Sem ele, saem as 12 de sempre.
+          schema:
+            type: string
+            example: nome,horas_trabalhadas,banco_credito_do_mes
+        - name: formatoHoras
+          in: query
+          required: false
+          description: Como saem as colunas de horas. Sem ele, `MINUTOS`.
+          schema:
+            $ref: "#/components/schemas/PontoFolhaFormatoHoras"
+        - name: separador
+          in: query
+          required: false
+          description: O separador das células. Sem ele, `PONTO_E_VIRGULA`.
+          schema:
+            $ref: "#/components/schemas/PontoFolhaSeparador"
       responses:
         "200":
           description: O arquivo CSV.
@@ -24113,6 +24145,19 @@ components:
         ativo:
           type: boolean
           description: "`false` desativa o feriado sem apagá-lo."
+    PontoFolhaFormatoHoras:
+      type: string
+      description: Como as colunas de horas da exportação para a folha saem. `HORAS_DECIMAIS` tem duas casas (`17,35`) e `HH_MM` é `17:21`.
+      enum:
+        - MINUTOS
+        - HORAS_DECIMAIS
+        - HH_MM
+    PontoFolhaSeparador:
+      type: string
+      description: O separador das células do CSV da folha.
+      enum:
+        - PONTO_E_VIRGULA
+        - VIRGULA
     AtestadoSituacao:
       type: string
       description: Situação do atestado (valores do banco, `STATUS_ATESTADO`). `ENVIADO` aguarda o RH.

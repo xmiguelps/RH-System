@@ -10,6 +10,7 @@ Decisões do dono de 2026-11-17 depois do back-end completo (fatias 0 a 8), part
 - **Erro novo** `ADVERTENCIA_ANTES_DA_ADMISSAO` (422) em `registrarAdvertencia` e `registrarAdvertenciaDaEquipe`: o dia do ocorrido não pode ser anterior à admissão da pessoa.
 - **`FORMULARIO_JA_RESPONDIDO`** (422, já devolvido pela API) passa a constar em `editarFormulario`, com exemplo: mudar o tipo ou o sentido de um formulário publicado que já tem respostas.
 - **`gestorQueAnalisa`** de `obterMinhasFerias` também é `null` quando o gestor do setor está ausente hoje (só o RH decide). Só texto.
+- **`exportarPontoParaFolha`** ganha três parâmetros de consulta opcionais (versão menor): `colunas`, `formatoHoras` (esquema novo `PontoFolhaFormatoHoras`: `MINUTOS`, `HORAS_DECIMAIS`, `HH_MM`) e `separador` (esquema novo `PontoFolhaSeparador`: `PONTO_E_VIRGULA`, `VIRGULA`). Sem eles o arquivo é o mesmo de antes.
 
 ## 0.2.2 — 2026-11-03 (rascunho)
 
