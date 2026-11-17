@@ -416,6 +416,68 @@ const TELAS_E_TEXTOS_PROIBIDOS: readonly (readonly [string, Caso])[] = [
       textos: ['Contestação', 'Resposta do RH'],
     },
   ],
+  // Fatia 7: o que o dono cortou (`telas/fatia-7.md`).
+  [
+    'painel do RH (00)',
+    {
+      rota: '/rh/painel',
+      pronta: () => screen.findByRole('table', { name: 'Últimas alterações' }),
+      textos: ['Folga ou compensação', 'Fim do período de experiência', 'Treinamento presencial'],
+    },
+  ],
+  [
+    'Painel da equipe (51)',
+    {
+      rota: '/gestor/equipe',
+      perfil: 'Gestor',
+      pronta: () => screen.findByRole('table', { name: 'Pessoas da equipe' }),
+      textos: ['Lembrar Diego por e-mail', 'Lembrar'],
+    },
+  ],
+  [
+    'Registrar férias (06)',
+    {
+      rota: '/rh/colaboradores/12?aba=ferias',
+      pronta: () => screen.findByRole('table', { name: 'Períodos de férias' }),
+      acao: async (user) => {
+        const botao = await screen.findByRole('button', { name: 'Registrar férias' })
+        await waitFor(() => expect(botao).toBeEnabled())
+        await user.click(botao)
+        await screen.findByRole('dialog', { name: /^Registrar férias de / })
+      },
+      textos: ['Avisar', 'por e-mail'],
+    },
+  ],
+  ...(
+    [
+      [
+        'Benefícios (44)',
+        '/eu/beneficios',
+        () => screen.findByRole('region', { name: 'Seus benefícios' }),
+      ],
+      [
+        'Aderir ao benefício (45)',
+        '/eu/beneficios/aderir/3',
+        () => screen.findByRole('button', { name: 'Enviar pedido' }),
+      ],
+    ] as const
+  ).map(
+    ([nome, rota, pronta]) =>
+      [
+        nome,
+        {
+          rota,
+          perfil: 'Funcionario',
+          pronta,
+          textos: [
+            'responde por e-mail',
+            'Ver regras de uso',
+            'Ver carteirinha',
+            'Ver beneficiários',
+          ],
+        },
+      ] as const,
+  ),
 ]
 
 describe('textos cortados pelo dono', { timeout: 15000 }, () => {

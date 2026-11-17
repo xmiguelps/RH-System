@@ -679,6 +679,54 @@ const PASSOS = [
       await pagina.getByText('Certificado não encontrado').waitFor(T)
     },
   },
+  {
+    nome: 'abre o painel do RH, as pendencias e as pessoas sem registro',
+    fazer: async () => {
+      await aquietar()
+      await pagina.goto(servidor.url + '/rh/painel')
+      await pagina
+        .getByRole('heading', { level: 1, name: /^(Bom dia|Boa tarde|Boa noite), / })
+        .waitFor(T)
+      await aquietar()
+      await pagina.goto(servidor.url + '/rh/painel/pendencias')
+      await pagina.getByRole('heading', { level: 1, name: 'Pendências' }).waitFor(T)
+      await aquietar()
+      await pagina.goto(servidor.url + '/rh/painel/sem-registro')
+      await pagina.getByRole('heading', { level: 1, name: 'Sem registro de ponto hoje' }).waitFor(T)
+    },
+  },
+  {
+    nome: 'abre os pedidos de ferias e de beneficios do RH e o Pagamento dos Cadastros',
+    fazer: async () => {
+      await aquietar()
+      await pagina.goto(servidor.url + '/rh/pedidos-de-ferias')
+      await pagina.getByRole('heading', { level: 1, name: 'Pedidos de férias' }).waitFor(T)
+      await aquietar()
+      await pagina.goto(servidor.url + '/rh/pedidos-de-beneficios')
+      await pagina.getByRole('heading', { level: 1, name: 'Pedidos de benefícios' }).waitFor(T)
+      await aquietar()
+      await pagina.goto(servidor.url + '/rh/cadastros/pagamento')
+      await pagina.getByRole('heading', { level: 2, name: 'Regra do pagamento' }).waitFor(T)
+    },
+  },
+  {
+    nome: 'abre o Inicio, as Ferias (com o painel Pedir ferias) e os Beneficios da pessoa',
+    fazer: async () => {
+      await aquietar()
+      await pagina.goto(servidor.url + '/eu/inicio')
+      await pagina.getByRole('heading', { level: 1, name: /^Olá, / }).waitFor(T)
+      await aquietar()
+      await pagina.goto(servidor.url + '/eu/ferias')
+      await pagina.getByRole('heading', { level: 1, name: 'Férias' }).waitFor(T)
+      await aquietar()
+      await pagina.goto(servidor.url + '/eu/ferias/pedir')
+      await pagina.getByRole('dialog', { name: 'Pedir férias' }).waitFor(T)
+      await aquietar()
+      await pagina.keyboard.press('Escape')
+      await pagina.goto(servidor.url + '/eu/beneficios')
+      await pagina.getByRole('heading', { level: 1, name: 'Benefícios' }).waitFor(T)
+    },
+  },
   // ACRESCENTE AQUI, uma vez por fatia: { nome: 'abre /rota-da-tela', fazer: async () => { ... } }
   // (passos da vitrine, 1a Task 13: vitrine.passo('abre a vitrine', () => vitrine.abrir()), e os outros
   // com vitrine.passo(nome, async () => { ... }))

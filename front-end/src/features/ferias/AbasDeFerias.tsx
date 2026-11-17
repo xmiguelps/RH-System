@@ -20,8 +20,18 @@ import { Tabela, type ColunaDaTabela } from '../../shared/ui/Tabela'
 import { useNotificacao } from '../../shared/ui/useNotificacao'
 import { NumerosDoPonto } from '../ponto/PecasDoPonto'
 import { CamposDasFerias } from './CamposDasFerias'
-import { frasesDaDecisao, periodoCompleto, SITUACAO_DAS_FERIAS, textoDeDias } from './rotulosDasFerias'
-import { comandoDaConferencia, FERIAS_VAZIAS, useConferenciaDeFerias, type DadosDasFerias } from './useConferenciaDeFerias'
+import {
+  frasesDaDecisao,
+  periodoCompleto,
+  SITUACAO_DAS_FERIAS,
+  textoDeDias,
+} from './rotulosDasFerias'
+import {
+  comandoDaConferencia,
+  FERIAS_VAZIAS,
+  useConferenciaDeFerias,
+  type DadosDasFerias,
+} from './useConferenciaDeFerias'
 
 type Ficha = Esquema<'FeriasFicha'>
 type Pedido = Esquema<'FeriasPedido'>
@@ -53,7 +63,12 @@ function ConteudoDaAba({
         <span className="flex flex-col gap-1">
           <span>{periodoCompleto(p.dataInicio, p.dataFim)}</span>
           {comFrases &&
-            [...frasesDaDecisao(p), ...(p.situacao === 'SUGESTAO_DE_DATA' && p.motivoNaoPodeDecidir ? [p.motivoNaoPodeDecidir] : [])].map((f) => (
+            [
+              ...frasesDaDecisao(p),
+              ...(p.situacao === 'SUGESTAO_DE_DATA' && p.motivoNaoPodeDecidir
+                ? [p.motivoNaoPodeDecidir]
+                : []),
+            ].map((f) => (
               <span key={f} className="text-pequeno text-texto-suave">
                 {f}
               </span>
@@ -65,7 +80,11 @@ function ConteudoDaAba({
     {
       chave: 'situacao',
       titulo: 'Situação',
-      celula: (p) => <Selo tom={SITUACAO_DAS_FERIAS[p.situacao].tom}>{SITUACAO_DAS_FERIAS[p.situacao].texto}</Selo>,
+      celula: (p) => (
+        <Selo tom={SITUACAO_DAS_FERIAS[p.situacao].tom}>
+          {SITUACAO_DAS_FERIAS[p.situacao].texto}
+        </Selo>
+      ),
     },
   ]
   if (erro) return <AvisoDeErro erro={erro} aoTentarDeNovo={aoTentarDeNovo} />
@@ -78,9 +97,14 @@ function ConteudoDaAba({
           { rotulo: 'Dias disponíveis', valor: r ? textoDeDias(r.diasDisponiveis) : '—' },
           {
             rotulo: 'Período aquisitivo atual',
-            valor: r?.periodoAquisitivoAtual ? periodoCompleto(r.periodoAquisitivoAtual.inicio, r.periodoAquisitivoAtual.fim) : '—',
+            valor: r?.periodoAquisitivoAtual
+              ? periodoCompleto(r.periodoAquisitivoAtual.inicio, r.periodoAquisitivoAtual.fim)
+              : '—',
           },
-          { rotulo: 'Prazo para tirar o saldo', valor: r?.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—' },
+          {
+            rotulo: 'Prazo para tirar o saldo',
+            valor: r?.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—',
+          },
         ]}
       />
       <div className="flex items-center justify-between gap-3">
@@ -101,16 +125,30 @@ function ConteudoDaAba({
 }
 
 /** Tela 06: "Registrar férias de {nome}". Nasce aprovada; nenhuma regra é reimplementada. */
-function ModalRegistrarFerias({ ficha, dados, aoFechar }: { ficha: { id: number; nome: string }; dados: Ficha; aoFechar: () => void }) {
+function ModalRegistrarFerias({
+  ficha,
+  dados,
+  aoFechar,
+}: {
+  ficha: { id: number; nome: string }
+  dados: Ficha
+  aoFechar: () => void
+}) {
   const queryClient = useQueryClient()
   const notificacao = useNotificacao()
   const registrar = $api.useMutation('post', '/api/rh/funcionarios/{funcionarioId}/ferias')
   const [valores, setValores] = useState<DadosDasFerias>(FERIAS_VAZIAS)
   const [erro, setErro] = useState<unknown>(null)
-  const { conferencia, conferindo, erro: erroDaConferencia } = useConferenciaDeFerias({ tipo: 'rh', funcionarioId: ficha.id }, valores)
+  const {
+    conferencia,
+    conferindo,
+    erro: erroDaConferencia,
+  } = useConferenciaDeFerias({ tipo: 'rh', funcionarioId: ficha.id }, valores)
   const r = dados.resumo
   const regras =
-    erro instanceof ErroDeApi && Array.isArray(erro.corpo?.regras) ? (erro.corpo.regras as Regra[]) : undefined
+    erro instanceof ErroDeApi && Array.isArray(erro.corpo?.regras)
+      ? (erro.corpo.regras as Regra[])
+      : undefined
 
   async function salvar() {
     if (registrar.isPending || !conferencia?.podeEnviar) return
@@ -140,12 +178,18 @@ function ModalRegistrarFerias({ ficha, dados, aoFechar }: { ficha: { id: number;
       tamanho="media"
       rodape={
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="text-pequeno text-texto-suave">As férias aparecem na aba Férias e no ponto como dias de férias.</span>
+          <span className="text-pequeno text-texto-suave">
+            As férias aparecem na aba Férias e no ponto como dias de férias.
+          </span>
           <div className="flex gap-3">
             <Botao variante="secundario" onClick={aoFechar}>
               Cancelar
             </Botao>
-            <Botao onClick={() => void salvar()} disabled={!conferencia?.podeEnviar || conferindo} carregando={registrar.isPending}>
+            <Botao
+              onClick={() => void salvar()}
+              disabled={!conferencia?.podeEnviar || conferindo}
+              carregando={registrar.isPending}
+            >
               Registrar férias
             </Botao>
           </div>
@@ -157,11 +201,20 @@ function ModalRegistrarFerias({ ficha, dados, aoFechar }: { ficha: { id: number;
           rotulo="Saldo para registrar"
           itens={[
             { rotulo: 'Saldo disponível', valor: textoDeDias(r.diasDisponiveis) },
-            { rotulo: 'Período aquisitivo', valor: r.periodoDoSaldo ? periodoCompleto(r.periodoDoSaldo.inicio, r.periodoDoSaldo.fim) : '—' },
-            { rotulo: 'Prazo para tirar', valor: r.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—' },
+            {
+              rotulo: 'Período aquisitivo',
+              valor: r.periodoDoSaldo
+                ? periodoCompleto(r.periodoDoSaldo.inicio, r.periodoDoSaldo.fim)
+                : '—',
+            },
+            {
+              rotulo: 'Prazo para tirar',
+              valor: r.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—',
+            },
           ]}
         />
-        {!!erro && (regras ? <Aviso tom="erro">{mensagemDeErro(erro)}</Aviso> : <AvisoDeErro erro={erro} />)}
+        {!!erro &&
+          (regras ? <Aviso tom="erro">{mensagemDeErro(erro)}</Aviso> : <AvisoDeErro erro={erro} />)}
         <CamposDasFerias
           valores={valores}
           aoMudar={(v) => {

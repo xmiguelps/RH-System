@@ -36,7 +36,7 @@ describe('Ficha da pessoa da equipe (tela 52)', { timeout: 15000 }, () => {
       within(abas)
         .getAllByRole('tab')
         .map((t) => t.textContent),
-    ).toEqual(['Dados', 'Ponto', 'Treinamentos', 'Advertências'])
+    ).toEqual(['Dados', 'Ponto', 'Férias', 'Treinamentos', 'Advertências'])
     expect(within(abas).getByRole('tab', { name: 'Dados' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -188,7 +188,7 @@ describe('Ficha da pessoa da equipe (tela 52)', { timeout: 15000 }, () => {
     const indicadores = capturar('obterIndicadoresDaEquipe')
     await abrir()
     await waitFor(() => expect(indicadores.quantas()).toBeGreaterThan(0))
-    await screen.findByText('22 dias')
+    await within(await screen.findByRole('dialog')).findByText('22 dias')
     servidor.events.removeAllListeners('request:start')
     expect(doRh).toEqual([])
   })

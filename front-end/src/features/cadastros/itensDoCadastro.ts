@@ -1,5 +1,5 @@
 export type ChaveDoCadastro =
-  'cargos' | 'setores' | 'gestores' | 'beneficios' | 'usuarios' | 'empresa'
+  'cargos' | 'setores' | 'gestores' | 'beneficios' | 'usuarios' | 'empresa' | 'pagamento'
 
 export type ItemDoCadastro = {
   chave: ChaveDoCadastro
@@ -8,7 +8,7 @@ export type ItemDoCadastro = {
   comContagem: boolean
 }
 
-// Sem "Níveis de acesso" (decisão do dono). A fatia 7 acrescenta "Pagamento".
+// Sem "Níveis de acesso" (decisão do dono). "Pagamento" é da fatia 7.
 export const ITENS_DO_CADASTRO: readonly ItemDoCadastro[] = [
   { chave: 'cargos', titulo: 'Cargos', apoio: 'Nome e carga horária', comContagem: true },
   { chave: 'setores', titulo: 'Setores', apoio: 'Áreas e seus gestores', comContagem: true },
@@ -29,6 +29,12 @@ export const ITENS_DO_CADASTRO: readonly ItemDoCadastro[] = [
     chave: 'empresa',
     titulo: 'Empresa',
     apoio: 'Nome, horário e dia de pagamento',
+    comContagem: false,
+  },
+  {
+    chave: 'pagamento',
+    titulo: 'Pagamento',
+    apoio: 'Calendário e exceções por mês',
     comContagem: false,
   },
 ]

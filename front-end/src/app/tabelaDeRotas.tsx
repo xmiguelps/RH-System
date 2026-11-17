@@ -3,6 +3,7 @@ import { PaginaDeAuditoria } from '../features/auditoria/PaginaDeAuditoria'
 import { CadastroDeBeneficios } from '../features/cadastros/beneficios/CadastroDeBeneficios'
 import { CadastroDeCargos } from '../features/cadastros/cargos/CadastroDeCargos'
 import { CadastroDeEmpresa } from '../features/cadastros/empresa/CadastroDeEmpresa'
+import { CadastroDePagamento } from '../features/cadastros/pagamento/CadastroDePagamento'
 import { CadastroDeGestores } from '../features/cadastros/gestores/CadastroDeGestores'
 import { PaginaDeCadastros } from '../features/cadastros/PaginaDeCadastros'
 import { CadastroDeSetores } from '../features/cadastros/setores/CadastroDeSetores'
@@ -48,6 +49,12 @@ import { PaginaTreinamentosDaEquipe } from '../features/treinamentos/TelasDoGest
 import { PaginaDefinirSenha } from '../features/autenticacao/PaginaDefinirSenha'
 import { PaginaEsqueciSenha } from '../features/autenticacao/PaginaEsqueciSenha'
 import { PaginaMeusDocumentos } from '../features/documentos/PaginaMeusDocumentos'
+import { PaginaMeusBeneficios } from '../features/beneficios/PaginaMeusBeneficios'
+import { PaginaPedidosDeBeneficiosRh } from '../features/beneficios/PaginaPedidosDeBeneficiosRh'
+import { PainelAderirAoBeneficio } from '../features/beneficios/PainelAderirAoBeneficio'
+import { PaginaMinhasFerias, PainelPedirFerias } from '../features/ferias/PaginaMinhasFerias'
+import { PaginaPedidosDeFeriasRh } from '../features/ferias/PaginaPedidosDeFeriasRh'
+import { PaginaPainelDaEquipe } from '../features/equipe/PaginaPainelDaEquipe'
 import { PainelDaFichaDaEquipe } from '../features/equipe/PainelDaFichaDaEquipe'
 import { PaginaMeuPonto } from '../features/ponto/PaginaMeuPonto'
 import { PaginaPontoDaEquipe } from '../features/ponto/PaginaPontoDaEquipe'
@@ -62,7 +69,8 @@ import { PainelDoExtrato } from '../features/ponto/PainelDoExtrato'
 import { Carregando } from '../shared/ui/Carregando'
 import { PaginaDeEntrada } from './PaginaDeEntrada'
 import { InicioDaPessoa } from './paginas/InicioDaPessoa'
-import { InicioDoRh } from './paginas/InicioDoRh'
+import { PaginaPainelDoRh } from '../features/painel/PaginaPainelDoRh'
+import { PaginaPendenciasDoRh, PaginaSemRegistroHoje } from '../features/painel/ListasDoPainelDoRh'
 
 export type RotaDoPortal = {
   caminho: string
@@ -73,7 +81,9 @@ export type RotaDoPortal = {
 // A tabela de rotas: uma linha por tela. O perfil vem da família (/rh, /gestor, /eu); o item do
 // menu (menu.ts) aparece sozinho quando a rota dele existe.
 export const ROTAS_RH: readonly RotaDoPortal[] = [
-  { caminho: 'painel', elemento: <InicioDoRh /> },
+  { caminho: 'painel', elemento: <PaginaPainelDoRh /> },
+  { caminho: 'painel/pendencias', elemento: <PaginaPendenciasDoRh /> },
+  { caminho: 'painel/sem-registro', elemento: <PaginaSemRegistroHoje /> },
   {
     caminho: 'colaboradores',
     elemento: <ListaDeColaboradores />,
@@ -115,6 +125,8 @@ export const ROTAS_RH: readonly RotaDoPortal[] = [
       { caminho: ':treinamentoId/editar', elemento: <AssistenteDoTreinamento /> },
     ],
   },
+  { caminho: 'pedidos-de-ferias', elemento: <PaginaPedidosDeFeriasRh /> },
+  { caminho: 'pedidos-de-beneficios', elemento: <PaginaPedidosDeBeneficiosRh /> },
   { caminho: 'auditoria', elemento: <PaginaDeAuditoria /> },
   {
     caminho: 'ponto-e-feriados',
@@ -139,12 +151,17 @@ export const ROTAS_RH: readonly RotaDoPortal[] = [
       { caminho: 'beneficios', elemento: <CadastroDeBeneficios /> },
       { caminho: 'usuarios', elemento: <CadastroDeUsuarios /> },
       { caminho: 'empresa', elemento: <CadastroDeEmpresa /> },
+      { caminho: 'pagamento', elemento: <CadastroDePagamento /> },
     ],
   },
 ]
 
 export const ROTAS_GESTOR: readonly RotaDoPortal[] = [
-  { caminho: 'equipe/:funcionarioId', elemento: <PainelDaFichaDaEquipe /> },
+  {
+    caminho: 'equipe',
+    elemento: <PaginaPainelDaEquipe />,
+    filhas: [{ caminho: ':funcionarioId', elemento: <PainelDaFichaDaEquipe /> }],
+  },
   {
     caminho: 'ponto-da-equipe',
     elemento: <PaginaPontoDaEquipe />,
@@ -196,6 +213,16 @@ export const ROTAS_EU: readonly RotaDoPortal[] = [
     filhas: [{ caminho: ':avisoId', elemento: <ModalMeuAviso /> }],
   },
   { caminho: 'holerites', elemento: <PaginaMeusHolerites /> },
+  {
+    caminho: 'ferias',
+    elemento: <PaginaMinhasFerias />,
+    filhas: [{ caminho: 'pedir', elemento: <PainelPedirFerias /> }],
+  },
+  {
+    caminho: 'beneficios',
+    elemento: <PaginaMeusBeneficios />,
+    filhas: [{ caminho: 'aderir/:beneficioId', elemento: <PainelAderirAoBeneficio /> }],
+  },
   { caminho: 'advertencias', elemento: <PaginaMinhasAdvertencias /> },
   { caminho: 'formularios', elemento: <PaginaMeusFormularios /> },
   { caminho: 'formularios/:formularioId/responder', elemento: <PaginaResponder /> },

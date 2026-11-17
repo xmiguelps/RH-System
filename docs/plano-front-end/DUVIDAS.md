@@ -61,6 +61,9 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
 | `D6-4` | `fichas\fatia-6.md`, seção 10 (incluir no onboarding uma pessoa já cadastrada, a partir da ficha da tela 03; `incluirFuncionarioNoOnboarding`) | **Sem botão**: a rota fica na exclusão da cobertura. |
 | `D-F7-1` | `fichas\fatia-7.md`, seção "9. Decisão do dono sobre o menu e dúvidas que a sessão já pode registrar" (tela 51, sugestões de outra data) | Deixe assim: o gestor só vê as sugestões que aguardam resposta na aba Férias da ficha da pessoa. |
 | `D-F7-2` | `fichas\fatia-7.md`, seção 9 (tela 7.4, "Pagamento") | Siga o contrato: monte "Pagamento" dentro de Cadastros, ao lado de "Empresa". |
+| `D-V-contraste` | vistoria do front-end (2026-11-17): cores do Figma abaixo de 4,5:1 (`primaria-media` sobre fundo claro, `borda-campo` 1,47:1, número da bolinha do menu 4,2:1) | **Seguir o Figma** e registrar; não mexo em `index.css`. |
+| `D-V-avaliacao-encerrada` | vistoria (2026-11-17): "Ver minhas respostas" de uma avaliação já encerrada não tem de onde tirar o `avaliadoId` | Sem o atalho; a pessoa vê o que a lista dela mostra. |
+| `D-V-token-na-url` | vistoria (2026-11-17): o link de definir senha deixa o `token` no endereço | **Mantido**: o site manda `Referrer-Policy: no-referrer`, o link vale uma vez e recarregar a página quebraria o formulário. |
 | `D-F8-1` | `fichas\fatia-8.md`, seção "9. Dúvidas que a sessão pode registrar" (roteiro da demo) | Descreva os quatro fluxos no roteiro; o dono corta. |
 | `D-F8-2` | `fichas\fatia-8.md`, seção 9 (plano B da demo) | Se a API cair, mostre as telas pelo servidor de desenvolvimento com os dados de `ELENCO.md`, avisando a banca. |
 | `D-F8-3` | `fichas\fatia-8.md`, seção 9 (resolução do projetor) | Projete para 1366 px, com piso de 1280 px (`04-visual.md`, seção 9). |
@@ -223,3 +226,112 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
 - **Resposta do dono:** (vazio)
 - **O que mudou por causa da resposta:** (vazio)
 
+### D-F7-1 · O gestor não tem lista das sugestões de outra data que ainda esperam resposta · aberta
+
+- **Registrada em:** 2026-11-17 (F7, bloco 7a)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F7-1 do front-end do RH-System (sugestões de outra data de férias)
+
+  Olá! Estou fechando o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: fatia 7 (gestão), Painel da equipe (tela 51); rota listarFeriasDaEquipe; contrato 0.3.0.
+  O que achei: quando o gestor sugere outra data para as férias de alguém, o pedido espera a resposta da pessoa e deixa o painel e o calendário. O gestor só volta a ver essa sugestão na aba Férias da ficha da pessoa. A rota listarFeriasDaEquipe (com situacao=SUGESTAO_DE_DATA) listaria todas, mas não há tela para ela.
+  O que sugiro: deixar como está.
+  Pergunta: o gestor precisa de uma lista das sugestões de data que aguardam resposta? (A) não, a aba Férias da ficha basta; (B) sim, um bloco no Painel da equipe.
+  Enquanto isso: sigo sem o bloco.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-F7-2 · "Pagamento" dentro de Cadastros · aberta
+
+- **Registrada em:** 2026-11-17 (F7, bloco 7c)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F7-2 do front-end do RH-System (tela de Pagamento)
+
+  Olá! Estou fechando o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: fatia 7, tela 7.4 (calendário de pagamento e exceções por mês); contrato 0.3.0.
+  O que achei: o Figma não desenha essa tela. O contrato sugere um item "Pagamento" em Cadastros, ao lado de "Empresa".
+  O que sugiro: seguir o contrato (foi o que fiz).
+  Pergunta: posso manter "Pagamento" dentro de Cadastros? (A) sim; (B) não, quero em outro lugar.
+  Enquanto isso: ficou em Cadastros.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-V-contraste · Cores do Figma abaixo do contraste recomendado · aberta
+
+- **Registrada em:** 2026-11-17 (vistoria do front-end)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-V-contraste do front-end do RH-System (contraste das cores)
+
+  Olá! Conferi o front-end inteiro e preciso de uma decisão sua.
+
+  Onde: cores do desenho (04-visual.md e index.css).
+  O que achei: alguns pares de cor do Figma ficam abaixo de 4,5:1 de contraste (WCAG): a cor de destaque sobre fundo claro, a borda dos campos (1,47:1) e o número da bolinha do menu (4,2:1). O desenho foi seguido à risca.
+  O que sugiro: manter o desenho agora; se a avaliação de acessibilidade pesar, escurecer essas três cores.
+  Pergunta: manter as cores do Figma (A) ou escurecer as que ficam abaixo de 4,5:1 (B)?
+  Enquanto isso: sigo o Figma.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-V-avaliacao-encerrada · "Ver minhas respostas" de uma avaliação encerrada · aberta
+
+- **Registrada em:** 2026-11-17 (vistoria do front-end)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-V-avaliacao-encerrada do front-end do RH-System (minhas respostas)
+
+  Olá! Conferi o front-end inteiro e preciso de uma decisão sua.
+
+  Onde: formulários da pessoa (Meus formulários), avaliação já encerrada.
+  O que achei: para abrir "Minhas respostas" de uma avaliação, a API pede qual pessoa foi avaliada, e a lista de formulários encerrados não informa isso. Hoje a tela não oferece o atalho nesse caso.
+  O que sugiro: a API incluir o avaliado na lista de "Meus formulários".
+  Pergunta: quer que a lista passe a trazer o avaliado (A) ou fica sem esse atalho (B)?
+  Enquanto isso: sigo sem o atalho.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-V-token-na-url · O link de definir senha deixa o token no endereço · decidida (mantido)
+
+- **Registrada em:** 2026-11-17 (vistoria do front-end)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-V-token-na-url do front-end do RH-System (segurança do link de senha)
+
+  Olá! Conferi o front-end inteiro e deixo um registro para você.
+
+  Onde: tela de definir senha (/definir-senha?token=...).
+  O que achei: o código do link fica no endereço da página, então aparece no histórico do navegador. Tirar o código do endereço depois de ler faria a página quebrar se a pessoa recarregar.
+  O que fiz: mantive como está. O site manda Referrer-Policy: no-referrer (o código não sai para outros sites) e o link vale uma única vez.
+  Pergunta: tudo bem manter assim (A) ou prefere tirar o código do endereço, aceitando que recarregar a página peça um link novo (B)?
+  Enquanto isso: mantido.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)

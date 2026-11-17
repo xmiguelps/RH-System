@@ -44,17 +44,17 @@ type Periodo = Esquema<'FeriasPeriodoAquisitivo'>
 type Regra = Esquema<'FeriasRegraConferida'>
 
 function regrasDoErro(erro: unknown): Regra[] | undefined {
-  if (erro instanceof ErroDeApi && Array.isArray(erro.corpo?.regras)) return erro.corpo.regras as Regra[]
+  if (erro instanceof ErroDeApi && Array.isArray(erro.corpo?.regras))
+    return erro.corpo.regras as Regra[]
   return undefined
 }
 
-function BlocoDaSugestao({ pedido }: { pedido: Pedido }) {
+function BlocoDaSugestao({ pedido, aoRecusar }: { pedido: Pedido; aoRecusar: () => void }) {
   const queryClient = useQueryClient()
   const notificacao = useNotificacao()
   const aceitar = $api.useMutation('post', '/api/eu/ferias/{feriasId}/sugestao/aceitar')
   const recusar = $api.useMutation('post', '/api/eu/ferias/{feriasId}/sugestao/recusar')
   const [erro, setErro] = useState<unknown>(null)
-  const [encerrado, setEncerrado] = useState(false)
   const s = pedido.sugestao!
   const params = { params: { path: { feriasId: pedido.id } } }
 
@@ -66,22 +66,25 @@ function BlocoDaSugestao({ pedido }: { pedido: Pedido }) {
         notificacao.sucesso('Datas aceitas. Agora o RH confirma.')
       } else {
         await recusar.mutateAsync(params)
-        setEncerrado(true)
+        aoRecusar()
       }
       await invalidarRota(queryClient, '/api/eu/ferias')
     } catch (e) {
       setErro(e)
-      if (e instanceof ErroDeApi && e.status === 409) await invalidarRota(queryClient, '/api/eu/ferias')
+      if (e instanceof ErroDeApi && e.status === 409)
+        await invalidarRota(queryClient, '/api/eu/ferias')
     }
   }
 
-  if (encerrado) return <Aviso tom="info">{TEXTO_DA_RECUSA_DA_SUGESTAO}</Aviso>
   const regras = regrasDoErro(erro)
   return (
-    <section aria-label="Sugestão de outra data" className="flex flex-col gap-3 rounded-cartao border-2 border-alerta-ponto bg-superficie p-5">
+    <section
+      aria-label="Sugestão de outra data"
+      className="flex flex-col gap-3 rounded-cartao border-2 border-alerta-ponto bg-superficie p-5"
+    >
       <p className="text-corpo text-texto">
-        {s.sugeridaPor.nome} sugeriu outras datas: {periodoCurto(s.dataInicio, s.dataFim)} ({textoDeDias(s.dias)}).
-        Responda até {formatarData(s.expiraEm)}.
+        {s.sugeridaPor.nome} sugeriu outras datas: {periodoCurto(s.dataInicio, s.dataFim)} (
+        {textoDeDias(s.dias)}). Responda até {formatarData(s.expiraEm)}.
       </p>
       {!!erro && <AvisoDeErro erro={erro} />}
       {regras && (
@@ -92,10 +95,19 @@ function BlocoDaSugestao({ pedido }: { pedido: Pedido }) {
         </ul>
       )}
       <div className="flex gap-3">
-        <Botao onClick={() => void responder('aceitar')} carregando={aceitar.isPending} disabled={recusar.isPending}>
+        <Botao
+          onClick={() => void responder('aceitar')}
+          carregando={aceitar.isPending}
+          disabled={recusar.isPending}
+        >
           Aceitar as novas datas
         </Botao>
-        <Botao variante="secundario" onClick={() => void responder('recusar')} carregando={recusar.isPending} disabled={aceitar.isPending}>
+        <Botao
+          variante="secundario"
+          onClick={() => void responder('recusar')}
+          carregando={recusar.isPending}
+          disabled={aceitar.isPending}
+        >
           Recusar
         </Botao>
       </div>
@@ -112,22 +124,33 @@ function CartaoDoPeriodo({ p }: { p: Periodo }) {
         {p.situacao === 'EM_AQUISICAO' ? (
           <Selo tom="info">Em andamento</Selo>
         ) : (
-          p.diasDisponiveis > 0 && <Selo tom="alerta">Tire até {formatarData(p.prazoParaTirar)}</Selo>
+          p.diasDisponiveis > 0 && (
+            <Selo tom="alerta">Tire até {formatarData(p.prazoParaTirar)}</Selo>
+          )
         )}
       </div>
       {p.situacao === 'EM_AQUISICAO' ? (
         <>
-          <Progresso valor={p.mesesTrabalhados ?? 0} maximo={12} rotulo={`Meses trabalhados do período ${periodoCompleto(p.inicio, p.fim)}`} />
+          <Progresso
+            valor={p.mesesTrabalhados ?? 0}
+            maximo={12}
+            rotulo={`Meses trabalhados do período ${periodoCompleto(p.inicio, p.fim)}`}
+          />
           <p className="text-pequeno text-texto-suave">
-            {p.mesesTrabalhados ?? 0} de 12 meses trabalhados. Os 30 dias desse período ficam disponíveis a
-            partir de {formatarData(p.disponivelAPartirDe)}.
+            {p.mesesTrabalhados ?? 0} de 12 meses trabalhados. Os 30 dias desse período ficam
+            disponíveis a partir de {formatarData(p.disponivelAPartirDe)}.
           </p>
         </>
       ) : (
         <>
-          <Progresso valor={p.diasTirados} maximo={total} rotulo={`Dias tirados do período ${periodoCompleto(p.inicio, p.fim)}`} />
+          <Progresso
+            valor={p.diasTirados}
+            maximo={total}
+            rotulo={`Dias tirados do período ${periodoCompleto(p.inicio, p.fim)}`}
+          />
           <p className="text-pequeno text-texto-suave">
-            {textoDeDias(p.diasTirados)} {p.diasTirados === 1 ? 'tirado' : 'tirados'} e {textoDeDias(p.diasDisponiveis)}{' '}
+            {textoDeDias(p.diasTirados)} {p.diasTirados === 1 ? 'tirado' : 'tirados'} e{' '}
+            {textoDeDias(p.diasDisponiveis)}{' '}
             {p.diasDisponiveis === 1 ? 'disponível' : 'disponíveis'}
             {p.diasEmPedido > 0 ? ` (${p.diasEmPedido} reservados em pedido)` : ''}
           </p>
@@ -146,7 +169,11 @@ export function PainelPedirFerias() {
   const pedir = $api.useMutation('post', '/api/eu/ferias')
   const [valores, setValores] = useState<DadosDasFerias>(FERIAS_VAZIAS)
   const [erro, setErro] = useState<unknown>(null)
-  const { conferencia, conferindo, erro: erroDaConferencia } = useConferenciaDeFerias({ tipo: 'eu' }, valores)
+  const {
+    conferencia,
+    conferindo,
+    erro: erroDaConferencia,
+  } = useConferenciaDeFerias({ tipo: 'eu' }, valores)
   const fechar = () => navegar('/eu/ferias')
   const resumo = minhas.data?.resumo
   const gestor = minhas.data?.gestorQueAnalisa ?? null
@@ -163,7 +190,10 @@ export function PainelPedirFerias() {
         },
       })
       notificacao.sucesso('Pedido de férias enviado.')
-      await Promise.all([invalidarRota(queryClient, '/api/eu/ferias'), invalidarRota(queryClient, '/api/eu/painel')])
+      await Promise.all([
+        invalidarRota(queryClient, '/api/eu/ferias'),
+        invalidarRota(queryClient, '/api/eu/painel'),
+      ])
       fechar()
     } catch (e) {
       setErro(e)
@@ -188,7 +218,11 @@ export function PainelPedirFerias() {
             <Botao variante="secundario" onClick={fechar}>
               Cancelar
             </Botao>
-            <Botao onClick={() => void enviar()} disabled={!conferencia?.podeEnviar || conferindo} carregando={pedir.isPending}>
+            <Botao
+              onClick={() => void enviar()}
+              disabled={!conferencia?.podeEnviar || conferindo}
+              carregando={pedir.isPending}
+            >
               Enviar pedido
             </Botao>
           </div>
@@ -198,8 +232,12 @@ export function PainelPedirFerias() {
       <div className="flex flex-col gap-5">
         {resumo && (
           <Aviso tom="info">
-            Você tem {textoDeDias(resumo.diasDisponiveis)} {resumo.diasDisponiveis === 1 ? 'disponível' : 'disponíveis'}
-            {resumo.prazoParaTirarSaldo ? ` para tirar até ${formatarData(resumo.prazoParaTirarSaldo)}` : ''}.
+            Você tem {textoDeDias(resumo.diasDisponiveis)}{' '}
+            {resumo.diasDisponiveis === 1 ? 'disponível' : 'disponíveis'}
+            {resumo.prazoParaTirarSaldo
+              ? ` para tirar até ${formatarData(resumo.prazoParaTirarSaldo)}`
+              : ''}
+            .
           </Aviso>
         )}
         {!!erro && !regrasDoErro(erro) && <AvisoDeErro erro={erro} />}
@@ -213,7 +251,9 @@ export function PainelPedirFerias() {
           conferencia={conferencia}
           conferindo={conferindo}
           erroDaConferencia={erroDaConferencia}
-          rotuloDoTexto={gestor ? `Mensagem para ${gestor.nome} (opcional)` : 'Mensagem para o RH (opcional)'}
+          rotuloDoTexto={
+            gestor ? `Mensagem para ${gestor.nome} (opcional)` : 'Mensagem para o RH (opcional)'
+          }
           exemploDoTexto="Ex.: queria emendar com o feriado de 20/11"
           comSobra
           regrasDoErro={regrasDoErro(erro)}
@@ -228,7 +268,11 @@ export function PaginaMinhasFerias() {
   const consulta = $api.useQuery('get', '/api/eu/ferias')
   const d = consulta.data
   const r = d?.resumo
-  const sugestoes = (d?.historico ?? []).filter((p) => p.situacao === 'SUGESTAO_DE_DATA' && p.sugestao)
+  // a recusa encerra o pedido: depois de a lista vir de novo o bloco some, e o texto fica por aqui
+  const [recusadas, setRecusadas] = useState<readonly number[]>([])
+  const sugestoes = (d?.historico ?? []).filter(
+    (p) => p.situacao === 'SUGESTAO_DE_DATA' && p.sugestao && !recusadas.includes(p.id),
+  )
   const colunas: readonly ColunaDaTabela<Pedido>[] = [
     {
       chave: 'periodo',
@@ -245,11 +289,19 @@ export function PaginaMinhasFerias() {
       ),
     },
     { chave: 'dias', titulo: 'Dias', celula: (p) => textoDeDias(p.dias) },
-    { chave: 'pedido', titulo: 'Pedido em', celula: (p) => formatarDataDoInstante(p.solicitadaEmUtc) },
+    {
+      chave: 'pedido',
+      titulo: 'Pedido em',
+      celula: (p) => formatarDataDoInstante(p.solicitadaEmUtc),
+    },
     {
       chave: 'situacao',
       titulo: 'Situação',
-      celula: (p) => <Selo tom={SITUACAO_DAS_FERIAS[p.situacao].tom}>{SITUACAO_DAS_FERIAS[p.situacao].texto}</Selo>,
+      celula: (p) => (
+        <Selo tom={SITUACAO_DAS_FERIAS[p.situacao].tom}>
+          {SITUACAO_DAS_FERIAS[p.situacao].texto}
+        </Selo>
+      ),
     },
   ]
   return (
@@ -278,10 +330,15 @@ export function PaginaMinhasFerias() {
                 ? `Do período ${r.periodoDoSaldo.inicio.slice(0, 4)} a ${r.periodoDoSaldo.fim.slice(0, 4)}`
                 : undefined,
             },
-            { rotulo: 'Prazo para tirar esse saldo', valor: r?.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—' },
+            {
+              rotulo: 'Prazo para tirar esse saldo',
+              valor: r?.prazoParaTirarSaldo ? formatarData(r.prazoParaTirarSaldo) : '—',
+            },
             {
               rotulo: 'Próximas férias',
-              valor: r?.proximasFerias ? periodoCurto(r.proximasFerias.dataInicio, r.proximasFerias.dataFim) : 'Nenhuma',
+              valor: r?.proximasFerias
+                ? periodoCurto(r.proximasFerias.dataInicio, r.proximasFerias.dataFim)
+                : 'Nenhuma',
               apoio: r?.proximasFerias ? textoDeDias(r.proximasFerias.dias) : 'Nada agendado ainda',
             },
             {
@@ -292,8 +349,13 @@ export function PaginaMinhasFerias() {
           ]}
         />
       )}
+      {recusadas.length > 0 && <Aviso tom="info">{TEXTO_DA_RECUSA_DA_SUGESTAO}</Aviso>}
       {sugestoes.map((p) => (
-        <BlocoDaSugestao key={p.id} pedido={p} />
+        <BlocoDaSugestao
+          key={p.id}
+          pedido={p}
+          aoRecusar={() => setRecusadas((r) => [...r, p.id])}
+        />
       ))}
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-6">
         <div className="flex flex-col gap-6">
@@ -325,7 +387,10 @@ export function PaginaMinhasFerias() {
             />
           </section>
         </div>
-        <section aria-labelledby="titulo-como" className="flex flex-col gap-3 rounded-cartao bg-superficie-suave p-5">
+        <section
+          aria-labelledby="titulo-como"
+          className="flex flex-col gap-3 rounded-cartao bg-superficie-suave p-5"
+        >
           <h2 id="titulo-como" className="text-corpo font-bold text-texto">
             Como funciona
           </h2>
