@@ -12,6 +12,7 @@ export type JanelaProps = {
   tamanho?: 'media' | 'larga' | 'extra'
   largura?: 'estreita' | 'media' | 'larga'
   rodape?: ReactNode
+  /** Por padrão clicar fora NÃO fecha (o que a pessoa digitou não some por um clique); Esc e o X fecham. Só janelas sem nada a perder passam `true`. */
   fecharAoClicarFora?: boolean
   children: ReactNode
 }
@@ -28,7 +29,7 @@ export function Janela({
   tamanho = 'media',
   largura = 'media',
   rodape,
-  fecharAoClicarFora = true,
+  fecharAoClicarFora = false,
   children,
 }: JanelaProps) {
   const lateral = posicao === 'direita'

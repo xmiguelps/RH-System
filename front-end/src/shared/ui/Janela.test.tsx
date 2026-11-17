@@ -22,10 +22,10 @@ describe('Janela', () => {
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
   })
 
-  it('Janela fecha com Escape, com o X e clicando fora, e nao fecha clicando fora com fecharAoClicarFora false', async () => {
+  it('Janela fecha com Escape e com o X, e por padrao NAO fecha clicando fora (o que a pessoa digitou nao some por um clique)', async () => {
     const usuario = userEvent.setup()
     const aoFechar = vi.fn()
-    const { unmount } = render(
+    render(
       <Janela aberta aoFechar={aoFechar} titulo="Teste">
         <p>corpo</p>
       </Janela>,
@@ -35,17 +35,19 @@ describe('Janela', () => {
     await usuario.click(screen.getByRole('button', { name: 'Fechar' }))
     expect(aoFechar).toHaveBeenCalledTimes(2)
     await usuario.click(screen.getByTestId('janela-fundo'))
-    expect(aoFechar).toHaveBeenCalledTimes(3)
-    unmount()
+    expect(aoFechar).toHaveBeenCalledTimes(2)
+  })
 
-    const outro = vi.fn()
+  it('Janela com fecharAoClicarFora fecha clicando fora', async () => {
+    const usuario = userEvent.setup()
+    const aoFechar = vi.fn()
     render(
-      <Janela aberta aoFechar={outro} titulo="Teste" fecharAoClicarFora={false}>
+      <Janela aberta aoFechar={aoFechar} titulo="Teste" fecharAoClicarFora>
         <p>corpo</p>
       </Janela>,
     )
     await usuario.click(screen.getByTestId('janela-fundo'))
-    expect(outro).not.toHaveBeenCalled()
+    expect(aoFechar).toHaveBeenCalledTimes(1)
   })
 
   it('Janela fechada nao escreve nada', () => {

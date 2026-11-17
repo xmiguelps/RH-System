@@ -116,6 +116,25 @@ describe('MenuLateral', () => {
     expect(screen.getByRole('link', { name: /^Início/ })).not.toHaveAttribute('aria-current')
   })
 
+  it.each([
+    ['RH', '/rh/colaboradores/12', /^Colaboradores/],
+    ['RH', '/rh/formularios/12/editar', /^Formulários/],
+    ['RH', '/rh/cadastros/cargos', /^Cadastros/],
+    ['Funcionario', '/eu/treinamentos/2', /^Treinamentos/],
+  ] as const)(
+    '%s: em %s (rota filha) o item do menu continua marcado e os outros nao',
+    async (perfil, rota, item) => {
+      montar(perfil, rota)
+      expect(await screen.findByRole('link', { name: item })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      expect(
+        screen.getAllByRole('link').filter((l) => l.getAttribute('aria-current') === 'page'),
+      ).toHaveLength(1)
+    },
+  )
+
   it('invalidarContadoresDoMenu refaz as tres consultas', async () => {
     const chamadas: string[] = []
     servidor.use(
