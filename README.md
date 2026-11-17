@@ -337,7 +337,7 @@ Nesta fatia não há rota nova: ela deixa o sistema **pronto para a banca**.
 
 ## Front-end
 
-O front-end (React 19, TypeScript, Vite) está em `front-end/`, feito por Lucas num repositório à parte e trazido para cá (fatias 0 a 6 prontas; a fatia 7 começou e não está completa). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.
+O front-end (React 19, TypeScript, Vite) está em `front-end/`, trazido para cá de um repositório à parte (**fatias 0 a 8 prontas**: as 61 telas com print e as sem print, com o contrato 0.3.0). O plano está em `docs/plano-front-end/` (comece por `LEIA-PRIMEIRO.md`) e o andamento, em `PROGRESSO.md` e `DUVIDAS.md` da mesma pasta.
 
 ### Rodar o front para ver as telas
 
@@ -353,7 +353,7 @@ Abra **http://localhost:5173**. O `npm run dev` primeiro gera os tipos e os dado
 
 - **Os dados são simulados (MSW), e a API não precisa estar de pé.** O front intercepta as chamadas `/api/...` no navegador e responde com os exemplos do contrato. É o padrão em `npm run dev`; não precisa de arquivo `.env`.
 - **O login simulado ignora o que você digita** (use um e-mail com formato válido e qualquer senha) e **entra sempre como Ana Souza, perfil RH**. Os dados de exemplo são os mesmos para qualquer id (a tela de cada pessoa mostra os mesmos dados). **Não há seletor de perfil hoje**: com os dados simulados, as telas de gestor e de funcionário não aparecem (o exemplo do login vem do contrato e a pasta `src/shared/mocks/gerado/` é gerada de novo a cada `npm run dev`, então não adianta editá-la).
-- **Falar com a API de verdade:** copie `front-end/.env.example` para `front-end/.env.local` e ponha `VITE_MOCKS=nao` (e `VITE_API_URL=http://localhost:5000`, a API rodando como em "Rodar a API"). **Hoje só existem na API o login, a sessão, a saúde e a auditoria** (ver `contrato/STATUS.md`): as outras telas dão erro nesse modo até as rotas ficarem prontas.
+- **Falar com a API de verdade (back-end completo, fatias 0 a 8):** suba o MySQL, o Mailpit e o Azurite (`docker compose up -d --wait`), rode a API como em "Rodar a API", aplique o seed fictício (`Banco de Dados/Demo/LEIA-ME.md`) e copie `front-end/.env.example` para `front-end/.env.local` com `VITE_MOCKS=nao` e `VITE_API_URL=http://localhost:5000`. Entre com `helena.martins@rhsystem-demo.example` (RH), `rafael.costa@rhsystem-demo.example` (gestor) ou `lucas.pereira@rhsystem-demo.example` (funcionário), todos com a senha `Demo#RH2026`. O roteiro da demo está no `PROGRESSO.md` (`docs/plano-front-end/`).
 - **Só os componentes:** `VITE_VITRINE=sim npm run dev` (no PowerShell: `$env:VITE_VITRINE="sim"; npm run dev`) habilita a rota `/eu/vitrine`, uma página de prova dos componentes.
 
-Outros comandos de `front-end/`: `npm test` (Vitest), `npm run lint`, `npm run build` (gera `dist/`), `npm run csp` (confere a política de segurança do site, precisa do Edge ou do Chrome instalado) e `npm run format:check`. **Hoje o `format:check` falha** em 6 arquivos de `src/features/ferias/` (a fatia 7 começada e sem formatar).
+Outros comandos de `front-end/`: `npm test` (Vitest), `npm run lint`, `npm run build` (gera `dist/`), `npm run csp` (confere a política de segurança do site, precisa do Edge ou do Chrome instalado) e `npm run format:check`. `lint`, `format:check`, `tsc` e `build` passam limpos.
