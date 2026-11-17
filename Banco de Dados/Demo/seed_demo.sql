@@ -3,7 +3,7 @@
 --
 -- NAO E UM SCRIPT DE VERSAO: fica fora de "Banco de Dados/Scripts" de proposito (a API aplica sozinha so o que esta la). Rode DEPOIS que a API
 -- aplicou os scripts V001 a V007, num banco SEM nenhum colaborador (o primeiro INSERT de verdade e a configuracao da empresa, que so tem uma linha: uma segunda rodada falha logo no
--- comeco, sem deixar nada pela metade que importe). Tudo e inventado: nomes, CPFs (digitos validos, de ninguem), telefones e e-mails.
+-- comeco, sem deixar nada pela metade que importe). Tudo e inventado: nomes, CPFs (digitos validos, de ninguem), telefones e e-mails, COM UMA EXCECAO COMBINADA: o Miguel Passos (dono do projeto), com nome e e-mail reais.
 --
 -- Como rodar (uma sessao so, porque o script usa variaveis de usuario; veja o LEIA-ME.md desta pasta; no PowerShell o operador < nao existe: use o Git Bash ou cmd /c):
 --   mysql --default-character-set=utf8mb4 -h <servidor> -u <usuario> -p <banco> < seed_demo.sql
@@ -66,6 +66,7 @@ CREATE TABLE TMP_DEMO_PESSOAS (
     CHAVE VARCHAR(20) NOT NULL,
     NOME VARCHAR(150) NOT NULL,
     EMAIL_LOCAL VARCHAR(60) NOT NULL,
+    EMAIL VARCHAR(150) NULL,
     CARGO VARCHAR(60) NOT NULL,
     SETOR VARCHAR(60) NOT NULL,
     NIVEL VARCHAR(40) NOT NULL,
@@ -87,27 +88,33 @@ INSERT INTO TMP_DEMO_PESSOAS (ORDEM, CHAVE, NOME, EMAIL_LOCAL, CARGO, SETOR, NIV
     (9, 'patricia', 'Patrícia Gomes',    'patricia.gomes',    'Assistente Comercial',     'Comercial',      'Funcionario',        DATE_SUB(@hoje, INTERVAL 9 MONTH),  '1998-08-12', '30006335292', '11900000009'),
     (10, 'carla',   'Carla Mendes',      'carla.mendes',      'Assistente Administrativo', 'Administrativo', 'Funcionario',        DATE_SUB(@hoje, INTERVAL 40 MONTH), '1991-02-27', '30007127120', '11900000010'),
     (11, 'bruno',   'Bruno Azevedo',     'bruno.azevedo',     'Assistente Administrativo', 'Administrativo', 'Funcionario',        DATE_SUB(@hoje, INTERVAL 6 MONTH),  '1999-06-03', '30007919069', '11900000011'),
-    (12, 'julia',   'Júlia Andrade',     'julia.andrade',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_ADD(@hoje, INTERVAL 5 DAY),    '1997-10-19', '30008710988', '11900000012');
+    (12, 'julia',   'Júlia Andrade',     'julia.andrade',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_ADD(@hoje, INTERVAL 5 DAY),    '1997-10-19', '30008710988', '11900000012'),
+    (13, 'miguel',  'Miguel Passos',     'miguel.passos',     'Desenvolvedor',            'Tecnologia',     'Funcionario',        DATE_SUB(@hoje, INTERVAL 11 MONTH), '1999-03-08', '30009502734', '11900000013');
+
+-- O e-mail de login de cada pessoa: o do dominio da demo, menos o do dono do projeto, que entrou com o NOME e o E-MAIL REAIS dele (ele mesmo autorizou, em 2026-11-17, pôr os dois neste
+-- repositorio; CPF, telefone, nascimento e endereco continuam inventados). E-mail real e o unico que sai de verdade: os de aviso, holerite e redefinicao de senha dele chegam na caixa dele.
+UPDATE TMP_DEMO_PESSOAS SET EMAIL = CONCAT(EMAIL_LOCAL, '@', @dominio);
+UPDATE TMP_DEMO_PESSOAS SET EMAIL = 'gibertoni.passos@gmail.com' WHERE CHAVE = 'miguel';
 
 INSERT INTO FUNCIONARIOS (NOME, DATA_NASCIMENTO, DATA_ADMISSAO, ATIVO, EMAIL_CORPORATIVO, ID_CARGO, ID_SETOR, ID_NIVEL_ACESSO, MATRICULA, TIPO_CONTRATO)
-SELECT p.NOME, p.NASCIMENTO, p.ADMISSAO, TRUE, CONCAT(p.EMAIL_LOCAL, '@', @dominio), c.ID_CARGO, s.ID_SETOR, n.ID_NIVEL_ACESSO, LPAD(p.ORDEM, 5, '0'), 'CLT'
+SELECT p.NOME, p.NASCIMENTO, p.ADMISSAO, TRUE, p.EMAIL, c.ID_CARGO, s.ID_SETOR, n.ID_NIVEL_ACESSO, LPAD(p.ORDEM, 5, '0'), 'CLT'
   FROM TMP_DEMO_PESSOAS p
   JOIN CARGOS c ON c.NOME_CARGO = p.CARGO
   JOIN SETORES s ON s.NOME_SETOR = p.SETOR
   JOIN NIVEIS_DE_ACESSO n ON n.NOME_NIVEL_ACESSO = p.NIVEL
  ORDER BY p.ORDEM;
 
-UPDATE SEQUENCIAS SET ULTIMO_VALOR = 12 WHERE NOME = 'MATRICULA';
+UPDATE SEQUENCIAS SET ULTIMO_VALOR = 13 WHERE NOME = 'MATRICULA';
 
 INSERT INTO FUNCIONARIOS_DETALHES (ID_FUNCIONARIO, CPF, TELEFONE, EMAIL_PESSOAL, CEP, LOGRADOURO, NUMERO, BAIRRO, CIDADE, UF)
 SELECT f.ID_FUNCIONARIO, p.CPF, p.TELEFONE, CONCAT(p.EMAIL_LOCAL, '.pessoal@', @dominio), '01310100', 'Avenida Paulista', CAST(100 + p.ORDEM * 10 AS CHAR), 'Bela Vista', 'São Paulo', 'SP'
   FROM TMP_DEMO_PESSOAS p
-  JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = CONCAT(p.EMAIL_LOCAL, '@', @dominio);
+  JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = p.EMAIL;
 
 INSERT INTO USUARIOS (ID_FUNCIONARIO, SENHA, ATIVO, SENHA_PROVISORIA)
 SELECT f.ID_FUNCIONARIO, @senha, TRUE, FALSE
   FROM TMP_DEMO_PESSOAS p
-  JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = CONCAT(p.EMAIL_LOCAL, '@', @dominio);
+  JOIN FUNCIONARIOS f ON f.EMAIL_CORPORATIVO = p.EMAIL;
 
 -- Os dois gestores, o setor de cada um e o gestor de quem e da equipe (o Administrativo fica sem gestor: o RH decide os pedidos de la).
 INSERT INTO GESTORES (ID_FUNCIONARIO)

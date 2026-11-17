@@ -5,6 +5,7 @@ using RHSystem.Api.IntegrationTests.Formularios;
 using RHSystem.Api.IntegrationTests.Importacoes;
 using RHSystem.Api.IntegrationTests.Infra;
 using RHSystem.Api.IntegrationTests.Ponto;
+using RHSystem.Demo.Exemplos;
 using static RHSystem.Api.IntegrationTests.Acesso.AcessoDeTeste;
 using static RHSystem.Api.IntegrationTests.Demo.DemoDeTeste;
 
@@ -48,7 +49,7 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
         var espelho = await GetAsync(await EntrarComoAsync(api, "bruno.azevedo"), "/api/eu/ponto/espelho?ano=2026&mes=10");
         var dias = espelho.GetProperty("dias").EnumerateArray().ToDictionary(d => d.GetProperty("data").GetString()!, d => d.GetProperty("situacao").GetString()!);
         Assert.Equal("NORMAL", dias["2026-10-06"]); // os dias anteriores do seed têm as quatro batidas e as horas somadas
-        Assert.DoesNotContain("FALTA", dias.Where(d => string.CompareOrdinal(d.Key, "2026-10-07") < 0).Select(d => d.Value)); // nenhum dia útil do mês virou falta
+        Assert.DoesNotContain("SEM_REGISTRO", dias.Where(d => string.CompareOrdinal(d.Key, "2026-10-07") < 0).Select(d => d.Value)); // nenhum dia útil do mês virou falta
         Assert.Equal(JsonValueKind.Object, antes.ValueKind);
     }
 
@@ -103,14 +104,15 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
     // ---------------------------------------------------------------- passo 4: o RH envia o holerite e a pessoa baixa
 
     [Fact]
-    public async Task Passo_4_o_RH_envia_o_holerite_da_pessoa_e_ela_recebe_o_link_do_arquivo()
+    public async Task Passo_4_o_RH_envia_o_holerite_do_mes_atual_e_a_pessoa_ve_os_tres_com_o_link_do_arquivo()
     {
         var api = await ApiAsync(mysql);
+        await new EnviadorDeExemplos(api.CreateClient(), Hoje, Dominio, Senha).EnviarAsync(); // o roteiro começa depois da ferramenta dos exemplos: agosto e setembro já estão na ficha
         var lucas = IdDe(api, "lucas.pereira");
         var rh = await EntrarComoAsync(api, "helena.martins");
         var formulario = new MultipartFormDataContent
         {
-            { new StringContent("9"), "mes" },
+            { new StringContent("10"), "mes" },
             { new StringContent("2026"), "ano" },
             { new StringContent("MENSAL"), "tipo" },
         };
@@ -123,9 +125,27 @@ public class FluxosDaDemoTests(MySqlFixture mysql)
         Assert.Equal(201, (int)envio.StatusCode);
         var pessoa = await EntrarComoAsync(api, "lucas.pereira");
         var meus = await GetAsync(pessoa, "/api/eu/holerites");
-        var holerite = meus.GetProperty("itens").EnumerateArray().Single();
+        Assert.Equal([8, 9, 10], meus.GetProperty("itens").EnumerateArray().Select(h => h.GetProperty("mes").GetInt32()).Order()); // os dois de exemplo e o novo
+        var holerite = meus.GetProperty("itens").EnumerateArray().Single(h => h.GetProperty("mes").GetInt32() == 10);
         var link = await GetAsync(pessoa, $"/api/eu/holerites/{holerite.GetProperty("id").GetInt32()}/download");
         Assert.False(string.IsNullOrWhiteSpace(link.GetProperty("url").GetString()));
+    }
+
+    [Fact]
+    public async Task Passo_4_repetir_um_mes_que_a_ferramenta_dos_exemplos_ja_enviou_da_HOLERITE_JA_EXISTE()
+    {
+        var api = await ApiAsync(mysql);
+        await new EnviadorDeExemplos(api.CreateClient(), Hoje, Dominio, Senha).EnviarAsync();
+        var rh = await EntrarComoAsync(api, "helena.martins");
+        var formulario = new MultipartFormDataContent { { new StringContent("9"), "mes" }, { new StringContent("2026"), "ano" }, { new StringContent("MENSAL"), "tipo" } };
+        var pdf = new ByteArrayContent(ArquivosDeTeste.Pdf(2048));
+        pdf.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        formulario.Add(pdf, "arquivo", "holerite.pdf");
+
+        var envio = await rh.PostAsync($"/api/rh/funcionarios/{IdDe(api, "lucas.pereira")}/holerites", formulario);
+
+        Assert.Equal(409, (int)envio.StatusCode);
+        Assert.Equal("HOLERITE_JA_EXISTE", (await CorpoAsync(envio)).GetProperty("codigo").GetString());
     }
 
     // ---------------------------------------------------------------- passo 4: atestado
