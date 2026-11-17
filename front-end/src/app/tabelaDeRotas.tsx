@@ -69,7 +69,8 @@ import { PainelDoExtrato } from '../features/ponto/PainelDoExtrato'
 import { Carregando } from '../shared/ui/Carregando'
 import { PaginaDeEntrada } from './PaginaDeEntrada'
 import { InicioDaPessoa } from './paginas/InicioDaPessoa'
-import { InicioDoRh } from './paginas/InicioDoRh'
+import { PaginaPainelDoRh } from '../features/painel/PaginaPainelDoRh'
+import { PaginaPendenciasDoRh, PaginaSemRegistroHoje } from '../features/painel/ListasDoPainelDoRh'
 
 export type RotaDoPortal = {
   caminho: string
@@ -80,7 +81,9 @@ export type RotaDoPortal = {
 // A tabela de rotas: uma linha por tela. O perfil vem da família (/rh, /gestor, /eu); o item do
 // menu (menu.ts) aparece sozinho quando a rota dele existe.
 export const ROTAS_RH: readonly RotaDoPortal[] = [
-  { caminho: 'painel', elemento: <InicioDoRh /> },
+  { caminho: 'painel', elemento: <PaginaPainelDoRh /> },
+  { caminho: 'painel/pendencias', elemento: <PaginaPendenciasDoRh /> },
+  { caminho: 'painel/sem-registro', elemento: <PaginaSemRegistroHoje /> },
   {
     caminho: 'colaboradores',
     elemento: <ListaDeColaboradores />,
