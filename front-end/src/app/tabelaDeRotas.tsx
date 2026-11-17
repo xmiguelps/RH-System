@@ -48,6 +48,8 @@ import { PaginaTreinamentosDaEquipe } from '../features/treinamentos/TelasDoGest
 import { PaginaDefinirSenha } from '../features/autenticacao/PaginaDefinirSenha'
 import { PaginaEsqueciSenha } from '../features/autenticacao/PaginaEsqueciSenha'
 import { PaginaMeusDocumentos } from '../features/documentos/PaginaMeusDocumentos'
+import { PaginaMeusBeneficios } from '../features/beneficios/PaginaMeusBeneficios'
+import { PainelAderirAoBeneficio } from '../features/beneficios/PainelAderirAoBeneficio'
 import { PaginaMinhasFerias, PainelPedirFerias } from '../features/ferias/PaginaMinhasFerias'
 import { PaginaPedidosDeFeriasRh } from '../features/ferias/PaginaPedidosDeFeriasRh'
 import { PaginaPainelDaEquipe } from '../features/equipe/PaginaPainelDaEquipe'
@@ -208,6 +210,11 @@ export const ROTAS_EU: readonly RotaDoPortal[] = [
     caminho: 'ferias',
     elemento: <PaginaMinhasFerias />,
     filhas: [{ caminho: 'pedir', elemento: <PainelPedirFerias /> }],
+  },
+  {
+    caminho: 'beneficios',
+    elemento: <PaginaMeusBeneficios />,
+    filhas: [{ caminho: 'aderir/:beneficioId', elemento: <PainelAderirAoBeneficio /> }],
   },
   { caminho: 'advertencias', elemento: <PaginaMinhasAdvertencias /> },
   { caminho: 'formularios', elemento: <PaginaMeusFormularios /> },
