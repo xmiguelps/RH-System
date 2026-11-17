@@ -10275,7 +10275,7 @@ paths:
         Só o RH. Serve ao botão "Registrar advertência" da ficha (tela 11) e ao "Nova advertência" da lista (tela 15, que antes pede à pessoa
         uma lista de colaboradores: use a lista de funcionários da fatia 1). A advertência nasce `PENDENTE` ("Aguardando ciência").
 
-        - `dataDoOcorrido`: dia do fato, hoje ou antes (futura: 400).
+        - `dataDoOcorrido`: dia do fato, hoje ou antes (futura: 400). Não pode ser anterior à admissão da pessoa (422 `ADVERTENCIA_ANTES_DA_ADMISSAO`; no próprio dia da admissão vale).
         - `aplicadaPor`: `GESTOR_DO_COLABORADOR` registra em nome do gestor da pessoa (o gestor ativo dela; se ela não tem gestor, ou o gestor foi
           desligado, 422 `ADVERTENCIA_SEM_GESTOR`); `RH` registra em nome do RH (a lista mostra "RH").
         - `motivo`: resumo de uma linha (até 255 caracteres). `descricao`: o que aconteceu, quando e qual regra foi descumprida.
@@ -10337,8 +10337,8 @@ paths:
         "422":
           description: |
             Recusada por regra de negócio ou do banco. `FUNCIONARIO_INATIVO` (código único em todas as fatias; trigger: `Nao e possivel registrar advertencia para funcionario inativo.`),
-            `ADVERTENCIA_SEM_GESTOR` (a pessoa não tem gestor ativo e `aplicadaPor` é `GESTOR_DO_COLABORADOR`) e `ADVERTENCIA_GESTOR_ADVERTE_A_SI_MESMO`
-            (trigger: `O gestor nao pode advertir a si mesmo.`, quando a pessoa é o próprio gestor).
+            `ADVERTENCIA_SEM_GESTOR` (a pessoa não tem gestor ativo e `aplicadaPor` é `GESTOR_DO_COLABORADOR`), `ADVERTENCIA_ANTES_DA_ADMISSAO` (o dia do ocorrido é anterior à admissão)
+            e `ADVERTENCIA_GESTOR_ADVERTE_A_SI_MESMO` (trigger: `O gestor nao pode advertir a si mesmo.`, quando a pessoa é o próprio gestor).
           content:
             application/problem+json:
               schema:
@@ -10361,6 +10361,14 @@ paths:
                     detail: Esta pessoa não tem gestor ativo. Escolha "RH" em "Aplicada por".
                     traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
                     codigo: ADVERTENCIA_SEM_GESTOR
+                antesDaAdmissao:
+                  summary: Dia do ocorrido anterior à admissão
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O dia do ocorrido não pode ser anterior à admissão da pessoa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ADVERTENCIA_ANTES_DA_ADMISSAO
         "500":
           $ref: "#/components/responses/Erro500Interno"
   /api/gestor/advertencias:
@@ -10697,7 +10705,7 @@ paths:
 
         **E-mail:** a pessoa recebe **sempre** o e-mail de "advertência registrada" e o RH recebe uma cópia dele (CONVENCOES, seção 12); não existe
         opção para não avisar. A caixa "Avisar o colaborador por e-mail" que o Figma mostra nas telas 53 e 60 fica escondida.
-        Pessoa inativa: 422 `FUNCIONARIO_INATIVO`. O gestor não registra advertência para si mesmo: ele não faz parte da equipe dele (a lista dele não o traz),
+        Pessoa inativa: 422 `FUNCIONARIO_INATIVO`. Dia do ocorrido anterior à admissão da pessoa: 422 `ADVERTENCIA_ANTES_DA_ADMISSAO`. O gestor não registra advertência para si mesmo: ele não faz parte da equipe dele (a lista dele não o traz),
         então pedir o próprio id devolve 404.
       x-perfis:
         - Gestor
@@ -10745,18 +10753,29 @@ paths:
         "404":
           $ref: "#/components/responses/Erro404NaoEncontrado"
         "422":
-          description: Pessoa inativa (trigger `Nao e possivel registrar advertencia para funcionario inativo.`).
+          description: Pessoa inativa (trigger `Nao e possivel registrar advertencia para funcionario inativo.`) ou dia do ocorrido anterior à admissão (`ADVERTENCIA_ANTES_DA_ADMISSAO`).
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemaDeRegraDeNegocio"
-              example:
-                title: Operação recusada.
-                status: 422
-                detail: Não é possível registrar advertência para uma pessoa inativa.
-                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
-                codigo: FUNCIONARIO_INATIVO
-                regraDoBanco: Nao e possivel registrar advertencia para funcionario inativo.
+              examples:
+                inativo:
+                  summary: Pessoa inativa
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não é possível registrar advertência para uma pessoa inativa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FUNCIONARIO_INATIVO
+                    regraDoBanco: Nao e possivel registrar advertencia para funcionario inativo.
+                antesDaAdmissao:
+                  summary: Dia do ocorrido anterior à admissão
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O dia do ocorrido não pode ser anterior à admissão da pessoa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ADVERTENCIA_ANTES_DA_ADMISSAO
         "500":
           $ref: "#/components/responses/Erro500Interno"
   /api/eu/advertencias:

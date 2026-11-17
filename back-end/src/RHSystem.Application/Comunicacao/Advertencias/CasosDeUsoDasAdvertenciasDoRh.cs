@@ -152,6 +152,11 @@ public sealed class RegistrarAdvertenciaDoRhCasoDeUso(IEscopoDoUsuario escopo, I
             throw MensagensDaComunicacao.AdvertenciaDeInativo.ComoProblema(RegrasDoBancoDaComunicacao.AdvertenciaDeInativo);
         }
 
+        if (corpo.DataDoOcorrido < pessoa.DataAdmissao)
+        {
+            throw MensagensDaComunicacao.AdvertenciaAntesDaAdmissao.ComoProblema();
+        }
+
         int? gestorId = null;
         if (corpo.AplicadaPor == AplicadaPorNoRegistro.GestorDoColaborador)
         {

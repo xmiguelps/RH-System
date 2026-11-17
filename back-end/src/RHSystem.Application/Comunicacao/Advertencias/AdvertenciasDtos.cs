@@ -121,7 +121,7 @@ public sealed record FiltroDeAdvertencias(int? Ano, SituacaoDaAdvertencia? Situa
 public sealed record PaginaDeAdvertencias(IReadOnlyList<AdvertenciaLida> Itens, int Total);
 
 /// <summary>O que o registro precisa saber da pessoa: o nome, se está ativa, o e-mail, o gestor dela (<c>FUNCIONARIOS.ID_GESTOR</c>, que pode apontar para um gestor já desligado) e o nome.</summary>
-public sealed record PessoaParaAdvertencia(int Id, string Nome, bool Ativo, string? EmailCorporativo, int? GestorId, bool GestorAtivo);
+public sealed record PessoaParaAdvertencia(int Id, string Nome, bool Ativo, string? EmailCorporativo, int? GestorId, bool GestorAtivo, DateOnly DataAdmissao);
 
 /// <summary>Uma advertência do ano para o resumo do RH: a situação e o setor atual da pessoa (<c>null</c> sem setor).</summary>
 public sealed record AdvertenciaParaResumoRh(SituacaoDaAdvertencia Situacao, string? Setor);

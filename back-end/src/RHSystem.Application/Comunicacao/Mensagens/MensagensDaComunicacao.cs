@@ -97,6 +97,8 @@ public static class MensagensDaComunicacao
 
     public static MensagemDaComunicacao AdvertenciaDeInativo { get; } = new(422, Recusada, "Não é possível registrar advertência para uma pessoa inativa.", "FUNCIONARIO_INATIVO");
 
+    public static MensagemDaComunicacao AdvertenciaAntesDaAdmissao { get; } = new(422, Recusada, "O dia do ocorrido não pode ser anterior à admissão da pessoa.", "ADVERTENCIA_ANTES_DA_ADMISSAO");
+
     public static MensagemDaComunicacao AdvertenciaSemGestor { get; } = new(422, Recusada, "Esta pessoa não tem gestor ativo. Escolha \"RH\" em \"Aplicada por\".", "ADVERTENCIA_SEM_GESTOR");
 
     public static MensagemDaComunicacao AdvertenciaGestorAdvertePorSiMesmo { get; } = new(422, Recusada, "O gestor não pode aplicar uma advertência a si mesmo.", "ADVERTENCIA_GESTOR_ADVERTE_A_SI_MESMO");
@@ -115,7 +117,7 @@ public static class MensagensDaComunicacao
     [
         AvisoPublicacaoNaoEditavel, AvisoNaoPodeSerExcluido, AvisoJaPublicado, AvisoNaoEstaAtivoParaEncerrar, AvisoNaoEstaAtivoParaLembrar, AvisoAindaNaoPublicado, HoleriteVersaoDesatualizada, EmpresaSemDiaDePagamento,
         HoleriteCompetenciaFutura, HoleriteCompetenciaAnteriorAAdmissao, HoleriteCompetenciaPosteriorAoDesligamento, HoleriteJaExiste(TipoDeHolerite.Mensal, 10, 2026), AdvertenciaNaoEstaContestada, AdvertenciaDeInativo,
-        AdvertenciaSemGestor, AdvertenciaGestorAdvertePorSiMesmo, AdvertenciaNaoEstaPendente,
+        AdvertenciaSemGestor, AdvertenciaAntesDaAdmissao, AdvertenciaGestorAdvertePorSiMesmo, AdvertenciaNaoEstaPendente,
     ];
 
     private static string NomeDoTipo(TipoDeHolerite tipo) => tipo switch
