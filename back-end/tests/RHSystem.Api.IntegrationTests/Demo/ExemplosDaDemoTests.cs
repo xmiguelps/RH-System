@@ -123,17 +123,46 @@ public class ExemplosDaDemoTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Rodar_de_novo_em_outro_dia_nao_manda_outro_atestado_para_a_pessoa_que_ja_tem_um_validado()
+    {
+        var api = await ApiAsync(mysql);
+        await Enviador(api).EnviarAsync(); // no dia do seed: o atestado da falta de 30/09
+        api.Relogio.Fixar(new DateTime(2026, 10, 9, 12, 42, 0, DateTimeKind.Utc)); // dois dias depois, 7 e 8/10 também aparecem como dias sem registro no espelho do Thiago
+
+        var outroDia = await new EnviadorDeExemplos(api.CreateClient(), new DateOnly(2026, 10, 9), Dominio, Senha).EnviarAsync();
+
+        Assert.Equal((0, 0), (outroDia.AtestadosEnviados, outroDia.AtestadosValidados));
+        Assert.Equal(1L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM ATESTADOS"));
+    }
+
+    [Fact]
+    public async Task Um_atestado_que_ficou_so_enviado_porque_a_rodada_anterior_parou_antes_de_validar_e_validado_em_vez_de_mandar_outro()
+    {
+        var api = await ApiAsync(mysql);
+        var thiago = await EntrarComoAsync(api, "thiago.mello");
+        Assert.Equal(201, (int)(await thiago.PostAsync("/api/eu/ponto/atestados", Ponto.AtestadosDeTeste.Dias("2026-09-30", "2026-09-30"))).StatusCode); // o envio que a ferramenta fez antes de cair
+
+        var relatorio = await Enviador(api).EnviarAsync();
+
+        Assert.Equal((0, 1), (relatorio.AtestadosEnviados, relatorio.AtestadosValidados));
+        Assert.Equal(1L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM ATESTADOS"));
+        Assert.Equal("VALIDADO", await Sql.EscalarAsync(api.Conexao, "SELECT STATUS_ATESTADO FROM ATESTADOS") as string);
+    }
+
+    [Fact]
     public async Task O_UPDATE_que_o_LEIA_ME_manda_rodar_cancela_so_os_emails_pendentes_do_dominio_ficticio()
     {
         var api = await ApiAsync(mysql);
         var leiaMe = File.ReadAllText(Path.Combine(Path.GetDirectoryName(ArquivoDoSeed())!, "LEIA-ME.md"));
         var comando = Regex.Match(leiaMe, @"UPDATE FILA_EMAILS[^;]*;").Value; // o comando está na seção do passo 4, e é o que o dono vai copiar
         Assert.NotEmpty(comando);
-        await Sql.ExecutarAsync(api.Conexao, $"INSERT INTO FILA_EMAILS (TIPO, CHAVE_IDEMPOTENCIA, DESTINATARIO_EMAIL, CARGA) VALUES ('TESTE_DEMO', 'TESTE_DEMO:ficticio', 'lucas.pereira@{Dominio}', JSON_OBJECT('a', 1)), ('TESTE_DEMO', 'TESTE_DEMO:real', 'alguem@exemplo.com.br', JSON_OBJECT('a', 1))");
+        // o sigiloso (convite ou redefinição de senha) não pode virar CANCELADO: o banco recusa (CHK_FILA_EMAILS_SIGILOSO_NAO_FICA) e derrubaria o comando inteiro
+        await Sql.ExecutarAsync(api.Conexao, $"INSERT INTO FILA_EMAILS (TIPO, CHAVE_IDEMPOTENCIA, DESTINATARIO_EMAIL, CARGA, SIGILOSO) VALUES ('TESTE_DEMO', 'TESTE_DEMO:ficticio', 'lucas.pereira@{Dominio}', JSON_OBJECT('a', 1), FALSE), ('TESTE_DEMO', 'TESTE_DEMO:real', 'alguem@exemplo.com.br', JSON_OBJECT('a', 1), FALSE), ('TESTE_DEMO', 'TESTE_DEMO:sigiloso', 'lucas.pereira@{Dominio}', JSON_OBJECT('a', 1), TRUE)");
 
         await Sql.ExecutarAsync(api.Conexao, comando);
 
         Assert.Equal("CANCELADO", await Sql.EscalarAsync(api.Conexao, "SELECT SITUACAO FROM FILA_EMAILS WHERE CHAVE_IDEMPOTENCIA = 'TESTE_DEMO:ficticio'") as string);
         Assert.Equal("PENDENTE", await Sql.EscalarAsync(api.Conexao, "SELECT SITUACAO FROM FILA_EMAILS WHERE CHAVE_IDEMPOTENCIA = 'TESTE_DEMO:real'") as string);
+        Assert.Equal("PENDENTE", await Sql.EscalarAsync(api.Conexao, "SELECT SITUACAO FROM FILA_EMAILS WHERE CHAVE_IDEMPOTENCIA = 'TESTE_DEMO:sigiloso'") as string);
     }
 }

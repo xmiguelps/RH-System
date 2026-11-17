@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using RHSystem.Application.Arquivos;
 using RHSystem.Demo.Exemplos;
 using UglyToad.PdfPig;
@@ -68,16 +70,16 @@ public class PdfsDeExemploTests
         Assert.Equal(esperado, PdfsDeExemplo.Reais((decimal)valor));
 
     [Theory]
-    [InlineData("Ana (a Grande) \\ Silva")]
-    [InlineData("João d'Ávila Çelik")]
-    [InlineData("Ünïcode ☃ fora do alfabeto")]
-    public void Nome_com_parentese_barra_ou_caractere_fora_do_alfabeto_nao_quebra_o_PDF(string nome)
+    [InlineData("Ana ) Silva (", "Ana)Silva(")] // parênteses desbalanceados: sem o escape o PDF perde o resto da linha
+    [InlineData("Bia \\ Costa", "Bia\\Costa")]
+    [InlineData("João d’Ávila Çelik", "Joãod'ÁvilaÇelik")] // o apóstrofo tipográfico (do teclado do celular) vira o reto
+    [InlineData("Ana “Ani” – Lima", "Ana\"Ani\"-Lima")] // aspas e travessão tipográficos
+    [InlineData("Ünïcode ☃ fora", "Ünïcode?fora")] // o que o Latin-1 não tem vira ?
+    public void O_nome_sai_no_PDF_como_foi_escrito_mesmo_com_parentese_barra_aspas_ou_caractere_fora_do_alfabeto(string nome, string esperadoCompacto)
     {
-        var bytes = PdfsDeExemplo.Holerite(nome, "Cargo", "Setor", 1, 2026);
+        var texto = TextoDoPdf(PdfsDeExemplo.Holerite(nome, "Cargo", "Setor", 1, 2026));
 
-        using var documento = PdfDocument.Open(bytes);
-        Assert.Equal(1, documento.NumberOfPages);
-        Assert.Contains("Cargo", string.Join(' ', documento.GetPages().Select(p => p.Text)));
+        Assert.Contains($"Funcionário:{esperadoCompacto}Cargo:Cargo", texto); // a linha seguinte (o cargo) ainda aparece: o nome não engoliu o resto
     }
 
     [Fact]
@@ -102,13 +104,30 @@ public class PdfsDeExemploTests
         Assert.Contains("(1dia)", texto);
     }
 
-    [Fact]
-    public void O_PDF_tem_a_estrutura_que_os_leitores_exigem_cabecalho_xref_e_fim()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_tabela_xref_o_startxref_e_o_Length_apontam_para_o_lugar_certo_como_exigem_os_leitores_estritos(bool holerite)
     {
-        var texto = Encoding.Latin1.GetString(PdfsDeExemplo.Holerite("Lucas Pereira", "Desenvolvedor", "Tecnologia", 9, 2026));
+        var bytes = holerite
+            ? PdfsDeExemplo.Holerite("Lucas Pereira", "Desenvolvedor", "Tecnologia", 9, 2026)
+            : PdfsDeExemplo.Atestado("Thiago Mello", new DateOnly(2026, 9, 30), new DateOnly(2026, 9, 30));
+        var texto = Encoding.Latin1.GetString(bytes); // Latin-1 mantém um caractere por byte: os índices do texto são os deslocamentos do arquivo
 
         Assert.StartsWith("%PDF-1.4", texto, StringComparison.Ordinal);
-        Assert.Contains("\nxref\n", texto, StringComparison.Ordinal);
         Assert.EndsWith("%%EOF\n", texto, StringComparison.Ordinal);
+        var inicioDaTabela = int.Parse(Regex.Match(texto, @"startxref\n(\d+)\n%%EOF").Groups[1].Value, CultureInfo.InvariantCulture);
+        Assert.Equal("xref\n", texto.Substring(inicioDaTabela, 5)); // o startxref aponta para a palavra xref
+        var entradas = Regex.Matches(texto[inicioDaTabela..], @"^(\d{10}) 00000 n $", RegexOptions.Multiline);
+        Assert.Equal(6, entradas.Count);
+        for (var i = 0; i < entradas.Count; i++)
+        {
+            var posicao = int.Parse(entradas[i].Groups[1].Value, CultureInfo.InvariantCulture);
+            Assert.StartsWith($"{i + 1} 0 obj\n", texto[posicao..], StringComparison.Ordinal); // cada entrada aponta para o "N 0 obj" do objeto
+        }
+
+        var fluxo = Regex.Match(texto, @"/Length (\d+) >>\nstream\n");
+        var comprimento = int.Parse(fluxo.Groups[1].Value, CultureInfo.InvariantCulture);
+        Assert.StartsWith("\nendstream", texto[(fluxo.Index + fluxo.Length + comprimento)..], StringComparison.Ordinal); // o /Length é o tamanho exato do fluxo
     }
 }

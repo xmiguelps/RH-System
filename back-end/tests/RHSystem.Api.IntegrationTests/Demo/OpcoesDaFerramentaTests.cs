@@ -59,6 +59,30 @@ public class OpcoesDaFerramentaTests
     }
 
     [Fact]
+    public void A_senha_pode_vir_da_variavel_de_ambiente_para_nao_ficar_no_historico_do_terminal()
+    {
+        var (opcoes, _) = OpcoesDaFerramenta.Ler(["--url", "https://a.b"], nome => nome == "RHSYSTEM_DEMO_SENHA" ? "Trocada#1" : null);
+
+        Assert.Equal("Trocada#1", opcoes?.Senha);
+    }
+
+    [Fact]
+    public void O_argumento_senha_vale_mais_que_a_variavel_de_ambiente()
+    {
+        var (opcoes, _) = OpcoesDaFerramenta.Ler(["--url", "https://a.b", "--senha", "DaLinhaDeComando#1"], _ => "Trocada#1");
+
+        Assert.Equal("DaLinhaDeComando#1", opcoes?.Senha);
+    }
+
+    [Fact]
+    public void Variavel_de_ambiente_vazia_vale_como_ausente()
+    {
+        var (opcoes, _) = OpcoesDaFerramenta.Ler(["--url", "https://a.b"], _ => string.Empty);
+
+        Assert.Equal("Demo#RH2026", opcoes?.Senha);
+    }
+
+    [Fact]
     public void O_dia_de_hoje_da_demo_e_o_de_Brasilia_mesmo_perto_da_meia_noite_em_UTC()
     {
         Assert.Equal(new DateOnly(2026, 10, 6), OpcoesDaFerramenta.HojeEmBrasilia(new DateTime(2026, 10, 7, 2, 59, 0, DateTimeKind.Utc))); // 23:59 de terça em Brasília

@@ -101,7 +101,7 @@ public static class PdfsDeExemplo
             _y -= tamanho + 7;
         }
 
-        /// <summary>Um rótulo à esquerda e o valor alinhado à direita (a Helvetica não tem largura fixa, então o valor entra numa coluna fixa).</summary>
+        /// <summary>Um rótulo à esquerda e o valor numa coluna fixa à direita (a Helvetica não tem largura fixa, então os valores começam todos na mesma coluna, sem alinhar pelo fim).</summary>
         public void Par(string rotulo, string valor, bool negrito = false)
         {
             Texto(Margem, rotulo, 12, negrito);
@@ -159,7 +159,7 @@ public static class PdfsDeExemplo
 
         private static void Escrever(Stream saida, string texto) => saida.Write(Encoding.Latin1.GetBytes(texto));
 
-        /// <summary>Barra invertida e parênteses viram escape; o que o Latin-1 não tem vira <c>?</c> (o <see cref="Encoding.Latin1"/> já faz isso).</summary>
+        /// <summary>Barra invertida e parênteses viram escape. O que o Latin-1 não tem, o <see cref="Encoding.Latin1"/> do .NET troca pelo parente mais próximo (aspas e travessões tipográficos viram os retos) ou por <c>?</c>; o teste do PDF prova os dois casos.</summary>
         private static string Escapar(string texto) => texto.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("(", "\\(", StringComparison.Ordinal).Replace(")", "\\)", StringComparison.Ordinal);
     }
 }

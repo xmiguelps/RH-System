@@ -28,17 +28,19 @@ cmd /c 'docker compose exec -T mysql mysql --default-character-set=utf8mb4 -u ro
 dotnet run --project back-end/tools/RHSystem.Demo.Exemplos -- --url <endereço da API>
 ```
 
-   - **O que ela envia:** cada pessoa **ativa** recebe o holerite mensal dos **dois meses anteriores** a hoje (um PDF de exemplo com o nome, o cargo e o setor da pessoa e valores ilustrativos; no seed padrão são 22 holerites); o **Thiago**, que faltou num dia útil recente, envia um atestado desse dia e a Helena o **valida** (o espelho dele passa a mostrar "Falta compensada"). Quem ainda não começou (a Júlia) não recebe.
-   - **Opções** (`--ajuda` lista todas): `--dominio` e `--senha`, se você mudou o `@dominio` ou a senha; `--email-do-rh`; `--hoje aaaa-mm-dd`, se rodou o seed com `@hoje`.
+   - **O que ela envia:** cada pessoa **ativa** recebe o holerite mensal dos **dois meses anteriores** a hoje (um PDF de exemplo com o nome, o cargo e o setor da pessoa e valores ilustrativos; no seed padrão são 22 holerites); o **Thiago**, que faltou num dia útil recente, envia um atestado desse dia e a Helena o **valida** (o espelho dele passa a mostrar "Falta compensada"). Quem ainda não começou (a Júlia) não recebe; passados os 5 dias para ela entrar, ela já é ativa e a API recusa os dois meses (são anteriores à admissão): saem dois `aviso` na tela, sem problema.
+   - **Opções** (`--ajuda` lista todas): `--dominio` e `--senha`, se você mudou o `@dominio` ou a senha (para a senha, prefira a variável de ambiente `RHSYSTEM_DEMO_SENHA`: um argumento fica no histórico do terminal); `--email-do-rh`; `--hoje aaaa-mm-dd`, se rodou o seed com `@hoje`.
    - **Pode rodar de novo:** o que já existe é contado e pulado, nada é duplicado. Uma recusa da API (por exemplo, holerite de mês anterior à admissão) vira `aviso` na saída e o resto segue; erro de login, de permissão ou do servidor para tudo e diz o que foi. Os testes `ExemplosDaDemoTests` rodam a ferramenta contra o seed e conferem o banco e o texto dos PDFs.
    - **Cuidado com o e-mail:** cada holerite publicado **enfileira um e-mail** para a pessoa. Com o envio ligado (`Email:EnvioAtivo=true`) e o domínio fictício, o servidor de destino devolve todos; se o seu provedor de SMTP penaliza devolução, deixe o envio desligado ao rodar a ferramenta, espere a fila encher (as tarefas rodam em segundos) e cancele os pendentes dos e-mails fictícios **antes** de ligar o envio, no banco:
 
 ```
 UPDATE FILA_EMAILS SET SITUACAO = 'CANCELADO', CARGA = NULL
- WHERE SITUACAO = 'PENDENTE' AND DESTINATARIO_EMAIL LIKE '%@rhsystem-demo.example';
+ WHERE SITUACAO = 'PENDENTE' AND SIGILOSO = FALSE AND DESTINATARIO_EMAIL LIKE '%@rhsystem-demo.example';
 ```
 
-A segunda rodada **falha logo no primeiro comando** (a configuração da empresa já existe), sem duplicar nada. Para recomeçar: `docker compose down -v` e suba tudo de novo, ou use um banco novo.
+   (Troque `rhsystem-demo.example` pelo seu `@dominio`, se você mudou. O `SIGILOSO = FALSE` deixa de fora o convite e a redefinição de senha, que o banco não deixa cancelar.)
+
+A segunda rodada **do seed** falha logo no primeiro comando (a configuração da empresa já existe), sem duplicar nada. Para recomeçar: `docker compose down -v` e suba tudo de novo, ou use um banco novo.
 
 ## Variáveis (opcionais, definidas na mesma sessão antes do arquivo)
 

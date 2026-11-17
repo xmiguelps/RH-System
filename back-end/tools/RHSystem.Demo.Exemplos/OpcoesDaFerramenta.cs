@@ -14,7 +14,8 @@ public sealed record OpcoesDaFerramenta(Uri Url, string Dominio, string Senha, s
 
           --url <endereço>      obrigatório: o endereço da API, com http:// ou https://
           --dominio <domínio>   o domínio dos e-mails do seed (padrão: rhsystem-demo.example)
-          --senha <senha>       a senha da demo (padrão: a senha pública do seed)
+          --senha <senha>       a senha da demo (padrão: a variável de ambiente RHSYSTEM_DEMO_SENHA e, sem ela, a senha pública do seed;
+                                se você trocou a senha, prefira a variável: um argumento fica no histórico do terminal)
           --email-do-rh <e-mail> o login do RH (padrão: helena.martins@<domínio>)
           --hoje <aaaa-mm-dd>   o dia "de hoje" da demo (padrão: hoje em Brasília)
           --ajuda               mostra esta mensagem
@@ -23,7 +24,12 @@ public sealed record OpcoesDaFerramenta(Uri Url, string Dominio, string Senha, s
     public static bool PediuAjuda(IReadOnlyList<string> argumentos) => argumentos.Any(a => a is "--ajuda" or "-h");
 
     /// <summary>As opções, ou <c>null</c> com a mensagem do que consertar (ou do uso, quando pediram ajuda).</summary>
-    public static (OpcoesDaFerramenta? Opcoes, string? Mensagem) Ler(IReadOnlyList<string> argumentos)
+    /// <summary>A variável de ambiente que guarda a senha quando ela não vem em <c>--senha</c> (um argumento fica no histórico do terminal e na lista de processos).</summary>
+    public const string VariavelDaSenha = "RHSYSTEM_DEMO_SENHA";
+
+    /// <param name="argumentos">Os argumentos da linha de comando.</param>
+    /// <param name="variavelDeAmbiente">Como ler uma variável de ambiente (nos testes, um dicionário); sem ela, o ambiente do processo.</param>
+    public static (OpcoesDaFerramenta? Opcoes, string? Mensagem) Ler(IReadOnlyList<string> argumentos, Func<string, string?>? variavelDeAmbiente = null)
     {
         if (PediuAjuda(argumentos))
         {
@@ -76,7 +82,8 @@ public sealed record OpcoesDaFerramenta(Uri Url, string Dominio, string Senha, s
             dia = lido;
         }
 
-        return (new OpcoesDaFerramenta(endereco, dominio ?? DominioPadrao, senha ?? SenhaPadrao, emailDoRh, dia), null);
+        var doAmbiente = (variavelDeAmbiente ?? Environment.GetEnvironmentVariable).Invoke(VariavelDaSenha);
+        return (new OpcoesDaFerramenta(endereco, dominio ?? DominioPadrao, senha ?? (string.IsNullOrEmpty(doAmbiente) ? SenhaPadrao : doAmbiente), emailDoRh, dia), null);
     }
 
     /// <summary>O dia de hoje no Brasil (UTC-3, sem horário de verão desde 2019), que é o dia que a API usa.</summary>
