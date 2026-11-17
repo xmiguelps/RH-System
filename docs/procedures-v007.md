@@ -6,8 +6,8 @@ Registro da reescrita das procedures que o grupo do banco entregou (decisão do 
 
 ## Como chamar sem a API
 
-- Cada procedure abre a **própria transação** e desfaz tudo ao recusar. **Chame fora de uma transação**: o `START TRANSACTION` confirma a que estiver aberta.
-- "Hoje" é o `CURDATE()`/`NOW()` do servidor (o banco roda em `-03:00`); a API usa um relógio próprio. Não há como bater ponto no passado.
+- Cada procedure abre a **própria transação** e desfaz tudo ao recusar. **Chame fora de uma transação**: o `START TRANSACTION` confirma a que estiver aberta e uma recusa (`ROLLBACK`) desfaz o que a transação de quem chama tivesse pendente.
+- "Hoje" é o `CURDATE()`/`NOW()` da **sessão** do banco, que o projeto exige em `-03:00` (como os triggers do `V002` e o `docker-compose.yml`; no Azure é o parâmetro `time_zone` do servidor). Só o ponto calcula o próprio horário de Brasília (UTC − 3 h) e não depende da sessão. A API usa um relógio próprio. Não há como bater ponto no passado.
 - Nenhuma confere o **perfil** de quem chama (só que a pessoa existe e está ativa), nenhuma grava evento de auditoria, manda e-mail, guarda arquivo ou cria tarefa agendada.
 - Recusa de negócio é `SQLSTATE 45000`, com mensagem sem acento (como as dos triggers do `V002`). Parâmetro maior que o tamanho declarado vem como erro do próprio MySQL.
 - O banco de horas só nasce da consolidação diária da API. Sem ela no ar, `SP_EFETIVAR_DESLIGAMENTO` sempre recusa ("banco de horas ainda não consolidado"; usar o desligamento só pelo banco exige inserir à mão a tarefa `CONSOLIDAR_BANCO_HORAS` concluída), e a decisão dos pedidos de ajuste de ponto não tem procedure.

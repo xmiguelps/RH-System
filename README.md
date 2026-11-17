@@ -18,7 +18,7 @@ Sistema de RH feito como TCC: API em .NET 10 em `back-end/`, front-end em React 
 
 O esquema vem dos scripts `Banco de Dados/Scripts/Vnnn__descricao.sql`. A API os aplica ao iniciar (controlado por configuração), guarda o hash de cada um e **recusa subir se um script já aplicado foi editado**.
 
-- **Nunca edite um script já aplicado.** Até o primeiro deploy no Azure, um script só se edita avisando o dono, e os bancos locais são recriados; depois do primeiro deploy, todo script aplicado fica congelado e qualquer mudança é um script novo (`ALTER` para tabela; `DROP` e `CREATE` para trigger e função).
+- **Nunca edite um script já aplicado.** Até o primeiro deploy no Azure, um script só se edita avisando o dono, e os bancos locais são recriados; depois do primeiro deploy, todo script aplicado fica congelado e qualquer mudança é um script novo (`ALTER` para tabela; `DROP` e `CREATE` para trigger, função e procedure).
 - Os números de versão (`Vnnn`) são do dono: o grupo envia o conteúdo e o dono numera, para não haver duas versões com o mesmo número.
 - Para recriar o banco local do zero: `docker compose down -v` e depois `docker compose up -d --wait`.
 - **DER/MER** do banco, em texto e sempre em dia com os scripts: [`Banco de Dados/Modelagem/DER_gerado.md`](Banco%20de%20Dados/Modelagem/DER_gerado.md). **Dados fictícios para a demonstração:** [`Banco de Dados/Demo/LEIA-ME.md`](Banco%20de%20Dados/Demo/LEIA-ME.md).

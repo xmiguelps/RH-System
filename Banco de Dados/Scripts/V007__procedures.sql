@@ -19,13 +19,48 @@
 --   E. Cadastros: SP_CRIAR_USUARIO, SP_CADASTRAR_FUNCIONARIO, SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO, SP_CADASTRAR_CARGO
 --
 -- PARA QUEM CHAMA AS PROCEDURES SEM A API:
---  * Cada uma abre a PROPRIA transacao (START TRANSACTION) e desfaz tudo se recusar: chame FORA de uma transacao, porque o START TRANSACTION confirma a que estiver aberta.
---  * "Hoje" e o CURDATE()/NOW() do servidor (a sessao do banco roda em -03:00); a API usa um relogio proprio. Nao ha como bater ponto no passado.
+--  * Cada uma abre a PROPRIA transacao (START TRANSACTION) e desfaz tudo se recusar: chame FORA de uma transacao. O START TRANSACTION confirma a que estiver aberta e uma
+--    recusa (ROLLBACK) desfaz o que a transacao de quem chama tivesse pendente.
+--  * "Hoje" e o CURDATE()/NOW() da SESSAO do banco, que o projeto exige em -03:00 (como os triggers do V002 e o docker-compose.yml; no Azure e o parametro time_zone
+--    do servidor). So o ponto calcula o proprio horario de Brasilia (UTC - 3 h) e nao depende da sessao. A API usa um relogio proprio. Nao ha como bater ponto no passado.
 --  * Nenhuma confere o PERFIL de quem chama (so que a pessoa existe e esta ativa), nenhuma grava evento de auditoria, manda e-mail, guarda arquivo ou cria tarefa agendada.
 --  * O banco de horas so nasce da consolidacao diaria da API: sem ela no ar, SP_EFETIVAR_DESLIGAMENTO sempre recusa (o banco de horas do ultimo dia nao foi consolidado)
 --    e a decisao dos pedidos de ajuste de ponto nao tem procedure (a decisao recalcula o banco de horas).
 --  * Uma recusa de negocio e SQLSTATE 45000 com a mensagem dita no bloco de cada procedure; erro de tamanho de parametro vem do proprio MySQL.
+--  * Comparacao entre variavel ou parametro e coluna leva COLLATE utf8mb4_unicode_ci explicito (a collation das tabelas), para o script funcionar num banco criado com a
+--    collation padrao do MySQL 8 (utf8mb4_0900_ai_ci), como o do Azure. Deadlock entre duas chamadas (erro 1213) e resolvido pelo proprio InnoDB: basta repetir.
 -- ============================================================
+
+-- DROP PROCEDURE IF EXISTS antes de criar, como o V002 e o V003: se a aplicacao do script for interrompida no meio (DDL nao desfaz), a proxima tentativa
+-- nao para no primeiro "PROCEDURE ... already exists" e o script inteiro volta a poder ser aplicado.
+DROP PROCEDURE IF EXISTS SP_REGISTRAR_MARCACAO_PONTO;
+DROP PROCEDURE IF EXISTS SP_SOLICITAR_AJUSTE_PONTO;
+DROP PROCEDURE IF EXISTS SP_CONFERIR_FERIAS;
+DROP PROCEDURE IF EXISTS SP_SOLICITAR_FERIAS;
+DROP PROCEDURE IF EXISTS SP_REGISTRAR_FERIAS_RH;
+DROP PROCEDURE IF EXISTS SP_DECIDIR_FERIAS_GESTOR;
+DROP PROCEDURE IF EXISTS SP_RESPONDER_SUGESTAO_FERIAS;
+DROP PROCEDURE IF EXISTS SP_CONFIRMAR_FERIAS_RH;
+DROP PROCEDURE IF EXISTS SP_RECUSAR_FERIAS_RH;
+DROP PROCEDURE IF EXISTS SP_PUBLICAR_HOLERITE;
+DROP PROCEDURE IF EXISTS SP_SUBSTITUIR_HOLERITE;
+DROP PROCEDURE IF EXISTS SP_ENVIAR_ATESTADO;
+DROP PROCEDURE IF EXISTS SP_DECIDIR_ATESTADO;
+DROP PROCEDURE IF EXISTS SP_SOLICITAR_BENEFICIO;
+DROP PROCEDURE IF EXISTS SP_DECIDIR_BENEFICIO;
+DROP PROCEDURE IF EXISTS SP_GERAR_ADVERTENCIA;
+DROP PROCEDURE IF EXISTS SP_REGISTRAR_CIENCIA_ADVERTENCIA;
+DROP PROCEDURE IF EXISTS SP_CONTESTAR_ADVERTENCIA;
+DROP PROCEDURE IF EXISTS SP_RESPONDER_CONTESTACAO_ADVERTENCIA;
+DROP PROCEDURE IF EXISTS SP_CONCLUIR_MODULO_TREINAMENTO;
+DROP PROCEDURE IF EXISTS SP_ENCERRAR_FORMULARIO;
+DROP PROCEDURE IF EXISTS SP_AGENDAR_DESLIGAMENTO;
+DROP PROCEDURE IF EXISTS SP_CANCELAR_DESLIGAMENTO;
+DROP PROCEDURE IF EXISTS SP_EFETIVAR_DESLIGAMENTO;
+DROP PROCEDURE IF EXISTS SP_CRIAR_USUARIO;
+DROP PROCEDURE IF EXISTS SP_CADASTRAR_FUNCIONARIO;
+DROP PROCEDURE IF EXISTS SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO;
+DROP PROCEDURE IF EXISTS SP_CADASTRAR_CARGO;
 
 DELIMITER $$
 
