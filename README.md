@@ -312,7 +312,7 @@ As 41 rotas de `contrato/fontes/70-fatia-7-gestao.yaml` (todas em `contrato/STAT
 9. Registrar férias no passado recalcula o banco de horas dos dias já fechados. É isso?
 10. Benefícios contam como pendência do painel do RH (o Figma só desenha quatro tipos; o contrato já marca como provisório).
 11. Painel do gestor: "não se aplica" na coluna de avaliação vale para quem não é avaliado pelo gestor naquele formulário **e** para quem está de férias hoje (a pessoa já avaliada continua "respondida"); o rótulo do ciclo vem do que está depois de "ciclo " no título do formulário.
-12. `gestorQueAnalisa` continua sendo o gestor do setor quando ele está ausente (o contrato só põe nulo nos outros três casos). Prefere nulo também aí?
+12. `gestorQueAnalisa` com o gestor ausente: **decidido pelo dono em 2026-11-17: `null`** (só o RH decide; o contrato e `obterMinhasFerias` já foram ajustados).
 13. Admissão com documentos pendentes no painel do RH: só quem começa em até 7 dias, tem formulário de admissão publicado atribuído e ainda não respondeu. A janela de 7 dias está certa?
 
 ### Demonstração e fechamento (fatia 8)

@@ -16393,8 +16393,9 @@ paths:
         - `historico`: todos os pedidos da pessoa, do mais novo para o mais antigo (inclui os que ainda esperam
           análise e os cancelados ou recusados). A lista é curta e vem sem paginação.
         - `gestorQueAnalisa`: quem faz a primeira etapa (texto "X analisa primeiro e depois o RH confirma").
-          É `null` quando a pessoa é gestora (tem linha ativa em `GESTORES`), não tem gestor ativo ou tem o gestor
-          desligado: nesse caso o pedido não tem etapa do gestor, só o RH decide, e o texto deve dizer "O RH analisa o pedido".
+          É `null` quando a pessoa é gestora (tem linha ativa em `GESTORES`), não tem gestor ativo, tem o gestor
+          desligado ou o gestor do setor está **ausente hoje** (decisão do dono de 2026-11-17; a etapa dele já nasce
+          aprovada): nesses casos o pedido não espera o gestor, só o RH decide, e o texto deve dizer "O RH analisa o pedido".
 
         Cada pedido do `historico` traz `status` (o do banco), `etapa`, `situacao`, `gestorResponsavel`, `decisaoGestor` e
         `decisaoRh`, como em `CONVENCOES.md`, seção 9 (ver `pedirFerias`). Nesta rota `podeDecidir` é sempre falso (a pessoa vê o
