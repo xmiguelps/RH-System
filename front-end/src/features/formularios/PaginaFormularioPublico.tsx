@@ -181,7 +181,17 @@ export function PaginaFormularioPublico() {
     </main>
   )
 
-  if (consulta.error) return moldura(<Aviso tom="erro">{mensagemDaPagina(consulta.error)}</Aviso>)
+  if (consulta.error)
+    return moldura(
+      <div className="flex flex-col items-start gap-3">
+        <Aviso tom="erro">{mensagemDaPagina(consulta.error)}</Aviso>
+        {!(consulta.error instanceof ErroDeApi && consulta.error.status === 404) && (
+          <Botao variante="secundario" onClick={() => void consulta.refetch()}>
+            Tentar de novo
+          </Botao>
+        )}
+      </div>,
+    )
   if (!pagina)
     return moldura(
       <div role="status" aria-label="Carregando o formulário" className="flex flex-col gap-3">
