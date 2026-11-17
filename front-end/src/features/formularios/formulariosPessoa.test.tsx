@@ -7,6 +7,7 @@ import { servidor } from '../../shared/mocks/servidor'
 import { exemploDoContrato } from '../../shared/teste/exemploDoContrato'
 import { capturar, problema } from '../../test/capturar'
 import { renderizarTela } from '../../test/telas'
+import { instalarTurnstileFalso } from '../../test/turnstileFalso'
 import { responderFormulario, responderFormularioPublico } from './enviarRespostas'
 
 vi.mock('./enviarRespostas', () => ({
@@ -382,7 +383,40 @@ describe('Pagina publica do candidato', { timeout: 20000 }, () => {
     expect(await screen.findByText(texto)).toBeInTheDocument()
   })
 
+  it('429 ao abrir a pagina oferece "Tentar de novo" e a segunda tentativa abre o formulario; 404 nao oferece', async () => {
+    const publico = ex<Esquema<'FormularioPaginaPublica'>>('obterFormularioPublico')
+    let chamadas = 0
+    servidor.use(
+      http.get('*/api/publico/formularios/:token', () => {
+        chamadas += 1
+        return chamadas === 1
+          ? HttpResponse.json(ex<Record<string, unknown>>('obterFormularioPublico', 429), {
+              status: 429,
+              headers: { 'content-type': 'application/problem+json' },
+            })
+          : HttpResponse.json(publico)
+      }),
+    )
+    const { user } = renderizarTela('/formulario/abc')
+    await user.click(await screen.findByRole('button', { name: 'Tentar de novo' }))
+    expect(
+      await screen.findByRole('heading', { level: 1, name: publico.titulo }),
+    ).toBeInTheDocument()
+    expect(chamadas).toBe(2)
+  })
+
+  it('404 (link inexistente) nao oferece "Tentar de novo"', async () => {
+    capturar('obterFormularioPublico', problemaDoContrato('obterFormularioPublico', 404))
+    renderizarTela('/formulario/abc')
+    expect(
+      await screen.findByText('Este link não existe ou não está mais disponível.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull()
+  })
+
   it('envio: 409 JA_RESPONDIDO mostra o detail; sucesso mostra a mensagem do recibo', async () => {
+    // o exemplo do contrato traz o captcha ligado: o widget falso passa sozinho (os testes do captcha estão em captchaDaCandidatura.test.tsx)
+    const turnstile = instalarTurnstileFalso({ automatico: 'tk' })
     const publico = ex<Esquema<'FormularioPaginaPublica'>>('obterFormularioPublico')
     servidor.use(
       http.get('*/api/publico/formularios/:token', () =>
@@ -428,12 +462,21 @@ describe('Pagina publica do candidato', { timeout: 20000 }, () => {
         telefone: '(11) 98877-1204',
         curriculo: null,
         aceitouAvisoDePrivacidade: true,
+        captchaToken: 'tk-1',
       },
       { respostas: [{ perguntaId: 1, texto: 'Sim' }], arquivos: [] },
+    )
+    // depois do erro o widget nasce de novo e traz outro token (cada um vale uma tentativa)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Enviar candidatura' })).toBeEnabled(),
     )
     await user.click(screen.getByRole('button', { name: 'Enviar candidatura' }))
     const recibo = ex<{ mensagem: string }>('responderFormularioPublico', 201)
     expect(await screen.findByText(recibo.mensagem)).toBeInTheDocument()
+    expect(vi.mocked(responderFormularioPublico).mock.calls[1]![1]).toMatchObject({
+      captchaToken: 'tk-2',
+    })
+    turnstile.desinstalar()
   })
 })
 

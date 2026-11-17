@@ -184,6 +184,135 @@ async function abrirAssistente(rota: string) {
   return { ...tela, janela }
 }
 
+describe('Alterar prazo e voltar para rascunho (contrato 0.3.0)', { timeout: 20000 }, () => {
+  const LISTA = ex<Esquema<'FormularioRhLista'>>('listarFormulariosRh')
+  const ITEM = LISTA.itens[0]!
+  const comSituacao = (situacao: Esquema<'FormularioSituacao'>, titulo: string) =>
+    capturar('listarFormulariosRh', {
+      corpo: { ...LISTA, itens: [{ ...ITEM, id: 12, situacao, titulo, prazo: '2026-11-15' }] },
+    })
+  const abrirMenu = async (titulo: string) => {
+    const { user } = await abrirLista()
+    await user.click(within(await linha(titulo)).getByRole('button', { name: /Mais ações/ }))
+    return user
+  }
+
+  it('"Alterar prazo" so existe no publicado; manda o novo prazo (PUT, so a data) e pede a lista de novo', async () => {
+    const lista = comSituacao('PUBLICADO', 'Formulário de teste')
+    const alterar = capturar('alterarPrazoDoFormulario')
+    const user = await abrirMenu('Formulário de teste')
+    await user.click(await screen.findByRole('menuitem', { name: 'Alterar prazo' }))
+    const janela = await screen.findByRole('dialog', { name: 'Alterar o prazo' })
+    const campo = within(janela).getByLabelText('Novo prazo')
+    expect(campo).toHaveValue('2026-11-15')
+    fireEvent.change(campo, { target: { value: '2026-11-30' } })
+    const antes = lista.quantas()
+    await user.click(within(janela).getByRole('button', { name: 'Salvar prazo' }))
+    await waitFor(() => expect(alterar.quantas()).toBe(1))
+    expect(alterar.ultima().parametrosDoCaminho).toEqual({ formularioId: '12' })
+    expect(alterar.ultima().corpo).toEqual({ prazo: '2026-11-30' })
+    alterar.conforme()
+    expect(await screen.findByText('Prazo alterado.')).toBeInTheDocument()
+    await waitFor(() => expect(lista.quantas()).toBeGreaterThan(antes))
+    expect(screen.queryByRole('dialog', { name: 'Alterar o prazo' })).toBeNull()
+  })
+
+  it.each(['RASCUNHO', 'AGENDADO', 'ENCERRADO'] as const)(
+    '"Alterar prazo" nao aparece em formulario %s',
+    async (situacao) => {
+      comSituacao(situacao, 'Formulário de teste')
+      await abrirMenu('Formulário de teste')
+      await screen.findByRole('menuitem', { name: 'Ver resultado' })
+      expect(screen.queryByRole('menuitem', { name: 'Alterar prazo' })).toBeNull()
+    },
+  )
+
+  it('400 no prazo (dia anterior a hoje) aparece no campo e a janela continua aberta', async () => {
+    comSituacao('PUBLICADO', 'Formulário de teste')
+    capturar(
+      'alterarPrazoDoFormulario',
+      problema(400, {
+        title: 'Confira os dados informados.',
+        status: 400,
+        errors: { prazo: ['O prazo não pode ser anterior a hoje.'] },
+      }),
+    )
+    const user = await abrirMenu('Formulário de teste')
+    await user.click(await screen.findByRole('menuitem', { name: 'Alterar prazo' }))
+    const janela = await screen.findByRole('dialog', { name: 'Alterar o prazo' })
+    fireEvent.change(within(janela).getByLabelText('Novo prazo'), {
+      target: { value: '2026-10-01' },
+    })
+    await user.click(within(janela).getByRole('button', { name: 'Salvar prazo' }))
+    expect(
+      await within(janela).findByText('O prazo não pode ser anterior a hoje.'),
+    ).toBeInTheDocument()
+  })
+
+  it.each(['recorrente', 'naoPublicado', 'encerrado'] as const)(
+    '422 %s mostra o texto do contrato dentro da janela',
+    async (nome) => {
+      comSituacao('PUBLICADO', 'Formulário de teste')
+      capturar(
+        'alterarPrazoDoFormulario',
+        problemaDoContrato('alterarPrazoDoFormulario', 422, nome),
+      )
+      const user = await abrirMenu('Formulário de teste')
+      await user.click(await screen.findByRole('menuitem', { name: 'Alterar prazo' }))
+      const janela = await screen.findByRole('dialog', { name: 'Alterar o prazo' })
+      await user.click(within(janela).getByRole('button', { name: 'Salvar prazo' }))
+      const detalhe = ex<{ detail: string }>('alterarPrazoDoFormulario', 422, nome).detail
+      expect(await within(janela).findByText(detalhe)).toBeInTheDocument()
+    },
+  )
+
+  it('"Voltar para rascunho" so existe no agendado; pede confirmacao, chama a rota sem corpo e pede a lista de novo', async () => {
+    const lista = comSituacao('AGENDADO', 'Formulário agendado')
+    const voltar = capturar('voltarFormularioParaRascunho')
+    const user = await abrirMenu('Formulário agendado')
+    await user.click(await screen.findByRole('menuitem', { name: 'Voltar para rascunho' }))
+    const confirmacao = await screen.findByRole('alertdialog', {
+      name: 'Voltar este formulário para rascunho?',
+    })
+    expect(voltar.quantas()).toBe(0)
+    expect(within(confirmacao).getByText(/O link por código deixa de valer/)).toBeInTheDocument()
+    const antes = lista.quantas()
+    await user.click(within(confirmacao).getByRole('button', { name: 'Voltar para rascunho' }))
+    await waitFor(() => expect(voltar.quantas()).toBe(1))
+    expect(voltar.ultima().parametrosDoCaminho).toEqual({ formularioId: '12' })
+    voltar.conforme()
+    expect(await screen.findByText('Formulário voltou para rascunho.')).toBeInTheDocument()
+    await waitFor(() => expect(lista.quantas()).toBeGreaterThan(antes))
+  })
+
+  it.each(['RASCUNHO', 'PUBLICADO', 'ENCERRADO'] as const)(
+    '"Voltar para rascunho" nao aparece em formulario %s',
+    async (situacao) => {
+      comSituacao(situacao, 'Formulário de teste')
+      await abrirMenu('Formulário de teste')
+      await screen.findByRole('menuitem', { name: 'Ver resultado' })
+      expect(screen.queryByRole('menuitem', { name: 'Voltar para rascunho' })).toBeNull()
+    },
+  )
+
+  it('422 FORMULARIO_NAO_ESTA_AGENDADO mostra o texto do contrato na confirmacao', async () => {
+    comSituacao('AGENDADO', 'Formulário agendado')
+    capturar(
+      'voltarFormularioParaRascunho',
+      problemaDoContrato('voltarFormularioParaRascunho', 422),
+    )
+    const user = await abrirMenu('Formulário agendado')
+    await user.click(await screen.findByRole('menuitem', { name: 'Voltar para rascunho' }))
+    const confirmacao = await screen.findByRole('alertdialog', {
+      name: 'Voltar este formulário para rascunho?',
+    })
+    await user.click(within(confirmacao).getByRole('button', { name: 'Voltar para rascunho' }))
+    expect(
+      await within(confirmacao).findByText('Só um formulário agendado volta para rascunho.'),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('Assistente (telas 17 a 20)', { timeout: 20000 }, () => {
   it('etapa Detalhes: seis tipos (com Pesquisa e Sugestao, sem Quiz); Sugestao esconde "Respostas anonimas"', async () => {
     const { user, janela } = await abrirAssistente('/rh/formularios/novo')
@@ -445,6 +574,109 @@ describe('Assistente (telas 17 a 20)', { timeout: 20000 }, () => {
     expect(
       await screen.findByText(/A data de agendamento só é guardada ao publicar/),
     ).toBeInTheDocument()
+  })
+})
+
+describe('Assistente: publicado, agendado e rascunho sem publico (travas do contrato)', () => {
+  const comFormulario = (parcial: Partial<Formulario>) =>
+    capturar('obterFormularioRh', {
+      corpo: { ...FORMULARIO, temRespostas: null, ...parcial } satisfies Formulario,
+    })
+  const publicacao = (p: Partial<Formulario['publicacao']>) => ({ ...FORMULARIO.publicacao, ...p })
+
+  it('PUBLICADO: a etapa Publicacao e so leitura, "Voltar" e "Salvar e sair" nao chamam salvarPublicacaoFormulario (o contrato recusa com 422)', async () => {
+    comFormulario({
+      situacao: 'PUBLICADO',
+      anonimo: false,
+      publicacao: publicacao({ alvo: 'PESSOAS' }),
+    })
+    const salvar = capturar('salvarPublicacaoFormulario')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    expect(
+      within(janela).getByText(
+        /Este formulário já está publicado\. Para mudar o prazo, use "Alterar prazo"/,
+      ),
+    ).toBeInTheDocument()
+    expect(within(janela).getByLabelText('Aceitar respostas até')).toBeDisabled()
+    expect(within(janela).queryByRole('button', { name: 'Salvar rascunho e sair' })).toBeNull()
+    await user.click(within(janela).getByRole('button', { name: 'Voltar' }))
+    await within(janela).findByRole('heading', { name: 'Verificação' })
+    expect(salvar.quantas()).toBe(0)
+    await user.click(within(janela).getByRole('button', { name: 'Próximo' }))
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    await user.click(within(janela).getByRole('button', { name: 'Salvar e sair' }))
+    expect(await screen.findByText('Alterações salvas.')).toBeInTheDocument()
+    expect(salvar.quantas()).toBe(0)
+  })
+
+  it.each<[string, Partial<Formulario['publicacao']>]>([
+    ['sem "para quem" escolhido', { alvo: null }],
+    ['"Pessoas escolhidas" sem nenhuma pessoa', { alvo: 'PESSOAS', pessoas: [] }],
+    ['"Setores" sem nenhum setor', { alvo: 'SETORES', setores: [] }],
+  ])(
+    'RASCUNHO %s: "Voltar" e "Salvar rascunho e sair" nao mandam a publicacao (o contrato recusaria com 400)',
+    async (_nome, parcial) => {
+      comFormulario({ situacao: 'RASCUNHO', publicacao: publicacao(parcial) })
+      const salvar = capturar('salvarPublicacaoFormulario')
+      const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+      await within(janela).findByRole('heading', { name: 'Publicação' })
+      await user.click(within(janela).getByRole('button', { name: 'Voltar' }))
+      await within(janela).findByRole('heading', { name: 'Verificação' })
+      expect(salvar.quantas()).toBe(0)
+      await user.click(within(janela).getByRole('button', { name: 'Próximo' }))
+      await within(janela).findByRole('heading', { name: 'Publicação' })
+      await user.click(within(janela).getByRole('button', { name: 'Salvar rascunho e sair' }))
+      expect(await screen.findByText('Rascunho salvo.')).toBeInTheDocument()
+      expect(salvar.quantas()).toBe(0)
+    },
+  )
+
+  it('RASCUNHO com publico escolhido continua gravando a publicacao ao voltar', async () => {
+    comFormulario({ situacao: 'RASCUNHO', publicacao: publicacao({ alvo: 'LINK' }) })
+    const salvar = capturar('salvarPublicacaoFormulario')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    await user.click(within(janela).getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(salvar.quantas()).toBe(1))
+    salvar.conforme()
+  })
+
+  it('AGENDADO: no lugar de "Publicar formulario" ha "Salvar" (grava a publicacao) e "Voltar para rascunho" (com confirmacao)', async () => {
+    comFormulario({
+      situacao: 'AGENDADO',
+      publicacao: publicacao({ alvo: 'LINK', agendarPara: '2026-10-20' }),
+    })
+    const salvar = capturar('salvarPublicacaoFormulario')
+    const publicar = capturar('publicarFormulario')
+    const voltar = capturar('voltarFormularioParaRascunho')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    expect(within(janela).queryByRole('button', { name: 'Publicar formulário' })).toBeNull()
+    await user.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(salvar.quantas()).toBe(1))
+    expect(salvar.ultima().corpo).toMatchObject({ agendarPara: '2026-10-20' })
+    expect(await screen.findByText('Alterações salvas.')).toBeInTheDocument()
+    expect(publicar.quantas()).toBe(0)
+    expect(voltar.quantas()).toBe(0)
+  })
+
+  it('AGENDADO: "Voltar para rascunho" pede confirmacao, chama a rota e fecha o assistente', async () => {
+    comFormulario({
+      situacao: 'AGENDADO',
+      publicacao: publicacao({ alvo: 'LINK', agendarPara: '2026-10-20' }),
+    })
+    const voltar = capturar('voltarFormularioParaRascunho')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await user.click(await within(janela).findByRole('button', { name: 'Voltar para rascunho' }))
+    const confirmacao = await screen.findByRole('alertdialog', {
+      name: 'Voltar este formulário para rascunho?',
+    })
+    expect(voltar.quantas()).toBe(0)
+    await user.click(within(confirmacao).getByRole('button', { name: 'Voltar para rascunho' }))
+    await waitFor(() => expect(voltar.quantas()).toBe(1))
+    voltar.conforme()
+    expect(await screen.findByText('Formulário voltou para rascunho.')).toBeInTheDocument()
   })
 })
 

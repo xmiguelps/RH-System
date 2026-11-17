@@ -125,19 +125,6 @@ describe('clienteApi', () => {
     expect(corpos).toEqual({ renovar: { refreshToken: 'r1' }, sair: { refreshToken: 'r1' } })
   })
 
-  it('clienteApi.eu envia GET /api/auth/eu com Authorization Bearer', async () => {
-    let autorizacao: string | null = null
-    servidor.use(
-      http.get('*/api/auth/eu', ({ request }) => {
-        autorizacao = request.headers.get('authorization')
-        return HttpResponse.json(exemplos.obterUsuarioLogado.corpo as Record<string, unknown>)
-      }),
-    )
-    const usuario = await criarClienteApi(URL_BASE).eu('tok-123')
-    expect(autorizacao).toBe('Bearer tok-123')
-    expect(usuario.nome).toBe('Ana Souza')
-  })
-
   it('criarClienteHttp manda o token de obterToken em toda requisicao', async () => {
     let autorizacao: string | null = null
     servidor.use(

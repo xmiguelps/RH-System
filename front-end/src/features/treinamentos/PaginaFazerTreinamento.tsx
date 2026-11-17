@@ -10,6 +10,7 @@ import type { Esquema } from '../../shared/api/tipos'
 import { useBaixarPorLink } from '../../shared/arquivos/useBaixarPorLink'
 import { inteiroDaUrl } from '../../shared/lista/valoresDeLista'
 import { Aviso } from '../../shared/ui/Aviso'
+import { AvisoDeErro } from '../../shared/ui/AvisoDeErro'
 import { Botao } from '../../shared/ui/Botao'
 import { BotaoLink } from '../../shared/ui/BotaoLink'
 import { cn } from '../../shared/ui/estilo'
@@ -34,6 +35,60 @@ function mensagemDoTreinamento(erro: unknown): string {
   if (erro instanceof ErroDeApi && erro.codigo === 'INSCRICAO_PENDENTE')
     return 'Inscreva-se no treinamento antes de começar.'
   return mensagemDeErro(erro)
+}
+
+/** Vídeo enviado pelo RH: o link temporário de `baixarArquivoDeModulo` vai num `<video controls>` (o armazenamento aceita pedido de trecho, então avança e volta sem baixar tudo). */
+function VideoDoModulo({
+  treinamentoId,
+  moduloId,
+  titulo,
+}: {
+  treinamentoId: number
+  moduloId: number
+  titulo: string
+}) {
+  const link = $api.useQuery(
+    'get',
+    '/api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/download',
+    { params: { path: { treinamentoId, moduloId } } },
+    // trocar o link no meio da aula reiniciaria o vídeo: só pede de novo quando a pessoa mandar
+    { retry: false, staleTime: Infinity, refetchOnWindowFocus: false },
+  )
+  const [naoTocou, setNaoTocou] = useState(false)
+  if (link.error)
+    return <AvisoDeErro erro={link.error} aoTentarDeNovo={() => void link.refetch()} />
+  if (!link.data) return <Esqueleto className="aspect-video w-full" />
+  if (naoTocou) {
+    return (
+      <Aviso
+        tom="erro"
+        acao={
+          <Botao
+            variante="secundario"
+            tamanho="pequeno"
+            onClick={() => {
+              setNaoTocou(false)
+              void link.refetch()
+            }}
+          >
+            Tentar de novo
+          </Botao>
+        }
+      >
+        O vídeo não abriu. O link pode ter vencido.
+      </Aviso>
+    )
+  }
+  return (
+    <video
+      controls
+      preload="metadata"
+      aria-label={`Vídeo: ${titulo}`}
+      src={link.data.url}
+      onError={() => setNaoTocou(true)}
+      className="aspect-video w-full rounded-cartao bg-primaria"
+    />
+  )
 }
 
 function ConteudoDoModulo({
@@ -86,6 +141,9 @@ function ConteudoDoModulo({
             {m.tipo === 'VIDEO' ? 'O vídeo abre em outra aba.' : 'O link abre em outra aba.'}
           </p>
         </div>
+      )}
+      {m.tipo === 'VIDEO' && m.temArquivo && (
+        <VideoDoModulo treinamentoId={treinamentoId} moduloId={moduloId} titulo={m.titulo} />
       )}
       {m.tipo === 'PDF' && m.temArquivo && (
         <div>

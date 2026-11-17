@@ -147,4 +147,39 @@ describe('Tabela', () => {
     expect(screen.queryByText('detalhe de Carla Rocha')).not.toBeInTheDocument()
     expect(screen.getByText('Mostrando 1 a 2 de 2')).toBeInTheDocument()
   })
+
+  it('Tabela recarregando com linhas na tela marca o corpo como ocupado (aria-busy e esmaecido) e mantem as linhas', () => {
+    const { rerender } = render(
+      <Tabela rotulo="T" colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.id} />,
+    )
+    const corpo = () => screen.getByRole('table').querySelector('tbody')!
+    expect(corpo().className).not.toContain('opacity-')
+    rerender(
+      <Tabela rotulo="T" colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.id} carregando />,
+    )
+    expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true')
+    expect(corpo().className).toContain('opacity-60')
+    expect(screen.getByText('Bruno Lima')).toBeInTheDocument()
+  })
+
+  it('Tabela sem lista vazia customizada diz "Nenhum registro encontrado."', () => {
+    render(<Tabela rotulo="T" colunas={COLUNAS} linhas={[]} chaveDaLinha={(l) => l.id} />)
+    expect(screen.getByText('Nenhum registro encontrado.')).toBeInTheDocument()
+  })
+
+  it('Tabela destaca o titulo da coluna ordenada pelo proprio botao (o aria-sort fica no th, nao no botao)', () => {
+    render(
+      <Tabela
+        rotulo="T"
+        colunas={COLUNAS}
+        linhas={LINHAS}
+        chaveDaLinha={(l) => l.id}
+        ordenacao={{ campo: 'nome', direcao: 'ASC' }}
+        aoOrdenar={() => {}}
+      />,
+    )
+    const botao = screen.getByRole('button', { name: /Nome/ })
+    expect(botao.className).not.toContain('aria-[sort]')
+    expect(botao.className).toContain('text-primaria')
+  })
 })

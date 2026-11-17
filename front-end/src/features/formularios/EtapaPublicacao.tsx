@@ -148,9 +148,8 @@ export function EtapaPublicacao({
   aoMudar: (v: Publicacao) => void
   erros: ErrosDaPublicacao
 }) {
-  const travado =
-    formulario.situacao === 'ENCERRADO' ||
-    (formulario.anonimo && formulario.situacao === 'PUBLICADO')
+  // Publicado e encerrado não mudam por aqui (`salvarPublicacaoFormulario` recusa com 422); o prazo do publicado muda por "Alterar prazo", na lista.
+  const travado = formulario.situacao === 'ENCERRADO' || formulario.situacao === 'PUBLICADO'
   const ehSugestao = formulario.tipo === 'OUTRO'
   const linkPossivel = formulario.tipo === 'ENTREVISTA' && !formulario.anonimo
   const dicaDoLink = formulario.anonimo
@@ -166,7 +165,7 @@ export function EtapaPublicacao({
         <p className="text-pequeno text-texto-suave">
           {formulario.situacao === 'ENCERRADO'
             ? 'Formulário encerrado não muda.'
-            : 'Num formulário anônimo publicado, quem responde não muda.'}
+            : 'Este formulário já está publicado. Para mudar o prazo, use "Alterar prazo" na lista de formulários.'}
         </p>
       )}
       <OpcoesEmCartao<Alvo>
@@ -259,7 +258,7 @@ export function EtapaPublicacao({
               lang="pt-BR"
               min={valores.agendarPara || hoje}
               value={valores.prazo}
-              disabled={formulario.situacao === 'ENCERRADO'}
+              disabled={travado}
               onChange={(e) => aoMudar({ ...valores, prazo: e.target.value })}
             />
           </Campo>
@@ -269,7 +268,7 @@ export function EtapaPublicacao({
         <CaixaDeSelecao
           marcada={valores.lembreteAutomatico}
           aoMudar={(lembreteAutomatico) => aoMudar({ ...valores, lembreteAutomatico })}
-          desabilitada={formulario.situacao === 'ENCERRADO'}
+          desabilitada={travado}
           rotulo="Lembrar quem não respondeu 7 dias antes do prazo"
         />
       )}

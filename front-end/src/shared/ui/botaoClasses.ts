@@ -18,7 +18,8 @@ const botao = cva(
         texto: 'rounded-botao px-1 text-primaria-media underline-offset-2 hover:underline',
         perigo:
           'rounded-[9px] border border-erro-texto bg-superficie text-erro-texto hover:bg-erro-fundo',
-        claro: 'rounded-botao bg-primaria-clara text-[#0b3f44] hover:opacity-90',
+        claro:
+          'rounded-botao bg-primaria-clara text-[#0b3f44] hover:opacity-90 focus-visible:outline-primaria-clara',
       },
       tamanho: {
         normal: 'h-11 px-5 text-corpo',

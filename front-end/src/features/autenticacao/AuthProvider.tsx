@@ -18,63 +18,80 @@ function ehNaoAutenticado(erro: unknown): boolean {
   return erro instanceof ErroDeApi && erro.status === 401
 }
 
-async function comTrava(tarefa: () => Promise<void>): Promise<void> {
+async function comTrava<T>(tarefa: () => Promise<T>): Promise<T> {
   const travas = typeof navigator === 'undefined' ? undefined : navigator.locks
-  if (travas) {
-    await travas.request(CHAVE_DO_REFRESH, tarefa)
-    return
-  }
-  await tarefa()
+  if (travas) return travas.request(CHAVE_DO_REFRESH, tarefa)
+  return tarefa()
 }
 
 export function AuthProvider({ cliente, children }: Props) {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [carregando, setCarregando] = useState(() => lerRefresh() !== null)
-  const renovacaoEmAndamento = useRef<Promise<void> | null>(null)
+  const [falhaDeConexao, setFalhaDeConexao] = useState(false)
+  const [encerradaPelaPessoa, setEncerradaPelaPessoa] = useState(false)
+  const renovacaoEmAndamento = useRef<Promise<boolean> | null>(null)
+  // Conta as vezes que a sessão mudou por ação da pessoa (entrar, sair, sair em outra aba): uma renovação que
+  // começou antes e termina depois traz uma sessão que a pessoa já deixou para trás e não pode ressuscitá-la.
+  const geracao = useRef(0)
 
   const aplicarSessao = useCallback((sessao: Sessao) => {
     tokenDeAcesso.definir(sessao.tokenDeAcesso)
     gravarRefresh(sessao.refreshToken)
+    setFalhaDeConexao(false)
+    setEncerradaPelaPessoa(false)
     setUsuario(sessao.usuario)
   }, [])
 
   const esquecerSessao = useCallback((apagarRefresh: boolean) => {
     tokenDeAcesso.definir(null)
     if (apagarRefresh) limparRefresh()
+    setFalhaDeConexao(false)
     setUsuario(null)
   }, [])
 
-  const renovarDentroDaTrava = useCallback(async () => {
+  /** Devolve `true` só quando a sessão renovada foi aplicada. */
+  const renovarDentroDaTrava = useCallback(async (): Promise<boolean> => {
+    const minha = geracao.current
+    const aplicarSeAindaVale = (sessao: Sessao): boolean => {
+      if (geracao.current !== minha) {
+        // a pessoa saiu (ou entrou de novo) enquanto isto voltava: o refresh novo não fica com ninguém
+        void cliente.sair(sessao.refreshToken).catch(() => undefined)
+        return false
+      }
+      aplicarSessao(sessao)
+      return true
+    }
     // Relê dentro da trava: outra aba pode ter acabado de renovar.
     const usado = lerRefresh()
     if (!usado) {
       esquecerSessao(false)
-      return
+      return false
     }
     try {
-      aplicarSessao(await cliente.renovar(usado))
-      return
+      return aplicarSeAindaVale(await cliente.renovar(usado))
     } catch (erro) {
       if (!ehNaoAutenticado(erro)) {
-        // Rede ou servidor: o refresh ainda pode valer; fica sem usuário e não o apaga.
-        esquecerSessao(false)
-        return
+        // Rede ou servidor: o refresh ainda pode valer. Quem já estava logado continua logado
+        // (a chamada que pediu a renovação é que falha); quem abriu o site vê "Não foi possível conectar".
+        setFalhaDeConexao(true)
+        return false
       }
     }
     const atual = lerRefresh()
     if (atual && atual !== usado) {
       try {
-        aplicarSessao(await cliente.renovar(atual))
-        return
+        return aplicarSeAindaVale(await cliente.renovar(atual))
       } catch (erro) {
-        esquecerSessao(ehNaoAutenticado(erro))
-        return
+        if (ehNaoAutenticado(erro)) esquecerSessao(true)
+        else setFalhaDeConexao(true)
+        return false
       }
     }
     esquecerSessao(true)
+    return false
   }, [aplicarSessao, cliente, esquecerSessao])
 
-  const renovar = useCallback((): Promise<void> => {
+  const renovar = useCallback((): Promise<boolean> => {
     if (!renovacaoEmAndamento.current) {
       renovacaoEmAndamento.current = comTrava(renovarDentroDaTrava).finally(() => {
         renovacaoEmAndamento.current = null
@@ -88,11 +105,21 @@ export function AuthProvider({ cliente, children }: Props) {
     void renovar().finally(() => setCarregando(false))
   }, [renovar])
 
+  const tentarDeNovo = useCallback(async () => {
+    setFalhaDeConexao(false)
+    setCarregando(true)
+    try {
+      await renovar()
+    } finally {
+      setCarregando(false)
+    }
+  }, [renovar])
+
   // Para o cliente HTTP: renova quando uma chamada de negócio recebe 401 e devolve o token novo
   // (ou null, quando a sessão acabou e já foi limpa).
   const renovarAcesso = useCallback(async (): Promise<string | null> => {
-    await renovar()
-    return tokenDeAcesso.obter()
+    const renovou = await renovar()
+    return renovou ? tokenDeAcesso.obter() : null
   }, [renovar])
 
   useEffect(() => {
@@ -103,6 +130,7 @@ export function AuthProvider({ cliente, children }: Props) {
   useEffect(() => {
     const aoMudarArmazenamento = (evento: StorageEvent) => {
       if ((evento.key === CHAVE_DO_REFRESH || evento.key === null) && evento.newValue === null) {
+        geracao.current += 1
         tokenDeAcesso.definir(null)
         setUsuario(null)
       }
@@ -113,13 +141,17 @@ export function AuthProvider({ cliente, children }: Props) {
 
   const entrar = useCallback(
     async (email: string, senha: string) => {
-      aplicarSessao(await cliente.entrar(email, senha))
+      const nova = await cliente.entrar(email, senha)
+      geracao.current += 1
+      aplicarSessao(nova)
     },
     [aplicarSessao, cliente],
   )
 
   const sair = useCallback(async () => {
     const refresh = lerRefresh()
+    geracao.current += 1
+    setEncerradaPelaPessoa(true)
     esquecerSessao(true)
     if (!refresh) return
     try {
@@ -130,8 +162,16 @@ export function AuthProvider({ cliente, children }: Props) {
   }, [cliente, esquecerSessao])
 
   const valor = useMemo<ValorDoContexto>(
-    () => ({ usuario, carregando, entrar, sair }),
-    [usuario, carregando, entrar, sair],
+    () => ({
+      usuario,
+      carregando,
+      falhaDeConexao,
+      encerradaPelaPessoa,
+      tentarDeNovo,
+      entrar,
+      sair,
+    }),
+    [usuario, carregando, falhaDeConexao, encerradaPelaPessoa, tentarDeNovo, entrar, sair],
   )
 
   return <ContextoDeAutenticacao.Provider value={valor}>{children}</ContextoDeAutenticacao.Provider>

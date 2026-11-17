@@ -72,6 +72,39 @@ describe('PaginaEntrar', () => {
     expect(chamadas).toBe(0)
   })
 
+  it('PaginaEntrar no 429 com Retry-After diz quanto esperar', async () => {
+    servidor.use(
+      http.post('*/api/auth/entrar', () =>
+        HttpResponse.json(
+          { title: 'Muitas tentativas.', status: 429 },
+          {
+            status: 429,
+            headers: { 'content-type': 'application/problem+json', 'retry-after': '45' },
+          },
+        ),
+      ),
+    )
+    renderizarApp()
+    await preencherEEntrar()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Muitas tentativas. Aguarde 45 segundos e tente de novo.',
+    )
+  })
+
+  it('PaginaEntrar com o erro mostrado liga a mensagem aos dois campos (aria-invalid e aria-describedby) e a leva ao leitor de tela', async () => {
+    servidor.use(http.post('*/api/auth/entrar', () => problema(401, 'Credenciais.')))
+    renderizarApp()
+    const usuario = await preencherEEntrar()
+    const alerta = await screen.findByRole('alert')
+    for (const campo of [screen.getByLabelText('E-mail'), screen.getByLabelText('Senha')]) {
+      expect(campo).toHaveAttribute('aria-invalid', 'true')
+      expect(campo).toHaveAttribute('aria-describedby', alerta.id)
+    }
+    expect(alerta.id).not.toBe('')
+    await usuario.type(screen.getByLabelText('Senha'), 'x')
+    expect(screen.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'true')
+  })
+
   it('PaginaEntrar desabilita o botao enquanto envia', async () => {
     let liberar: () => void = () => {}
     const espera = new Promise<void>((resolver) => {

@@ -61,6 +61,51 @@ describe('modulos do treinamento (multipart)', () => {
     edicao.conforme()
   })
 
+  it('video por arquivo: manda o arquivo e nenhum endereco; video por link nao manda arquivo; editar sem nada novo nao manda nenhum dos dois', async () => {
+    const envio = capturar('adicionarModuloDeTreinamento')
+    const mp4 = new File(['....'], 'boas-vindas.mp4', { type: 'video/mp4' })
+    await adicionarModulo(
+      6,
+      {
+        titulo: 'Boas-vindas',
+        tipo: 'VIDEO',
+        urlExterna: 'https://velho.exemplo.com.br/a',
+        arquivo: mp4,
+      },
+      cliente,
+    )
+    expect(envio.ultima().corpo).toEqual({
+      titulo: 'Boas-vindas',
+      tipo: 'VIDEO',
+      arquivo: 'boas-vindas.mp4',
+    })
+    envio.conforme()
+    const edicao = capturar('atualizarModuloDeTreinamento')
+    await atualizarModulo(
+      6,
+      23,
+      { titulo: 'Boas-vindas', tipo: 'VIDEO', urlExterna: null, arquivo: null },
+      cliente,
+    )
+    expect(edicao.ultima().corpo).toEqual({ titulo: 'Boas-vindas', tipo: 'VIDEO' })
+    await atualizarModulo(
+      6,
+      23,
+      {
+        titulo: 'Boas-vindas',
+        tipo: 'VIDEO',
+        urlExterna: 'https://videos.exemplo.com.br/b',
+        arquivo: null,
+      },
+      cliente,
+    )
+    expect(edicao.ultima().corpo).toEqual({
+      titulo: 'Boas-vindas',
+      tipo: 'VIDEO',
+      urlExterna: 'https://videos.exemplo.com.br/b',
+    })
+  })
+
   it('um campo de quiz ou de aula presencial seria acusado pelo contrato', () => {
     expect(() =>
       esperarRequisicaoConforme('adicionarModuloDeTreinamento', {

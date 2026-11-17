@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { tokenDeAcesso } from '../features/autenticacao/armazenamentoDaSessao'
@@ -36,6 +36,20 @@ describe('PortalLayout', () => {
     expect(localStorage.getItem('rh.refresh')).toBeNull()
     expect(tokenDeAcesso.obter()).toBeNull()
     expect(roteador.state.location.pathname).toBe('/entrar')
+    // quem sai de proposito nao deixa a tela dele como destino da proxima pessoa
+    expect(roteador.state.location.search).toBe('')
+  })
+
+  it('o titulo da aba acompanha o h1 da tela (e volta a RH-System ao sair do portal)', async () => {
+    entrarComo('RH')
+    const { roteador, unmount } = renderizarApp({ rota: '/rh/colaboradores' })
+    const h1 = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(document.title).toBe(`${h1.textContent} · RH-System`))
+    await roteador.navigate('/rh/painel')
+    const novoH1 = await screen.findByRole('heading', { level: 1, name: /, Ana$/ })
+    await waitFor(() => expect(document.title).toBe(`${novoH1.textContent} · RH-System`))
+    unmount()
+    expect(document.title).toBe('RH-System')
   })
 
   it('nao tem item de menu com icone e o menu e uma nav nomeada', async () => {

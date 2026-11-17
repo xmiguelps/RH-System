@@ -34,7 +34,6 @@ export function MenuLateral({ caminhosExistentes }: { caminhosExistentes?: Reado
                 <li key={item.caminho}>
                   <NavLink
                     to={item.caminho}
-                    end
                     className={({ isActive }) =>
                       cn(
                         'flex h-11 items-center justify-between rounded-campo px-3 text-corpo font-medium text-menu-texto hover:bg-primaria-suave focus-visible:outline-2 focus-visible:outline-primaria-clara',

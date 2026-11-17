@@ -53,6 +53,8 @@ export type DadosDoCandidato = {
   telefone?: string
   curriculo?: File | null
   aceitouAvisoDePrivacidade: boolean
+  /** O token do widget do captcha (só quando a página traz `captcha`); cada token vale uma tentativa. */
+  captchaToken?: string
 }
 
 /** Página pública: sem sessão (cliente público, sem Authorization nem renovação). */
@@ -68,6 +70,7 @@ export async function responderFormularioPublico(
     ...(candidato.telefone ? { telefone: candidato.telefone } : {}),
     ...(candidato.curriculo ? { curriculo: candidato.curriculo.name } : {}),
     aceitouAvisoDePrivacidade: candidato.aceitouAvisoDePrivacidade,
+    ...(candidato.captchaToken ? { captchaToken: candidato.captchaToken } : {}),
     respostas: [...envio.respostas],
     ...(envio.arquivos.length ? { arquivos: envio.arquivos.map((a) => a.name) } : {}),
   }
@@ -81,6 +84,7 @@ export async function responderFormularioPublico(
       if (candidato.telefone) formulario.append('telefone', candidato.telefone)
       if (candidato.curriculo) formulario.append('curriculo', candidato.curriculo)
       formulario.append('aceitouAvisoDePrivacidade', String(candidato.aceitouAvisoDePrivacidade))
+      if (candidato.captchaToken) formulario.append('captchaToken', candidato.captchaToken)
       partesDasRespostas(formulario, envio.respostas, envio.arquivos)
       return formulario
     },

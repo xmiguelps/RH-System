@@ -130,7 +130,7 @@ const problema = (status, titulo, detalhe) => ({
 
 const servidor = await iniciarServidor({ dist, config })
 const politica = servidor.cabecalhos['Content-Security-Policy']
-const origemDaApi = /connect-src 'self' (\S+)/.exec(politica)?.[1]
+const origemDaApi = /connect-src 'self' ([^\s;]+)/.exec(politica)?.[1]
 if (!origemDaApi) throw new Error(`A política não tem origem da API no connect-src: ${politica}`)
 console.log(`servidor de teste em ${servidor.url}\npolítica: ${politica}`)
 if (/exemplo\.test|invalid/.test(politica))

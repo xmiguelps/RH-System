@@ -23,7 +23,7 @@ describe('staticwebapp.config.json', () => {
     })
   })
 
-  it('a politica fecha tudo em self e libera so a API no connect-src, sem unsafe-inline nem unsafe-eval', () => {
+  it('a politica fecha tudo em self e libera so o que o app usa (API, armazenamento e o Turnstile), sem unsafe-inline nem unsafe-eval', () => {
     const politica = ler().globalHeaders['Content-Security-Policy']
     expect(politica).toBeDefined()
     const diretivas = Object.fromEntries(
@@ -36,11 +36,39 @@ describe('staticwebapp.config.json', () => {
           return [nome, valores]
         }),
     )
-    expect(Object.keys(diretivas).sort()).toEqual(['connect-src', 'default-src'])
+    expect(Object.keys(diretivas).sort()).toEqual([
+      'base-uri',
+      'connect-src',
+      'default-src',
+      'form-action',
+      'frame-ancestors',
+      'frame-src',
+      'media-src',
+      'script-src',
+    ])
     expect(diretivas['default-src']).toEqual(["'self'"])
     expect(diretivas['connect-src']).toHaveLength(2)
     expect(diretivas['connect-src'][0]).toBe("'self'")
     expect(diretivas['connect-src'][1]).toMatch(/^https:\/\/\S+$/)
+    // o widget do Cloudflare Turnstile (candidatura publica) pede o script e o iframe, e so desse endereco
+    expect(diretivas['script-src']).toEqual(["'self'", 'https://challenges.cloudflare.com'])
+    expect(diretivas['frame-src']).toEqual(['https://challenges.cloudflare.com'])
+    // o video por arquivo vem do armazenamento (endereco-marcador que o dono troca no deploy, como o da API)
+    expect(diretivas['media-src']).toHaveLength(2)
+    expect(diretivas['media-src'][0]).toBe("'self'")
+    expect(diretivas['media-src'][1]).toMatch(/^https:\/\/\S+$/)
+    // estas tres nao herdam do default-src
+    expect(diretivas['base-uri']).toEqual(["'self'"])
+    expect(diretivas['form-action']).toEqual(["'self'"])
+    expect(diretivas['frame-ancestors']).toEqual(["'none'"])
     expect(politica).not.toMatch(/unsafe-inline|unsafe-eval|data:|blob:|\*/)
+  })
+
+  it('a politica nao deixa um arquivo de /assets que nao existe virar a pagina do app, e exige https', () => {
+    const config = ler() as Configuracao & { navigationFallback: { exclude?: string[] } }
+    expect(config.navigationFallback.exclude).toEqual(['/assets/*', '/*.{svg,js,css,woff2}'])
+    expect(config.globalHeaders['Strict-Transport-Security']).toBe(
+      'max-age=31536000; includeSubDomains',
+    )
   })
 })

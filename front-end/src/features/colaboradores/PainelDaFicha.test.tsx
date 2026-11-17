@@ -1,7 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Esquema } from '../../shared/api/tipos'
 import { exemplos } from '../../shared/mocks/gerado/handlers'
+import { servidor } from '../../shared/mocks/servidor'
 import { exemploDoContrato } from '../../shared/teste/exemploDoContrato'
 import { capturar, problema } from '../../test/capturar'
 import { escolherOpcao } from '../../test/formulario'
@@ -361,6 +363,60 @@ describe('Ficha: Editar dados', { timeout: 15000 }, () => {
     expect(
       await screen.findByText('Você não pode alterar o seu próprio nível de acesso.'),
     ).toBeInTheDocument()
+  })
+
+  it('trocar de pessoa pelo link do 409 abre a outra ficha em leitura, com os dados dela, e salvar nunca leva os dados da primeira', async () => {
+    const HENRIQUE: Ficha = {
+      ...FICHA,
+      id: 31,
+      nome: 'Henrique Alves',
+      cpf: '52998224725',
+      emailCorporativo: 'henrique.alves@empresa.com.br',
+    }
+    servidor.use(
+      http.get('*/api/rh/funcionarios/:funcionarioId', ({ params }) => {
+        if (!/^\d+$/.test(String(params.funcionarioId))) return undefined
+        return HttpResponse.json(params.funcionarioId === '31' ? HENRIQUE : FICHA)
+      }),
+    )
+    capturar(
+      'editarFuncionario',
+      problema(409, {
+        ...exemploDoContrato<Record<string, unknown>>('editarFuncionario', 409, 'cpf'),
+        cadastroExistente: { funcionarioId: 31, nome: 'Henrique Alves', ativo: true },
+      }),
+    )
+    // Henrique ja esta no cache: sem a chave por pessoa o formulario nem remontaria.
+    const { user, roteador } = await abrir('/rh/colaboradores/31')
+    expect(await screen.findByText('Henrique Alves', { selector: 'p' })).toBeInTheDocument()
+    await roteador.navigate('/rh/colaboradores/12')
+    expect(await screen.findByText('Bruno Lima', { selector: 'p' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Editar dados' }))
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Cargo' })).not.toHaveTextContent('Carregando'),
+    )
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await user.click(await screen.findByRole('link', { name: 'Abrir a ficha de Henrique Alves' }))
+    expect(await screen.findByText('Henrique Alves', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Salvar alterações' })).toBeNull()
+    expect(screen.queryByLabelText('Nome completo')).toBeNull()
+    expect(screen.getByText('529.982.247-25')).toBeInTheDocument()
+
+    const editar = capturar('editarFuncionario')
+    await user.click(screen.getByRole('button', { name: 'Editar dados' }))
+    expect(await screen.findByLabelText('Nome completo')).toHaveValue('Henrique Alves')
+    expect(screen.queryByRole('link', { name: /^Abrir a ficha de / })).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Cargo' })).not.toHaveTextContent('Carregando'),
+    )
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await waitFor(() => expect(editar.quantas()).toBe(1))
+    expect(editar.ultima().parametrosDoCaminho).toEqual({ funcionarioId: '31' })
+    expect(editar.ultima().corpo).toMatchObject({
+      nome: 'Henrique Alves',
+      cpf: '52998224725',
+      emailCorporativo: 'henrique.alves@empresa.com.br',
+    })
   })
 
   it('a ficha sem dados pessoais abre o formulario com os obrigatorios vazios e exige o preenchimento', async () => {

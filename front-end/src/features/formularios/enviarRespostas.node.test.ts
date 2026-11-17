@@ -125,4 +125,25 @@ describe('responderFormularioPublico (multipart, sem sessao)', () => {
     expect(recibo).toEqual(exemploDoContrato('responderFormularioPublico', 201))
     envio.conforme()
   })
+
+  it('captchaToken vai como campo de texto do multipart quando o captcha esta ligado e nao vai quando esta desligado', async () => {
+    const envio = capturar('responderFormularioPublico')
+    const chamar = (captchaToken?: string) =>
+      responderFormularioPublico(
+        'k3Qz9vT1mP8xLw2RbN7cYdEa5HuJ0sFgXo4iBtVq6Zc',
+        {
+          nome: 'Mariana Teixeira',
+          email: 'mariana.teixeira@email.com.br',
+          aceitouAvisoDePrivacidade: true,
+          ...(captchaToken ? { captchaToken } : {}),
+        },
+        { respostas: [{ perguntaId: 501, alternativaIds: [901] }], arquivos: [] },
+        semSessao,
+      )
+    await chamar('token-do-widget')
+    expect(envio.ultima().corpo).toMatchObject({ captchaToken: 'token-do-widget' })
+    envio.conforme()
+    await chamar()
+    expect(envio.ultima().corpo).not.toHaveProperty('captchaToken')
+  })
 })

@@ -38,6 +38,22 @@ describe('rotas', () => {
   })
 
   it.each([
+    ['Funcionario', '/rh/painel', '/eu/inicio'],
+    ['Funcionario', '/gestor/equipe', '/eu/inicio'],
+    ['Gestor', '/rh/painel', '/eu/inicio'],
+    ['RH', '/gestor/equipe', '/rh/painel'],
+    ['Gestor', '/gestor/equipe', '/gestor/equipe'],
+    ['Funcionario', '/eu/ferias', '/eu/ferias'],
+  ] as const)(
+    '%s que entra com voltar=%s so e levado la se a familia de telas e do perfil dele (senao cai no inicio: %s)',
+    async (perfil, voltar, esperado) => {
+      const { roteador } = renderizarApp({ rota: `/entrar?voltar=${encodeURIComponent(voltar)}` })
+      await entrarPelaTela(perfil)
+      await waitFor(() => expect(roteador.state.location.pathname).toBe(esperado))
+    },
+  )
+
+  it.each([
     ['RH', '/rh/painel'],
     ['Funcionario', '/eu/inicio'],
     ['Gestor', '/eu/inicio'],
@@ -92,6 +108,7 @@ describe('rotas', () => {
     const logado = renderizarApp({ rota: '/colaboradores-que-nao-existe' })
     expect(await screen.findByText('Página não encontrada.')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Menu principal' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ir para o início' })).toHaveAttribute('href', '/')
     logado.unmount()
     localStorage.clear()
     tokenDeAcesso.definir(null)
@@ -115,6 +132,25 @@ describe('rotas', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Carregando')
     expect(screen.queryByRole('button', { name: 'Entrar' })).not.toBeInTheDocument()
     liberar()
+    expect(await screen.findByText('Portal de RH')).toBeInTheDocument()
+  })
+
+  it('com refresh guardado e a API fora do ar mostra "Não foi possível conectar" (sem mandar para a entrada) e "Tentar de novo" entra quando ela volta', async () => {
+    localStorage.setItem('rh.refresh', 'r-guardado')
+    let fora = true
+    servidor.use(
+      http.post('*/api/auth/renovar', () =>
+        fora
+          ? HttpResponse.error()
+          : HttpResponse.json(exemplos.renovarSessao.corpo as Record<string, unknown>),
+      ),
+    )
+    renderizarApp({ rota: '/rh/painel' })
+    expect(await screen.findByText('Não foi possível conectar.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Entrar' })).not.toBeInTheDocument()
+    expect(localStorage.getItem('rh.refresh')).toBe('r-guardado')
+    fora = false
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Tentar de novo' }))
     expect(await screen.findByText('Portal de RH')).toBeInTheDocument()
   })
 

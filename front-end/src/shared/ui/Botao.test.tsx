@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { Botao } from './Botao'
+import { Cartao } from './Cartao'
 import { BotaoLink } from './BotaoLink'
 
 describe('Botao', () => {
@@ -30,6 +31,21 @@ describe('Botao', () => {
     expect(botao).toHaveAttribute('aria-busy', 'true')
     await usuario.click(botao)
     expect(aoClicar).not.toHaveBeenCalled()
+  })
+
+  it('o foco de um controle sobre o cartao escuro usa o anel claro (o anel padrao some em cima do fundo escuro) e o botao claro tambem', () => {
+    render(
+      <Cartao tom="escuro">
+        <a href="/x">Pedir ajuste</a>
+        <Botao variante="claro">Registrar entrada</Botao>
+      </Cartao>,
+    )
+    expect(screen.getByRole('link').closest('section')!.className).toContain(
+      '**:focus-visible:outline-primaria-clara',
+    )
+    expect(screen.getByRole('button', { name: 'Registrar entrada' }).className).toContain(
+      'focus-visible:outline-primaria-clara',
+    )
   })
 
   it('Botao expoe data-variante e data-tamanho', () => {

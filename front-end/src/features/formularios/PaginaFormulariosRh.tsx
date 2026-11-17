@@ -22,6 +22,7 @@ import { Progresso } from '../../shared/ui/Progresso'
 import { Selo } from '../../shared/ui/Selo'
 import { Tabela, type ColunaDaTabela } from '../../shared/ui/Tabela'
 import { useNotificacao } from '../../shared/ui/useNotificacao'
+import { ModalDoPrazoDoFormulario } from './ModalDoPrazoDoFormulario'
 import {
   rotuloDoTipo,
   SITUACAO_DO_FORMULARIO,
@@ -32,7 +33,7 @@ import {
 type Item = Esquema<'FormularioRhItem'>
 type Tipo = Esquema<'FormularioTipo'>
 type Aba = Tipo | 'TODOS'
-type Acao = 'encerrar' | 'excluir'
+type Acao = 'encerrar' | 'excluir' | 'rascunho'
 type Confirmacao = { acao: Acao; item: Item; texto: string; comConfirmar: boolean } | null
 
 const TIPOS = ['ENTREVISTA', 'ADMISSAO', 'AVALIACAO', 'PESQUISA', 'OUTRO'] as const
@@ -42,7 +43,29 @@ const OPCOES_DE_SITUACAO = SITUACOES.map((s) => ({
   rotulo: SITUACAO_DO_FORMULARIO[s].texto,
 }))
 
+const MENSAGEM_DE_SUCESSO: Record<Acao, string> = {
+  encerrar: 'Formulário encerrado.',
+  excluir: 'Formulário excluído.',
+  rascunho: 'Formulário voltou para rascunho.',
+}
+
+const TITULO_DA_CONFIRMACAO: Record<Acao, string> = {
+  encerrar: 'Encerrar este formulário?',
+  excluir: 'Excluir este formulário?',
+  rascunho: 'Voltar este formulário para rascunho?',
+}
+
+const ROTULO_DE_CONFIRMAR: Record<Acao, string> = {
+  encerrar: 'Encerrar',
+  excluir: 'Excluir',
+  rascunho: 'Voltar para rascunho',
+}
+
+const TEXTO_DO_RASCUNHO =
+  'O link por código deixa de valer e, ao publicar de novo, o sistema gera outro. As escolhas da etapa Publicação continuam guardadas; o dia agendado é apagado.'
+
 function textoDaConfirmacao(acao: Acao, pendentes: number | null): string {
+  if (acao === 'rascunho') return TEXTO_DO_RASCUNHO
   if (pendentes === null)
     return acao === 'encerrar'
       ? 'Este formulário é anônimo: o sistema não diz quantas pessoas ainda não responderam. Encerrar mesmo assim?'
@@ -75,6 +98,7 @@ export function PaginaFormulariosRh() {
     },
   })
   const [confirmacao, setConfirmacao] = useState<Confirmacao>(null)
+  const [prazoDe, setPrazoDe] = useState<Item | null>(null)
   const [executando, setExecutando] = useState(false)
   const [erroDaAcao, setErroDaAcao] = useState<unknown>(null)
   const dados = lista.data
@@ -94,6 +118,12 @@ export function PaginaFormulariosRh() {
   }
 
   async function executar(acao: Acao, item: Item, confirmar: boolean) {
+    if (acao === 'rascunho') {
+      await clienteHttp.POST('/api/rh/formularios/{formularioId}/rascunho', {
+        params: { path: { formularioId: item.id } },
+      })
+      return
+    }
     const params = {
       path: { formularioId: item.id },
       query: confirmar ? { confirmar: true } : {},
@@ -109,7 +139,7 @@ export function PaginaFormulariosRh() {
     try {
       await executar(acao, item, confirmar)
       setConfirmacao(null)
-      notificacao.sucesso(acao === 'encerrar' ? 'Formulário encerrado.' : 'Formulário excluído.')
+      notificacao.sucesso(MENSAGEM_DE_SUCESSO[acao])
       await invalidarRota(queryClient, '/api/rh/formularios')
     } catch (erro) {
       if (
@@ -218,9 +248,31 @@ export function PaginaFormulariosRh() {
               ...(f.situacao === 'PUBLICADO'
                 ? [
                     {
+                      chave: 'prazo',
+                      rotulo: 'Alterar prazo',
+                      aoEscolher: () => setPrazoDe(f),
+                    },
+                    {
                       chave: 'encerrar',
                       rotulo: 'Encerrar',
                       aoEscolher: () => void tentar('encerrar', f, false),
+                    },
+                  ]
+                : []),
+              ...(f.situacao === 'AGENDADO'
+                ? [
+                    {
+                      chave: 'rascunho',
+                      rotulo: 'Voltar para rascunho',
+                      aoEscolher: () => {
+                        setErroDaAcao(null)
+                        setConfirmacao({
+                          acao: 'rascunho',
+                          item: f,
+                          texto: TEXTO_DO_RASCUNHO,
+                          comConfirmar: false,
+                        })
+                      },
                     },
                   ]
                 : []),
@@ -336,14 +388,10 @@ export function PaginaFormulariosRh() {
       </div>
       <JanelaDeConfirmacao
         aberta={confirmacao !== null}
-        titulo={
-          confirmacao?.acao === 'encerrar'
-            ? 'Encerrar este formulário?'
-            : 'Excluir este formulário?'
-        }
+        titulo={TITULO_DA_CONFIRMACAO[confirmacao?.acao ?? 'excluir']}
         descricao={confirmacao?.texto ?? ''}
-        rotuloDeConfirmar={confirmacao?.acao === 'encerrar' ? 'Encerrar' : 'Excluir'}
-        perigo
+        rotuloDeConfirmar={ROTULO_DE_CONFIRMAR[confirmacao?.acao ?? 'excluir']}
+        perigo={confirmacao?.acao !== 'rascunho'}
         confirmando={executando}
         erro={erroDaAcao ?? undefined}
         aoCancelar={() => setConfirmacao(null)}
@@ -353,6 +401,7 @@ export function PaginaFormulariosRh() {
             : undefined
         }
       />
+      <ModalDoPrazoDoFormulario formulario={prazoDe} aoFechar={() => setPrazoDe(null)} />
       <Outlet />
     </div>
   )

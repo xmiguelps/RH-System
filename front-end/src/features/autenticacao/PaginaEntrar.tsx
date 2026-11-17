@@ -15,6 +15,8 @@ const esquemaDeEntrada = z.object({
 
 type DadosDeEntrada = z.infer<typeof esquemaDeEntrada>
 
+const ID_DA_MENSAGEM = 'entrar-mensagem'
+
 export function PaginaEntrar() {
   const { entrar } = useAuth()
   const navegar = useNavigate()
@@ -52,6 +54,8 @@ export function PaginaEntrar() {
             id="entrar-email"
             type="email"
             autoComplete="username"
+            aria-invalid={mensagem ? true : undefined}
+            aria-describedby={mensagem ? ID_DA_MENSAGEM : undefined}
             className="h-11 rounded-campo border border-borda-campo bg-superficie px-[13px] text-corpo text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria-media"
             {...register('email')}
           />
@@ -64,12 +68,15 @@ export function PaginaEntrar() {
             id="entrar-senha"
             type="password"
             autoComplete="current-password"
+            aria-invalid={mensagem ? true : undefined}
+            aria-describedby={mensagem ? ID_DA_MENSAGEM : undefined}
             className="h-11 rounded-campo border border-borda-campo bg-superficie px-[13px] text-corpo text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria-media"
             {...register('senha')}
           />
         </div>
         {mensagem && (
           <p
+            id={ID_DA_MENSAGEM}
             role="alert"
             className="rounded-campo bg-erro-fundo px-3 py-2 text-pequeno text-erro-texto"
           >
