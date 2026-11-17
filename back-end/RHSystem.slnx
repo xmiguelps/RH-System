@@ -5,6 +5,9 @@
     <Project Path="src/RHSystem.Domain/RHSystem.Domain.csproj" />
     <Project Path="src/RHSystem.Infrastructure/RHSystem.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/RHSystem.Demo.Exemplos/RHSystem.Demo.Exemplos.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/RHSystem.Api.IntegrationTests/RHSystem.Api.IntegrationTests.csproj" />
     <Project Path="tests/RHSystem.Application.Tests/RHSystem.Application.Tests.csproj" />
