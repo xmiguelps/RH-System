@@ -118,6 +118,25 @@ describe('rotas', () => {
     expect(await screen.findByText('Portal de RH')).toBeInTheDocument()
   })
 
+  it('com refresh guardado e a API fora do ar mostra "Não foi possível conectar" (sem mandar para a entrada) e "Tentar de novo" entra quando ela volta', async () => {
+    localStorage.setItem('rh.refresh', 'r-guardado')
+    let fora = true
+    servidor.use(
+      http.post('*/api/auth/renovar', () =>
+        fora
+          ? HttpResponse.error()
+          : HttpResponse.json(exemplos.renovarSessao.corpo as Record<string, unknown>),
+      ),
+    )
+    renderizarApp({ rota: '/rh/painel' })
+    expect(await screen.findByText('Não foi possível conectar.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Entrar' })).not.toBeInTheDocument()
+    expect(localStorage.getItem('rh.refresh')).toBe('r-guardado')
+    fora = false
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Tentar de novo' }))
+    expect(await screen.findByText('Portal de RH')).toBeInTheDocument()
+  })
+
   it('sem VITE_VITRINE a rota /eu/vitrine nao existe (404)', async () => {
     entrarComo('RH')
     renderizarApp({ rota: '/eu/vitrine' })

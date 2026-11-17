@@ -4,6 +4,7 @@ import { IrParaOInicio } from './IrParaOInicio'
 import { GuardaDePerfil } from './GuardaDePerfil'
 import { GuardaDeSessao } from './GuardaDeSessao'
 import { Pagina404 } from './paginas/Pagina404'
+import { PaginaDeErro } from './paginas/PaginaDeErro'
 import { PortalLayout } from './PortalLayout'
 import { RaizDoApp } from './RaizDoApp'
 import {
@@ -30,6 +31,8 @@ function familia(
   return {
     path: prefixo,
     element: <GuardaDePerfil perfis={perfis} />,
+    // a tela que quebra é trocada aqui dentro: o menu do portal continua em volta
+    errorElement: <PaginaDeErro />,
     children: [...rotas.map(paraRota), { path: '*', element: <Pagina404 /> }],
   }
 }
@@ -38,6 +41,7 @@ export function criarRotas(): RouteObject[] {
   return [
     {
       element: <RaizDoApp />,
+      errorElement: <PaginaDeErro />,
       children: [
         ...ROTAS_PUBLICAS.map(paraRota),
         {

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClienteApi } from '../../shared/api/clienteApi'
 import { ErroDeApi } from '../../shared/api/erroDeApi'
+import { renovadorDeAcesso } from '../../shared/api/renovadorDeAcesso'
 import type { Sessao } from '../../shared/api/tipos'
 import { exemplos } from '../../shared/mocks/gerado/handlers'
 import { tokenDeAcesso } from './armazenamentoDaSessao'
@@ -214,6 +215,65 @@ describe('AuthProvider', () => {
       )
     })
     expect(result.current.usuario?.nome).toBe('Ana Souza')
+  })
+
+  it('AuthProvider sem rede ao abrir o site avisa por falhaDeConexao (o refresh fica guardado) e tentarDeNovo entra quando a rede volta', async () => {
+    localStorage.setItem('rh.refresh', 'r-guardado')
+    const cliente = criarClienteFalso()
+    cliente.renovar.mockRejectedValueOnce(ErroDeApi.semConexao('x'))
+    const { result } = montar(cliente)
+    await waitFor(() => expect(result.current.carregando).toBe(false))
+    expect(result.current.falhaDeConexao).toBe(true)
+    expect(result.current.usuario).toBeNull()
+    cliente.renovar.mockResolvedValueOnce(sessao('r-novo'))
+    await act(() => result.current.tentarDeNovo())
+    expect(result.current.falhaDeConexao).toBe(false)
+    expect(result.current.usuario?.nome).toBe('Ana Souza')
+    expect(cliente.renovar).toHaveBeenLastCalledWith('r-guardado')
+  })
+
+  it('AuthProvider com 401 de verdade (refresh recusado) nao e falhaDeConexao: a pessoa volta para a entrada', async () => {
+    localStorage.setItem('rh.refresh', 'r-guardado')
+    const cliente = criarClienteFalso()
+    cliente.renovar.mockRejectedValue(new ErroDeApi(401, 'Não autenticado.'))
+    const { result } = montar(cliente)
+    await waitFor(() => expect(result.current.carregando).toBe(false))
+    expect(result.current.falhaDeConexao).toBe(false)
+  })
+
+  it('AuthProvider logado: a renovacao tardia (401 de uma chamada) que falha por rede NAO derruba o usuario e devolve null (a chamada nao repete)', async () => {
+    localStorage.setItem('rh.refresh', 'r-guardado')
+    const cliente = criarClienteFalso()
+    cliente.renovar.mockResolvedValueOnce(sessao('r-novo'))
+    const { result } = montar(cliente)
+    await waitFor(() => expect(result.current.usuario).not.toBeNull())
+    cliente.renovar.mockRejectedValueOnce(ErroDeApi.semConexao('x'))
+    const token = await act(() => renovadorDeAcesso.renovar())
+    expect(token).toBeNull()
+    expect(result.current.usuario?.nome).toBe('Ana Souza')
+    expect(localStorage.getItem('rh.refresh')).toBe('r-novo')
+  })
+
+  it('AuthProvider.sair durante uma renovacao em andamento: a sessao que chega depois e descartada e o refresh novo e revogado', async () => {
+    localStorage.setItem('rh.refresh', 'r-guardado')
+    const cliente = criarClienteFalso()
+    cliente.renovar.mockResolvedValueOnce(sessao('r-novo'))
+    cliente.sair.mockResolvedValue()
+    const { result } = montar(cliente)
+    await waitFor(() => expect(result.current.usuario).not.toBeNull())
+    let chegou!: (s: Sessao) => void
+    cliente.renovar.mockImplementationOnce(() => new Promise<Sessao>((r) => (chegou = r)))
+    const renovando = renovadorDeAcesso.renovar()
+    await waitFor(() => expect(cliente.renovar).toHaveBeenCalledTimes(2))
+    await act(() => result.current.sair())
+    await act(async () => {
+      chegou(sessao('r-tardio'))
+      await renovando
+    })
+    expect(result.current.usuario).toBeNull()
+    expect(localStorage.getItem('rh.refresh')).toBeNull()
+    expect(tokenDeAcesso.obter()).toBeNull()
+    expect(cliente.sair).toHaveBeenCalledWith('r-tardio')
   })
 
   it('useAuth fora do AuthProvider lanca erro', () => {

@@ -1,13 +1,16 @@
 import { QueryClient } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { tokenDeAcesso } from '../features/autenticacao/armazenamentoDaSessao'
 import { useAuth } from '../features/autenticacao/useAuth'
 import { $api } from '../shared/api/api'
 import { criarQueryClient } from '../shared/api/consultas'
 import { exemplos } from '../shared/mocks/gerado/handlers'
-import { entrarComo } from '../test/sessao'
+import { servidor } from '../shared/mocks/servidor'
+import { capturar } from '../test/capturar'
+import { entrarComo, sessaoDeTeste } from '../test/sessao'
 import { Provedores } from './Provedores'
 
 const NOME_EMPRESA = (exemplos.obterEmpresa.corpo as { nomeEmpresa: string }).nomeEmpresa
@@ -63,5 +66,39 @@ describe('Provedores', () => {
     )
     expect(await screen.findByText('Bruno Lima')).toBeInTheDocument()
     expect(screen.queryByText('Ana Souza')).not.toBeInTheDocument()
+  })
+
+  it('quando outra pessoa assume a sessao sem passar por "sem sessao" (entrada em outra aba), o cache da anterior e limpo', async () => {
+    const usuario = userEvent.setup()
+    const queryClient: QueryClient = criarQueryClient()
+    entrarComo('RH')
+    const empresa = capturar('obterEmpresa')
+    servidor.use(
+      http.post('*/api/auth/entrar', () => HttpResponse.json(sessaoDeTeste('Funcionario'))),
+    )
+    function TelaComEntrar() {
+      const { usuario: pessoa, entrar } = useAuth()
+      if (!pessoa) return <p>sem sessão</p>
+      return (
+        <>
+          <p>{pessoa.nome}</p>
+          <Empresa />
+          <button type="button" onClick={() => void entrar('bruno.lima@empresa.com.br', 'x')}>
+            Assumir
+          </button>
+        </>
+      )
+    }
+    render(
+      <Provedores queryClient={queryClient}>
+        <TelaComEntrar />
+      </Provedores>,
+    )
+    expect(await screen.findByText(NOME_EMPRESA)).toBeInTheDocument()
+    expect(empresa.quantas()).toBe(1)
+    await usuario.click(screen.getByRole('button', { name: 'Assumir' }))
+    expect(await screen.findByText('Bruno Lima')).toBeInTheDocument()
+    // os dados da pessoa anterior foram descartados e a tela buscou os dela de novo
+    await waitFor(() => expect(empresa.quantas()).toBe(2))
   })
 })
