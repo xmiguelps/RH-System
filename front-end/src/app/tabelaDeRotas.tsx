@@ -49,6 +49,7 @@ import { PaginaDefinirSenha } from '../features/autenticacao/PaginaDefinirSenha'
 import { PaginaEsqueciSenha } from '../features/autenticacao/PaginaEsqueciSenha'
 import { PaginaMeusDocumentos } from '../features/documentos/PaginaMeusDocumentos'
 import { PaginaMeusBeneficios } from '../features/beneficios/PaginaMeusBeneficios'
+import { PaginaPedidosDeBeneficiosRh } from '../features/beneficios/PaginaPedidosDeBeneficiosRh'
 import { PainelAderirAoBeneficio } from '../features/beneficios/PainelAderirAoBeneficio'
 import { PaginaMinhasFerias, PainelPedirFerias } from '../features/ferias/PaginaMinhasFerias'
 import { PaginaPedidosDeFeriasRh } from '../features/ferias/PaginaPedidosDeFeriasRh'
@@ -121,6 +122,7 @@ export const ROTAS_RH: readonly RotaDoPortal[] = [
     ],
   },
   { caminho: 'pedidos-de-ferias', elemento: <PaginaPedidosDeFeriasRh /> },
+  { caminho: 'pedidos-de-beneficios', elemento: <PaginaPedidosDeBeneficiosRh /> },
   { caminho: 'auditoria', elemento: <PaginaDeAuditoria /> },
   {
     caminho: 'ponto-e-feriados',
