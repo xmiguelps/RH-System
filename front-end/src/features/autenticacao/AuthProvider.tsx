@@ -28,6 +28,7 @@ export function AuthProvider({ cliente, children }: Props) {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [carregando, setCarregando] = useState(() => lerRefresh() !== null)
   const [falhaDeConexao, setFalhaDeConexao] = useState(false)
+  const [encerradaPelaPessoa, setEncerradaPelaPessoa] = useState(false)
   const renovacaoEmAndamento = useRef<Promise<boolean> | null>(null)
   // Conta as vezes que a sessão mudou por ação da pessoa (entrar, sair, sair em outra aba): uma renovação que
   // começou antes e termina depois traz uma sessão que a pessoa já deixou para trás e não pode ressuscitá-la.
@@ -37,6 +38,7 @@ export function AuthProvider({ cliente, children }: Props) {
     tokenDeAcesso.definir(sessao.tokenDeAcesso)
     gravarRefresh(sessao.refreshToken)
     setFalhaDeConexao(false)
+    setEncerradaPelaPessoa(false)
     setUsuario(sessao.usuario)
   }, [])
 
@@ -149,6 +151,7 @@ export function AuthProvider({ cliente, children }: Props) {
   const sair = useCallback(async () => {
     const refresh = lerRefresh()
     geracao.current += 1
+    setEncerradaPelaPessoa(true)
     esquecerSessao(true)
     if (!refresh) return
     try {
@@ -159,8 +162,16 @@ export function AuthProvider({ cliente, children }: Props) {
   }, [cliente, esquecerSessao])
 
   const valor = useMemo<ValorDoContexto>(
-    () => ({ usuario, carregando, falhaDeConexao, tentarDeNovo, entrar, sair }),
-    [usuario, carregando, falhaDeConexao, tentarDeNovo, entrar, sair],
+    () => ({
+      usuario,
+      carregando,
+      falhaDeConexao,
+      encerradaPelaPessoa,
+      tentarDeNovo,
+      entrar,
+      sair,
+    }),
+    [usuario, carregando, falhaDeConexao, encerradaPelaPessoa, tentarDeNovo, entrar, sair],
   )
 
   return <ContextoDeAutenticacao.Provider value={valor}>{children}</ContextoDeAutenticacao.Provider>

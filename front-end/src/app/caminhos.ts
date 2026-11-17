@@ -19,3 +19,15 @@ export const PERFIS_POR_FAMILIA: { rh: Perfil[]; gestor: Perfil[]; eu: Perfil[] 
   gestor: ['Gestor'],
   eu: ['Funcionario', 'Gestor', 'RH'],
 }
+
+const FAMILIAS_DE_TELAS = ['rh', 'gestor', 'eu'] as const
+
+/** `destinoSeguro` e, além disso, só uma tela de uma família que o perfil pode abrir (quem entra com `?voltar=/rh/painel` sendo funcionário cairia num 403). */
+export function destinoDoPerfil(voltar: string | null, perfil: Perfil): string | null {
+  const destino = destinoSeguro(voltar)
+  if (!destino) return null
+  const primeiro = destino.split(/[?#]/)[0]!.split('/')[1] ?? ''
+  const familia = FAMILIAS_DE_TELAS.find((f) => f === primeiro)
+  if (familia && !PERFIS_POR_FAMILIA[familia].includes(perfil)) return null
+  return destino
+}

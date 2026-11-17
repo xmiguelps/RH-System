@@ -36,6 +36,8 @@ describe('PortalLayout', () => {
     expect(localStorage.getItem('rh.refresh')).toBeNull()
     expect(tokenDeAcesso.obter()).toBeNull()
     expect(roteador.state.location.pathname).toBe('/entrar')
+    // quem sai de proposito nao deixa a tela dele como destino da proxima pessoa
+    expect(roteador.state.location.search).toBe('')
   })
 
   it('nao tem item de menu com icone e o menu e uma nav nomeada', async () => {

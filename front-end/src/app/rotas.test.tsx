@@ -38,6 +38,22 @@ describe('rotas', () => {
   })
 
   it.each([
+    ['Funcionario', '/rh/painel', '/eu/inicio'],
+    ['Funcionario', '/gestor/equipe', '/eu/inicio'],
+    ['Gestor', '/rh/painel', '/eu/inicio'],
+    ['RH', '/gestor/equipe', '/rh/painel'],
+    ['Gestor', '/gestor/equipe', '/gestor/equipe'],
+    ['Funcionario', '/eu/ferias', '/eu/ferias'],
+  ] as const)(
+    '%s que entra com voltar=%s so e levado la se a familia de telas e do perfil dele (senao cai no inicio: %s)',
+    async (perfil, voltar, esperado) => {
+      const { roteador } = renderizarApp({ rota: `/entrar?voltar=${encodeURIComponent(voltar)}` })
+      await entrarPelaTela(perfil)
+      await waitFor(() => expect(roteador.state.location.pathname).toBe(esperado))
+    },
+  )
+
+  it.each([
     ['RH', '/rh/painel'],
     ['Funcionario', '/eu/inicio'],
     ['Gestor', '/eu/inicio'],
