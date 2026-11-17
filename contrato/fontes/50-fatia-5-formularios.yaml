@@ -441,7 +441,8 @@ paths:
           `ANONIMATO_FIXO_APOS_PUBLICAR`; regra 2 em "Formulários"), para ninguém responder achando que o formulário era
           de um jeito e ser de outro. O resto: **sem resposta**, tudo pode mudar, exceto que um formulário publicado por
           link (`alvo = LINK`) não sai de `ENTREVISTA` (422 `LINK_SO_PARA_ENTREVISTA`, ver `publicarFormulario`); **com
-          resposta** (`temRespostas`), só `titulo` e `descricao`. O banco é a segunda barreira da troca de `anonimo` depois
+          resposta** (`temRespostas`), só `titulo` e `descricao` (mudar o tipo ou o sentido da avaliação é 422
+          `FORMULARIO_JA_RESPONDIDO`). O banco é a segunda barreira da troca de `anonimo` depois
           da primeira resposta (chave estrangeira composta de `V001`), mas a API responde 409 antes de chegar nele.
         - `ENCERRADO`: nada muda (422 `FORMULARIO_ENCERRADO`).
         Passar para anônimo (só em rascunho ou agendado) com uma pergunta de envio de arquivo, ou com link público, é
@@ -2534,7 +2535,8 @@ components:
       description: |
         A edição foi recusada por uma regra do formulário. `codigo`: `FORMULARIO_ENCERRADO` (formulário encerrado não muda),
         `FORMULARIO_NAO_PUBLICADO` (só publicado se encerra), `PERGUNTA_JA_RESPONDIDA` (só em formulário com nome: no
-        anônimo publicado o erro é o 409 `ANONIMO_PERGUNTAS_FIXAS`), `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`,
+        anônimo publicado o erro é o 409 `ANONIMO_PERGUNTAS_FIXAS`), `FORMULARIO_JA_RESPONDIDO` (formulário com nome,
+        publicado e já respondido: só `titulo` e `descricao` mudam), `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`,
         `LINK_SO_PARA_ENTREVISTA`. Pode trazer `regraDoBanco` com a mensagem original do trigger.
       content:
         application/problem+json:
@@ -2565,6 +2567,14 @@ components:
                 detail: O formulário está encerrado e não pode mais ser alterado.
                 traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
                 codigo: FORMULARIO_ENCERRADO
+            jaRespondido:
+              summary: Formulário publicado que já tem respostas
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: Este formulário já tem respostas. Só o título e a descrição podem mudar.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FORMULARIO_JA_RESPONDIDO
     FormularioErro422Publicacao:
       description: |
         A publicação foi recusada. `codigo`: `FORMULARIO_ANONIMO_PUBLICO_PEQUENO` (anônimo para menos de 5 pessoas; é
