@@ -18,6 +18,14 @@ export type Publicacao = {
   ate: string
 }
 
+/** A publicação já diz para quem vai? Sem isso (ou com "pessoas" sem ninguém, ou "setores" sem nenhum), o contrato recusa o corpo (400): quem sai ou volta da etapa antes de escolher não manda nada. */
+export function publicacaoCompleta(v: Publicacao): boolean {
+  if (v.alvo === null) return false
+  if (v.alvo === 'PESSOAS') return v.pessoas.length > 0
+  if (v.alvo === 'SETORES') return v.setorIds.length > 0
+  return true
+}
+
 export function publicacaoInicial(f: Formulario): Publicacao {
   const p = f.publicacao
   return {

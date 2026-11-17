@@ -577,6 +577,109 @@ describe('Assistente (telas 17 a 20)', { timeout: 20000 }, () => {
   })
 })
 
+describe('Assistente: publicado, agendado e rascunho sem publico (travas do contrato)', () => {
+  const comFormulario = (parcial: Partial<Formulario>) =>
+    capturar('obterFormularioRh', {
+      corpo: { ...FORMULARIO, temRespostas: null, ...parcial } satisfies Formulario,
+    })
+  const publicacao = (p: Partial<Formulario['publicacao']>) => ({ ...FORMULARIO.publicacao, ...p })
+
+  it('PUBLICADO: a etapa Publicacao e so leitura, "Voltar" e "Salvar e sair" nao chamam salvarPublicacaoFormulario (o contrato recusa com 422)', async () => {
+    comFormulario({
+      situacao: 'PUBLICADO',
+      anonimo: false,
+      publicacao: publicacao({ alvo: 'PESSOAS' }),
+    })
+    const salvar = capturar('salvarPublicacaoFormulario')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    expect(
+      within(janela).getByText(
+        /Este formulário já está publicado\. Para mudar o prazo, use "Alterar prazo"/,
+      ),
+    ).toBeInTheDocument()
+    expect(within(janela).getByLabelText('Aceitar respostas até')).toBeDisabled()
+    expect(within(janela).queryByRole('button', { name: 'Salvar rascunho e sair' })).toBeNull()
+    await user.click(within(janela).getByRole('button', { name: 'Voltar' }))
+    await within(janela).findByRole('heading', { name: 'Verificação' })
+    expect(salvar.quantas()).toBe(0)
+    await user.click(within(janela).getByRole('button', { name: 'Próximo' }))
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    await user.click(within(janela).getByRole('button', { name: 'Salvar e sair' }))
+    expect(await screen.findByText('Alterações salvas.')).toBeInTheDocument()
+    expect(salvar.quantas()).toBe(0)
+  })
+
+  it.each<[string, Partial<Formulario['publicacao']>]>([
+    ['sem "para quem" escolhido', { alvo: null }],
+    ['"Pessoas escolhidas" sem nenhuma pessoa', { alvo: 'PESSOAS', pessoas: [] }],
+    ['"Setores" sem nenhum setor', { alvo: 'SETORES', setores: [] }],
+  ])(
+    'RASCUNHO %s: "Voltar" e "Salvar rascunho e sair" nao mandam a publicacao (o contrato recusaria com 400)',
+    async (_nome, parcial) => {
+      comFormulario({ situacao: 'RASCUNHO', publicacao: publicacao(parcial) })
+      const salvar = capturar('salvarPublicacaoFormulario')
+      const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+      await within(janela).findByRole('heading', { name: 'Publicação' })
+      await user.click(within(janela).getByRole('button', { name: 'Voltar' }))
+      await within(janela).findByRole('heading', { name: 'Verificação' })
+      expect(salvar.quantas()).toBe(0)
+      await user.click(within(janela).getByRole('button', { name: 'Próximo' }))
+      await within(janela).findByRole('heading', { name: 'Publicação' })
+      await user.click(within(janela).getByRole('button', { name: 'Salvar rascunho e sair' }))
+      expect(await screen.findByText('Rascunho salvo.')).toBeInTheDocument()
+      expect(salvar.quantas()).toBe(0)
+    },
+  )
+
+  it('RASCUNHO com publico escolhido continua gravando a publicacao ao voltar', async () => {
+    comFormulario({ situacao: 'RASCUNHO', publicacao: publicacao({ alvo: 'LINK' }) })
+    const salvar = capturar('salvarPublicacaoFormulario')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    await user.click(within(janela).getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(salvar.quantas()).toBe(1))
+    salvar.conforme()
+  })
+
+  it('AGENDADO: no lugar de "Publicar formulario" ha "Salvar" (grava a publicacao) e "Voltar para rascunho" (com confirmacao)', async () => {
+    comFormulario({
+      situacao: 'AGENDADO',
+      publicacao: publicacao({ alvo: 'LINK', agendarPara: '2026-10-20' }),
+    })
+    const salvar = capturar('salvarPublicacaoFormulario')
+    const publicar = capturar('publicarFormulario')
+    const voltar = capturar('voltarFormularioParaRascunho')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await within(janela).findByRole('heading', { name: 'Publicação' })
+    expect(within(janela).queryByRole('button', { name: 'Publicar formulário' })).toBeNull()
+    await user.click(within(janela).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(salvar.quantas()).toBe(1))
+    expect(salvar.ultima().corpo).toMatchObject({ agendarPara: '2026-10-20' })
+    expect(await screen.findByText('Alterações salvas.')).toBeInTheDocument()
+    expect(publicar.quantas()).toBe(0)
+    expect(voltar.quantas()).toBe(0)
+  })
+
+  it('AGENDADO: "Voltar para rascunho" pede confirmacao, chama a rota e fecha o assistente', async () => {
+    comFormulario({
+      situacao: 'AGENDADO',
+      publicacao: publicacao({ alvo: 'LINK', agendarPara: '2026-10-20' }),
+    })
+    const voltar = capturar('voltarFormularioParaRascunho')
+    const { user, janela } = await abrirAssistente('/rh/formularios/12/editar?etapa=publicacao')
+    await user.click(await within(janela).findByRole('button', { name: 'Voltar para rascunho' }))
+    const confirmacao = await screen.findByRole('alertdialog', {
+      name: 'Voltar este formulário para rascunho?',
+    })
+    expect(voltar.quantas()).toBe(0)
+    await user.click(within(confirmacao).getByRole('button', { name: 'Voltar para rascunho' }))
+    await waitFor(() => expect(voltar.quantas()).toBe(1))
+    voltar.conforme()
+    expect(await screen.findByText('Formulário voltou para rascunho.')).toBeInTheDocument()
+  })
+})
+
 async function abrirRespondentes(id = 11) {
   const tela = renderizarTela(`/rh/formularios/${id}/respondentes`)
   await screen.findByRole('heading', { level: 1, hidden: true })

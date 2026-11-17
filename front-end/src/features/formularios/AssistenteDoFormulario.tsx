@@ -13,6 +13,7 @@ import { AvisoDeErro } from '../../shared/ui/AvisoDeErro'
 import { Botao } from '../../shared/ui/Botao'
 import { Esqueleto } from '../../shared/ui/Esqueleto'
 import { Etapas } from '../../shared/ui/Etapas'
+import { JanelaDeConfirmacao } from '../../shared/ui/JanelaDeConfirmacao'
 import { Janela } from '../../shared/ui/Janela'
 import { useNotificacao } from '../../shared/ui/useNotificacao'
 import { EtapaDetalhes, type Detalhes, type ErrosDosDetalhes } from './EtapaDetalhes'
@@ -21,7 +22,13 @@ import { EtapaPublicacao, type ErrosDaPublicacao } from './EtapaPublicacao'
 import { EtapaVerificacao } from './EtapaVerificacao'
 import { travasDosDetalhes, useVerificacao } from './regrasDoAssistente'
 import { PreviaDoFormulario } from './PreviaDoFormulario'
-import { comandoDaPublicacao, linkPublico, publicacaoInicial, type Publicacao } from './publicacao'
+import {
+  comandoDaPublicacao,
+  linkPublico,
+  publicacaoCompleta,
+  publicacaoInicial,
+  type Publicacao,
+} from './publicacao'
 import { cartaoDoTipo, tipoDoCartao } from './rotulosDosFormularios'
 
 type Formulario = Esquema<'FormularioDetalheRh'>
@@ -82,12 +89,19 @@ function CorpoDoAssistente({
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [publicado, setPublicado] = useState<Formulario | null>(null)
   const [gravando, setGravando] = useState(false)
+  const [confirmandoRascunho, setConfirmandoRascunho] = useState(false)
+  const [erroDoRascunho, setErroDoRascunho] = useState<unknown>(null)
   const criar = $api.useMutation('post', '/api/rh/formularios')
   const editar = $api.useMutation('put', '/api/rh/formularios/{formularioId}')
   const salvarPub = $api.useMutation('put', '/api/rh/formularios/{formularioId}/publicacao')
   const publicar = $api.useMutation('post', '/api/rh/formularios/{formularioId}/publicar')
+  const paraRascunho = $api.useMutation('post', '/api/rh/formularios/{formularioId}/rascunho')
   const verificacao = useVerificacaoSeExistir(formulario?.id, etapa === 'verificacao')
   const encerrado = formulario?.situacao === 'ENCERRADO'
+  const jaPublicado = formulario?.situacao === 'PUBLICADO'
+  const agendado = formulario?.situacao === 'AGENDADO'
+  // Rascunho (ou ainda nem criado): "Salvar rascunho"; publicado e agendado: só "Salvar" (as alterações).
+  const rascunho = !formulario || formulario.situacao === 'RASCUNHO'
 
   async function atualizar() {
     await invalidarRota(queryClient, '/api/rh/formularios')
@@ -134,7 +148,9 @@ function CorpoDoAssistente({
   }
 
   async function gravarPublicacao(): Promise<boolean> {
-    if (!formulario || !publicacao || encerrado) return true
+    // Publicado e encerrado não aceitam `salvarPublicacaoFormulario` (422), e uma publicação sem "para quem" o contrato recusa (400): nesses casos só se navega, nada se grava.
+    if (!formulario || !publicacao || encerrado || jaPublicado || !publicacaoCompleta(publicacao))
+      return true
     setErrosPublicacao({})
     setErroGeral(null)
     try {
@@ -186,9 +202,30 @@ function CorpoDoAssistente({
           return
         }
       }
-      notificacao.sucesso('Rascunho salvo.')
+      notificacao.sucesso(rascunho ? 'Rascunho salvo.' : 'Alterações salvas.')
       fechar()
     })
+
+  const salvarAgendamento = () =>
+    comTrava(async () => {
+      if (!(await gravarPublicacao())) return
+      notificacao.sucesso('Alterações salvas.')
+      fechar()
+    })
+
+  async function voltarParaRascunho() {
+    if (!formulario) return
+    setErroDoRascunho(null)
+    try {
+      await paraRascunho.mutateAsync({ params: { path: { formularioId: formulario.id } } })
+      await atualizar()
+      setConfirmandoRascunho(false)
+      notificacao.sucesso('Formulário voltou para rascunho.')
+      fechar()
+    } catch (erro) {
+      setErroDoRascunho(erro)
+    }
+  }
 
   const avancar = () =>
     comTrava(async () => {
@@ -272,7 +309,7 @@ function CorpoDoAssistente({
         </Botao>
       ) : (
         <Botao variante="texto" onClick={() => void salvarESair()} disabled={gravando}>
-          Salvar rascunho e sair
+          {rascunho ? 'Salvar rascunho e sair' : 'Salvar e sair'}
         </Botao>
       )}
       <div className="flex gap-3">
@@ -281,15 +318,33 @@ function CorpoDoAssistente({
             Voltar
           </Botao>
         )}
-        {etapa === 'publicacao' ? (
+        {etapa === 'publicacao' && agendado && (
+          <>
+            <Botao
+              variante="secundario"
+              onClick={() => {
+                setErroDoRascunho(null)
+                setConfirmandoRascunho(true)
+              }}
+              disabled={gravando}
+            >
+              Voltar para rascunho
+            </Botao>
+            <Botao onClick={() => void salvarAgendamento()} disabled={gravando}>
+              Salvar
+            </Botao>
+          </>
+        )}
+        {etapa === 'publicacao' && !agendado && !jaPublicado && !encerrado && (
           <Botao
             onClick={() => void publicarAgora()}
             carregando={publicar.isPending}
-            disabled={encerrado || formulario?.situacao === 'PUBLICADO' || gravando}
+            disabled={gravando}
           >
             Publicar formulário
           </Botao>
-        ) : (
+        )}
+        {etapa === 'publicacao' ? null : (
           <Botao
             onClick={() => void avancar()}
             carregando={gravando && etapa === 'detalhes'}
@@ -338,6 +393,16 @@ function CorpoDoAssistente({
         />
       </div>
       <div className="mt-6 border-t border-divisor pt-4">{rodape}</div>
+      <JanelaDeConfirmacao
+        aberta={confirmandoRascunho}
+        titulo="Voltar este formulário para rascunho?"
+        descricao="O link por código deixa de valer e, ao publicar de novo, o sistema gera outro. As escolhas da etapa Publicação continuam guardadas; o dia agendado é apagado."
+        rotuloDeConfirmar="Voltar para rascunho"
+        confirmando={paraRascunho.isPending}
+        erro={erroDoRascunho ?? undefined}
+        aoCancelar={() => setConfirmandoRascunho(false)}
+        aoConfirmar={() => voltarParaRascunho()}
+      />
     </>
   )
 }
