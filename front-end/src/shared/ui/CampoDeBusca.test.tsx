@@ -11,7 +11,7 @@ function ComEstadoAparado({ aoMudar }: { aoMudar?: (texto: string) => void }) {
     <>
       <CampoDeBusca
         valor={busca}
-        esperaMs={10}
+        esperaMs={50}
         aoMudar={(texto) => {
           aoMudar?.(texto)
           setBusca(texto.trim())
@@ -26,7 +26,7 @@ function ComEstadoAparado({ aoMudar }: { aoMudar?: (texto: string) => void }) {
 
 describe('CampoDeBusca', () => {
   it('o espaco digitado no fim nao some quando a pagina guarda a busca aparada (o usuario ainda esta escrevendo "ana maria")', async () => {
-    const usuario = userEvent.setup()
+    const usuario = userEvent.setup({ delay: null })
     const aoMudar = vi.fn()
     render(<ComEstadoAparado aoMudar={aoMudar} />)
     const campo = screen.getByRole('searchbox', { name: 'Buscar' })

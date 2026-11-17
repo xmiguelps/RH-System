@@ -26,8 +26,34 @@ describe('mensagemDeErro', () => {
     expect(mensagemDeErro(new ErroDeApi(422, 'Regra.'))).toBe('Regra.')
   })
 
-  it('erro que nao e ErroDeApi vira a mensagem de conexao', () => {
-    expect(mensagemDeErro(new Error('x'))).toBe('Não foi possível conectar. Tente novamente.')
-    expect(mensagemDeErro(undefined)).toBe('Não foi possível conectar. Tente novamente.')
+  it('so a falta de conexao (status 0) diz que nao conectou; um erro de programa diz que algo deu errado', () => {
+    expect(mensagemDeErro(new ErroDeApi(0, 'Sem conexão.'))).toBe(
+      'Não foi possível conectar. Tente novamente.',
+    )
+    expect(mensagemDeErro(new Error('x'))).toBe('Algo deu errado. Tente novamente.')
+    expect(mensagemDeErro(undefined)).toBe('Algo deu errado. Tente novamente.')
+  })
+
+  it('429 usa o Retry-After quando ele vem (segundos ate 90, depois minutos arredondados para cima)', () => {
+    const com = (s: number) =>
+      mensagemDeErro(new ErroDeApi(429, 'T.', { retryAfterSegundos: s }))
+    expect(com(1)).toBe('Muitas tentativas. Aguarde 1 segundo e tente de novo.')
+    expect(com(30)).toBe('Muitas tentativas. Aguarde 30 segundos e tente de novo.')
+    expect(com(90)).toBe('Muitas tentativas. Aguarde 90 segundos e tente de novo.')
+    expect(com(91)).toBe('Muitas tentativas. Aguarde 2 minutos e tente de novo.')
+    expect(com(120)).toBe('Muitas tentativas. Aguarde 2 minutos e tente de novo.')
+    expect(com(0)).toBe('Muitas tentativas. Aguarde um minuto e tente de novo.')
+    expect(mensagemDeErro(new ErroDeApi(429, 'T.'))).toBe(
+      'Muitas tentativas. Aguarde um minuto e tente de novo.',
+    )
+  })
+
+  it('413 (arquivo ou envio grande demais) tem texto proprio', () => {
+    expect(mensagemDeErro(new ErroDeApi(413, 'Too Large'))).toBe(
+      'O arquivo ou os dados enviados são grandes demais.',
+    )
+    expect(mensagemDeErro(new ErroDeApi(413, 'T.', { detail: 'O vídeo passa de 100 MB.' }))).toBe(
+      'O vídeo passa de 100 MB.',
+    )
   })
 })

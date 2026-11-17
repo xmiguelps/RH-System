@@ -1,7 +1,7 @@
 import createClient, { type Client } from 'openapi-fetch'
 import { ErroDeApi } from './erroDeApi'
 import type { paths } from './gerado/schema'
-import { ehSessao, ehUsuarioDoContrato, type Sessao, type Usuario } from './tipos'
+import { ehSessao, type Sessao } from './tipos'
 
 export type ClienteHttp = Client<paths>
 
@@ -43,7 +43,8 @@ export function criarClienteHttp(opcoes: OpcoesDoClienteHttp): ClienteHttp {
       if (!response.ok) throw await ErroDeApi.deResposta(response)
       return response
     },
-    onError({ error }) {
+    onError({ error, id }) {
+      copias.delete(id) // a chamada nem chegou ao servidor: ninguém vai repetir
       return error instanceof ErroDeApi ? error : ErroDeApi.semConexao(error)
     },
   })
@@ -54,7 +55,6 @@ export type ClienteApi = {
   entrar(email: string, senha: string): Promise<Sessao>
   renovar(refreshToken: string): Promise<Sessao>
   sair(refreshToken: string): Promise<void>
-  eu(tokenDeAcesso: string): Promise<Usuario>
 }
 
 function exigirSessao(dado: unknown): Sessao {
@@ -75,13 +75,6 @@ export function criarClienteApi(urlBase: string, fetchImpl?: typeof fetch): Clie
     },
     async sair(refreshToken) {
       await cliente.POST('/api/auth/sair', { body: { refreshToken } })
-    },
-    async eu(tokenDeAcesso) {
-      const { data } = await cliente.GET('/api/auth/eu', {
-        headers: { Authorization: `Bearer ${tokenDeAcesso}` },
-      })
-      if (!ehUsuarioDoContrato(data)) throw new ErroDeApi(500, 'Resposta inesperada da API.')
-      return data
     },
   }
 }

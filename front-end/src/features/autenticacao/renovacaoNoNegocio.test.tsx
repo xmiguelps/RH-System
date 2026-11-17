@@ -25,7 +25,6 @@ function clienteFalso() {
     entrar: vi.fn<ClienteApi['entrar']>(),
     renovar: vi.fn<ClienteApi['renovar']>(),
     sair: vi.fn<ClienteApi['sair']>(),
-    eu: vi.fn<ClienteApi['eu']>(),
   }
 }
 
