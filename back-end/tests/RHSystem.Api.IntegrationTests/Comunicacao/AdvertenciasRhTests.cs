@@ -127,6 +127,27 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Ocorrido_anterior_a_admissao_e_422_ADVERTENCIA_ANTES_DA_ADMISSAO_e_nada_e_gravado_e_no_proprio_dia_da_admissao_ja_vale()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-10-01' WHERE ID_FUNCIONARIO = {pessoa}");
+
+        var antes = await RegistrarAsync(api, pessoa, Registro(data: "2026-09-30"));
+
+        Assert.Equal(422, (int)antes.StatusCode);
+        var erro = await CorpoAsync(antes);
+        Assert.Equal(("ADVERTENCIA_ANTES_DA_ADMISSAO", "O dia do ocorrido não pode ser anterior à admissão da pessoa."), (erro.GetProperty("codigo").GetString(), erro.GetProperty("detail").GetString()));
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM ADVERTENCIAS WHERE ID_FUNCIONARIO = {pessoa}"));
+
+        var noDia = await RegistrarAsync(api, pessoa, Registro(data: "2026-10-01"));
+
+        Assert.Equal(201, (int)noDia.StatusCode);
+        Assert.Equal(1, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM ADVERTENCIAS WHERE ID_FUNCIONARIO = {pessoa}"));
+    }
+
+    [Fact]
     public async Task Pessoa_inativa_e_422_FUNCIONARIO_INATIVO_com_o_texto_do_trigger_em_regraDoBanco()
     {
         var api = await ApiAsync();

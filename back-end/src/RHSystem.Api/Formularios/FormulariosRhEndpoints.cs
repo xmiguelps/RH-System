@@ -33,6 +33,8 @@ public static class FormulariosRhEndpoints
         servicos.AddScoped<VerificarFormularioCasoDeUso>();
         servicos.AddScoped<PublicarFormularioCasoDeUso>();
         servicos.AddScoped<EncerrarFormularioCasoDeUso>();
+        servicos.AddScoped<AlterarPrazoDoFormularioCasoDeUso>();
+        servicos.AddScoped<VoltarFormularioParaRascunhoCasoDeUso>();
         servicos.AddScoped<AdicionarDestinatariosCasoDeUso>();
         return servicos;
     }
@@ -146,6 +148,27 @@ public static class FormulariosRhEndpoints
                 StatusCodes.Status422UnprocessableEntity,
                 StatusCodes.Status500InternalServerError);
 
+        rh.MapPut("/formularios/{formularioId:int}/prazo", AlterarPrazo)
+            .WithName("alterarPrazoDoFormulario")
+            .Produces<FormularioDetalheRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status400BadRequest,
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
+        rh.MapPost("/formularios/{formularioId:int}/rascunho", VoltarParaRascunho)
+            .WithName("voltarFormularioParaRascunho")
+            .Produces<FormularioDetalheRh>(StatusCodes.Status200OK)
+            .ProduzProblemas(
+                StatusCodes.Status401Unauthorized,
+                StatusCodes.Status403Forbidden,
+                StatusCodes.Status404NotFound,
+                StatusCodes.Status422UnprocessableEntity,
+                StatusCodes.Status500InternalServerError);
+
         rh.MapPost("/formularios/{formularioId:int}/destinatarios", AdicionarDestinatarios)
             .WithName("adicionarDestinatariosFormulario")
             .Produces<FormularioDestinatariosResultado>(StatusCodes.Status200OK)
@@ -188,6 +211,10 @@ public static class FormulariosRhEndpoints
     private static async Task<FormularioDetalheRh> Publicar(int formularioId, FormularioPublicacaoComando corpo, PublicarFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
 
     private static async Task<FormularioDetalheRh> Encerrar(int formularioId, bool? confirmar, EncerrarFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, confirmar ?? false, ct);
+
+    private static async Task<FormularioDetalheRh> AlterarPrazo(int formularioId, FormularioPrazoComando corpo, AlterarPrazoDoFormularioCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
+
+    private static async Task<FormularioDetalheRh> VoltarParaRascunho(int formularioId, VoltarFormularioParaRascunhoCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, ct);
 
     private static async Task<FormularioDestinatariosResultado> AdicionarDestinatarios(int formularioId, FormularioDestinatariosComando corpo, AdicionarDestinatariosCasoDeUso casoDeUso, CancellationToken ct) => await casoDeUso.ExecutarAsync(formularioId, corpo, ct);
 

@@ -89,6 +89,11 @@ public sealed class RegistrarAdvertenciaDaEquipeCasoDeUso(IEscopoDoUsuario escop
             throw MensagensDaComunicacao.AdvertenciaDeInativo.ComoProblema(RegrasDoBancoDaComunicacao.AdvertenciaDeInativo);
         }
 
+        if (corpo.DataDoOcorrido < pessoa.DataAdmissao)
+        {
+            throw MensagensDaComunicacao.AdvertenciaAntesDaAdmissao.ComoProblema();
+        }
+
         var id = await registrador.RegistrarAsync(pessoa, equipe!.GestorId, escopo.Nome, corpo.DataDoOcorrido, corpo.Tipo, campos!, true, ct);
         return MapeadorDaAdvertencia.DetalheGestor((await consulta.ObterAsync(id, doGestor, ct)).OuNaoEncontrado());
     }

@@ -129,6 +129,24 @@ public static class ValidacaoDaPergunta
 }
 
 /// <summary>
+/// Confere o corpo de <c>alterarPrazoDoFormulario</c> (o <c>prazo</c> obrigatório já vem garantido pelo corpo): a caixa de sugestões nunca tem prazo e o novo prazo não pode ser anterior a hoje (dia no Brasil). Os textos são os da publicação.
+/// </summary>
+public static class ValidacaoDoPrazoDoFormulario
+{
+    public static void Validar(ColetorDeErros erros, DateOnly prazo, DateOnly hoje, TipoDeFormulario tipo)
+    {
+        if (tipo == TipoDeFormulario.Outro)
+        {
+            erros.Adicionar("prazo", "A caixa de sugestões é sempre aberta: não tem prazo.");
+        }
+        else if (prazo < hoje)
+        {
+            erros.Adicionar("prazo", "O prazo não pode ser anterior a hoje.");
+        }
+    }
+}
+
+/// <summary>
 /// Confere a publicação (<c>salvarPublicacaoFormulario</c> e <c>publicarFormulario</c>): as listas certas para cada alvo, o dia agendado e o prazo contra <paramref name="hoje"/> (dia no Brasil), a Sugestão sem prazo nem recorrência e a recorrência
 /// (intervalo de 1 a 365, exige prazo, nunca por link, fim não anterior a hoje). Todos os erros juntos.
 /// </summary>

@@ -10,10 +10,12 @@ namespace RHSystem.Application.Comum.Exportacao;
 /// </summary>
 public static class CsvSeguro
 {
-    private const char Separador = ';';
+    private const char SeparadorPadrao = ';';
 
-    // A célula com separador, aspas ou quebra de linha vai entre aspas.
-    private static readonly SearchValues<char> ExigemAspas = SearchValues.Create(";\"\r\n");
+    // A célula com o separador, aspas ou quebra de linha vai entre aspas.
+    private static readonly SearchValues<char> ExigemAspasComPontoEVirgula = SearchValues.Create(";\"\r\n");
+
+    private static readonly SearchValues<char> ExigemAspasComVirgula = SearchValues.Create(",\"\r\n");
 
     public static string Texto(string? valor)
     {
@@ -29,39 +31,39 @@ public static class CsvSeguro
     public static string Numero(long valor) => valor.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// UTF-8 com BOM (o Excel abre os acentos certos), separador <c>;</c>, aspas dobradas e fim de linha CRLF. As células já vêm prontas
+    /// UTF-8 com BOM (o Excel abre os acentos certos), separador <c>;</c> (ou o <paramref name="separador"/> escolhido), aspas dobradas e fim de linha CRLF. As células já vêm prontas
     /// (<see cref="Texto"/> e <see cref="Numero"/>): aqui só se põe aspas onde o formato exige.
     /// </summary>
-    public static byte[] Escrever(IReadOnlyList<string> titulos, IEnumerable<IReadOnlyList<string>> linhas)
+    public static byte[] Escrever(IReadOnlyList<string> titulos, IEnumerable<IReadOnlyList<string>> linhas, char separador = SeparadorPadrao)
     {
         var texto = new StringBuilder();
-        AcrescentarLinha(texto, titulos);
+        AcrescentarLinha(texto, titulos, separador);
         foreach (var linha in linhas)
         {
-            AcrescentarLinha(texto, linha);
+            AcrescentarLinha(texto, linha, separador);
         }
 
         var codificacao = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
         return [.. codificacao.GetPreamble(), .. codificacao.GetBytes(texto.ToString())];
     }
 
-    private static void AcrescentarLinha(StringBuilder texto, IReadOnlyList<string> celulas)
+    private static void AcrescentarLinha(StringBuilder texto, IReadOnlyList<string> celulas, char separador)
     {
         for (var i = 0; i < celulas.Count; i++)
         {
             if (i > 0)
             {
-                texto.Append(Separador);
+                texto.Append(separador);
             }
 
-            texto.Append(Celula(celulas[i]));
+            texto.Append(Celula(celulas[i], separador));
         }
 
         texto.Append("\r\n");
     }
 
-    private static string Celula(string valor) =>
-        valor.AsSpan().ContainsAny(ExigemAspas)
+    private static string Celula(string valor, char separador) =>
+        valor.AsSpan().ContainsAny(separador == ',' ? ExigemAspasComVirgula : ExigemAspasComPontoEVirgula)
             ? "\"" + valor.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
             : valor;
 }

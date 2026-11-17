@@ -288,6 +288,27 @@ public class AdvertenciasGestorTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task Ocorrido_anterior_a_admissao_e_422_tambem_no_registro_do_gestor_e_nada_e_gravado_nem_enfileirado()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-10-01' WHERE ID_FUNCIONARIO = {pessoa}");
+
+        var antes = await PostAsync(await GestorAsync(api, setor), $"/api/gestor/equipe/{pessoa}/advertencias", Registro(data: "2026-09-30"));
+
+        Assert.Equal(422, (int)antes.StatusCode);
+        var erro = await CorpoAsync(antes);
+        Assert.Equal(("ADVERTENCIA_ANTES_DA_ADMISSAO", "O dia do ocorrido não pode ser anterior à admissão da pessoa."), (erro.GetProperty("codigo").GetString(), erro.GetProperty("detail").GetString()));
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM ADVERTENCIAS WHERE ID_FUNCIONARIO = {pessoa}"));
+        Assert.Equal(0, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM FILA_EMAILS WHERE ID_FUNCIONARIO = {pessoa}"));
+
+        var noDia = await PostAsync(await GestorAsync(api, setor), $"/api/gestor/equipe/{pessoa}/advertencias", Registro(data: "2026-10-01"));
+
+        Assert.Equal(201, (int)noDia.StatusCode);
+    }
+
+    [Fact]
     public async Task Quem_do_RH_esta_inativo_nao_recebe_a_copia()
     {
         var api = await ApiAsync();

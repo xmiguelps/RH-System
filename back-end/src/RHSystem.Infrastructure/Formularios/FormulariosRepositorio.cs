@@ -124,6 +124,33 @@ public sealed class FormulariosRepositorio(AppDbContext db) : IFormulariosReposi
         return linhas == 1;
     }
 
+    public async Task<bool> AtualizarPrazoAsync(FormularioLido lido, DateOnly novoPrazo, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var anonimoLido = lido.Anonimo;
+        var prazoLido = lido.Prazo;
+        DateOnly? prazo = novoPrazo;
+
+        // AUDITORIA-OK: a mudança do prazo é auditada à mão pelo caso de uso (evento Alterou, com o título e os dois dias, na mesma transação); o UPDATE só vale se o formulário continua PUBLICADO e com o prazo lido.
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && f.Ativo && f.EncerradoEmUtc == null && f.Anonimo == anonimoLido && f.Prazo == prazoLido)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Prazo, prazo), ct);
+        return linhas == 1;
+    }
+
+    public async Task<bool> VoltarParaRascunhoAsync(FormularioLido lido, CancellationToken ct)
+    {
+        var id = lido.Id;
+        var anonimoLido = lido.Anonimo;
+        var publicadoLido = lido.PublicadoEmUtc;
+
+        // AUDITORIA-OK: a volta a rascunho é auditada à mão pelo caso de uso (evento Alterou, só com o título, na mesma transação); o UPDATE só vale se o formulário continua AGENDADO com a mesma data. O código do link sai junto: o rascunho não tem link.
+        var linhas = await db.Formularios
+            .Where(f => f.Id == id && !f.Ativo && f.EncerradoEmUtc == null && f.PublicadoEmUtc == publicadoLido && f.Anonimo == anonimoLido)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.PublicadoEmUtc, (DateTime?)null).SetProperty(f => f.TokenDoLink, (string?)null), ct);
+        return linhas == 1;
+    }
+
     public async Task<IReadOnlyList<string>?> ExcluirAsync(int formularioId, CancellationToken ct)
     {
         var id = formularioId;

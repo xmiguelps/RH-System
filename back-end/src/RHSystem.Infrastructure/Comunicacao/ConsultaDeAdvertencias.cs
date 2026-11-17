@@ -84,7 +84,8 @@ public sealed class ConsultaDeAdvertencias(AppDbContext db) : IConsultaDeAdverte
                 f.Ativo,
                 f.EmailCorporativo,
                 f.GestorId,
-                db.Gestores.Any(g => g.Id == f.GestorId && db.Funcionarios.Any(x => x.Id == g.FuncionarioId && x.Ativo)))).FirstOrDefaultAsync(ct);
+                db.Gestores.Any(g => g.Id == f.GestorId && db.Funcionarios.Any(x => x.Id == g.FuncionarioId && x.Ativo)),
+                f.DataAdmissao)).FirstOrDefaultAsync(ct);
     }
 
     public async Task<IReadOnlyList<AdvertenciaParaResumoRh>> DoAnoParaOResumoDoRhAsync(int ano, CancellationToken ct)

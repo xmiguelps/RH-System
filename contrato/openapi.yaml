@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: API do RH-System
-  version: 0.2.2
+  version: 0.3.0
   description: |
     Contrato escrito antes do back-end. Quem implementa a API segue este documento; quem faz o
     front-end gera tipos e dados simulados dele. Só o dono muda o contrato.
@@ -8172,7 +8172,7 @@ paths:
         separador `;`, com `Content-Disposition: attachment; filename="ponto-AAAA-MM.csv"`), **uma linha por pessoa
         ativa no mês**. O sistema não integra com a folha: gera só este arquivo (spec, seção 9).
 
-        Colunas, nesta ordem: `matricula`, `nome`, `setor`, `cargo`, `dias_trabalhados`, `horas_trabalhadas_min`,
+        Colunas, nesta ordem (a **padrão**, sem `colunas`): `matricula`, `nome`, `setor`, `cargo`, `dias_trabalhados`, `horas_trabalhadas_min`,
         `horas_previstas_min`, `atrasos`, `faltas`, `faltas_compensadas`, `banco_credito_do_mes_min`,
         `banco_debito_do_mes_min`. `dias_trabalhados` conta os dias com batidas fechadas; `horas_previstas_min` é a
         soma de `cargaMinutos` dos dias do mês; `faltas` são os dias `SEM_REGISTRO` já passados;
@@ -8181,7 +8181,20 @@ paths:
         **nenhum número é negativo**, para a regra de segurança do CSV não estragar o valor: células de texto que
         começam com `=`, `+`, `-` ou `@` recebem um apóstrofo na frente (roadmap, decisão 9); como nenhum número
         começa com `-`, a regra vale igual para todas as células.
-      x-provisorio: "Formato do 'exportar para a folha' (decisão aberta do roadmap, fatia 3): quais colunas a folha precisa, separador, horas em minutos ou em decimal, e por pessoa ou por dia. O contrato assume o CSV de uma linha por pessoa descrito aqui. Mudar o formato muda só o arquivo, não as rotas."
+
+        **Personalização (decisão do dono de 2026-11-17).** Três parâmetros opcionais; sem nenhum, o arquivo é o de sempre:
+
+        - `colunas`: os códigos das colunas que o RH quer, **na ordem em que quer**, separados por vírgula (`nome,horas_trabalhadas,banco_credito_do_mes`). Os
+          códigos são os da lista acima **sem a unidade** (`horas_trabalhadas`, `horas_previstas`, `banco_credito_do_mes`, `banco_debito_do_mes`); não diferencia
+          caixa nem espaços. Código desconhecido, repetido ou vazio: 400 em `errors.colunas`.
+        - `formatoHoras`: como saem as quatro colunas de horas. `MINUTOS` (padrão, minutos inteiros), `HORAS_DECIMAIS` (minutos ÷ 60 com duas casas,
+          arredondado para cima no meio: 1041 min = `17,35`) ou `HH_MM` (`17:21`, no mínimo dois dígitos em cada parte e as horas passam de 99: `176:00`).
+          O cabeçalho das colunas de horas leva a unidade: `_min`, `_h` ou `_hhmm`.
+        - `separador`: `PONTO_E_VIRGULA` (padrão) ou `VIRGULA`. Com `VIRGULA` a marca decimal das horas decimais vira **ponto** (`17.35`), para não se confundir com o
+          separador; com `PONTO_E_VIRGULA` ela é a vírgula (`17,35`). A célula que contém o separador vai entre aspas.
+
+        Valor inválido de `formatoHoras` ou `separador`: 400 no campo. Todos os erros (ano, mês e estes) vêm juntos.
+      x-provisorio: "Formato do 'exportar para a folha' (decisão aberta do roadmap, fatia 3): o dono quis que o RH escolha as colunas, o formato das horas e o separador (feito); falta saber o que a folha da empresa pede e se é por pessoa ou por dia. O contrato assume o CSV de uma linha por pessoa. Mudar o formato muda só o arquivo, não as rotas."
       x-perfis:
         - RH
       parameters:
@@ -8199,6 +8212,25 @@ paths:
             type: integer
             minimum: 1
             maximum: 12
+        - name: colunas
+          in: query
+          required: false
+          description: Os códigos das colunas que saem, na ordem pedida, separados por vírgula. Sem ele, saem as 12 de sempre.
+          schema:
+            type: string
+            example: nome,horas_trabalhadas,banco_credito_do_mes
+        - name: formatoHoras
+          in: query
+          required: false
+          description: Como saem as colunas de horas. Sem ele, `MINUTOS`.
+          schema:
+            $ref: "#/components/schemas/PontoFolhaFormatoHoras"
+        - name: separador
+          in: query
+          required: false
+          description: O separador das células. Sem ele, `PONTO_E_VIRGULA`.
+          schema:
+            $ref: "#/components/schemas/PontoFolhaSeparador"
       responses:
         "200":
           description: O arquivo CSV.
@@ -10275,7 +10307,7 @@ paths:
         Só o RH. Serve ao botão "Registrar advertência" da ficha (tela 11) e ao "Nova advertência" da lista (tela 15, que antes pede à pessoa
         uma lista de colaboradores: use a lista de funcionários da fatia 1). A advertência nasce `PENDENTE` ("Aguardando ciência").
 
-        - `dataDoOcorrido`: dia do fato, hoje ou antes (futura: 400).
+        - `dataDoOcorrido`: dia do fato, hoje ou antes (futura: 400). Não pode ser anterior à admissão da pessoa (422 `ADVERTENCIA_ANTES_DA_ADMISSAO`; no próprio dia da admissão vale).
         - `aplicadaPor`: `GESTOR_DO_COLABORADOR` registra em nome do gestor da pessoa (o gestor ativo dela; se ela não tem gestor, ou o gestor foi
           desligado, 422 `ADVERTENCIA_SEM_GESTOR`); `RH` registra em nome do RH (a lista mostra "RH").
         - `motivo`: resumo de uma linha (até 255 caracteres). `descricao`: o que aconteceu, quando e qual regra foi descumprida.
@@ -10337,8 +10369,8 @@ paths:
         "422":
           description: |
             Recusada por regra de negócio ou do banco. `FUNCIONARIO_INATIVO` (código único em todas as fatias; trigger: `Nao e possivel registrar advertencia para funcionario inativo.`),
-            `ADVERTENCIA_SEM_GESTOR` (a pessoa não tem gestor ativo e `aplicadaPor` é `GESTOR_DO_COLABORADOR`) e `ADVERTENCIA_GESTOR_ADVERTE_A_SI_MESMO`
-            (trigger: `O gestor nao pode advertir a si mesmo.`, quando a pessoa é o próprio gestor).
+            `ADVERTENCIA_SEM_GESTOR` (a pessoa não tem gestor ativo e `aplicadaPor` é `GESTOR_DO_COLABORADOR`), `ADVERTENCIA_ANTES_DA_ADMISSAO` (o dia do ocorrido é anterior à admissão)
+            e `ADVERTENCIA_GESTOR_ADVERTE_A_SI_MESMO` (trigger: `O gestor nao pode advertir a si mesmo.`, quando a pessoa é o próprio gestor).
           content:
             application/problem+json:
               schema:
@@ -10361,6 +10393,14 @@ paths:
                     detail: Esta pessoa não tem gestor ativo. Escolha "RH" em "Aplicada por".
                     traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
                     codigo: ADVERTENCIA_SEM_GESTOR
+                antesDaAdmissao:
+                  summary: Dia do ocorrido anterior à admissão
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O dia do ocorrido não pode ser anterior à admissão da pessoa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ADVERTENCIA_ANTES_DA_ADMISSAO
         "500":
           $ref: "#/components/responses/Erro500Interno"
   /api/gestor/advertencias:
@@ -10697,7 +10737,7 @@ paths:
 
         **E-mail:** a pessoa recebe **sempre** o e-mail de "advertência registrada" e o RH recebe uma cópia dele (CONVENCOES, seção 12); não existe
         opção para não avisar. A caixa "Avisar o colaborador por e-mail" que o Figma mostra nas telas 53 e 60 fica escondida.
-        Pessoa inativa: 422 `FUNCIONARIO_INATIVO`. O gestor não registra advertência para si mesmo: ele não faz parte da equipe dele (a lista dele não o traz),
+        Pessoa inativa: 422 `FUNCIONARIO_INATIVO`. Dia do ocorrido anterior à admissão da pessoa: 422 `ADVERTENCIA_ANTES_DA_ADMISSAO`. O gestor não registra advertência para si mesmo: ele não faz parte da equipe dele (a lista dele não o traz),
         então pedir o próprio id devolve 404.
       x-perfis:
         - Gestor
@@ -10745,18 +10785,29 @@ paths:
         "404":
           $ref: "#/components/responses/Erro404NaoEncontrado"
         "422":
-          description: Pessoa inativa (trigger `Nao e possivel registrar advertencia para funcionario inativo.`).
+          description: Pessoa inativa (trigger `Nao e possivel registrar advertencia para funcionario inativo.`) ou dia do ocorrido anterior à admissão (`ADVERTENCIA_ANTES_DA_ADMISSAO`).
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemaDeRegraDeNegocio"
-              example:
-                title: Operação recusada.
-                status: 422
-                detail: Não é possível registrar advertência para uma pessoa inativa.
-                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
-                codigo: FUNCIONARIO_INATIVO
-                regraDoBanco: Nao e possivel registrar advertencia para funcionario inativo.
+              examples:
+                inativo:
+                  summary: Pessoa inativa
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Não é possível registrar advertência para uma pessoa inativa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FUNCIONARIO_INATIVO
+                    regraDoBanco: Nao e possivel registrar advertencia para funcionario inativo.
+                antesDaAdmissao:
+                  summary: Dia do ocorrido anterior à admissão
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O dia do ocorrido não pode ser anterior à admissão da pessoa.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: ADVERTENCIA_ANTES_DA_ADMISSAO
         "500":
           $ref: "#/components/responses/Erro500Interno"
   /api/eu/advertencias:
@@ -11428,7 +11479,8 @@ paths:
           `ANONIMATO_FIXO_APOS_PUBLICAR`; regra 2 em "Formulários"), para ninguém responder achando que o formulário era
           de um jeito e ser de outro. O resto: **sem resposta**, tudo pode mudar, exceto que um formulário publicado por
           link (`alvo = LINK`) não sai de `ENTREVISTA` (422 `LINK_SO_PARA_ENTREVISTA`, ver `publicarFormulario`); **com
-          resposta** (`temRespostas`), só `titulo` e `descricao`. O banco é a segunda barreira da troca de `anonimo` depois
+          resposta** (`temRespostas`), só `titulo` e `descricao` (mudar o tipo ou o sentido da avaliação é 422
+          `FORMULARIO_JA_RESPONDIDO`). O banco é a segunda barreira da troca de `anonimo` depois
           da primeira resposta (chave estrangeira composta de `V001`), mas a API responde 409 antes de chegar nele.
         - `ENCERRADO`: nada muda (422 `FORMULARIO_ENCERRADO`).
         Passar para anônimo (só em rascunho ou agendado) com uma pergunta de envio de arquivo, ou com link público, é
@@ -12213,6 +12265,203 @@ paths:
           $ref: "#/components/responses/FormularioErro409Confirmacao"
         "422":
           $ref: "#/components/responses/FormularioErro422Edicao"
+        "500":
+          $ref: "#/components/responses/Erro500Interno"
+  /api/rh/formularios/{formularioId}/prazo:
+    put:
+      tags:
+        - Formulários
+      operationId: alterarPrazoDoFormulario
+      summary: Muda o prazo de um formulário publicado.
+      description: |
+        Decisão do dono de 2026-11-17: o RH muda o último dia para responder de um formulário `PUBLICADO` (para dar mais tempo ou para
+        encerrar antes). Só o `PUBLICADO`: em `RASCUNHO` e `AGENDADO` o prazo é uma escolha da etapa Publicação (`salvarPublicacaoFormulario` e
+        `publicarFormulario`), e quem tenta aqui recebe 422 `FORMULARIO_NAO_PUBLICADO`; `ENCERRADO`, ou com o prazo já vencido, é 422
+        `FORMULARIO_ENCERRADO` (não há como reabrir).
+
+        - `prazo`: obrigatório, um dia que não seja anterior a hoje (400 em `errors.prazo`; hoje vale, e o formulário fecha no fim do dia). Um corpo
+          sem `prazo`, ou com `null`, é 400: **não existe jeito de tirar o prazo por aqui** (um corpo vazio nunca o tira sem querer). A caixa de
+          sugestões (`OUTRO`) é sempre aberta e não tem prazo (400).
+        - O mesmo prazo que já está é 200 sem efeito. O prazo vale para qualquer formulário publicado, anônimo ou com nome. **Não vale para o formulário
+          recorrente que ainda tem próxima reabertura** (422 `FORMULARIO_RECORRENTE`): cada rodada nova repete a duração da anterior (dias entre a
+          publicação e o prazo), então mudar o prazo de uma rodada mudaria todas as seguintes. Quem precisa mudar encerra o formulário e cria outro.
+        - O encerramento pelo prazo e o lembrete automático (7 dias antes do prazo, contados a partir do dia da publicação, a mesma conta da
+          publicação) acompanham o prazo novo. O lembrete só é agendado de hoje em diante: se o dia dele é hoje, sai logo; se já passou, não sai. A
+          mudança em si não manda e-mail.
+        - A auditoria registra "Mudou o prazo do formulário" com o título e os dois dias.
+      x-perfis:
+        - RH
+      parameters:
+        - $ref: "#/components/parameters/FormularioId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormularioPrazoComando"
+            example:
+              prazo: 2026-11-15
+      responses:
+        "200":
+          description: Prazo atualizado; devolve o formulário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormularioDetalheRh"
+              example:
+                id: 6
+                titulo: "Entrevista: vendedor"
+                descricao: Conte um pouco da sua experiência em vendas.
+                tipo: ENTREVISTA
+                sentidoAvaliacao: null
+                anonimo: false
+                situacao: PUBLICADO
+                autor:
+                  id: 2
+                  nome: Sofia Ramos
+                  cargo: Analista de RH
+                  setor: Recursos Humanos
+                  ativo: true
+                criadoEmUtc: 2026-08-12T16:45:00Z
+                temRespostas: true
+                perguntas:
+                  - id: 321
+                    ordem: 1
+                    texto: Há quanto tempo você trabalha com vendas?
+                    tipo: RESPOSTA_CURTA
+                    obrigatoria: true
+                    alternativas: []
+                publicacao:
+                  alvo: LINK
+                  setores: []
+                  pessoas: []
+                  agendarPara: null
+                  prazo: 2026-11-15
+                  recorrencia: null
+                  lembreteAutomatico: true
+                  publicadoEmUtc: 2026-08-13T11:00:00Z
+                  encerradoEmUtc: null
+                  proximaReaberturaEmUtc: null
+                  tokenDoLink: Xb8Lq2VnT5wKz0RmYc3JdPa7HuE1sFgNo9iBtCq4ZeA
+        "400":
+          $ref: "#/components/responses/Erro400Validacao"
+        "401":
+          $ref: "#/components/responses/Erro401NaoAutenticado"
+        "403":
+          $ref: "#/components/responses/Erro403SemPermissao"
+        "404":
+          $ref: "#/components/responses/Erro404NaoEncontrado"
+        "422":
+          description: |
+            `FORMULARIO_NAO_PUBLICADO` (rascunho ou agendado: o prazo é guardado na etapa Publicação), `FORMULARIO_ENCERRADO` (encerrado, ou com o
+            prazo vencido) ou `FORMULARIO_RECORRENTE` (recorrente com próxima reabertura).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemaDeRegraDeNegocio"
+              examples:
+                naoPublicado:
+                  summary: Rascunho ou agendado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Só um formulário publicado muda o prazo por aqui. Antes de publicar, o prazo é guardado na etapa Publicação.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_NAO_PUBLICADO
+                encerrado:
+                  summary: Formulário encerrado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O formulário está encerrado e não pode mais ser alterado.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_ENCERRADO
+                recorrente:
+                  summary: Formulário recorrente
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: "Formulário recorrente não muda o prazo por aqui: cada rodada nova repete a duração da anterior. Para mudar, encerre o formulário e crie outro."
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_RECORRENTE
+        "500":
+          $ref: "#/components/responses/Erro500Interno"
+  /api/rh/formularios/{formularioId}/rascunho:
+    post:
+      tags:
+        - Formulários
+      operationId: voltarFormularioParaRascunho
+      summary: Devolve um formulário agendado a rascunho.
+      description: |
+        Decisão do dono de 2026-11-17: o RH que agendou a publicação e quer mexer no formulário antes do dia o devolve a `RASCUNHO` (antes era
+        excluir e refazer). **Só o `AGENDADO`**: qualquer outra situação é 422 `FORMULARIO_NAO_ESTA_AGENDADO` (o publicado se encerra, o
+        encerrado não volta). Sem corpo.
+
+        - O dia agendado é apagado (um rascunho não o guarda, como diz `salvarPublicacaoFormulario`): para publicar de novo a tela manda o dia em
+          `publicarFormulario`. As demais escolhas da etapa Publicação (alvo, pessoas, setores, prazo, recorrência e lembrete) continuam guardadas.
+        - **O link agendado deixa de valer.** Um formulário por link já tem o código mesmo agendado; ao voltar a rascunho o código é apagado
+          (`publicacao.tokenDoLink` vem nulo) e publicar de novo gera **outro**.
+        - Todas as tarefas pendentes do formulário (publicar no dia, encerrar pelo prazo, lembrete) são canceladas e voltam a ser agendadas quando
+          ele for publicado de novo. Nenhum e-mail sai.
+        - Duas abas fazendo o mesmo dão um 200 e um 422. A auditoria registra "Voltou o formulário para rascunho", só com o título.
+      x-perfis:
+        - RH
+      parameters:
+        - $ref: "#/components/parameters/FormularioId"
+      responses:
+        "200":
+          description: Formulário de volta a rascunho.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormularioDetalheRh"
+              example:
+                id: 12
+                titulo: "Entrevista: auxiliar de logística"
+                descricao: Responda com calma. Leva uns 10 minutos e o RH entra em contato em até 5 dias úteis.
+                tipo: ENTREVISTA
+                sentidoAvaliacao: null
+                anonimo: false
+                situacao: RASCUNHO
+                autor:
+                  id: 2
+                  nome: Sofia Ramos
+                  cargo: Analista de RH
+                  setor: Recursos Humanos
+                  ativo: true
+                criadoEmUtc: 2026-10-06T14:05:00Z
+                temRespostas: false
+                perguntas: []
+                publicacao:
+                  alvo: LINK
+                  setores: []
+                  pessoas: []
+                  agendarPara: null
+                  prazo: 2026-10-31
+                  recorrencia: null
+                  lembreteAutomatico: true
+                  publicadoEmUtc: null
+                  encerradoEmUtc: null
+                  proximaReaberturaEmUtc: null
+                  tokenDoLink: null
+        "401":
+          $ref: "#/components/responses/Erro401NaoAutenticado"
+        "403":
+          $ref: "#/components/responses/Erro403SemPermissao"
+        "404":
+          $ref: "#/components/responses/Erro404NaoEncontrado"
+        "422":
+          description: Só o formulário agendado volta a rascunho (`FORMULARIO_NAO_ESTA_AGENDADO`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemaDeRegraDeNegocio"
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Só um formulário agendado volta para rascunho.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FORMULARIO_NAO_ESTA_AGENDADO
         "500":
           $ref: "#/components/responses/Erro500Interno"
   /api/rh/formularios/{formularioId}/destinatarios:
@@ -16393,8 +16642,9 @@ paths:
         - `historico`: todos os pedidos da pessoa, do mais novo para o mais antigo (inclui os que ainda esperam
           análise e os cancelados ou recusados). A lista é curta e vem sem paginação.
         - `gestorQueAnalisa`: quem faz a primeira etapa (texto "X analisa primeiro e depois o RH confirma").
-          É `null` quando a pessoa é gestora (tem linha ativa em `GESTORES`), não tem gestor ativo ou tem o gestor
-          desligado: nesse caso o pedido não tem etapa do gestor, só o RH decide, e o texto deve dizer "O RH analisa o pedido".
+          É `null` quando a pessoa é gestora (tem linha ativa em `GESTORES`), não tem gestor ativo, tem o gestor
+          desligado ou o gestor do setor está **ausente hoje** (decisão do dono de 2026-11-17; a etapa dele já nasce
+          aprovada): nesses casos o pedido não espera o gestor, só o RH decide, e o texto deve dizer "O RH analisa o pedido".
 
         Cada pedido do `historico` traz `status` (o do banco), `etapa`, `situacao`, `gestorResponsavel`, `decisaoGestor` e
         `decisaoRh`, como em `CONVENCOES.md`, seção 9 (ver `pedirFerias`). Nesta rota `podeDecidir` é sempre falso (a pessoa vê o
@@ -23905,6 +24155,19 @@ components:
         ativo:
           type: boolean
           description: "`false` desativa o feriado sem apagá-lo."
+    PontoFolhaFormatoHoras:
+      type: string
+      description: Como as colunas de horas da exportação para a folha saem. `HORAS_DECIMAIS` tem duas casas (`17,35`) e `HH_MM` é `17:21`.
+      enum:
+        - MINUTOS
+        - HORAS_DECIMAIS
+        - HH_MM
+    PontoFolhaSeparador:
+      type: string
+      description: O separador das células do CSV da folha.
+      enum:
+        - PONTO_E_VIRGULA
+        - VIRGULA
     AtestadoSituacao:
       type: string
       description: Situação do atestado (valores do banco, `STATUS_ATESTADO`). `ENVIADO` aguarda o RH.
@@ -25294,6 +25557,16 @@ components:
           type: integer
           minimum: 1
           description: Posição desejada (as outras se ajustam). Sem ela, a pergunta nova vai para o fim e a editada não se move.
+    FormularioPrazoComando:
+      type: object
+      description: Corpo de `alterarPrazoDoFormulario`.
+      required:
+        - prazo
+      properties:
+        prazo:
+          type: string
+          format: date
+          description: O novo último dia para responder (no horário de Brasília). Obrigatório e nunca anterior a hoje.
     FormularioDetalhesComando:
       type: object
       description: Etapa Detalhes do assistente.
@@ -29858,7 +30131,8 @@ components:
       description: |
         A edição foi recusada por uma regra do formulário. `codigo`: `FORMULARIO_ENCERRADO` (formulário encerrado não muda),
         `FORMULARIO_NAO_PUBLICADO` (só publicado se encerra), `PERGUNTA_JA_RESPONDIDA` (só em formulário com nome: no
-        anônimo publicado o erro é o 409 `ANONIMO_PERGUNTAS_FIXAS`), `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`,
+        anônimo publicado o erro é o 409 `ANONIMO_PERGUNTAS_FIXAS`), `FORMULARIO_JA_RESPONDIDO` (formulário com nome,
+        publicado e já respondido: só `titulo` e `descricao` mudam), `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`,
         `LINK_SO_PARA_ENTREVISTA`. Pode trazer `regraDoBanco` com a mensagem original do trigger.
       content:
         application/problem+json:
@@ -29890,6 +30164,14 @@ components:
                 detail: O formulário está encerrado e não pode mais ser alterado.
                 traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
                 codigo: FORMULARIO_ENCERRADO
+            jaRespondido:
+              summary: Formulário publicado que já tem respostas
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: Este formulário já tem respostas. Só o título e a descrição podem mudar.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FORMULARIO_JA_RESPONDIDO
     FormularioErro422Publicacao:
       description: |
         A publicação foi recusada. `codigo`: `FORMULARIO_ANONIMO_PUBLICO_PEQUENO` (anônimo para menos de 5 pessoas; é

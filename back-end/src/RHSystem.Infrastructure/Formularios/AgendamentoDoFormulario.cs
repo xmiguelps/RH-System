@@ -75,8 +75,18 @@ public sealed class AgendamentoDoFormulario(IAgendador agendador, IFilaDeEmails 
         }
     }
 
-    public async Task AgendarLembreteAutomaticoAsync(int formularioId, DateOnly dia, CancellationToken ct) =>
-        _ = await agendador.AgendarAsync(new NovaTarefa(TipoDoLembrete, RegrasDoLembrete.ChaveDaMarca(formularioId, dia, RegrasDoLembrete.AlcanceTodos), FusoBrasil.InicioDoDiaEmUtc(dia), formularioId, dia), ct);
+    /// <summary>Chave que já existe e foi cancelada (o prazo foi e voltou, ou o agendado voltou a rascunho e foi publicado de novo) é REATIVADA; pendente ou concluída, nada a fazer.</summary>
+    public async Task AgendarLembreteAutomaticoAsync(int formularioId, DateOnly dia, CancellationToken ct)
+    {
+        var chave = RegrasDoLembrete.ChaveDaMarca(formularioId, dia, RegrasDoLembrete.AlcanceTodos);
+        if (!await agendador.AgendarAsync(new NovaTarefa(TipoDoLembrete, chave, FusoBrasil.InicioDoDiaEmUtc(dia), formularioId, dia), ct))
+        {
+            _ = await agendador.ReativarAsync(chave, ct);
+        }
+    }
+
+    public async Task CancelarLembreteAutomaticoAsync(int formularioId, DateOnly dia, CancellationToken ct) =>
+        _ = await agendador.CancelarAsync(RegrasDoLembrete.ChaveDaMarca(formularioId, dia, RegrasDoLembrete.AlcanceTodos), ct);
 
     public async Task CancelarTudoAsync(int formularioId, CancellationToken ct)
     {

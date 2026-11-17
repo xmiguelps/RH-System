@@ -85,6 +85,8 @@ public static class EnumsDeParametrosDoContrato
         [("listarTreinamentos", "direcao")] = typeof(DirecaoDeOrdenacao),
         [("obterMeuBancoDeHoras", "tipo")] = typeof(TipoDeLancamentoDoBanco),
         [("obterBancoDeHorasDeFuncionario", "tipo")] = typeof(TipoDeLancamentoDoBanco),
+        [("exportarPontoParaFolha", "formatoHoras")] = typeof(FormatoDeHorasDaFolha),
+        [("exportarPontoParaFolha", "separador")] = typeof(SeparadorDaFolha),
     };
 
     /// <summary>

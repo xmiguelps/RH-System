@@ -43,6 +43,9 @@ public sealed record FormularioDestinatariosComando([property: JsonRequired] IRe
 /// <summary>O resultado de <c>adicionarDestinatariosFormulario</c> (<c>FormularioDestinatariosResultado</c>): quantas entraram agora e quantas já estavam.</summary>
 public sealed record FormularioDestinatariosResultado(int Adicionados, int JaEstavam);
 
+/// <summary>O corpo de <c>alterarPrazoDoFormulario</c> (<c>FormularioPrazoComando</c>): o novo último dia para responder. Obrigatório: um corpo sem <c>prazo</c> (ou com <c>null</c>) é 400, para um corpo vazio nunca tirar o prazo sem querer.</summary>
+public sealed record FormularioPrazoComando([property: JsonRequired] DateOnly Prazo);
+
 /// <summary>O corpo de <c>salvarPublicacaoFormulario</c> e <c>publicarFormulario</c> (<c>FormularioPublicacaoComando</c>): o alvo e as listas coerentes com ele, o dia agendado, o prazo, a recorrência e o lembrete automático (padrão ligado).</summary>
 public sealed record FormularioPublicacaoComando([property: JsonRequired] AlvoDoFormulario Alvo)
 {

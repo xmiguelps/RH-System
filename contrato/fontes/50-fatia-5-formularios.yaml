@@ -441,7 +441,8 @@ paths:
           `ANONIMATO_FIXO_APOS_PUBLICAR`; regra 2 em "Formulários"), para ninguém responder achando que o formulário era
           de um jeito e ser de outro. O resto: **sem resposta**, tudo pode mudar, exceto que um formulário publicado por
           link (`alvo = LINK`) não sai de `ENTREVISTA` (422 `LINK_SO_PARA_ENTREVISTA`, ver `publicarFormulario`); **com
-          resposta** (`temRespostas`), só `titulo` e `descricao`. O banco é a segunda barreira da troca de `anonimo` depois
+          resposta** (`temRespostas`), só `titulo` e `descricao` (mudar o tipo ou o sentido da avaliação é 422
+          `FORMULARIO_JA_RESPONDIDO`). O banco é a segunda barreira da troca de `anonimo` depois
           da primeira resposta (chave estrangeira composta de `V001`), mas a API responde 409 antes de chegar nele.
         - `ENCERRADO`: nada muda (422 `FORMULARIO_ENCERRADO`).
         Passar para anônimo (só em rascunho ou agendado) com uma pergunta de envio de arquivo, ou com link público, é
@@ -1069,6 +1070,177 @@ paths:
         '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
         '409': { $ref: '#/components/responses/FormularioErro409Confirmacao' }
         '422': { $ref: '#/components/responses/FormularioErro422Edicao' }
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/formularios/{formularioId}/prazo:
+    put:
+      tags: [Formulários]
+      operationId: alterarPrazoDoFormulario
+      summary: Muda o prazo de um formulário publicado.
+      description: |
+        Decisão do dono de 2026-11-17: o RH muda o último dia para responder de um formulário `PUBLICADO` (para dar mais tempo ou para
+        encerrar antes). Só o `PUBLICADO`: em `RASCUNHO` e `AGENDADO` o prazo é uma escolha da etapa Publicação (`salvarPublicacaoFormulario` e
+        `publicarFormulario`), e quem tenta aqui recebe 422 `FORMULARIO_NAO_PUBLICADO`; `ENCERRADO`, ou com o prazo já vencido, é 422
+        `FORMULARIO_ENCERRADO` (não há como reabrir).
+
+        - `prazo`: obrigatório, um dia que não seja anterior a hoje (400 em `errors.prazo`; hoje vale, e o formulário fecha no fim do dia). Um corpo
+          sem `prazo`, ou com `null`, é 400: **não existe jeito de tirar o prazo por aqui** (um corpo vazio nunca o tira sem querer). A caixa de
+          sugestões (`OUTRO`) é sempre aberta e não tem prazo (400).
+        - O mesmo prazo que já está é 200 sem efeito. O prazo vale para qualquer formulário publicado, anônimo ou com nome. **Não vale para o formulário
+          recorrente que ainda tem próxima reabertura** (422 `FORMULARIO_RECORRENTE`): cada rodada nova repete a duração da anterior (dias entre a
+          publicação e o prazo), então mudar o prazo de uma rodada mudaria todas as seguintes. Quem precisa mudar encerra o formulário e cria outro.
+        - O encerramento pelo prazo e o lembrete automático (7 dias antes do prazo, contados a partir do dia da publicação, a mesma conta da
+          publicação) acompanham o prazo novo. O lembrete só é agendado de hoje em diante: se o dia dele é hoje, sai logo; se já passou, não sai. A
+          mudança em si não manda e-mail.
+        - A auditoria registra "Mudou o prazo do formulário" com o título e os dois dias.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/FormularioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormularioPrazoComando' }
+            example:
+              prazo: '2026-11-15'
+      responses:
+        '200':
+          description: Prazo atualizado; devolve o formulário.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormularioDetalheRh' }
+              example:
+                id: 6
+                titulo: "Entrevista: vendedor"
+                descricao: Conte um pouco da sua experiência em vendas.
+                tipo: ENTREVISTA
+                sentidoAvaliacao: null
+                anonimo: false
+                situacao: PUBLICADO
+                autor: { id: 2, nome: Sofia Ramos, cargo: Analista de RH, setor: Recursos Humanos, ativo: true }
+                criadoEmUtc: '2026-08-12T16:45:00Z'
+                temRespostas: true
+                perguntas:
+                  - id: 321
+                    ordem: 1
+                    texto: Há quanto tempo você trabalha com vendas?
+                    tipo: RESPOSTA_CURTA
+                    obrigatoria: true
+                    alternativas: []
+                publicacao:
+                  alvo: LINK
+                  setores: []
+                  pessoas: []
+                  agendarPara: null
+                  prazo: '2026-11-15'
+                  recorrencia: null
+                  lembreteAutomatico: true
+                  publicadoEmUtc: '2026-08-13T11:00:00Z'
+                  encerradoEmUtc: null
+                  proximaReaberturaEmUtc: null
+                  tokenDoLink: Xb8Lq2VnT5wKz0RmYc3JdPa7HuE1sFgNo9iBtCq4ZeA
+        '400': { $ref: '#/components/responses/Erro400Validacao' }
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: |
+            `FORMULARIO_NAO_PUBLICADO` (rascunho ou agendado: o prazo é guardado na etapa Publicação), `FORMULARIO_ENCERRADO` (encerrado, ou com o
+            prazo vencido) ou `FORMULARIO_RECORRENTE` (recorrente com próxima reabertura).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              examples:
+                naoPublicado:
+                  summary: Rascunho ou agendado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: Só um formulário publicado muda o prazo por aqui. Antes de publicar, o prazo é guardado na etapa Publicação.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_NAO_PUBLICADO
+                encerrado:
+                  summary: Formulário encerrado
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: O formulário está encerrado e não pode mais ser alterado.
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_ENCERRADO
+                recorrente:
+                  summary: Formulário recorrente
+                  value:
+                    title: Operação recusada.
+                    status: 422
+                    detail: "Formulário recorrente não muda o prazo por aqui: cada rodada nova repete a duração da anterior. Para mudar, encerre o formulário e crie outro."
+                    traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                    codigo: FORMULARIO_RECORRENTE
+        '500': { $ref: '#/components/responses/Erro500Interno' }
+
+  /api/rh/formularios/{formularioId}/rascunho:
+    post:
+      tags: [Formulários]
+      operationId: voltarFormularioParaRascunho
+      summary: Devolve um formulário agendado a rascunho.
+      description: |
+        Decisão do dono de 2026-11-17: o RH que agendou a publicação e quer mexer no formulário antes do dia o devolve a `RASCUNHO` (antes era
+        excluir e refazer). **Só o `AGENDADO`**: qualquer outra situação é 422 `FORMULARIO_NAO_ESTA_AGENDADO` (o publicado se encerra, o
+        encerrado não volta). Sem corpo.
+
+        - O dia agendado é apagado (um rascunho não o guarda, como diz `salvarPublicacaoFormulario`): para publicar de novo a tela manda o dia em
+          `publicarFormulario`. As demais escolhas da etapa Publicação (alvo, pessoas, setores, prazo, recorrência e lembrete) continuam guardadas.
+        - **O link agendado deixa de valer.** Um formulário por link já tem o código mesmo agendado; ao voltar a rascunho o código é apagado
+          (`publicacao.tokenDoLink` vem nulo) e publicar de novo gera **outro**.
+        - Todas as tarefas pendentes do formulário (publicar no dia, encerrar pelo prazo, lembrete) são canceladas e voltam a ser agendadas quando
+          ele for publicado de novo. Nenhum e-mail sai.
+        - Duas abas fazendo o mesmo dão um 200 e um 422. A auditoria registra "Voltou o formulário para rascunho", só com o título.
+      x-perfis: [RH]
+      parameters:
+        - $ref: '#/components/parameters/FormularioId'
+      responses:
+        '200':
+          description: Formulário de volta a rascunho.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormularioDetalheRh' }
+              example:
+                id: 12
+                titulo: "Entrevista: auxiliar de logística"
+                descricao: Responda com calma. Leva uns 10 minutos e o RH entra em contato em até 5 dias úteis.
+                tipo: ENTREVISTA
+                sentidoAvaliacao: null
+                anonimo: false
+                situacao: RASCUNHO
+                autor: { id: 2, nome: Sofia Ramos, cargo: Analista de RH, setor: Recursos Humanos, ativo: true }
+                criadoEmUtc: '2026-10-06T14:05:00Z'
+                temRespostas: false
+                perguntas: []
+                publicacao:
+                  alvo: LINK
+                  setores: []
+                  pessoas: []
+                  agendarPara: null
+                  prazo: '2026-10-31'
+                  recorrencia: null
+                  lembreteAutomatico: true
+                  publicadoEmUtc: null
+                  encerradoEmUtc: null
+                  proximaReaberturaEmUtc: null
+                  tokenDoLink: null
+        '401': { $ref: '#/components/responses/Erro401NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Erro403SemPermissao' }
+        '404': { $ref: '#/components/responses/Erro404NaoEncontrado' }
+        '422':
+          description: Só o formulário agendado volta a rascunho (`FORMULARIO_NAO_ESTA_AGENDADO`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemaDeRegraDeNegocio' }
+              example:
+                title: Operação recusada.
+                status: 422
+                detail: Só um formulário agendado volta para rascunho.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FORMULARIO_NAO_ESTA_AGENDADO
         '500': { $ref: '#/components/responses/Erro500Interno' }
 
   /api/rh/formularios/{formularioId}/destinatarios:
@@ -2534,7 +2706,8 @@ components:
       description: |
         A edição foi recusada por uma regra do formulário. `codigo`: `FORMULARIO_ENCERRADO` (formulário encerrado não muda),
         `FORMULARIO_NAO_PUBLICADO` (só publicado se encerra), `PERGUNTA_JA_RESPONDIDA` (só em formulário com nome: no
-        anônimo publicado o erro é o 409 `ANONIMO_PERGUNTAS_FIXAS`), `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`,
+        anônimo publicado o erro é o 409 `ANONIMO_PERGUNTAS_FIXAS`), `FORMULARIO_JA_RESPONDIDO` (formulário com nome,
+        publicado e já respondido: só `titulo` e `descricao` mudam), `ANONIMO_SEM_ARQUIVO`, `ANONIMO_SEM_LINK`,
         `LINK_SO_PARA_ENTREVISTA`. Pode trazer `regraDoBanco` com a mensagem original do trigger.
       content:
         application/problem+json:
@@ -2565,6 +2738,14 @@ components:
                 detail: O formulário está encerrado e não pode mais ser alterado.
                 traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
                 codigo: FORMULARIO_ENCERRADO
+            jaRespondido:
+              summary: Formulário publicado que já tem respostas
+              value:
+                title: Operação recusada.
+                status: 422
+                detail: Este formulário já tem respostas. Só o título e a descrição podem mudar.
+                traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00
+                codigo: FORMULARIO_JA_RESPONDIDO
     FormularioErro422Publicacao:
       description: |
         A publicação foi recusada. `codigo`: `FORMULARIO_ANONIMO_PUBLICO_PEQUENO` (anônimo para menos de 5 pessoas; é
@@ -2884,6 +3065,15 @@ components:
           description: Posição desejada (as outras se ajustam). Sem ela, a pergunta nova vai para o fim e a editada não se move.
 
     # ----- formulário (RH) -----
+    FormularioPrazoComando:
+      type: object
+      description: Corpo de `alterarPrazoDoFormulario`.
+      required: [prazo]
+      properties:
+        prazo:
+          type: string
+          format: date
+          description: O novo último dia para responder (no horário de Brasília). Obrigatório e nunca anterior a hoje.
     FormularioDetalhesComando:
       type: object
       description: Etapa Detalhes do assistente.

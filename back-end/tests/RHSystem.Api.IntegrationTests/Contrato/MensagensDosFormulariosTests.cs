@@ -6,7 +6,7 @@ namespace RHSystem.Api.IntegrationTests.Contrato;
 
 /// <summary>
 /// Os textos e os códigos de erro dos formulários vêm dos EXEMPLOS do contrato (<c>50-fatia-5-formularios.yaml</c>), copiados e nunca reescritos (o front mostra o <c>detail</c> como vem). Este teste lê o contrato de verdade e confere o status, o título, o texto e o
-/// código de cada mensagem. As exceções declaradas são as que o contrato cita e não exemplifica (decisão 10 do plano: o executor escreve o texto) e o código novo <c>FORMULARIO_JA_RESPONDIDO</c>, que a decisão do plano para a lacuna da matriz de edição criou.
+/// código de cada mensagem. As exceções declaradas são as que o contrato cita e não exemplifica (decisão 10 do plano: o executor escreve o texto).
 /// </summary>
 public class MensagensDosFormulariosTests
 {
@@ -60,7 +60,6 @@ public class MensagensDosFormulariosTests
         "Este formulário não é respondido por link. Veja a lista de funcionários.",
         "Este formulário não é uma avaliação.",
         "Na caixa de sugestões não há respostas suas para rever: cada envio é uma sugestão nova.",
-        "Este formulário já tem respostas. Só o título e a descrição podem mudar.",
     ];
 
     [Fact]
@@ -84,13 +83,9 @@ public class MensagensDosFormulariosTests
         foreach (var mensagem in MensagensDosFormularios.Todas.Where(m => SemExemplo.Contains(m.Detalhe)))
         {
             Assert.DoesNotContain(exemplos, e => e.Detalhe == mensagem.Detalhe); // a lista de exceções não esconde um texto que o contrato já tem
-            if (mensagem.Codigo != "FORMULARIO_JA_RESPONDIDO")
-            {
-                Assert.Contains(mensagem.Codigo, contrato, StringComparison.Ordinal); // o código existe no contrato; só falta o texto
-            }
+            Assert.Contains(mensagem.Codigo, contrato, StringComparison.Ordinal); // o código existe no contrato; só falta o texto
         }
 
-        Assert.DoesNotContain("FORMULARIO_JA_RESPONDIDO", contrato, StringComparison.Ordinal); // o código novo: o contrato não o conhece
         Assert.Equal(SemExemplo.Length, MensagensDosFormularios.Todas.Count(m => SemExemplo.Contains(m.Detalhe)));
     }
 
@@ -122,7 +117,7 @@ public class MensagensDosFormulariosTests
             "ANONIMATO_FIXO_APOS_PUBLICAR", "ANONIMO_PERGUNTAS_FIXAS", "ANONIMO_SEM_NOVOS_DESTINATARIOS", "RESULTADO_ANONIMO_INDISPONIVEL", "JA_RESPONDIDO", "FORMULARIO_ENCERRADO", "FORMULARIO_NAO_PUBLICADO", "FORMULARIO_JA_PUBLICADO",
             "FORMULARIO_AINDA_NAO_ABERTO", "FORMULARIO_JA_RESPONDIDO", "EMPRESA_NAO_CONFIGURADA", "PERGUNTA_JA_RESPONDIDA", "ANONIMO_SEM_ARQUIVO", "ANONIMO_SEM_LINK", "LINK_SO_PARA_ENTREVISTA", "FORMULARIO_ANONIMO_PUBLICO_PEQUENO",
             "VERIFICACAO_COM_BLOQUEIO", "FUNCIONARIO_INATIVO", "FORMULARIO_POR_LINK", "FORMULARIO_SEM_LINK", "FORMULARIO_NAO_E_POR_PESSOAS", "FORMULARIO_NAO_E_AVALIACAO", "FORMULARIO_ANONIMO", "FORMULARIO_SUGESTAO",
-            "RESULTADO_SEM_RESPOSTAS_SUFICIENTES", "AVALIADO_INVALIDO",
+            "RESULTADO_SEM_RESPOSTAS_SUFICIENTES", "AVALIADO_INVALIDO", "FORMULARIO_NAO_ESTA_AGENDADO", "FORMULARIO_RECORRENTE",
         ];
 
         Assert.Equal(esperados.Order(), MensagensDosFormularios.Todas.Select(m => m.Codigo).Distinct().Order());

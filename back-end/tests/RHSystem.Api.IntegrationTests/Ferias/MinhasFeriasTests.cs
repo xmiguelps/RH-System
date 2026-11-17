@@ -298,7 +298,7 @@ public class MinhasFeriasTests(MySqlFixture mysql)
             await TextoAsync(api, $"SELECT DATE_FORMAT(DATA_ETAPA_GESTOR, '%Y-%m-%d %H:%i:%s') FROM FERIAS WHERE ID_FERIAS = {id}")));
         Assert.Equal(0, EmailsDe(api, pessoa.FuncionarioId));
         var minhas = await CorpoAsync(await (await api.ClienteAgoraAsync(pessoa.UsuarioId)).GetAsync(Rota));
-        Assert.Equal(gestor.FuncionarioId, minhas.GetProperty("gestorQueAnalisa").GetProperty("id").GetInt32()); // o contrato só põe nulo nos três casos: o gestor ausente continua sendo "quem analisa"
+        Assert.Equal(JsonValueKind.Null, minhas.GetProperty("gestorQueAnalisa").ValueKind); // decisão do dono (2026-11-17): com o gestor ausente só o RH decide, então não há "quem analisa" (a tela diz que o RH analisa o pedido)
     }
 
     // ---------------------------------------------------------------- pedirFerias: período, regras e erros

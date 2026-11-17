@@ -116,7 +116,10 @@ public interface IAgendamentoDoFormulario
     /// </summary>
     Task AgendarLembreteAutomaticoAsync(int formularioId, DateOnly dia, CancellationToken ct);
 
-    /// <summary>Cancela toda tarefa pendente do formulário (publicar, encerrar, reabrir, lembrete) e os e-mails de lembrete ainda na fila: a exclusão não deixa nada rodar depois.</summary>
+    /// <summary>Cancela a tarefa do lembrete automático daquele dia (<c>LEMBRETE_FORMULARIO:form={id}:dia={dia}:alcance=TODOS</c>), se ainda pendente: o prazo mudou e o dia do lembrete mudou junto.</summary>
+    Task CancelarLembreteAutomaticoAsync(int formularioId, DateOnly dia, CancellationToken ct);
+
+    /// <summary>Cancela toda tarefa pendente do formulário (publicar, encerrar, reabrir, lembrete) e os e-mails de lembrete ainda na fila: a exclusão e a volta do agendado a rascunho não deixam nada rodar depois.</summary>
     Task CancelarTudoAsync(int formularioId, CancellationToken ct);
 }
 
@@ -163,6 +166,15 @@ public interface IFormulariosRepositorio
     Task<bool> AvancarReaberturaAsync(int formularioId, DateTime reaberturaPrevistaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct);
 
     Task<bool> AtivarAgendadoAsync(int formularioId, DateTime publicacaoLidaEmUtc, DateTime? proximaReaberturaEmUtc, CancellationToken ct);
+
+    /// <summary>Troca o prazo do formulário PUBLICADO se ele ainda está como foi lido (<c>ATIVO</c>, sem encerramento, anonimato e prazo iguais). <c>false</c> se outra aba encerrou ou mudou o prazo nesse meio tempo.</summary>
+    Task<bool> AtualizarPrazoAsync(FormularioLido lido, DateOnly novoPrazo, CancellationToken ct);
+
+    /// <summary>
+    /// Devolve o AGENDADO a rascunho se ele ainda está como foi lido (inativo, sem encerramento, mesma data de publicação e anonimato): apaga a data de publicação e o código do link (o link agendado deixa de valer; publicar de novo gera outro). As demais escolhas da publicação ficam guardadas.
+    /// <c>false</c> se outra aba publicou, encerrou ou já devolveu o formulário a rascunho.
+    /// </summary>
+    Task<bool> VoltarParaRascunhoAsync(FormularioLido lido, CancellationToken ct);
 
     /// <summary>
     /// Encerra o formulário PUBLICADO como está lido: <c>ATIVO</c> falso e a data de encerramento no mesmo UPDATE (o CHECK do banco os amarra). <paramref name="cancelarReaberturas"/> tira a próxima reabertura (o encerramento à mão cancela a recorrência; o do prazo não).

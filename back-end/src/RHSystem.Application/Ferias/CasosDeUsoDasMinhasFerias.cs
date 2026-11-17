@@ -25,9 +25,9 @@ public sealed class ObterMinhasFeriasCasoDeUso(IEscopoDoUsuario escopo, IConsult
         var quem = new QuemConsultaOPedido(PapelNaConsulta.PropriaPessoa, eu, null);
         var historico = linhas.OrderByDescending(l => l.SolicitadaEmUtc).ThenByDescending(l => l.Id).Select(l => MontadorDoPedidoDeFerias.Montar(l, quem)).ToList();
 
-        // Quem faz a primeira etapa: o gestor do setor. Nulo para quem é gestor, para setor sem gestor ativo e para gestor desligado (o pedido só passa pelo RH).
+        // Quem faz a primeira etapa: o gestor do setor. Nulo sempre que só o RH decide: para quem é gestor, para setor sem gestor ativo, para gestor desligado e para gestor ausente hoje (a etapa dele já nasce aprovada).
         var etapa = await gestorAusente.EtapaInicialDoPedidoAsync(eu, ct);
-        var gestor = etapa.GestorId is { } gestorId ? await consulta.ResumoDoGestorAsync(gestorId, ct) : null;
+        var gestor = etapa is { Etapa: EtapaInicial.Gestor, GestorId: { } gestorId } ? await consulta.ResumoDoGestorAsync(gestorId, ct) : null;
         return new FeriasEuResposta(MontadorDoSaldoDeFerias.Resumo(saldo), gestor, MontadorDoSaldoDeFerias.Periodos(saldo), historico);
     }
 }

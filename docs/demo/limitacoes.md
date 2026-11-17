@@ -22,6 +22,7 @@ Este é um projeto de **TCC**. O que está pronto funciona e é testado; o que e
 - **Treinamento:** vídeo só por **link** externo (não há envio de vídeo); sem quiz nem prova final (cortado em 2026-10-29). O certificado tem código de validação e conferência pública por código.
 - **E-mail:** a lista de e-mails que o sistema envia é **fechada** (`contrato/CONVENCOES.md`, seção 12: convite, redefinição de senha, resultado de ajuste de ponto e de férias, holerite publicado, aviso, advertência e lembretes de aviso e de formulário); o envio fica **desligado** por padrão e a fila acumula. Em produção precisa de um provedor configurado e de domínio verificado.
 - **Arquivos** (holerite, atestado, documentos, certificado, PDF de módulo) exigem um armazenamento de blobs (Azure Blob ou Azurite no desenvolvimento). Sem ele, o envio e o download falham com mensagem, e o resto do sistema continua.
+- **Tipo do arquivo de currículo.** O tipo vem sempre do conteúdo, mas os formatos antigos do Office (`.doc`, `.xls`, `.ppt`) têm a mesma assinatura (OLE2): uma planilha ou apresentação renomeada como `.doc` passa na candidatura. O arquivo só é guardado e baixado como anexo por link temporário, nunca executado no servidor; verificar macro ou vírus de qualquer arquivo do Office (inclusive de um `.doc` verdadeiro) exigiria um antivírus, que não está no escopo.
 
 ## Regras de negócio decididas por hipótese
 
