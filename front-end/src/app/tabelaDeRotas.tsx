@@ -3,6 +3,7 @@ import { PaginaDeAuditoria } from '../features/auditoria/PaginaDeAuditoria'
 import { CadastroDeBeneficios } from '../features/cadastros/beneficios/CadastroDeBeneficios'
 import { CadastroDeCargos } from '../features/cadastros/cargos/CadastroDeCargos'
 import { CadastroDeEmpresa } from '../features/cadastros/empresa/CadastroDeEmpresa'
+import { CadastroDePagamento } from '../features/cadastros/pagamento/CadastroDePagamento'
 import { CadastroDeGestores } from '../features/cadastros/gestores/CadastroDeGestores'
 import { PaginaDeCadastros } from '../features/cadastros/PaginaDeCadastros'
 import { CadastroDeSetores } from '../features/cadastros/setores/CadastroDeSetores'
@@ -147,6 +148,7 @@ export const ROTAS_RH: readonly RotaDoPortal[] = [
       { caminho: 'beneficios', elemento: <CadastroDeBeneficios /> },
       { caminho: 'usuarios', elemento: <CadastroDeUsuarios /> },
       { caminho: 'empresa', elemento: <CadastroDeEmpresa /> },
+      { caminho: 'pagamento', elemento: <CadastroDePagamento /> },
     ],
   },
 ]

@@ -199,6 +199,7 @@ describe('matriz de perfis da fatia 1', { timeout: 15000 }, () => {
       'Minhas advertências',
       'Meus formulários',
       'Meus treinamentos',
+      'Benefícios',
     ])
     // O do gestor: "Meus formulários" (fatia 5) e "Minhas advertências" (fatia 4); treinamentos (fatia 6).
     const meuEspacoDoGestor = menuVisivel('Gestor', caminhos).find((g) => g.rotulo === 'Meu espaço')
