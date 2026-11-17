@@ -108,6 +108,7 @@ describe('rotas', () => {
     const logado = renderizarApp({ rota: '/colaboradores-que-nao-existe' })
     expect(await screen.findByText('Página não encontrada.')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Menu principal' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ir para o início' })).toHaveAttribute('href', '/')
     logado.unmount()
     localStorage.clear()
     tokenDeAcesso.definir(null)
