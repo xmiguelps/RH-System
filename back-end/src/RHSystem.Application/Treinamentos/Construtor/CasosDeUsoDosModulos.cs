@@ -12,10 +12,12 @@ using RHSystem.Domain.Treinamentos;
 
 namespace RHSystem.Application.Treinamentos.Construtor;
 
-/// <summary>A conferência do módulo recebido (compartilhada por acrescentar e atualizar): tipo e duração lidos do texto, as regras do tipo, e o PDF pelo CONTEÚDO (até 10 MiB, tipo pelos primeiros bytes). Devolve os campos e o tipo de arquivo (<c>null</c> sem arquivo novo); com erro, os dois <c>null</c> e os erros em <paramref name="erros"/>.</summary>
+/// <summary>A conferência do módulo recebido (compartilhada por acrescentar e atualizar): tipo e duração lidos do texto, as regras do tipo, o PDF pelo CONTEÚDO (até 10 MiB, tipo pelos primeiros bytes) e o vídeo por arquivo (MP4 ou WebM pelo conteúdo, até 100 MiB). Devolve os campos e o tipo de arquivo (<c>null</c> sem arquivo novo); com erro, os dois <c>null</c> e os erros em <paramref name="erros"/>.</summary>
 internal static class ConferenciaDoModulo
 {
-    public static async Task<(CamposDoModulo? Campos, TipoDeArquivo? Arquivo)> ConferirAsync(ColetorDeErros erros, NovoModulo novo, bool jaTemArquivo, CancellationToken ct)
+    /// <param name="tipoAtual">O tipo que o módulo tem hoje (<c>null</c> ao acrescentar).</param>
+    /// <param name="atualTemArquivo">O módulo de hoje já guarda um arquivo. Só vale como "já tem" se o tipo novo é o mesmo (um PDF não serve de vídeo).</param>
+    public static async Task<(CamposDoModulo? Campos, TipoDeArquivo? Arquivo)> ConferirAsync(ColetorDeErros erros, NovoModulo novo, TipoDeModulo? tipoAtual, bool atualTemArquivo, CancellationToken ct)
     {
         TipoDeModulo? tipo = null;
         LeituraDeFiltros.Tentar(erros, () => tipo = EnumsDeConsulta.Ler<TipoDeModulo>(novo.Tipo, "tipo"));
@@ -34,11 +36,16 @@ internal static class ConferenciaDoModulo
 
         var temArquivoNovo = novo.Arquivo is not null;
         var tipoLidoSemErro = tipo is not null || string.IsNullOrEmpty(novo.Tipo);
+        var jaTemArquivo = atualTemArquivo && tipoAtual == tipo;
         var campos = tipoLidoSemErro ? ValidacaoDoModulo.Validar(erros, novo.Titulo, tipo, duracao, novo.UrlExterna, novo.ConteudoTexto, temArquivoNovo, jaTemArquivo) : null;
         TipoDeArquivo? arquivo = null;
         if (tipo == TipoDeModulo.Pdf && temArquivoNovo)
         {
             arquivo = await ValidacaoDeArquivoDeDocumento.ValidarPdfAsync(erros, novo.Arquivo, novo.ArquivosRecebidos, "Envie o arquivo PDF do módulo.", LimitesDoModulo.TamanhoMaximoBytes, "O arquivo pode ter até 10 MB.", ct);
+        }
+        else if (tipo == TipoDeModulo.Video && temArquivoNovo)
+        {
+            arquivo = await ValidacaoDoVideoDoModulo.ValidarAsync(erros, novo.Arquivo!, novo.ArquivosRecebidos, ct);
         }
 
         return erros.TemErros ? (null, null) : (campos, arquivo);
@@ -60,12 +67,12 @@ public sealed class AdicionarModuloDeTreinamentoCasoDeUso(IConsultaDeTreinamento
         }
 
         var erros = new ColetorDeErros();
-        var (campos, arquivo) = await ConferenciaDoModulo.ConferirAsync(erros, novo, jaTemArquivo: false, ct);
+        var (campos, arquivo) = await ConferenciaDoModulo.ConferirAsync(erros, novo, tipoAtual: null, atualTemArquivo: false, ct);
         erros.LancarSeHouver();
 
         async Task<TreinamentoModuloRh> EfetivarAsync(string? caminho)
         {
-            var nome = caminho is null ? null : NomeParaDownload.Limpar(novo.Arquivo!.NomeOriginal, ".pdf");
+            var nome = caminho is null ? null : NomeParaDownload.Limpar(novo.Arquivo!.NomeOriginal, arquivo!.Extensao);
             return await unidade.ExecutarEmTransacaoAsync(
                 async () =>
                 {
@@ -141,7 +148,7 @@ public sealed class AtualizarModuloDeTreinamentoCasoDeUso(IConsultaDeTreinamento
         var atual = (await modulos.ObterAsync(treinamentoId, moduloId, ct)).OuNaoEncontrado();
 
         var erros = new ColetorDeErros();
-        var (campos, arquivo) = await ConferenciaDoModulo.ConferirAsync(erros, novo, jaTemArquivo: atual.Tipo == TipoDeModulo.Pdf && atual.CaminhoArquivo is not null, ct);
+        var (campos, arquivo) = await ConferenciaDoModulo.ConferirAsync(erros, novo, atual.Tipo, atual.CaminhoArquivo is not null, ct);
         erros.LancarSeHouver();
         if (treinamento.Publicado && campos!.Tipo != atual.Tipo)
         {
@@ -162,7 +169,7 @@ public sealed class AtualizarModuloDeTreinamentoCasoDeUso(IConsultaDeTreinamento
 
                     string? caminho;
                     string? nome;
-                    if (campos!.Tipo != TipoDeModulo.Pdf)
+                    if (campos!.Tipo is not (TipoDeModulo.Pdf or TipoDeModulo.Video))
                     {
                         caminho = null;
                         nome = null;
@@ -170,17 +177,23 @@ public sealed class AtualizarModuloDeTreinamentoCasoDeUso(IConsultaDeTreinamento
                     else if (caminhoNovo is not null)
                     {
                         caminho = caminhoNovo;
-                        nome = NomeParaDownload.Limpar(novo.Arquivo!.NomeOriginal, ".pdf");
+                        nome = NomeParaDownload.Limpar(novo.Arquivo!.NomeOriginal, arquivo!.Extensao);
+                    }
+                    else if (campos.Tipo == TipoDeModulo.Video && campos.UrlExterna is not null)
+                    {
+                        caminho = null; // o vídeo de arquivo virou link: o arquivo velho sai depois do commit
+                        nome = null;
+                    }
+                    else if (dentro.Tipo == campos.Tipo && dentro.CaminhoArquivo is not null)
+                    {
+                        caminho = dentro.CaminhoArquivo; // sem arquivo novo, do mesmo tipo: o atual fica (o caso de uso já exigiu que exista)
+                        nome = dentro.NomeArquivoOriginal;
                     }
                     else
                     {
-                        caminho = dentro.CaminhoArquivo; // PDF sem arquivo novo: o atual fica (o caso de uso já exigiu que exista)
-                        nome = dentro.NomeArquivoOriginal;
-                    }
-
-                    if (caminho is null && campos.Tipo == TipoDeModulo.Pdf)
-                    {
-                        throw new ErroDeValidacaoException("arquivo", "Envie o arquivo PDF do módulo.");
+                        throw campos.Tipo == TipoDeModulo.Pdf
+                            ? new ErroDeValidacaoException("arquivo", "Envie o arquivo PDF do módulo.")
+                            : new ErroDeValidacaoException("urlExterna", "Informe o endereço do vídeo ou envie o arquivo.");
                     }
 
                     await modulos.SubstituirAsync(moduloId, campos, caminho, nome, ct);

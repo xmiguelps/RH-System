@@ -213,8 +213,8 @@
 | `GET /api/eu/treinamentos/{treinamentoId}` | `obterMeuTreinamento` | Mostra um treinamento meu, com os módulos e o andamento em cada um. | Funcionario, Gestor, RH |
 | `POST /api/eu/treinamentos/{treinamentoId}/inscricao` | `inscreverMeEmTreinamento` | Inscreve a pessoa em um treinamento opcional ("Quero me inscrever"). | Funcionario, Gestor, RH |
 | `POST /api/eu/treinamentos/{treinamentoId}/iniciar` | `iniciarMeuTreinamento` | Marca que a pessoa começou o treinamento ("Começar"). | Funcionario, Gestor, RH |
-| `GET /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}` | `obterConteudoDeModulo` | Mostra o conteúdo de um módulo. * | Funcionario, Gestor, RH |
-| `GET /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/download` | `baixarArquivoDeModulo` | Dá um link temporário para abrir o arquivo PDF de um módulo. * | Funcionario, Gestor, RH |
+| `GET /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}` | `obterConteudoDeModulo` | Mostra o conteúdo de um módulo. | Funcionario, Gestor, RH |
+| `GET /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/download` | `baixarArquivoDeModulo` | Dá um link temporário para abrir o arquivo de um módulo (o PDF ou o vídeo por arquivo). | Funcionario, Gestor, RH |
 | `POST /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/concluir` | `concluirModuloDeTreinamento` | Marca um módulo como concluído; ao concluir o último, conclui o treinamento. * | Funcionario, Gestor, RH |
 | `GET /api/eu/treinamentos/{treinamentoId}/certificado/download` | `baixarMeuCertificado` | Dá um link temporário para baixar o meu certificado em PDF ("Ver certificado"). * | Funcionario, Gestor, RH |
 | `GET /api/gestor/treinamentos` | `listarTreinamentosDaEquipe` | Lista os treinamentos que valem para o meu setor, com o andamento da equipe. | Gestor |

@@ -47,6 +47,7 @@ internal static class TreinamentosDeTeste
         var nome = titulo ?? $"Módulo {ordem}";
         var (url, texto, arquivo, original) = tipo switch
         {
+            "VIDEO" when caminho is not null => ("NULL", "NULL", Valor(caminho), Valor(nomeArquivo ?? "Aula.mp4")),
             "VIDEO" => ("'https://videos.exemplo.com.br/aula'", "NULL", "NULL", "NULL"),
             "LINK" => ("'https://artigo.exemplo.com.br'", "NULL", "NULL", "NULL"),
             "PDF" => ("NULL", "NULL", Valor(caminho ?? $"treinamentos/modulo-{ordem}.pdf"), Valor(nomeArquivo ?? "Apostila.pdf")),

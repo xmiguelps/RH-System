@@ -53,7 +53,7 @@ public sealed class ObterConteudoDeModuloCasoDeUso(IMinhaParticipacaoRepositorio
 }
 
 /// <summary>
-/// <c>GET /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/download</c>: o link temporário do PDF do módulo, como anexo. Mesmas regras de acesso do conteúdo; módulo que não é PDF (sem arquivo) = 404. O caminho do armazenamento nunca aparece; o nome do download é o nome original já limpo. Sem evento de auditoria.
+/// <c>GET /api/eu/treinamentos/{treinamentoId}/modulos/{moduloId}/download</c>: o link temporário do arquivo do módulo (o PDF ou o vídeo por arquivo), como anexo. Mesmas regras de acesso do conteúdo; módulo sem arquivo = 404. O caminho do armazenamento nunca aparece; o nome do download é o nome original já limpo. Sem evento de auditoria.
 /// </summary>
 public sealed class BaixarArquivoDeModuloCasoDeUso(IMinhaParticipacaoRepositorio participacao, IModulosRepositorio modulos, IArmazenamentoDeArquivos armazenamento, IEscopoDoUsuario escopo, IRelogio relogio)
 {
@@ -61,11 +61,11 @@ public sealed class BaixarArquivoDeModuloCasoDeUso(IMinhaParticipacaoRepositorio
     {
         _ = AcessoAoConteudo.Conferir(await participacao.LerAsync(escopo.FuncionarioId, treinamentoId, ct), FusoBrasil.Hoje(relogio.AgoraUtc));
         var modulo = (await modulos.ObterAsync(treinamentoId, moduloId, ct)).OuNaoEncontrado();
-        if (modulo.Tipo != TipoDeModulo.Pdf || modulo.CaminhoArquivo is null)
+        if (modulo.CaminhoArquivo is null)
         {
             throw new NaoEncontradoException();
         }
 
-        return await armazenamento.CriarLinkTemporarioAsync(modulo.CaminhoArquivo, modulo.NomeArquivoOriginal ?? "modulo.pdf", ct);
+        return await armazenamento.CriarLinkTemporarioAsync(modulo.CaminhoArquivo, modulo.NomeArquivoOriginal ?? "modulo" + Path.GetExtension(modulo.CaminhoArquivo), ct);
     }
 }

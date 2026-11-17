@@ -9,7 +9,7 @@ public sealed record CamposDoModulo(string Titulo, TipoDeModulo Tipo, short? Dur
 
 /// <summary>
 /// Confere o módulo (<c>TreinamentoModuloComando</c>): título de 1 a 200, duração de 1 a 32767 minutos, <c>urlExterna</c> até 500 caracteres começando por <c>http://</c> ou <c>https://</c>, <c>conteudoTexto</c> até 50000. Cada tipo exige o seu campo e recusa os dos outros: <c>VIDEO</c> e <c>LINK</c> o endereço
-/// (o vídeo é só link externo: arquivo é recusado), <c>TEXTO</c> o texto, <c>PDF</c> o arquivo (na edição, sem arquivo novo o atual fica). Texto vazio num campo de outro tipo vale como ausente (o formulário multipart costuma mandar <c>""</c>). Todos os erros juntos; com algum erro devolve <c>null</c>.
+/// (o vídeo aceita um endereço OU um arquivo MP4/WebM, nunca os dois nem nenhum; decisão do dono de 2026-11-17), <c>TEXTO</c> o texto, <c>PDF</c> o arquivo (na edição, sem arquivo novo o atual fica, e o vídeo que já tem arquivo fica sem nada novo ou vira link com um endereço). Texto vazio num campo de outro tipo vale como ausente (o formulário multipart costuma mandar <c>""</c>). Todos os erros juntos; com algum erro devolve <c>null</c>.
 /// </summary>
 public static class ValidacaoDoModulo
 {
@@ -47,9 +47,14 @@ public static class ValidacaoDoModulo
             erros.Adicionar("urlExterna", "Use um endereço que comece com http:// ou https://, com até 500 caracteres.");
             valido = false;
         }
-        else if (endereco is null && tipo is TipoDeModulo.Video or TipoDeModulo.Link)
+        else if (endereco is null && tipo == TipoDeModulo.Link)
         {
             erros.Adicionar("urlExterna", "Informe o endereço do módulo.");
+            valido = false;
+        }
+        else if (endereco is null && tipo == TipoDeModulo.Video && !temArquivoNovo && !jaTemArquivo)
+        {
+            erros.Adicionar("urlExterna", "Informe o endereço do vídeo ou envie o arquivo.");
             valido = false;
         }
         else if (endereco is not null && tipo is TipoDeModulo.Texto or TipoDeModulo.Pdf)
@@ -79,9 +84,14 @@ public static class ValidacaoDoModulo
             erros.Adicionar("arquivo", "Envie o arquivo PDF do módulo.");
             valido = false;
         }
-        else if (tipo != TipoDeModulo.Pdf && temArquivoNovo)
+        else if (tipo == TipoDeModulo.Video && temArquivoNovo && endereco is not null)
         {
-            erros.Adicionar("arquivo", tipo == TipoDeModulo.Video ? "O vídeo é um link externo: não envie arquivo." : "Este tipo de módulo não tem arquivo.");
+            erros.Adicionar("arquivo", "Escolha um só: o link ou o arquivo de vídeo.");
+            valido = false;
+        }
+        else if (tipo is not (TipoDeModulo.Pdf or TipoDeModulo.Video) && temArquivoNovo)
+        {
+            erros.Adicionar("arquivo", "Este tipo de módulo não tem arquivo.");
             valido = false;
         }
 

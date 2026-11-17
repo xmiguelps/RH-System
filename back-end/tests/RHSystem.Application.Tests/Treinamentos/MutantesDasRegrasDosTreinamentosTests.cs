@@ -59,13 +59,13 @@ public class MutantesDasRegrasDosTreinamentosTests
     }
 
     [Fact]
-    public void O_arquivo_num_modulo_de_video_diz_que_e_link_externo_e_nos_outros_tipos_que_nao_tem_arquivo()
+    public void O_video_com_endereco_e_arquivo_novo_manda_escolher_um_so_e_nos_outros_tipos_o_arquivo_nao_existe()
     {
         var video = ErrosDe(e => ValidacaoDoModulo.Validar(e, "Abertura", TipoDeModulo.Video, null, "https://a.com", null, true, false));
         var texto = ErrosDe(e => ValidacaoDoModulo.Validar(e, "Leitura", TipoDeModulo.Texto, null, null, "Texto.", true, false));
         var link = ErrosDe(e => ValidacaoDoModulo.Validar(e, "Artigo", TipoDeModulo.Link, null, "https://a.com", null, true, false));
 
-        Assert.Equal(["O vídeo é um link externo: não envie arquivo."], video["arquivo"]);
+        Assert.Equal(["Escolha um só: o link ou o arquivo de vídeo."], video["arquivo"]);
         Assert.Equal(["Este tipo de módulo não tem arquivo."], texto["arquivo"]);
         Assert.Equal(["Este tipo de módulo não tem arquivo."], link["arquivo"]);
     }
