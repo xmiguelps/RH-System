@@ -113,6 +113,11 @@ public static class MensagensDosFormularios
     /// <summary>Sem exemplo no contrato (o <c>encerrarFormulario</c> só diz "só publicado se encerra"): texto do executor.</summary>
     public static MensagemDoFormulario FormularioNaoPublicadoParaEncerrar { get; } = new(422, Recusada, "Só um formulário publicado pode ser encerrado.", "FORMULARIO_NAO_PUBLICADO");
 
+    /// <summary>O mesmo código de <see cref="FormularioNaoPublicadoParaEncerrar"/>, com o texto de quem tenta mudar o prazo por <c>alterarPrazoDoFormulario</c>: antes de publicar, o prazo é uma escolha da etapa Publicação.</summary>
+    public static MensagemDoFormulario FormularioNaoPublicadoParaPrazo { get; } = new(422, Recusada, "Só um formulário publicado muda o prazo por aqui. Antes de publicar, o prazo é guardado na etapa Publicação.", "FORMULARIO_NAO_PUBLICADO");
+
+    public static MensagemDoFormulario FormularioNaoEstaAgendado { get; } = new(422, Recusada, "Só um formulário agendado volta para rascunho.", "FORMULARIO_NAO_ESTA_AGENDADO");
+
     /// <summary>Sem exemplo no contrato (publicar o que já está publicado ou agendado): texto do executor.</summary>
     public static MensagemDoFormulario FormularioJaPublicado { get; } = new(422, Recusada, "Este formulário já está publicado ou agendado.", "FORMULARIO_JA_PUBLICADO");
 
@@ -194,7 +199,7 @@ public static class MensagensDosFormularios
     public static IReadOnlyList<MensagemDoFormulario> Todas { get; } =
     [
         AnonimatoFixoAposPublicar, AnonimoPerguntasFixas, AnonimoSemNovosDestinatarios, ResultadoAnonimoIndisponivel, JaRespondidoPeloFuncionario, JaRespondidoPeloCandidato,
-        FormularioEncerradoParaEditar, FormularioEncerradoParaResponder, FormularioDeAdmissaoEncerrado, FormularioNaoPublicadoParaLembrar, FormularioNaoPublicadoParaEncerrar, FormularioJaPublicado, FormularioAindaNaoAberto,
+        FormularioEncerradoParaEditar, FormularioEncerradoParaResponder, FormularioDeAdmissaoEncerrado, FormularioNaoPublicadoParaLembrar, FormularioNaoPublicadoParaEncerrar, FormularioNaoPublicadoParaPrazo, FormularioNaoEstaAgendado, FormularioJaPublicado, FormularioAindaNaoAberto,
         FormularioJaRespondido, EmpresaNaoConfigurada, PerguntaJaRespondidaParaEditar, PerguntaJaRespondidaParaExcluir, AnonimoSemArquivo, AnonimoSemLink, LinkSoParaEntrevista, AnonimoPequeno(4), VerificacaoComBloqueio,
         PessoaInativaNoPublico, PessoaInativaParaResponder, FormularioPorLinkNaLista, FormularioPorLinkNoLembrete, FormularioSemLink, FormularioNaoEPorPessoas, FormularioNaoEAvaliacao, FormularioAnonimo, SugestaoNoLembrete,
         SugestaoNasMinhasRespostas, ResultadoSemRespostasNaExportacao, ResultadoSemRespostasDoAvaliado, AvaliadoInvalido,

@@ -147,7 +147,7 @@
 | `POST /api/eu/advertencias/{advertenciaId}/contestacao` | `contestarAdvertencia` | A pessoa contesta a advertência, explicando o motivo ("Contestar"). | Funcionario, Gestor, RH |
 | `GET /api/eu/aniversariantes` | `listarAniversariantes` | Lista quem faz aniversário hoje e nos próximos 14 dias (cartão da tela inicial, fatia 7d). | Funcionario, Gestor, RH |
 
-## fatia 5 formularios (32 rotas)
+## fatia 5 formularios (34 rotas)
 
 | Rota | operationId | O que faz | Quem usa |
 |---|---|---|---|
@@ -163,6 +163,8 @@
 | `PUT /api/rh/formularios/{formularioId}/publicacao` | `salvarPublicacaoFormulario` | Guarda as escolhas da etapa Publicação sem publicar ("Salvar rascunho e sair"). | RH |
 | `POST /api/rh/formularios/{formularioId}/publicar` | `publicarFormulario` | Publica o formulário agora ou agenda a publicação (botão Publicar formulário). | RH |
 | `POST /api/rh/formularios/{formularioId}/encerrar` | `encerrarFormulario` | Encerra o formulário: ele deixa de aceitar respostas. | RH |
+| `PUT /api/rh/formularios/{formularioId}/prazo` | `alterarPrazoDoFormulario` | Muda o prazo de um formulário publicado. | RH |
+| `POST /api/rh/formularios/{formularioId}/rascunho` | `voltarFormularioParaRascunho` | Devolve um formulário agendado a rascunho. | RH |
 | `POST /api/rh/formularios/{formularioId}/destinatarios` | `adicionarDestinatariosFormulario` | Acrescenta pessoas a um formulário que é para pessoas escolhidas. | RH |
 | `GET /api/rh/formularios/{formularioId}/respondentes` | `listarRespondentesFormulario` | Mostra quem respondeu e quem falta num formulário para funcionários (tela Quem respondeu). | RH |
 | `GET /api/rh/formularios/{formularioId}/candidatos` | `listarCandidatosFormulario` | Lista os candidatos que responderam um formulário por link. | RH |

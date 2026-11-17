@@ -2,6 +2,15 @@
 
 Regra de versão: ver `CONVENCOES.md`, seção 14. A versão fica em `fontes/00-base.yaml` (`info.version`).
 
+## 0.3.0 — 2026-11-17 (rascunho)
+
+Decisões do dono de 2026-11-17 depois do back-end completo (fatias 0 a 8), parte 1:
+
+- **Rotas novas** (versão menor): `alterarPrazoDoFormulario` (`PUT /api/rh/formularios/{formularioId}/prazo`, muda o prazo de um formulário publicado) e `voltarFormularioParaRascunho` (`POST /api/rh/formularios/{formularioId}/rascunho`, devolve um agendado a rascunho; o código do link agendado deixa de valer). Esquema novo `FormularioPrazoComando`; erro novo `FORMULARIO_NAO_ESTA_AGENDADO`; `FORMULARIO_NAO_PUBLICADO` ganha um texto para o prazo.
+- **Erro novo** `ADVERTENCIA_ANTES_DA_ADMISSAO` (422) em `registrarAdvertencia` e `registrarAdvertenciaDaEquipe`: o dia do ocorrido não pode ser anterior à admissão da pessoa.
+- **`FORMULARIO_JA_RESPONDIDO`** (422, já devolvido pela API) passa a constar em `editarFormulario`, com exemplo: mudar o tipo ou o sentido de um formulário publicado que já tem respostas.
+- **`gestorQueAnalisa`** de `obterMinhasFerias` também é `null` quando o gestor do setor está ausente hoje (só o RH decide). Só texto.
+
 ## 0.2.2 — 2026-11-03 (rascunho)
 
 - Só texto (versão de correção, `CONVENCOES.md`, seção 14): as citações aos scripts de banco `V006` a `V048` foram reescritas depois que o dono juntou os 42 scripts da aplicação dentro do `V001` e do `V002` (2026-11-03). Onde o contrato dizia "script `V042`", agora diz `V001`; as citações com número de linha passaram a apontar para a tabela ou para a nota «(antigo Vnnn)» do `V001`. Nenhuma rota, campo, exemplo ou código de erro mudou.
