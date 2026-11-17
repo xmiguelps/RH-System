@@ -16,19 +16,30 @@ import { Janela } from '../../shared/ui/Janela'
 import { Selo } from '../../shared/ui/Selo'
 import { useNotificacao } from '../../shared/ui/useNotificacao'
 import { ListaDeRegras } from './CamposDasFerias'
-import { extrasDoPedido, frasesDaDecisao, periodoCurto, SITUACAO_DAS_FERIAS, textoDeDias } from './rotulosDasFerias'
+import {
+  extrasDoPedido,
+  frasesDaDecisao,
+  periodoCurto,
+  SITUACAO_DAS_FERIAS,
+  textoDeDias,
+} from './rotulosDasFerias'
 
 type Pedido = Esquema<'FeriasPedidoAnalise'>
 type Regra = Esquema<'FeriasRegraConferida'>
 export type QuemDecide = 'gestor' | 'rh'
 
 function regrasDe(e: unknown): Regra[] | undefined {
-  return e instanceof ErroDeApi && Array.isArray(e.corpo?.regras) ? (e.corpo.regras as Regra[]) : undefined
+  return e instanceof ErroDeApi && Array.isArray(e.corpo?.regras)
+    ? (e.corpo.regras as Regra[])
+    : undefined
 }
 
 /** Mostra o `title` e o `detail` nos 422 do RH (PEDIDO_PROPRIO e PEDIDO_RH_FORA_DE_GESTORES). */
 function textoDoErro(e: unknown): string {
-  if (e instanceof ErroDeApi && (e.codigo === 'PEDIDO_PROPRIO' || e.codigo === 'PEDIDO_RH_FORA_DE_GESTORES'))
+  if (
+    e instanceof ErroDeApi &&
+    (e.codigo === 'PEDIDO_PROPRIO' || e.codigo === 'PEDIDO_RH_FORA_DE_GESTORES')
+  )
     return `${e.title} ${e.detail ?? ''}`.trim()
   return mensagemDeErro(e)
 }
@@ -74,7 +85,12 @@ function ModalRecusar({
       }
     >
       <Campo rotulo="Motivo" erro={erro}>
-        <AreaDeTexto rows={4} limite={500} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+        <AreaDeTexto
+          rows={4}
+          limite={500}
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+        />
       </Campo>
     </Janela>
   )
@@ -89,7 +105,11 @@ function ModalSugerir({ pedido, aoFechar }: { pedido: Pedido; aoFechar: () => vo
   const [enviando, setEnviando] = useState(false)
   async function enviar() {
     if (!inicio || !fim || fim < inicio) {
-      setErro(new ErroDeApi(400, 'Datas', { detail: 'Escolha o primeiro e o último dia (o último não pode ser antes).' }))
+      setErro(
+        new ErroDeApi(400, 'Datas', {
+          detail: 'Escolha o primeiro e o último dia (o último não pode ser antes).',
+        }),
+      )
       return
     }
     setEnviando(true)
@@ -107,7 +127,8 @@ function ModalSugerir({ pedido, aoFechar }: { pedido: Pedido; aoFechar: () => vo
       aoFechar()
     } catch (e) {
       setErro(e)
-      if (e instanceof ErroDeApi && e.status === 409) await invalidarRota(queryClient, '/api/gestor/')
+      if (e instanceof ErroDeApi && e.status === 409)
+        await invalidarRota(queryClient, '/api/gestor/')
     } finally {
       setEnviando(false)
     }
@@ -133,10 +154,20 @@ function ModalSugerir({ pedido, aoFechar }: { pedido: Pedido; aoFechar: () => vo
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-4">
           <Campo rotulo="Primeiro dia">
-            <Entrada type="date" lang="pt-BR" value={inicio} onChange={(e) => setInicio(e.target.value)} />
+            <Entrada
+              type="date"
+              lang="pt-BR"
+              value={inicio}
+              onChange={(e) => setInicio(e.target.value)}
+            />
           </Campo>
           <Campo rotulo="Último dia">
-            <Entrada type="date" lang="pt-BR" value={fim} onChange={(e) => setFim(e.target.value)} />
+            <Entrada
+              type="date"
+              lang="pt-BR"
+              value={fim}
+              onChange={(e) => setFim(e.target.value)}
+            />
           </Campo>
         </div>
         {!!erro && <Aviso tom="erro">{mensagemDeErro(erro)}</Aviso>}
@@ -176,10 +207,20 @@ export function CartaoDeFeriasParaDecidir({
     const params = { params: { path: { feriasId: p.id } } }
     try {
       if (quem === 'gestor') {
-        if (acao === 'aprovar') await clienteHttp.POST('/api/gestor/ferias/{feriasId}/aprovar', params)
-        else await clienteHttp.POST('/api/gestor/ferias/{feriasId}/recusar', { ...params, body: { motivo: motivo! } })
-      } else if (acao === 'aprovar') await clienteHttp.POST('/api/rh/ferias/{feriasId}/confirmar', params)
-      else await clienteHttp.POST('/api/rh/ferias/{feriasId}/recusar', { ...params, body: { motivo: motivo! } })
+        if (acao === 'aprovar')
+          await clienteHttp.POST('/api/gestor/ferias/{feriasId}/aprovar', params)
+        else
+          await clienteHttp.POST('/api/gestor/ferias/{feriasId}/recusar', {
+            ...params,
+            body: { motivo: motivo! },
+          })
+      } else if (acao === 'aprovar')
+        await clienteHttp.POST('/api/rh/ferias/{feriasId}/confirmar', params)
+      else
+        await clienteHttp.POST('/api/rh/ferias/{feriasId}/recusar', {
+          ...params,
+          body: { motivo: motivo! },
+        })
       notificacao.sucesso(
         acao === 'recusar'
           ? 'Pedido recusado.'
@@ -213,7 +254,11 @@ export function CartaoDeFeriasParaDecidir({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Selo tom="info">Férias</Selo>
-        {quem === 'rh' && <Selo tom={SITUACAO_DAS_FERIAS[p.situacao].tom}>{SITUACAO_DAS_FERIAS[p.situacao].texto}</Selo>}
+        {quem === 'rh' && (
+          <Selo tom={SITUACAO_DAS_FERIAS[p.situacao].tom}>
+            {SITUACAO_DAS_FERIAS[p.situacao].texto}
+          </Selo>
+        )}
       </div>
       <p className="text-corpo text-texto">
         {p.funcionario.nome}
@@ -223,12 +268,16 @@ export function CartaoDeFeriasParaDecidir({
         pediu {textoDeDias(p.dias)}, de {periodoCurto(p.dataInicio, p.dataFim)}.
         {extrasDoPedido(p).map((x) => ` ${x}`)}
       </p>
-      {p.observacao && <p className="whitespace-pre-line text-tabela text-texto-suave">“{p.observacao}”</p>}
+      {p.observacao && (
+        <p className="whitespace-pre-line text-tabela text-texto-suave">“{p.observacao}”</p>
+      )}
       {p.conflitos.map((c) => (
         <Aviso key={`${c.funcionario.id}-${c.dataInicio}`} tom="alerta">
           Coincide {textoDeDias(c.diasEmComum)} com as férias já aprovadas de {c.funcionario.nome} (
           {periodoCurto(c.dataInicio, c.dataFim)}).
-          {p.equipeDisponivel !== null ? ` A equipe fica com ${p.equipeDisponivel} pessoas nesse período.` : ''}
+          {p.equipeDisponivel !== null
+            ? ` A equipe fica com ${p.equipeDisponivel} pessoas nesse período.`
+            : ''}
         </Aviso>
       ))}
       {quem === 'rh' &&
@@ -239,18 +288,33 @@ export function CartaoDeFeriasParaDecidir({
         ))}
       {erro && <Aviso tom="erro">{erro}</Aviso>}
       <div className="flex flex-wrap items-center gap-2">
-        <Botao tamanho="pequeno" disabled={desligado} carregando={aprovando} onClick={() => {
-          setAprovando(true)
-          void decidir('aprovar').finally(() => setAprovando(false))
-        }}>
+        <Botao
+          tamanho="pequeno"
+          disabled={desligado}
+          carregando={aprovando}
+          onClick={() => {
+            setAprovando(true)
+            void decidir('aprovar').finally(() => setAprovando(false))
+          }}
+        >
           {quem === 'gestor' ? 'Aprovar' : 'Confirmar'}
         </Botao>
         {quem === 'gestor' && (
-          <Botao variante="secundario" tamanho="pequeno" disabled={desligado} onClick={() => setModal('sugerir')}>
+          <Botao
+            variante="secundario"
+            tamanho="pequeno"
+            disabled={desligado}
+            onClick={() => setModal('sugerir')}
+          >
             Sugerir outra data
           </Botao>
         )}
-        <Botao variante="perigo" tamanho="pequeno" disabled={desligado} onClick={() => setModal('recusar')}>
+        <Botao
+          variante="perigo"
+          tamanho="pequeno"
+          disabled={desligado}
+          onClick={() => setModal('recusar')}
+        >
           Recusar
         </Botao>
         {desligado && p.motivoNaoPodeDecidir && (
@@ -258,7 +322,11 @@ export function CartaoDeFeriasParaDecidir({
         )}
       </div>
       {modal === 'recusar' && (
-        <ModalRecusar nome={p.funcionario.nome} aoFechar={() => setModal(null)} aoConfirmar={(motivo) => decidir('recusar', motivo)} />
+        <ModalRecusar
+          nome={p.funcionario.nome}
+          aoFechar={() => setModal(null)}
+          aoConfirmar={(motivo) => decidir('recusar', motivo)}
+        />
       )}
       {modal === 'sugerir' && <ModalSugerir pedido={p} aoFechar={() => setModal(null)} />}
     </li>

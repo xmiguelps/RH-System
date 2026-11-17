@@ -5,6 +5,7 @@ import { AbaPonto } from '../ponto/AbaPonto'
 import { AbaDocumentos } from './AbaDocumentos'
 import { AbaHolerites } from '../holerites/AbaHolerites'
 import { AbaAdvertencias } from '../advertencias/AbasDeAdvertencias'
+import { AbaFerias } from '../ferias/AbasDeFerias'
 
 export type PropsDaAba = {
   ficha: Esquema<'FuncionarioFichaRh'>
@@ -23,6 +24,7 @@ export type AbaDaFicha = {
 export const ABAS_DA_FICHA_RH: readonly AbaDaFicha[] = [
   { valor: 'dados', rotulo: 'Dados', Componente: AbaDados },
   { valor: 'ponto', rotulo: 'Ponto', Componente: AbaPonto },
+  { valor: 'ferias', rotulo: 'Férias', Componente: AbaFerias },
   { valor: 'holerites', rotulo: 'Holerites', Componente: AbaHolerites },
   { valor: 'documentos', rotulo: 'Documentos', Componente: AbaDocumentos },
   { valor: 'advertencias', rotulo: 'Advertências', Componente: AbaAdvertencias },

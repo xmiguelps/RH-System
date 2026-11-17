@@ -48,6 +48,7 @@ import { PaginaTreinamentosDaEquipe } from '../features/treinamentos/TelasDoGest
 import { PaginaDefinirSenha } from '../features/autenticacao/PaginaDefinirSenha'
 import { PaginaEsqueciSenha } from '../features/autenticacao/PaginaEsqueciSenha'
 import { PaginaMeusDocumentos } from '../features/documentos/PaginaMeusDocumentos'
+import { PaginaMinhasFerias, PainelPedirFerias } from '../features/ferias/PaginaMinhasFerias'
 import { PainelDaFichaDaEquipe } from '../features/equipe/PainelDaFichaDaEquipe'
 import { PaginaMeuPonto } from '../features/ponto/PaginaMeuPonto'
 import { PaginaPontoDaEquipe } from '../features/ponto/PaginaPontoDaEquipe'
@@ -196,6 +197,11 @@ export const ROTAS_EU: readonly RotaDoPortal[] = [
     filhas: [{ caminho: ':avisoId', elemento: <ModalMeuAviso /> }],
   },
   { caminho: 'holerites', elemento: <PaginaMeusHolerites /> },
+  {
+    caminho: 'ferias',
+    elemento: <PaginaMinhasFerias />,
+    filhas: [{ caminho: 'pedir', elemento: <PainelPedirFerias /> }],
+  },
   { caminho: 'advertencias', elemento: <PaginaMinhasAdvertencias /> },
   { caminho: 'formularios', elemento: <PaginaMeusFormularios /> },
   { caminho: 'formularios/:formularioId/responder', elemento: <PaginaResponder /> },

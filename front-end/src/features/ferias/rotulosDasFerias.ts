@@ -49,7 +49,10 @@ export function frasesDaDecisao(p: Pedido): string[] {
       frases.push(
         g.automatica
           ? 'Aprovado automaticamente (gestor ausente)'
-          : `Aprovado pelo gestor ${g.decididaPor?.nome ?? ''} em ${formatarDiaMes(g.decididaEmUtc)}`.replace('  ', ' '),
+          : `Aprovado pelo gestor ${g.decididaPor?.nome ?? ''} em ${formatarDiaMes(g.decididaEmUtc)}`.replace(
+              '  ',
+              ' ',
+            ),
       )
     else
       frases.push(
@@ -60,7 +63,9 @@ export function frasesDaDecisao(p: Pedido): string[] {
   const r = p.decisaoRh
   if (r) {
     if (r.decisao === 'APROVADA')
-      frases.push(`Confirmado pelo RH (${r.decididaPor?.nome ?? 'RH'}) em ${formatarDiaMes(r.decididaEmUtc)}`)
+      frases.push(
+        `Confirmado pelo RH (${r.decididaPor?.nome ?? 'RH'}) em ${formatarDiaMes(r.decididaEmUtc)}`,
+      )
     else
       frases.push(
         `Recusado por ${r.decididaPor?.nome ?? 'o RH'} em ${formatarDiaMes(r.decididaEmUtc)}${r.observacao ? `: ${r.observacao}` : ''}`,

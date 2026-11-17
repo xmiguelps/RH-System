@@ -46,10 +46,13 @@ async function conferir(quem: Conferente, corpo: Comando): Promise<Conferencia |
     const { data } = await clienteHttp.POST('/api/eu/ferias/conferencia', { body: corpo })
     return data
   }
-  const { data } = await clienteHttp.POST('/api/rh/funcionarios/{funcionarioId}/ferias/conferencia', {
-    params: { path: { funcionarioId: quem.funcionarioId } },
-    body: corpo,
-  })
+  const { data } = await clienteHttp.POST(
+    '/api/rh/funcionarios/{funcionarioId}/ferias/conferencia',
+    {
+      params: { path: { funcionarioId: quem.funcionarioId } },
+      body: corpo,
+    },
+  )
   return data
 }
 
@@ -73,10 +76,12 @@ export function useConferenciaDeFerias(quem: Conferente, dados: DadosDasFerias) 
     if (!chave) return
     const espera = setTimeout(() => {
       const corpo = JSON.parse(chave) as Comando
-      const alvo: Conferente = funcionarioId === null ? { tipo: 'eu' } : { tipo: 'rh', funcionarioId }
+      const alvo: Conferente =
+        funcionarioId === null ? { tipo: 'eu' } : { tipo: 'rh', funcionarioId }
       conferir(alvo, corpo)
         .then((r) => {
-          if (ultimaChave.current === chave) setResultado({ chave, conferencia: r ?? null, erro: null })
+          if (ultimaChave.current === chave)
+            setResultado({ chave, conferencia: r ?? null, erro: null })
         })
         .catch((e: unknown) => {
           if (ultimaChave.current === chave)

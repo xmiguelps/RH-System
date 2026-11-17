@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import type { Esquema } from '../../shared/api/tipos'
 import { AbaPontoDaEquipe } from '../ponto/AbaPontoDaEquipe'
 import { AbaAdvertenciasDaEquipe } from '../advertencias/AbasDeAdvertencias'
+import { AbaFeriasDaEquipe } from '../ferias/AbasDeFerias'
 import { AbaTreinamentosDaEquipe } from '../treinamentos/TelasDoGestor'
 import { AbaDadosDaEquipe } from './AbaDadosDaEquipe'
 
@@ -17,6 +18,7 @@ export type AbaDaFichaDaEquipe = {
 export const ABAS_DA_FICHA_DA_EQUIPE: readonly AbaDaFichaDaEquipe[] = [
   { valor: 'dados', rotulo: 'Dados', Componente: AbaDadosDaEquipe },
   { valor: 'ponto', rotulo: 'Ponto', Componente: AbaPontoDaEquipe },
+  { valor: 'ferias', rotulo: 'Férias', Componente: AbaFeriasDaEquipe },
   { valor: 'treinamentos', rotulo: 'Treinamentos', Componente: AbaTreinamentosDaEquipe },
   { valor: 'advertencias', rotulo: 'Advertências', Componente: AbaAdvertenciasDaEquipe },
 ]

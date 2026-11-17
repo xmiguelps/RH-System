@@ -18,11 +18,21 @@ export function ListaDeRegras({ regras }: { regras: readonly Regra[] }) {
   return (
     <ul aria-label="Verificações" className="flex flex-col gap-2">
       {regras.map((r) => (
-        <li key={r.codigo} data-atendida={r.atendida} className="flex items-start gap-2 text-tabela text-texto">
+        <li
+          key={r.codigo}
+          data-atendida={r.atendida}
+          className="flex items-start gap-2 text-tabela text-texto"
+        >
           {r.atendida ? (
-            <CircleCheck aria-label="Atendida" className="mt-0.5 h-4 w-4 shrink-0 text-primaria-media" />
+            <CircleCheck
+              aria-label="Atendida"
+              className="mt-0.5 h-4 w-4 shrink-0 text-primaria-media"
+            />
           ) : (
-            <TriangleAlert aria-label="Não atendida" className="mt-0.5 h-4 w-4 shrink-0 text-alerta-ponto" />
+            <TriangleAlert
+              aria-label="Não atendida"
+              className="mt-0.5 h-4 w-4 shrink-0 text-alerta-ponto"
+            />
           )}
           <span>{r.mensagem}</span>
         </li>
@@ -59,10 +69,23 @@ export function CamposDasFerias({
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-4">
         <Campo rotulo="Primeiro dia">
-          <Entrada type="date" lang="pt-BR" value={valores.dataInicio} onChange={(e) => aoMudar({ ...valores, dataInicio: e.target.value })} />
+          <Entrada
+            type="date"
+            lang="pt-BR"
+            value={valores.dataInicio}
+            onChange={(e) => aoMudar({ ...valores, dataInicio: e.target.value })}
+          />
         </Campo>
-        <Campo rotulo="Último dia" erro={fimAntes ? 'O último dia não pode ser antes do primeiro.' : null}>
-          <Entrada type="date" lang="pt-BR" value={valores.dataFim} onChange={(e) => aoMudar({ ...valores, dataFim: e.target.value })} />
+        <Campo
+          rotulo="Último dia"
+          erro={fimAntes ? 'O último dia não pode ser antes do primeiro.' : null}
+        >
+          <Entrada
+            type="date"
+            lang="pt-BR"
+            value={valores.dataFim}
+            onChange={(e) => aoMudar({ ...valores, dataFim: e.target.value })}
+          />
         </Campo>
       </div>
       <div className="flex flex-col gap-1" aria-live="polite">
@@ -73,7 +96,9 @@ export function CamposDasFerias({
           <span className="text-corpo text-texto">
             {textoDeDias(conferencia.totalDias)} corridos.
             {comSobra &&
-              (sobra >= 0 ? ` Sobram ${textoDeDias(sobra)}.` : ` Passa ${textoDeDias(-sobra)} do saldo.`)}
+              (sobra >= 0
+                ? ` Sobram ${textoDeDias(sobra)}.`
+                : ` Passa ${textoDeDias(-sobra)} do saldo.`)}
           </span>
         ) : (
           <span className="text-corpo text-texto-suave">Escolha o primeiro e o último dia.</span>
@@ -81,13 +106,25 @@ export function CamposDasFerias({
       </div>
       <CaixaDeSelecao
         marcada={valores.abonoPecuniario}
-        aoMudar={(abonoPecuniario) => aoMudar({ ...valores, abonoPecuniario, diasAbono: abonoPecuniario ? valores.diasAbono || '10' : '' })}
+        aoMudar={(abonoPecuniario) =>
+          aoMudar({
+            ...valores,
+            abonoPecuniario,
+            diasAbono: abonoPecuniario ? valores.diasAbono || '10' : '',
+          })
+        }
         rotulo="Vender parte das férias (abono de até 10 dias)"
       />
       {valores.abonoPecuniario && (
         <div className="ml-8 w-40">
           <Campo rotulo="Quantos dias">
-            <Entrada type="number" min={1} max={10} value={valores.diasAbono} onChange={(e) => aoMudar({ ...valores, diasAbono: e.target.value })} />
+            <Entrada
+              type="number"
+              min={1}
+              max={10}
+              value={valores.diasAbono}
+              onChange={(e) => aoMudar({ ...valores, diasAbono: e.target.value })}
+            />
           </Campo>
         </div>
       )}
