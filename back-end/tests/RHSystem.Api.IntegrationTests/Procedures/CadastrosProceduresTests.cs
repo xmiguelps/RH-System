@@ -331,6 +331,30 @@ public class CadastrosProceduresTests(MySqlFixture mysql)
         Assert.Equal(1L, await Sql.ContarAsync(conexao, $"SELECT COUNT(*) FROM USUARIOS WHERE ID_FUNCIONARIO = {pessoa}"));
     }
 
+    [Fact]
+    public async Task Usuario_espera_o_desligamento_em_andamento_e_nao_cria_login_para_quem_acabou_de_ficar_inativo()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var pessoa = await FuncionarioAsync(conexao);
+
+        // Outro programa está inativando a pessoa e ainda não confirmou.
+        await using var outraSessao = new MySqlConnection(conexao);
+        await outraSessao.OpenAsync();
+        await ExecutarNaSessaoAsync(outraSessao, "START TRANSACTION");
+        await ExecutarNaSessaoAsync(outraSessao, $"UPDATE FUNCIONARIOS SET ATIVO = FALSE WHERE ID_FUNCIONARIO = {pessoa}");
+
+        var chamada = TentarAsync(conexao, "SP_CRIAR_USUARIO", pessoa, new Saida("id"));
+        await Task.Delay(EsperaPelaTrava);
+        var terminouComALinhaTravada = chamada.IsCompleted;
+        await ExecutarNaSessaoAsync(outraSessao, "COMMIT");
+        var mensagem = await chamada;
+
+        // Sem a trava na linha da pessoa, a procedure (e o trigger, na mesma leitura) ainda a veria ativa e criaria o login de quem já saiu.
+        Assert.False(terminouComALinhaTravada);
+        Assert.Equal("Nao e possivel criar usuario para funcionario inativo.", mensagem);
+        Assert.Equal(0L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM USUARIOS"));
+    }
+
     // ================================================================ SP_CADASTRAR_FUNCIONARIO
 
     [Fact]
