@@ -35,8 +35,7 @@ describe('mensagemDeErro', () => {
   })
 
   it('429 usa o Retry-After quando ele vem (segundos ate 90, depois minutos arredondados para cima)', () => {
-    const com = (s: number) =>
-      mensagemDeErro(new ErroDeApi(429, 'T.', { retryAfterSegundos: s }))
+    const com = (s: number) => mensagemDeErro(new ErroDeApi(429, 'T.', { retryAfterSegundos: s }))
     expect(com(1)).toBe('Muitas tentativas. Aguarde 1 segundo e tente de novo.')
     expect(com(30)).toBe('Muitas tentativas. Aguarde 30 segundos e tente de novo.')
     expect(com(90)).toBe('Muitas tentativas. Aguarde 90 segundos e tente de novo.')
