@@ -54,6 +54,17 @@ describe('Ficha do RH, aba Férias (tela 05)', { timeout: 20000 }, () => {
     aba.conforme()
   })
 
+  it('o periodo e o prazo (texto comprido) saem em letra menor que o numero de dias, para nao estourar o cartao (visto na API real, a 1366 px)', async () => {
+    await abrirAba()
+    const resumo = await screen.findByRole('region', { name: 'Resumo das férias' })
+    const dias = await within(resumo).findByText('18 dias')
+    expect(dias.className).toContain('text-numero')
+    expect(within(resumo).getByText('14/03/2026 a 13/03/2027').className).not.toContain(
+      'text-numero',
+    )
+    expect(within(resumo).getByText('13/03/2027').className).not.toContain('text-numero')
+  })
+
   it('sem nenhum pedido diz "Nenhum período de férias registrado ainda."', async () => {
     capturar('obterFeriasDaFichaDoFuncionario', { corpo: { ...FICHA, ferias: [] } })
     await abrirAba()

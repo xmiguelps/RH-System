@@ -89,6 +89,8 @@ export type NumeroDoPonto = {
   valor: string
   tom?: 'neutro' | 'alerta' | 'sucesso'
   apoio?: string
+  /** `texto`: para valor comprido (um período "14/03/2026 a 13/03/2027"), que na letra de número estoura o cartão. */
+  tamanho?: 'numero' | 'texto'
 }
 
 /** A fileira de números do topo (vêm prontos da API; nada é somado aqui). */
@@ -112,7 +114,7 @@ export function NumerosDoPonto({
       {itens.map((item) => (
         <div
           key={item.rotulo}
-          className="flex flex-col gap-1 rounded-cartao border border-borda bg-superficie p-5"
+          className="flex min-w-0 flex-col gap-1 rounded-cartao border border-borda bg-superficie p-5"
         >
           <span className="text-tabela text-texto-suave">{item.rotulo}</span>
           {carregando ? (
@@ -121,7 +123,9 @@ export function NumerosDoPonto({
             <span
               data-tom={item.tom ?? 'neutro'}
               className={cn(
-                'text-numero font-bold tabular-nums text-texto',
+                item.tamanho === 'texto'
+                  ? 'text-t3 font-bold break-words text-texto'
+                  : 'text-numero font-bold tabular-nums text-texto',
                 item.tom === 'alerta' && 'text-alerta-texto',
                 item.tom === 'sucesso' && 'text-primaria-media',
               )}

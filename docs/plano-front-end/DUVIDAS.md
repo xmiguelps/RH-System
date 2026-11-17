@@ -335,3 +335,69 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
 
 - **Resposta do dono:** (vazio)
 - **O que mudou por causa da resposta:** (vazio)
+
+### D-F8-1 · Quais fluxos entram no roteiro da demo · aberta
+
+- **Registrada em:** 2026-11-17 (F8)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F8-1 do front-end do RH-System (roteiro da demo)
+
+  Olá! Estou fechando o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: fatia 8, roteiro da demo (PROGRESSO.md, seção "Roteiro da demo").
+  O que achei: o roteiro pede "entrar e sair", "bater ponto", "importar planilha" e "pedir e aprovar férias". Deixei os quatro, mais a exportação do ponto, rodando contra a API real com o seed fictício.
+  O que sugiro: manter os quatro e você corta o que não couber no tempo.
+  Pergunta: quais fluxos entram na demo e em que ordem?
+  Enquanto isso: o roteiro traz todos, numerados.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-F8-2 · Plano B da demo · aberta
+
+- **Registrada em:** 2026-11-17 (F8)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F8-2 do front-end do RH-System (plano B da demo)
+
+  Olá! Estou fechando o front-end do RH-System e preciso de uma decisão sua.
+
+  Onde: fatia 8, roteiro da demo.
+  O que achei: se a API cair durante a demo, o front ainda roda com dados simulados (o servidor de desenvolvimento, sempre como Ana Souza, do RH, com a data fixa de 07/10/2026). Não é a demo real.
+  O que sugiro: usar só se a API cair, avisando a banca.
+  Pergunta: esse plano B é aceitável (A) ou a demo só vale contra a API real (B)?
+  Enquanto isso: o roteiro descreve o plano B com o aviso.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
+
+### D-F8-3 · Resolução do projetor · aberta
+
+- **Registrada em:** 2026-11-17 (F8)
+- **Bloqueia:** não
+- **Mostrada à pessoa:** na hora [ ] · de novo na próxima mensagem [ ] · ao travar [ ] · no final [x]
+- **Texto para colar para o dono:**
+
+  ```
+  Mensagem para o dono: dúvida D-F8-3 do front-end do RH-System (resolução da apresentação)
+
+  Olá! Estou fechando o front-end do RH-System e preciso de uma informação sua.
+
+  Onde: fatia 8, conferência de largura.
+  O que achei: o desenho é de 1440 px de largura. Conferi as telas a 1366×768 (um projetor comum) contra a API real e nenhuma rola na horizontal, mas a 768 px de altura o menu do RH rola por dentro.
+  O que sugiro: apresentar a 1366×768 ou maior, com o zoom do navegador em 100%.
+  Pergunta: qual é a resolução real do projetor da banca e do notebook de quem apresenta?
+  Enquanto isso: sigo com 1366×768 como referência.
+  ```
+
+- **Resposta do dono:** (vazio)
+- **O que mudou por causa da resposta:** (vazio)
