@@ -188,11 +188,13 @@ describe('matriz de perfis da fatia 1', { timeout: 15000 }, () => {
         expect(rotulos(perfil)).not.toContain(doRh)
       }
     }
-    expect(rotulos('Gestor')).not.toContain('Painel da equipe')
+    // fatia 7: o Painel da equipe ganhou a rota, e o item aparece sozinho
+    expect(rotulos('Gestor')).toContain('Painel da equipe')
     // Fatias 3 e 4: no "Meu espaço" do RH só aparecem os itens cuja rota já existe.
     const meuEspacoDoRh = menuVisivel('RH', caminhos).find((g) => g.rotulo === 'Meu espaço')
     expect(meuEspacoDoRh?.itens.map((i) => i.rotulo)).toEqual([
       'Meu ponto',
+      'Férias',
       'Holerites',
       'Minhas advertências',
       'Meus formulários',

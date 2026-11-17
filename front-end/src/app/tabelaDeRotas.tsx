@@ -49,6 +49,7 @@ import { PaginaDefinirSenha } from '../features/autenticacao/PaginaDefinirSenha'
 import { PaginaEsqueciSenha } from '../features/autenticacao/PaginaEsqueciSenha'
 import { PaginaMeusDocumentos } from '../features/documentos/PaginaMeusDocumentos'
 import { PaginaMinhasFerias, PainelPedirFerias } from '../features/ferias/PaginaMinhasFerias'
+import { PaginaPainelDaEquipe } from '../features/equipe/PaginaPainelDaEquipe'
 import { PainelDaFichaDaEquipe } from '../features/equipe/PainelDaFichaDaEquipe'
 import { PaginaMeuPonto } from '../features/ponto/PaginaMeuPonto'
 import { PaginaPontoDaEquipe } from '../features/ponto/PaginaPontoDaEquipe'
@@ -145,7 +146,11 @@ export const ROTAS_RH: readonly RotaDoPortal[] = [
 ]
 
 export const ROTAS_GESTOR: readonly RotaDoPortal[] = [
-  { caminho: 'equipe/:funcionarioId', elemento: <PainelDaFichaDaEquipe /> },
+  {
+    caminho: 'equipe',
+    elemento: <PaginaPainelDaEquipe />,
+    filhas: [{ caminho: ':funcionarioId', elemento: <PainelDaFichaDaEquipe /> }],
+  },
   {
     caminho: 'ponto-da-equipe',
     elemento: <PaginaPontoDaEquipe />,

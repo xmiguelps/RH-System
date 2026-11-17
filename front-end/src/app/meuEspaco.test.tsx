@@ -65,7 +65,7 @@ describe('"Meu espaço" (decisão do dono, 2026-11-02; ficha 4, item 13)', { tim
       const menu = screen.getByRole('navigation', { name: 'Menu principal' })
       expect(
         within(menu).getByRole('link', {
-          name: perfil === 'RH' ? 'Colaboradores' : /^Painel da equipe|^Ponto da equipe/,
+          name: perfil === 'RH' ? 'Colaboradores' : /^Painel da equipe/,
         }),
       ).toBeInTheDocument()
     },
