@@ -39,7 +39,8 @@ describe('Painel Adicionar colaborador (tela 02)', { timeout: 15000 }, () => {
   it('mostra os blocos e os rotulos da tela 02 e nao tem matricula nem unidade nem gestorId', async () => {
     await abrir()
     for (const titulo of ['Dados pessoais', 'Contrato', 'Benefícios', 'Depois de salvar']) {
-      expect(screen.getByText(titulo)).toBeInTheDocument()
+      // dentro do painel: o menu do RH tambem tem "Benefícios" (Meu espaço) desde a fatia 7
+      expect(within(screen.getByRole('dialog')).getByText(titulo)).toBeInTheDocument()
     }
     expect(
       screen.getByText(

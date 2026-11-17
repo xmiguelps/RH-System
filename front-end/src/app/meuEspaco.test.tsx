@@ -29,6 +29,40 @@ describe('"Meu espaço" (decisão do dono, 2026-11-02; ficha 4, item 13)', { tim
     expect(within(menu).getByRole('link', { name: 'Cadastros' })).toBeInTheDocument()
   })
 
+  it('RH: "Férias" e "Benefícios" no "Meu espaço" levam a /eu/ferias e /eu/beneficios com o menu do RH a vista (ficha 7, item 13)', async () => {
+    const { user, roteador } = renderizarTela('/rh/painel')
+    await user.click(within(await grupoDoMenu('Meu espaço')).getByRole('link', { name: 'Férias' }))
+    await waitFor(() => expect(roteador.state.location.pathname).toBe('/eu/ferias'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Férias' })).toBeInTheDocument()
+    const menu = screen.getByRole('navigation', { name: 'Menu principal' })
+    expect(within(menu).getByRole('link', { name: 'Colaboradores' })).toBeInTheDocument()
+    await user.click(
+      within(await grupoDoMenu('Meu espaço')).getByRole('link', { name: 'Benefícios' }),
+    )
+    await waitFor(() => expect(roteador.state.location.pathname).toBe('/eu/beneficios'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Benefícios' })).toBeInTheDocument()
+    expect(within(menu).getByRole('link', { name: 'Cadastros' })).toBeInTheDocument()
+  })
+
+  it('Gestor: "Férias" e "Benefícios" continuam em "Seu dia a dia" e levam aos mesmos enderecos (ficha 7, item 13)', async () => {
+    const { user, roteador } = renderizarTela('/eu/inicio', { perfil: 'Gestor' })
+    const grupo = await grupoDoMenu('Seu dia a dia')
+    expect(within(grupo).getByRole('link', { name: 'Férias' })).toHaveAttribute(
+      'href',
+      '/eu/ferias',
+    )
+    expect(within(grupo).getByRole('link', { name: 'Benefícios' })).toHaveAttribute(
+      'href',
+      '/eu/beneficios',
+    )
+    await user.click(within(grupo).getByRole('link', { name: 'Férias' }))
+    await waitFor(() => expect(roteador.state.location.pathname).toBe('/eu/ferias'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Férias' })).toBeInTheDocument()
+    expect(
+      within(await grupoDoMenu('Seu setor')).getByRole('link', { name: /^Painel da equipe/ }),
+    ).toBeInTheDocument()
+  })
+
   it('Gestor: "Minhas advertências" no "Meu espaço"; "Holerites" e "Avisos" continuam nos grupos do Figma', async () => {
     const { user, roteador } = renderizarTela('/eu/inicio', { perfil: 'Gestor' })
     const meuEspaco = await grupoDoMenu('Meu espaço')
