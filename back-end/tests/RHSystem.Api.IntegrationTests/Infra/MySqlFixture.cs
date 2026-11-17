@@ -63,6 +63,12 @@ public class MySqlFixture : IAsyncLifetime
     /// Cria um banco vazio e exclusivo (utf8mb4, utf8mb4_unicode_ci) e um usuário restrito a ele, com os mesmos privilégios que o
     /// usuário do Azure terá, e devolve a connection string desse usuário (assim um problema de privilégio aparece aqui).
     /// </summary>
+    /// <summary>
+    /// A collation padrão do banco de teste: <c>utf8mb4_unicode_ci</c>, a das tabelas. Para provar que o código que compara variável com coluna (as procedures do <c>V007</c>) não depende dela, rode a suíte com a variável de ambiente <c>RH_TESTES_COLACAO=utf8mb4_0900_ai_ci</c>
+    /// (o padrão de um MySQL 8 criado sem opções, como o Flexible Server do Azure): as tabelas continuam em <c>unicode_ci</c> (o <c>V001</c> as declara), mas variáveis e parâmetros de procedure passam a ter a outra.
+    /// </summary>
+    private static string ColacaoDoBanco { get; } = Environment.GetEnvironmentVariable("RH_TESTES_COLACAO") is { Length: > 0 } c && c.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '_') ? c : "utf8mb4_unicode_ci";
+
     public async Task<string> NovoBancoAsync()
     {
         // Cada banco de teste tem o próprio usuário, logo o próprio pool de conexões, e o pool de um teste já terminado só se limpa quando
@@ -77,7 +83,7 @@ public class MySqlFixture : IAsyncLifetime
 
         await using var admin = new MySqlConnection(ConexaoDeAdministracao());
         await admin.OpenAsync();
-        await ExecutarAsync(admin, $"CREATE DATABASE `{banco}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        await ExecutarAsync(admin, $"CREATE DATABASE `{banco}` CHARACTER SET utf8mb4 COLLATE {ColacaoDoBanco}");
         await ExecutarAsync(admin, $"CREATE USER '{usuario}'@'%' IDENTIFIED BY '{senha}'");
         await ExecutarAsync(
             admin,
