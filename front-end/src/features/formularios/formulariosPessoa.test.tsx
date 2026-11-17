@@ -7,6 +7,7 @@ import { servidor } from '../../shared/mocks/servidor'
 import { exemploDoContrato } from '../../shared/teste/exemploDoContrato'
 import { capturar, problema } from '../../test/capturar'
 import { renderizarTela } from '../../test/telas'
+import { instalarTurnstileFalso } from '../../test/turnstileFalso'
 import { responderFormulario, responderFormularioPublico } from './enviarRespostas'
 
 vi.mock('./enviarRespostas', () => ({
@@ -383,6 +384,8 @@ describe('Pagina publica do candidato', { timeout: 20000 }, () => {
   })
 
   it('envio: 409 JA_RESPONDIDO mostra o detail; sucesso mostra a mensagem do recibo', async () => {
+    // o exemplo do contrato traz o captcha ligado: o widget falso passa sozinho (os testes do captcha estão em captchaDaCandidatura.test.tsx)
+    const turnstile = instalarTurnstileFalso({ automatico: 'tk' })
     const publico = ex<Esquema<'FormularioPaginaPublica'>>('obterFormularioPublico')
     servidor.use(
       http.get('*/api/publico/formularios/:token', () =>
@@ -428,12 +431,21 @@ describe('Pagina publica do candidato', { timeout: 20000 }, () => {
         telefone: '(11) 98877-1204',
         curriculo: null,
         aceitouAvisoDePrivacidade: true,
+        captchaToken: 'tk-1',
       },
       { respostas: [{ perguntaId: 1, texto: 'Sim' }], arquivos: [] },
+    )
+    // depois do erro o widget nasce de novo e traz outro token (cada um vale uma tentativa)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Enviar candidatura' })).toBeEnabled(),
     )
     await user.click(screen.getByRole('button', { name: 'Enviar candidatura' }))
     const recibo = ex<{ mensagem: string }>('responderFormularioPublico', 201)
     expect(await screen.findByText(recibo.mensagem)).toBeInTheDocument()
+    expect(vi.mocked(responderFormularioPublico).mock.calls[1]![1]).toMatchObject({
+      captchaToken: 'tk-2',
+    })
+    turnstile.desinstalar()
   })
 })
 

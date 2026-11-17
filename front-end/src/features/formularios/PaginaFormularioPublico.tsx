@@ -15,6 +15,7 @@ import { Markdown } from '../../shared/ui/Markdown'
 import { Progresso } from '../../shared/ui/Progresso'
 import { SeletorDeArquivo } from '../../shared/ui/SeletorDeArquivo'
 import { CampoDaPergunta } from './CampoDaPergunta'
+import { CaptchaTurnstile } from './CaptchaTurnstile'
 import { responderFormularioPublico } from './enviarRespostas'
 import { estaRespondida, montarEnvio, type RespostaLocal } from './respostasLocais'
 import { ARQUIVOS_ACEITOS } from './rotulosDosFormularios'
@@ -155,7 +156,11 @@ export function PaginaFormularioPublico() {
   const [erroGeral, setErroGeral] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [mensagemFinal, setMensagemFinal] = useState<string | null>(null)
+  // O captcha (Cloudflare Turnstile, contrato 0.3.0): só quando a página traz `captcha`. O token vale uma tentativa: depois de qualquer erro o widget nasce de novo.
+  const [tokenDoCaptcha, setTokenDoCaptcha] = useState<string | null>(null)
+  const [versaoDoCaptcha, setVersaoDoCaptcha] = useState(0)
   const pagina = consulta.data
+  const captcha = pagina?.captcha ?? null
 
   const moldura = (conteudo: ReactNode) => (
     <main className="min-h-screen bg-pagina px-4 py-8">
@@ -197,9 +202,28 @@ export function PaginaFormularioPublico() {
   const perguntas = [...pagina.perguntas].sort((a, b) => a.ordem - b.ordem)
   const atual = perguntas[indice]
   const ultima = indice === perguntas.length - 1
+  const verificacao = captcha && (
+    <div className="flex flex-col gap-2">
+      <CaptchaTurnstile
+        key={versaoDoCaptcha}
+        chaveDoSite={captcha.chaveDoSite}
+        aoMudar={setTokenDoCaptcha}
+      />
+      {!tokenDoCaptcha && (
+        <p className="text-pequeno text-texto-suave">
+          Confirme que você não é um robô para enviar.
+        </p>
+      )}
+    </div>
+  )
+
+  function reiniciarCaptcha() {
+    setTokenDoCaptcha(null)
+    setVersaoDoCaptcha((v) => v + 1)
+  }
 
   async function enviar() {
-    if (enviando || !pagina) return
+    if (enviando || !pagina || (captcha && !tokenDoCaptcha)) return
     setEnviando(true)
     setErroGeral(null)
     try {
@@ -211,11 +235,13 @@ export function PaginaFormularioPublico() {
           telefone: dados.telefone.trim() || undefined,
           curriculo: dados.curriculo,
           aceitouAvisoDePrivacidade: dados.aceite,
+          ...(captcha && tokenDoCaptcha ? { captchaToken: tokenDoCaptcha } : {}),
         },
         montarEnvio(perguntas, respostas),
       )
       setMensagemFinal(recibo.mensagem)
     } catch (erro) {
+      if (captcha) reiniciarCaptcha()
       if (erro instanceof ErroDeApi && erro.status === 400) {
         const e = erro.errors
         const doCandidato: ErrosDosDados = {
@@ -289,6 +315,7 @@ export function PaginaFormularioPublico() {
               aoMudar={(v) => setRespostas({ ...respostas, [atual.id]: v })}
               erro={erroDaPergunta}
             />
+            {ultima && verificacao}
             {erroGeral && <Aviso tom="erro">{erroGeral}</Aviso>}
             <div className="flex justify-between gap-3">
               <Botao
@@ -297,15 +324,24 @@ export function PaginaFormularioPublico() {
               >
                 Voltar
               </Botao>
-              <Botao onClick={seguir} carregando={enviando}>
+              <Botao
+                onClick={seguir}
+                carregando={enviando}
+                disabled={ultima && captcha !== null && !tokenDoCaptcha}
+              >
                 {ultima ? 'Enviar candidatura' : 'Próxima'}
               </Botao>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
+            {verificacao}
             {erroGeral && <Aviso tom="erro">{erroGeral}</Aviso>}
-            <Botao onClick={() => void enviar()} carregando={enviando}>
+            <Botao
+              onClick={() => void enviar()}
+              carregando={enviando}
+              disabled={captcha !== null && !tokenDoCaptcha}
+            >
               Enviar candidatura
             </Botao>
           </div>
