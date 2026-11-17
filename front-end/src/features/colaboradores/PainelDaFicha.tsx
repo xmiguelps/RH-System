@@ -41,7 +41,13 @@ function ehNaoEncontrado(erro: unknown): boolean {
   return erro instanceof ErroDeApi && erro.status === 404
 }
 
+/** Uma ficha por pessoa: trocar de :funcionarioId remonta tudo (edição, diálogos, avisos, formulário). */
 export function PainelDaFicha() {
+  const { funcionarioId } = useParams()
+  return <FichaDaPessoa key={funcionarioId} />
+}
+
+function FichaDaPessoa() {
   const { fechar } = usePainelSobreLista()
   const notificacao = useNotificacao()
   const queryClient = useQueryClient()
