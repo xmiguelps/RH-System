@@ -20,6 +20,8 @@ public class DocumentosProceduresTests(MySqlFixture mysql)
     private const string PedidoJaRespondido = "Este pedido de beneficio ja foi respondido.";
     private const string MotivoObrigatorio = "Informe o motivo da recusa, de 1 a 500 caracteres.";
     private const string RhInvalido = "Responsavel do RH inexistente ou inativo.";
+    private const int PessoasEmParalelo = 12;
+    private const int RodadasEmParalelo = 6;
     private const string UmDependente = """[{"nome": "  Ana Lima  ", "parentesco": " Filha ", "dataNascimento": "2015-03-09"}]""";
 
     // ---------------------------------------------------------------- apoio desta seção
@@ -271,6 +273,27 @@ public class DocumentosProceduresTests(MySqlFixture mysql)
 
         Assert.Equal([HoleriteJaExiste], recusas);
         Assert.Equal(["1"], await Sql.ColunaAsync(conexao, "SELECT VERSAO FROM HOLERITES"));
+    }
+
+    [Fact]
+    public async Task Pessoas_diferentes_publicando_holerite_ao_mesmo_tempo_gravam_todas_sem_impasse()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var hoje = await HojeAsync(conexao);
+        var pessoas = new List<int>();
+        for (var i = 0; i < PessoasEmParalelo; i++)
+        {
+            pessoas.Add(await FuncionarioAsync(conexao));
+        }
+
+        // Ninguém tem holerite da competência: a leitura da existência não pode travar o intervalo do índice (duas sessões segurariam o mesmo intervalo e os INSERT esperariam um pelo outro, erro 1213).
+        for (var rodada = 1; rodada <= RodadasEmParalelo; rodada++)
+        {
+            var competencia = hoje.AddMonths(-rodada);
+            await Task.WhenAll(pessoas.Select(pessoa => Task.Run(() => PublicarAsync(conexao, pessoa, competencia))));
+        }
+
+        Assert.Equal((long)PessoasEmParalelo * RodadasEmParalelo, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM HOLERITES WHERE VERSAO = 1"));
     }
 
     // ================================================================ SP_SUBSTITUIR_HOLERITE
@@ -755,6 +778,27 @@ public class DocumentosProceduresTests(MySqlFixture mysql)
         Assert.Equal([BeneficioJaPedido], recusas);
         Assert.Equal(1L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM BENEFICIOS_FUNCIONARIOS"));
         Assert.Equal(1L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM DEPENDENTES"));
+    }
+
+    [Fact]
+    public async Task Pessoas_diferentes_pedindo_beneficio_ao_mesmo_tempo_gravam_todas_sem_impasse()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var hoje = await HojeAsync(conexao);
+        var pessoas = new List<int>();
+        for (var i = 0; i < PessoasEmParalelo; i++)
+        {
+            pessoas.Add(await FuncionarioAsync(conexao));
+        }
+
+        for (var rodada = 1; rodada <= RodadasEmParalelo; rodada++)
+        {
+            var beneficio = await BeneficioAsync(conexao, aceitaDependentes: true);
+            await Task.WhenAll(pessoas.Select(pessoa => Task.Run(() => SolicitarAsync(conexao, pessoa, beneficio, hoje, dependentes: UmDependente))));
+        }
+
+        Assert.Equal((long)PessoasEmParalelo * RodadasEmParalelo, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM BENEFICIOS_FUNCIONARIOS WHERE STATUS_PEDIDO = 'PENDENTE'"));
+        Assert.Equal((long)PessoasEmParalelo * RodadasEmParalelo, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM DEPENDENTES"));
     }
 
     // ================================================================ SP_DECIDIR_BENEFICIO
