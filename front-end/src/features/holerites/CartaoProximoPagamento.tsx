@@ -1,4 +1,5 @@
 import { formatarDiaEMes, nomeDoMes } from '../../shared/formato/datas'
+import { Link } from 'react-router'
 import { Cartao } from '../../shared/ui/Cartao'
 
 /**
@@ -8,9 +9,12 @@ import { Cartao } from '../../shared/ui/Cartao'
 export function CartaoProximoPagamento({
   data,
   mesReferencia,
+  comLinkParaHolerites = false,
 }: {
   data: string | null | undefined
   mesReferencia: number | null | undefined
+  /** Nas telas iniciais (32 e 46) leva aos holerites; nas telas 36 e 49 o cartão já está lá. */
+  comLinkParaHolerites?: boolean
 }) {
   if (!data) return null
   return (
@@ -24,6 +28,11 @@ export function CartaoProximoPagamento({
         </span>
       ) : null}
       <span className="text-pequeno text-menu-apoio">Dúvida sobre um valor? Fale com o RH</span>
+      {comLinkParaHolerites && (
+        <Link to="/eu/holerites" className="text-corpo font-semibold text-primaria-clara">
+          Ver holerites
+        </Link>
+      )}
     </Cartao>
   )
 }
