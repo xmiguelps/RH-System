@@ -209,24 +209,31 @@ public class CadastrosProceduresTests(MySqlFixture mysql)
     }
 
     [Fact]
-    public async Task Nivel_espera_quem_esta_gravando_na_linha_da_pessoa_e_so_entao_troca()
+    public async Task Nivel_espera_a_troca_de_gestor_de_setor_em_andamento_e_recusa_tirar_o_nivel_de_quem_acabou_de_virar_gestor()
     {
         var conexao = await NovoBancoAsync(mysql);
         var pessoa = await FuncionarioAsync(conexao);
-        var rh = await NivelAsync(conexao, "RH");
+        var gestor = await GestorAsync(conexao, pessoa);
+        var setor = await SetorAsync(conexao);
+        var nivelGestor = await NivelAsync(conexao, "Funcionario Gestor");
+
+        // A API está pondo a pessoa como gestora de um setor (promove a pessoa e grava o setor, na mesma transação) e ainda não confirmou.
         await using var outraSessao = new MySqlConnection(conexao);
         await outraSessao.OpenAsync();
         await ExecutarNaSessaoAsync(outraSessao, "START TRANSACTION");
-        await ExecutarNaSessaoAsync(outraSessao, $"SELECT ID_FUNCIONARIO FROM FUNCIONARIOS WHERE ID_FUNCIONARIO = {pessoa} FOR UPDATE");
+        await ExecutarNaSessaoAsync(outraSessao, $"UPDATE FUNCIONARIOS SET ID_NIVEL_ACESSO = {nivelGestor} WHERE ID_FUNCIONARIO = {pessoa}");
+        await ExecutarNaSessaoAsync(outraSessao, $"UPDATE SETORES SET ID_GESTOR = {gestor} WHERE ID_SETOR = {setor}");
 
-        var chamada = ChamarAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", pessoa, rh);
+        var chamada = TentarAsync(conexao, "SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO", pessoa, await NivelAsync(conexao, "RH"));
         await Task.Delay(EsperaPelaTrava);
         var terminouComALinhaTravada = chamada.IsCompleted;
         await ExecutarNaSessaoAsync(outraSessao, "COMMIT");
-        await chamada;
+        var mensagem = await chamada;
 
+        // Sem a trava na linha da pessoa, a procedure conferiria o setor ANTES de a troca aparecer e deixaria um gestor de setor com o nível RH.
         Assert.False(terminouComALinhaTravada);
-        Assert.Equal("RH", await NivelDeAsync(conexao, pessoa));
+        Assert.Equal("O funcionario gerencia um setor e precisa ter o nivel Funcionario Gestor. Tire-o do setor antes de mudar o nivel.", mensagem);
+        Assert.Equal("Funcionario Gestor", await NivelDeAsync(conexao, pessoa));
     }
 
     // ================================================================ SP_CRIAR_USUARIO
