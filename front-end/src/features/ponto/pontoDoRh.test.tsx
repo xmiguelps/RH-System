@@ -93,6 +93,14 @@ describe('Ponto e feriados (tela 12)', { timeout: 15000 }, () => {
     expect(pdf.ultima().parametrosDoCaminho).toEqual({ funcionarioId: '12' })
     pdf.conforme()
     await user.click(screen.getByRole('button', { name: 'Exportar para a folha' }))
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Exportar para a folha' })).getByRole(
+        'button',
+        {
+          name: 'Baixar arquivo',
+        },
+      ),
+    )
     await waitFor(() => expect(baixados).toContain('ponto-2026-09.csv'))
     expect(folha.ultima().consulta.get('ano')).toBe('2026')
     expect(folha.ultima().consulta.get('mes')).toBe('9')

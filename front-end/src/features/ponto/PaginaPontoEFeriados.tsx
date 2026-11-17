@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Outlet, useSearchParams } from 'react-router'
 import { $api, clienteHttp } from '../../shared/api/api'
 import type { Esquema } from '../../shared/api/tipos'
-import { baixarExportacao } from '../../shared/arquivos/baixar'
 import { useBaixarPorLink } from '../../shared/arquivos/useBaixarPorLink'
 import { formatarMesAno, hojeEmSaoPaulo } from '../../shared/formato/datas'
 import { formatarMinutosComoHoras, formatarNumero } from '../../shared/formato/numeros'
@@ -16,9 +15,8 @@ import { Campo } from '../../shared/ui/Campo'
 import { ComboDeBusca } from '../../shared/ui/ComboDeBusca'
 import { EstadoVazio } from '../../shared/ui/EstadoVazio'
 import { Selecao } from '../../shared/ui/Selecao'
-import { useNotificacao } from '../../shared/ui/useNotificacao'
-import { mensagemDeErro } from '../../shared/api/mensagemDeErro'
 import { FeriadosDoMes } from './FeriadosDoMes'
+import { ModalDaExportacaoDoPonto } from './ModalDaExportacaoDoPonto'
 import { ModalCorrigirBatidas } from './ModalCorrigirBatidas'
 import { ModalPedidosDeAjusteRh } from './ModalPedidosDeAjusteRh'
 import { NumerosDoPonto } from './PecasDoPonto'
@@ -55,7 +53,6 @@ function ultimosMeses(hoje: string, incluir?: string): { valor: string; rotulo: 
 
 /** Tela 12: espelho de qualquer pessoa, feriados, exportar para a folha; o modal 13 por `?pedido`. */
 export function PaginaPontoEFeriados() {
-  const notificacao = useNotificacao()
   const [busca, setBusca] = useSearchParams()
   const hoje = hojeEmSaoPaulo()
   const funcionarioId = inteiroDaUrl(busca.get('funcionarioId') ?? undefined)
@@ -67,7 +64,7 @@ export function PaginaPontoEFeriados() {
   const pedidoNaUrl = inteiroDaUrl(busca.get('pedido') ?? undefined)
   const modalAberto = pedidoNaUrl !== undefined || busca.get('pedidos') === 'abertos'
   const [editando, setEditando] = useState<Dia | null>(null)
-  const [exportando, setExportando] = useState(false)
+  const [exportandoAberta, setExportandoAberta] = useState(false)
   const { baixar, baixando } = useBaixarPorLink()
 
   const espelho = $api.useQuery(
@@ -98,24 +95,6 @@ export function PaginaPontoEFeriados() {
     })
   }
 
-  async function exportar() {
-    if (exportando) return
-    setExportando(true)
-    try {
-      await baixarExportacao(
-        clienteHttp.GET('/api/rh/ponto/folha/exportacao', {
-          params: { query: { ano, mes } },
-          parseAs: 'blob',
-        }),
-        `ponto-${periodo}.csv`,
-      )
-    } catch (erro) {
-      notificacao.erro(mensagemDeErro(erro))
-    } finally {
-      setExportando(false)
-    }
-  }
-
   const resumo = espelho.data?.resumo
   const comRh = fila.data?.resumo.comRh
   const paraValidar = atestados.data?.total
@@ -141,9 +120,7 @@ export function PaginaPontoEFeriados() {
               Pedidos de ajuste
               {comRh !== undefined && comRh > 0 && <Bolinha valor={comRh} />}
             </Botao>
-            <Botao onClick={() => void exportar()} carregando={exportando}>
-              Exportar para a folha
-            </Botao>
+            <Botao onClick={() => setExportandoAberta(true)}>Exportar para a folha</Botao>
           </>
         }
       />
@@ -242,6 +219,12 @@ export function PaginaPontoEFeriados() {
           aoFechar={() => mudar({ pedido: null, pedidos: null })}
         />
       )}
+      <ModalDaExportacaoDoPonto
+        aberta={exportandoAberta}
+        ano={ano}
+        mes={mes}
+        aoFechar={() => setExportandoAberta(false)}
+      />
       <Outlet />
     </div>
   )
