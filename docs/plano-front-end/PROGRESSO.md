@@ -12,7 +12,7 @@
 - **Autorização de Git:** o dono autorizou abrir, aprovar e integrar cada PR (`gh pr merge --squash --admin`); commits em português sem acento, sem coautor
 - **Node (`node -v`):** v24.13.1 neste computador (o `engines` pede `^22.22.2 || ^24.15.0`: avisa na instalação, mas tudo roda)
 - **Versão do contrato em uso (`info.version`):** 0.3.0
-- **Última prova:** F8 (2026-11-17): `tsc`, `eslint` e `prettier --check` limpos; `vitest` 122 arquivos, 1247 testes passando; `build` ok; `csp` PASSOU (0 violações, 4 de 4 controles). **Integração com a API real local:** 65 rotas dos três perfis abrem sem erro (ver "Integração com a API real")
+- **Última prova:** F8 (2026-11-17): `tsc`, `eslint` e `prettier --check` limpos; `vitest` 122 arquivos, 1248 testes passando; `build` ok; `csp` PASSOU (0 violações, 4 de 4 controles). **Integração com a API real local:** 65 rotas dos três perfis abrem sem erro (ver "Integração com a API real")
 - **Último `csp`:** `PASSOU` em 2026-11-17 (build normal; vitrine pulada)
 
 ## Passos
@@ -325,7 +325,7 @@ O dono autorizou rodar o back-end completo no computador para provar o front (a 
 
 ## Relatório final
 
-**O front-end está completo** (fatias 0 a 8, contrato 0.3.0): as 61 telas com print e as sem print, 1247 testes, `tsc`, `eslint`, `prettier`, `build` e `csp` limpos, e a prova contra a API real local (três perfis, 65 rotas e os fluxos da demo).
+**O front-end está completo** (fatias 0 a 8, contrato 0.3.0): as 61 telas com print e as sem print, 1248 testes, `tsc`, `eslint`, `prettier`, `build` e `csp` limpos, e a prova contra a API real local (três perfis, 65 rotas e os fluxos da demo).
 
 **Para a pessoa conferir (não bloqueia):**
 - **Ao lado do print** (61 telas, por fatia em `telas\fatia-8.md`): fatia 1: 01, 02, 03, 09, 10, 29, 30, 31, 52; fatia 3: 04, 12, 13, 33, 47, 54, 55, 56; fatia 4: 07, 08, 11, 14, 15, 27, 28, 36, 37, 38, 43, 49, 50, 53, 59, 60; fatia 5: 16 a 21, 39, 40, 57; fatia 6: 22 a 26, 41, 42, 58; fatia 7: 00, 05, 06, 32, 34, 35, 44, 45, 46, 48, 51. As telas sem print se conferem pela descrição em `telas\fatia-N.md` (lista em `telas\fatia-8.md`, seção 2).
