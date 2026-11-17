@@ -333,7 +333,7 @@ Nesta fatia não há rota nova: ela deixa o sistema **pronto para a banca**.
 3. **Holerites, atestados e documentos enviados não vêm no seed**, porque dependem de arquivo no armazenamento; o roteiro os envia ao vivo. Aceita, ou prefere um passo a mais que envie PDFs de exemplo pela API depois do seed?
 4. **A senha pública `Demo#RH2026`** só serve para a demo com dados fictícios; trocar antes de qualquer URL aberta.
 5. **Onde roda a demo:** local (compose, custo zero) ou no Azure (a Task 14 da fatia 0 ainda não foi feita; ver `custos-e-como-desligar.md`).
-6. **Revisão dos scripts finais com o grupo:** o roadmap pede que os scripts finais sejam revisados com o grupo; o arquivo de procedures SQL recebido continua com o veredito "não aplicar como está" (contradiz o contrato) e fica pendente.
+6. **Revisão dos scripts finais com o grupo:** o roadmap pede que os scripts finais sejam revisados com o grupo. O arquivo de procedures SQL recebido **não é aplicado como está** (contradizia o contrato): o dono decidiu em 2026-11-17 que eu o reescrevesse, e o resultado é o `V007` (28 procedures, testadas num MySQL 8.4; as decisões, o que a API faz a mais e os achados nos scripts `V001` a `V006` estão em `docs/procedures-v007.md`). A revisão do `V001` a `V007` com o grupo continua sendo do dono.
 
 ## Front-end
 

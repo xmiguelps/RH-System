@@ -1,6 +1,6 @@
 # Esquema do banco: o que a aplicação acrescentou aos arquivos do grupo
 
-**Atualização de 2026-11-03: os antigos scripts `V006` a `V047` foram incorporados ao `V001` e ao `V002`.** A pasta tem hoje `V001` a `V006` e este arquivo. O texto original de cada script antigo continua no histórico do git (commit `10fe79a`; por exemplo `git show 10fe79a:"Banco de Dados/Scripts/V033__usuarios_tokens_senha.sql"`). **Neste arquivo, os números `V006` a `V047` são os dos scripts antigos**; as tabelas abaixo dizem de que pedido veio cada um e onde está hoje.
+**Atualização de 2026-11-03: os antigos scripts `V006` a `V047` foram incorporados ao `V001` e ao `V002`.** A pasta tem hoje `V001` a `V007` e este arquivo. O texto original de cada script antigo continua no histórico do git (commit `10fe79a`; por exemplo `git show 10fe79a:"Banco de Dados/Scripts/V033__usuarios_tokens_senha.sql"`). **Neste arquivo, os números `V006` a `V047` são os dos scripts antigos**; as tabelas abaixo dizem de que pedido veio cada um e onde está hoje.
 
 | Script | O que tem hoje |
 |---|---|
@@ -10,6 +10,7 @@
 | `V004` | `REFRESH_TOKENS` (login da API) |
 | `V005` | os níveis de acesso iniciais (`RH`, `Funcionario`, `Funcionario Gestor`) |
 | `V006` | `ADVERTENCIAS.ID_FUNCIONARIO_RH`: a pessoa do RH que registrou a advertência (decisão do dono, 2026-11-17; só o RH vê; anulável) |
+| `V007` | as **28 procedures** (decisão do dono, 2026-11-17): a reescrita das 24 do arquivo do grupo, alinhada ao contrato e aos scripts `V001` a `V006` e testada num MySQL 8.4. Só procedures: nenhuma tabela, função ou trigger. O que cada uma faz, as decisões e o que a API faz a mais estão em `docs/procedures-v007.md` |
 
 Dentro do `V001`, cada grupo de colunas ou regras acrescentado depois vem com um comentário que diz de que pedido veio (o título do antigo script), e cada tabela nova tem uma seção numerada com o mesmo título. **Para conferir o que a aplicação mudou**, procure esses comentários ou compare com o `V001` e o `V002` de antes da junção (no histórico, commit `f69db4e`). O banco que sai do `V001` ao `V005` foi conferido contra o que os 47 scripts produziam: veja "Como a base nova foi conferida".
 
@@ -120,7 +121,7 @@ Se você já tiver a sua própria correção, compare: o resultado esperado é o
 
 ## Numeração
 
-A pasta tem `V001` a `V006`; o **próximo script é o `V007`**. **Quem numera é o dono**: o grupo envia o conteúdo e o dono dá o número, para não haver dois com o mesmo. O nome do arquivo precisa seguir `V{nnn}__{nome}.sql`: o executor recusa outro padrão.
+A pasta tem `V001` a `V007`; o **próximo script é o `V008`**. **Quem numera é o dono**: o grupo envia o conteúdo e o dono dá o número, para não haver dois com o mesmo. O nome do arquivo precisa seguir `V{nnn}__{nome}.sql`: o executor recusa outro padrão.
 
 Regra do projeto: **depois do primeiro deploy no Azure, script aplicado não se edita mais**. Mudança vira script novo (`ALTER` para tabela; `DROP` e `CREATE` para trigger e função). **Antes** do primeiro deploy foi possível ter um esquema "limpo", com as mudanças dentro dos `CREATE TABLE`: o dono decidiu fazer isso em 2026-11-03, e é a junção descrita no topo. Quem tiver um banco local criado antes precisa recriá-lo (`docker compose down -v`), porque o executor recusa um banco cujo `V001` ou `V002` aplicado mudou.
 
