@@ -218,6 +218,13 @@ public class FeriasProceduresTests(MySqlFixture mysql)
         await SolicitarAsync(c, c.Pessoa, c.Inicio.AddDays(21), 6); // sobram 14 e ainda cabe uma terceira parte
         Assert.Equal(Parte14, await RecusaAoSolicitarAsync(c, c.Pessoa, c.Inicio.AddDays(42), 13)); // a terceira e última parte teria de ser a de 14
         await SolicitarAsync(c, c.Pessoa, c.Inicio.AddDays(42), 14);
+
+        // Duas partes de 5 dias: sobram 20, mas a terceira é a última possível e tem de ser a de 14, mesmo sobrando 15 depois dela.
+        var outra = await FuncionarioAsync(c.Conexao, admissao: Iso(c.Admissao), setorId: c.Setor);
+        await SolicitarAsync(c, outra, c.Inicio, 5);
+        await SolicitarAsync(c, outra, c.Inicio.AddDays(7), 5);
+        Assert.Equal(Parte14, await RecusaAoSolicitarAsync(c, outra, c.Inicio.AddDays(14), 5));
+        await SolicitarAsync(c, outra, c.Inicio.AddDays(14), 14);
     }
 
     [Fact]
@@ -614,6 +621,7 @@ public class FeriasProceduresTests(MySqlFixture mysql)
         Assert.Equal("Resposta invalida: use ACEITOU ou RECUSOU.", await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", sugerido, c.Pessoa, "EXPIROU"));
         Assert.Equal("Resposta invalida: use ACEITOU ou RECUSOU.", await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", sugerido, c.Pessoa, null));
         Assert.Equal(NaoEncontradoDaPessoa, await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", sugerido, c.Chefe, "ACEITOU"));
+        Assert.Equal(NaoEncontradoDaPessoa, await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", sugerido, c.Chefe, "RECUSOU")); // o gestor que sugeriu não responde pela pessoa
         Assert.Equal(NaoEncontradoDaPessoa, await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", sugerido, 999_999, "ACEITOU"));
         Assert.Equal(NaoEncontradoDaPessoa, await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", 999_999, c.Pessoa, "ACEITOU"));
         Assert.Equal(EtapaErradaDaSugestao, await RecusaSemGravarAsync(c.Conexao, "SP_RESPONDER_SUGESTAO_FERIAS", comOGestor, c.Pessoa, "ACEITOU"));
