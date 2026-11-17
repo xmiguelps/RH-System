@@ -49,6 +49,7 @@ import { PaginaDefinirSenha } from '../features/autenticacao/PaginaDefinirSenha'
 import { PaginaEsqueciSenha } from '../features/autenticacao/PaginaEsqueciSenha'
 import { PaginaMeusDocumentos } from '../features/documentos/PaginaMeusDocumentos'
 import { PaginaMinhasFerias, PainelPedirFerias } from '../features/ferias/PaginaMinhasFerias'
+import { PaginaPedidosDeFeriasRh } from '../features/ferias/PaginaPedidosDeFeriasRh'
 import { PaginaPainelDaEquipe } from '../features/equipe/PaginaPainelDaEquipe'
 import { PainelDaFichaDaEquipe } from '../features/equipe/PainelDaFichaDaEquipe'
 import { PaginaMeuPonto } from '../features/ponto/PaginaMeuPonto'
@@ -117,6 +118,7 @@ export const ROTAS_RH: readonly RotaDoPortal[] = [
       { caminho: ':treinamentoId/editar', elemento: <AssistenteDoTreinamento /> },
     ],
   },
+  { caminho: 'pedidos-de-ferias', elemento: <PaginaPedidosDeFeriasRh /> },
   { caminho: 'auditoria', elemento: <PaginaDeAuditoria /> },
   {
     caminho: 'ponto-e-feriados',
