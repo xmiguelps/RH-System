@@ -1,12 +1,30 @@
 -- ============================================================
 -- V007: PROCEDURES (decisao do dono, 2026-11-17)
 -- Reescrita do arquivo de procedures do grupo (RHSystem_Procedures_RHSystem_Atual.sql, 24 procedures) alinhada ao contrato da API
--- (contrato/) e aos scripts V001 a V006, testada em MySQL 8.4 (back-end/tests/.../Procedures).
+-- (contrato/) e aos scripts V001 a V006, testada em MySQL 8.4 (back-end/tests/.../Procedures, uma classe por dominio abaixo).
 --
 -- Somente PROCEDURES: nenhuma tabela, FUNCTION ou TRIGGER e criada aqui. Cada procedure e UMA operacao transacional de negocio, com as mesmas
 -- regras e os mesmos efeitos no BANCO que o caso de uso equivalente da API. O que fica de fora de proposito (a API faz e o banco nao pode):
 -- autorizacao por perfil, envio de e-mail, arquivo no armazenamento, eventos de auditoria e tarefas agendadas.
 -- Mensagens de recusa: SIGNAL SQLSTATE '45000', sem acento (como as dos triggers do V002).
+--
+-- Resultado: 28 procedures. Das 24 do arquivo antigo, 22 ficaram (todas corrigidas) e 2 foram REMOVIDAS de proposito (SP_LANCAR_BANCO_HORAS e
+-- SP_CADASTRAR_NIVEL_ACESSO; o porque esta no fim da secao de cada uma). Seis sao novas, porque a API tem a operacao e o arquivo antigo nao: SP_CONFERIR_FERIAS,
+-- SP_REGISTRAR_FERIAS_RH, SP_RESPONDER_SUGESTAO_FERIAS, SP_RECUSAR_FERIAS_RH, SP_SUBSTITUIR_HOLERITE e SP_RESPONDER_CONTESTACAO_ADVERTENCIA.
+--   A. Ponto: SP_REGISTRAR_MARCACAO_PONTO, SP_SOLICITAR_AJUSTE_PONTO
+--   B. Ferias: SP_CONFERIR_FERIAS, SP_SOLICITAR_FERIAS, SP_REGISTRAR_FERIAS_RH, SP_DECIDIR_FERIAS_GESTOR, SP_RESPONDER_SUGESTAO_FERIAS, SP_CONFIRMAR_FERIAS_RH, SP_RECUSAR_FERIAS_RH
+--   C. Holerite, atestado e beneficios: SP_PUBLICAR_HOLERITE, SP_SUBSTITUIR_HOLERITE, SP_ENVIAR_ATESTADO, SP_DECIDIR_ATESTADO, SP_SOLICITAR_BENEFICIO, SP_DECIDIR_BENEFICIO
+--   D. Advertencia, treinamento, formulario e desligamento: SP_GERAR_ADVERTENCIA, SP_REGISTRAR_CIENCIA_ADVERTENCIA, SP_CONTESTAR_ADVERTENCIA, SP_RESPONDER_CONTESTACAO_ADVERTENCIA,
+--      SP_CONCLUIR_MODULO_TREINAMENTO, SP_ENCERRAR_FORMULARIO, SP_AGENDAR_DESLIGAMENTO, SP_CANCELAR_DESLIGAMENTO, SP_EFETIVAR_DESLIGAMENTO
+--   E. Cadastros: SP_CRIAR_USUARIO, SP_CADASTRAR_FUNCIONARIO, SP_ALTERAR_NIVEL_ACESSO_FUNCIONARIO, SP_CADASTRAR_CARGO
+--
+-- PARA QUEM CHAMA AS PROCEDURES SEM A API:
+--  * Cada uma abre a PROPRIA transacao (START TRANSACTION) e desfaz tudo se recusar: chame FORA de uma transacao, porque o START TRANSACTION confirma a que estiver aberta.
+--  * "Hoje" e o CURDATE()/NOW() do servidor (a sessao do banco roda em -03:00); a API usa um relogio proprio. Nao ha como bater ponto no passado.
+--  * Nenhuma confere o PERFIL de quem chama (so que a pessoa existe e esta ativa), nenhuma grava evento de auditoria, manda e-mail, guarda arquivo ou cria tarefa agendada.
+--  * O banco de horas so nasce da consolidacao diaria da API: sem ela no ar, SP_EFETIVAR_DESLIGAMENTO sempre recusa (o banco de horas do ultimo dia nao foi consolidado)
+--    e a decisao dos pedidos de ajuste de ponto nao tem procedure (a decisao recalcula o banco de horas).
+--  * Uma recusa de negocio e SQLSTATE 45000 com a mensagem dita no bloco de cada procedure; erro de tamanho de parametro vem do proprio MySQL.
 -- ============================================================
 
 DELIMITER $$
