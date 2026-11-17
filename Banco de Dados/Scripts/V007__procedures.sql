@@ -3437,7 +3437,8 @@ END$$
 --
 -- Regras, na ordem das recusas (a mesma do contrato):
 --   1. P_ID_FUNCIONARIO obrigatorio;
---   2. o funcionario existe (a linha fica travada, FOR UPDATE: e o que poe em fila duas criacoes do login da mesma pessoa);
+--   2. o funcionario existe (a linha fica travada, FOR UPDATE: e o que poe em fila duas criacoes do login da mesma pessoa; a leitura
+--      de USUARIOS nao leva trava, para chamadas de pessoas diferentes nao se bloquearem);
 --   3. esta ativo;
 --   4. tem e-mail corporativo (e o login dele);
 --   5. se ja tem login com a senha definida: recusa (SENHA_JA_DEFINIDA na API: a pessoa usa "Esqueci minha senha");
@@ -3496,11 +3497,15 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'O funcionario precisa ter e-mail corporativo para criar o usuario.';
     END IF;
 
+    -- Leitura SEM trava, de proposito (a API tambem le USUARIOS sem trava). Um FOR UPDATE aqui, quando a pessoa ainda nao tem login, nao
+    -- acha linha e trava um INTERVALO do indice; duas chamadas para pessoas DIFERENTES segurariam o mesmo intervalo e os dois INSERT
+    -- esperariam um pelo outro (erro 1213, deadlock). A mesma pessoa ja esta em fila pela trava da linha dela em FUNCIONARIOS, acima, que
+    -- e o primeiro comando da transacao: esta leitura ja enxerga o login que a chamada da frente confirmou. A chave unica
+    -- UQ_USUARIOS_FUNCIONARIO e a ultima barreira.
     SELECT ID_USUARIO, ATIVO, SENHA_PROVISORIA
       INTO V_ID_USUARIO, V_USUARIO_ATIVO, V_SENHA_PROVISORIA
       FROM USUARIOS
-     WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO
-       FOR UPDATE;
+     WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO;
 
     IF V_ID_USUARIO IS NOT NULL THEN
         IF V_SENHA_PROVISORIA = FALSE THEN
@@ -3879,6 +3884,12 @@ END$$
 -- esta logado, e a procedure nao sabe quem a chama), registrar auditoria e conferir o perfil de quem chama. A API nao tem regra de
 -- "ultimo RH"; esta procedure tambem nao.
 --
+-- Corrida com a troca de gestor de setor da API (SetoresCasoDeUso): a API so grava na linha da pessoa em FUNCIONARIOS quando a PROMOVE
+-- (quem ainda nao tem o nivel Funcionario Gestor); nesse caso a trava desta procedure poe as duas operacoes em fila. Se a pessoa JA e
+-- Funcionario Gestor e ja tem linha em GESTORES, a API so grava SETORES: por o gestor num setor enquanto esta procedure o rebaixa nao
+-- fica em fila, e pode sobrar um gestor de setor sem o nivel Gestor. E a mesma corrida que a API tem entre editarFuncionario e a edicao
+-- do setor (as duas conferem antes de gravar, sem trava em comum); a procedure nao a piora nem a resolve.
+--
 -- Mudou em relacao ao arquivo antigo: aceitava qualquer linha de NIVEIS_DE_ACESSO, recusava a troca pelo mesmo nivel (tratava como
 -- erro o que nao e), nao distinguia "funcionario nao existe" de "nivel igual" e deixava rebaixar quem gerencia um setor.
 -- ------------------------------------------------------------
@@ -3904,8 +3915,8 @@ BEGIN
 
     START TRANSACTION;
 
-    -- Primeiro comando da transacao (uma leitura com trava enxerga o que ja foi confirmado): a troca de gestor de setor da API tambem
-    -- grava nesta linha, entao as duas operacoes ficam em fila.
+    -- Primeiro comando da transacao (uma leitura com trava enxerga o que ja foi confirmado). A troca de gestor de setor da API grava nesta
+    -- linha quando PROMOVE a pessoa a gestor: nesse caso as duas operacoes ficam em fila (ver a corrida que sobra no cabecalho).
     SELECT ID_FUNCIONARIO, ID_NIVEL_ACESSO
       INTO V_ID_FUNCIONARIO, V_ID_NIVEL_ATUAL
       FROM FUNCIONARIOS
@@ -3921,7 +3932,7 @@ BEGIN
      WHERE ID_NIVEL_ACESSO = P_ID_NIVEL_ACESSO;
 
     IF V_NOME_NIVEL IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nivel de acesso nao encontrado.';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'O nivel de acesso nao existe.';
     END IF;
 
     IF V_NOME_NIVEL COLLATE utf8mb4_bin NOT IN ('RH', 'Funcionario', 'Funcionario Gestor') THEN
