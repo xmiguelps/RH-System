@@ -16,4 +16,20 @@ describe('validarArquivo', () => {
   ])('validarArquivo(%#)', (entrada, saida) => {
     expect(validarArquivo(entrada, REGRAS)).toBe(saida)
   })
+
+  it('arquivo com type vazio (o Windows nem sempre registra o tipo) vale pela extensao, sem diferenciar maiusculas', () => {
+    const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const regras = { tiposAceitos: [xlsx, 'application/pdf'], tamanhoMaximoMb: 5 }
+    expect(validarArquivo(arquivo(10, '', 'folha.XLSX'), regras)).toBeNull()
+    expect(validarArquivo(arquivo(10, '', 'holerite.pdf'), regras)).toBeNull()
+    expect(validarArquivo(arquivo(10, '', 'virus.exe'), regras)).toBe(
+      'Esse tipo de arquivo não é aceito.',
+    )
+    expect(validarArquivo(arquivo(10, '', 'semextensao'), regras)).toBe(
+      'Esse tipo de arquivo não é aceito.',
+    )
+    expect(validarArquivo(arquivo(10, '', 'foto.png'), regras)).toBe(
+      'Esse tipo de arquivo não é aceito.',
+    )
+  })
 })

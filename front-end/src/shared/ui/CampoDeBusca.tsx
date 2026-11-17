@@ -19,10 +19,10 @@ export function CampoDeBusca({
   const [valorAnterior, setValorAnterior] = useState(valor)
   const espera = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Quando o valor muda por fora (filtro limpo, voltar no navegador), o texto acompanha.
+  // Quando o valor muda por fora (filtro limpo, voltar no navegador), o texto acompanha. A página guarda a busca aparada: se o valor é só o texto digitado sem os espaços das pontas, o campo fica como está (senão o espaço de "ana maria" some enquanto a pessoa escreve).
   if (valor !== valorAnterior) {
     setValorAnterior(valor)
-    setTexto(valor)
+    if (valor !== texto.trim()) setTexto(valor)
   }
 
   useEffect(

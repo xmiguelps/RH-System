@@ -21,9 +21,10 @@ export function Paginacao({
   resumo?: (de: number, ate: number, total: number) => string
 }) {
   const { pagina, tamanhoPagina, total, totalPaginas } = dados
-  const de = (pagina - 1) * tamanhoPagina + 1
-  const ate = Math.min(pagina * tamanhoPagina, total)
-  const temVarias = totalPaginas > 1
+  // página além da última (os itens dela foram apagados): mostra a última que existe, em vez de "21 a 20"
+  const paginaMostrada = totalPaginas > 0 ? Math.min(pagina, totalPaginas) : pagina
+  const de = (paginaMostrada - 1) * tamanhoPagina + 1
+  const ate = Math.min(paginaMostrada * tamanhoPagina, total)
   return (
     <div className="flex items-center justify-between gap-4">
       <p className="text-tabela text-texto-suave">
@@ -33,15 +34,15 @@ export function Paginacao({
         <Botao
           variante="secundario"
           tamanho="pequeno"
-          disabled={!temVarias || pagina <= 1}
-          onClick={() => aoMudar(pagina - 1)}
+          disabled={pagina <= 1}
+          onClick={() => aoMudar(Math.min(pagina, totalPaginas + 1) - 1)}
         >
           Anterior
         </Botao>
         <Botao
           variante="secundario"
           tamanho="pequeno"
-          disabled={!temVarias || pagina >= totalPaginas}
+          disabled={pagina >= totalPaginas}
           onClick={() => aoMudar(pagina + 1)}
         >
           Próxima

@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { Fragment, type ReactNode } from 'react'
 import { AvisoDeErro } from './AvisoDeErro'
+import { EstadoVazio } from './EstadoVazio'
 import { Esqueleto } from './Esqueleto'
 import { cn } from './estilo'
 
@@ -78,7 +79,9 @@ export function Tabela<L>({
   } else if (linhas.length === 0) {
     corpo = (
       <tr>
-        <td colSpan={quantasColunas}>{vazio}</td>
+        <td colSpan={quantasColunas}>
+          {vazio ?? <EstadoVazio titulo="Nenhum registro encontrado." />}
+        </td>
       </tr>
     )
   } else {
@@ -150,7 +153,10 @@ export function Tabela<L>({
                       <button
                         type="button"
                         onClick={() => aoOrdenar(coluna.chave)}
-                        className="inline-flex items-center gap-1 font-medium aria-[sort]:text-primaria focus-visible:outline-2 focus-visible:outline-primaria-media"
+                        className={cn(
+                          'inline-flex items-center gap-1 font-medium focus-visible:outline-2 focus-visible:outline-primaria-media',
+                          sentido !== 'none' && 'text-primaria',
+                        )}
                       >
                         {coluna.titulo}
                         <Icone size={14} strokeWidth={1.75} aria-hidden="true" />
@@ -163,7 +169,9 @@ export function Tabela<L>({
               })}
             </tr>
           </thead>
-          <tbody>{corpo}</tbody>
+          <tbody className={cn(carregando && !semDados && 'opacity-60 transition-opacity')}>
+            {corpo}
+          </tbody>
         </table>
       </div>
       {rodape && <div className="border-t border-divisor px-[18px] py-3">{rodape}</div>}
