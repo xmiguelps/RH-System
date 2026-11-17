@@ -236,6 +236,20 @@ public class PontoProceduresTests(MySqlFixture mysql)
         Assert.Equal(["2026-03-10"], await LinhasAsync(conexao, "DATA", "FROM PONTOS"));
     }
 
+    [Fact]
+    public async Task Antes_da_admissao_a_batida_e_recusada_pela_procedure_mesmo_quando_o_dia_ja_existe()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var pessoa = await FuncionarioAsync(conexao);
+        await DiaDoPontoAsync(conexao, pessoa, Dia); // o dia já existe: o trigger de PONTOS não roda, e a admissão foi corrigida para depois dele
+        await Sql.ExecutarAsync(conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-03-11' WHERE ID_FUNCIONARIO = {pessoa}");
+
+        var mensagem = await RecusaEmAsync(conexao, Em(10, 8, 0), Registrar, pessoa, "ENTRADA", new Saida("id"));
+
+        Assert.Equal("A data do ponto e anterior a admissao.", mensagem);
+        Assert.Equal(0L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM PONTOS_MARCACOES"));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -595,6 +609,20 @@ public class PontoProceduresTests(MySqlFixture mysql)
 
         Assert.Equal("A data do ponto e anterior a admissao.", mensagem);
         Assert.Equal(["2026-03-10"], await LinhasAsync(conexao, "DATA", "FROM PONTOS"));
+    }
+
+    [Fact]
+    public async Task Dia_anterior_a_admissao_e_recusado_pela_procedure_mesmo_quando_o_dia_ja_existe()
+    {
+        var conexao = await NovoBancoAsync(mysql);
+        var pessoa = await FuncionarioAsync(conexao);
+        await DiaDoPontoAsync(conexao, pessoa, Dia);
+        await Sql.ExecutarAsync(conexao, $"UPDATE FUNCIONARIOS SET DATA_ADMISSAO = '2026-03-11' WHERE ID_FUNCIONARIO = {pessoa}");
+
+        var mensagem = await RecusaEmAsync(conexao, Agora, Solicitar, pessoa, Dia, Justificativa, DiaInteiro(), new Saida("id"));
+
+        Assert.Equal("A data do ponto e anterior a admissao.", mensagem);
+        Assert.Equal(0L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM PONTOS_MANUTENCOES"));
     }
 
     [Theory]
