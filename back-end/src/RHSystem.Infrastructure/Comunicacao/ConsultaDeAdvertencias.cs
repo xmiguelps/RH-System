@@ -156,5 +156,8 @@ public sealed class ConsultaDeAdvertencias(AppDbContext db) : IConsultaDeAdverte
             a.GestorId == null ? null : db.Gestores.Where(g => g.Id == a.GestorId).Join(db.Funcionarios, g => g.FuncionarioId, x => x.Id, (g, x) => x.Nome).FirstOrDefault(),
             a.CienciaEmUtc,
             a.TextoContestacao,
-            a.ContestacaoEmUtc);
+            a.ContestacaoEmUtc,
+            a.RegistradaPorRhId == null
+                ? null
+                : db.Funcionarios.Where(r => r.Id == a.RegistradaPorRhId).Select(r => new FuncionarioResumo(r.Id, r.Nome, r.Ativo, r.Cargo != null ? r.Cargo.Nome : null, r.Setor != null ? r.Setor.Nome : null)).FirstOrDefault());
 }

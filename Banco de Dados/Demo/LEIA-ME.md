@@ -6,7 +6,7 @@ Isto **não é um script de versão**: fica fora de `Banco de Dados/Scripts` de 
 
 ## Como rodar
 
-1. Suba o banco e a API uma vez, para ela aplicar os scripts `V001` a `V005` (veja o `README.md` da raiz). O banco não pode ter nenhum colaborador ainda.
+1. Suba o banco e a API uma vez, para ela aplicar os scripts `V001` a `V006` (veja o `README.md` da raiz). O banco não pode ter nenhum colaborador ainda.
 2. Rode o arquivo **numa sessão só** (ele usa variáveis de usuário), com o `mysql` do cliente:
 
 ```

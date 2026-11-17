@@ -18,6 +18,9 @@ public class Advertencia
     /// <summary>A linha de <c>GESTORES</c> de quem aplicou; <c>null</c> quando foi o RH.</summary>
     public int? GestorId { get; private set; }
 
+    /// <summary>A pessoa do RH que registrou (<c>ID_FUNCIONARIO_RH</c>, decisão do dono de 2026-11-17); <c>null</c> quando o gestor registrou pela tela dele e nas advertências de antes da coluna. Só o RH vê.</summary>
+    public int? RegistradaPorRhId { get; private set; }
+
     /// <summary>O dia do ocorrido.</summary>
     public DateOnly? Data { get; private set; }
 
@@ -36,11 +39,12 @@ public class Advertencia
     public DateTime? ContestacaoEmUtc { get; private set; }
 
     /// <summary>Nasce <c>PENDENTE</c>.</summary>
-    public static Advertencia Registrar(int funcionarioId, int? gestorId, DateOnly data, TipoDeAdvertencia tipo, string motivo, string descricao) =>
+    public static Advertencia Registrar(int funcionarioId, int? gestorId, int? registradaPorRhId, DateOnly data, TipoDeAdvertencia tipo, string motivo, string descricao) =>
         new()
         {
             FuncionarioId = funcionarioId,
             GestorId = gestorId,
+            RegistradaPorRhId = registradaPorRhId,
             Data = data,
             Tipo = tipo,
             Motivo = motivo,

@@ -15,6 +15,7 @@ public class AdvertenciaConfiguracao : IEntityTypeConfiguration<Advertencia>
         builder.Property(a => a.Id).HasColumnName("ID_ADVERTENCIA");
         builder.Property(a => a.FuncionarioId).HasColumnName("ID_FUNCIONARIO");
         builder.Property(a => a.GestorId).HasColumnName("ID_GESTOR");
+        builder.Property(a => a.RegistradaPorRhId).HasColumnName("ID_FUNCIONARIO_RH");
 
         // Quase toda coluna aceita NULL no banco e por isso a propriedade também; a aplicação sempre preenche (o trigger só preencheria a situação e a data com o CURDATE() real).
         builder.Property(a => a.Data).HasColumnName("DATA_ADVERTENCIA");
@@ -30,5 +31,6 @@ public class AdvertenciaConfiguracao : IEntityTypeConfiguration<Advertencia>
 
         builder.HasOne<Funcionario>().WithMany().HasForeignKey(a => a.FuncionarioId);
         builder.HasOne<Gestor>().WithMany().HasForeignKey(a => a.GestorId);
+        builder.HasOne<Funcionario>().WithMany().HasForeignKey(a => a.RegistradaPorRhId);
     }
 }

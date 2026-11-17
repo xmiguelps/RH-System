@@ -1,6 +1,6 @@
 # DER/MER gerado dos scripts
 
-Gerado por `Banco de Dados/Modelagem/gerar_der.py` a partir de `Banco de Dados/Scripts/V*.sql` (não edite à mão: mudou o esquema, rode o script de novo). São **48 tabelas** e **71 chaves estrangeiras**. O desenho do grupo continua em `DER.png` e `MER_RHSystem.drawio`; este arquivo é o mesmo modelo em texto, versionável e sempre igual aos scripts.
+Gerado por `Banco de Dados/Modelagem/gerar_der.py` a partir de `Banco de Dados/Scripts/V*.sql` (não edite à mão: mudou o esquema, rode o script de novo). São **48 tabelas** e **72 chaves estrangeiras**. O desenho do grupo continua em `DER.png` e `MER_RHSystem.drawio`; este arquivo é o mesmo modelo em texto, versionável e sempre igual aos scripts.
 Abra no GitHub, no VS Code (extensão Mermaid) ou em <https://mermaid.live>. Cada relação diz a coluna que liga o filho ao pai.
 
 ```mermaid
@@ -528,6 +528,7 @@ erDiagram
         TINYINT EM_ABERTO
     }
     FUNCIONARIOS ||--o{ ADVERTENCIAS : "ID_FUNCIONARIO"
+    FUNCIONARIOS ||--o{ ADVERTENCIAS : "ID_FUNCIONARIO_RH"
     GESTORES ||--o{ ADVERTENCIAS : "ID_GESTOR"
     FUNCIONARIOS ||--o{ ATESTADOS : "ID_FUNCIONARIO"
     FUNCIONARIOS ||--o{ ATESTADOS : "ID_FUNCIONARIO_RH"

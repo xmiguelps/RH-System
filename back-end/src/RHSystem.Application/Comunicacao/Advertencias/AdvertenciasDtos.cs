@@ -6,7 +6,7 @@ using RHSystem.Domain.Comunicacao;
 
 namespace RHSystem.Application.Comunicacao.Advertencias;
 
-/// <summary>Quem aplicou a advertência (<c>AdvertenciaAplicadaPor.tipo</c>): o gestor (com o nome) ou o RH (sem nome: o banco não guarda qual pessoa do RH registrou).</summary>
+/// <summary>Quem aplicou a advertência (<c>AdvertenciaAplicadaPor.tipo</c>): o gestor (com o nome) ou o RH (sem nome para quem vê "aplicada por": quem do RH registrou só aparece em <c>registradaPor</c> do detalhe do RH).</summary>
 public enum QuemAplicouAAdvertencia
 {
     Gestor,
@@ -32,7 +32,7 @@ public sealed record AdvertenciaAplicadaPor(QuemAplicouAAdvertencia Tipo, string
 /// <summary>Uma advertência numa lista (RH, gestor ou ficha), sem a descrição (<c>AdvertenciaItem</c>).</summary>
 public sealed record AdvertenciaItem(int Id, DateOnly Data, FuncionarioResumo Funcionario, TipoDeAdvertencia Tipo, string Motivo, AdvertenciaAplicadaPor AplicadaPor, SituacaoDaAdvertencia Situacao);
 
-/// <summary>Uma advertência inteira como o RH vê (<c>AdvertenciaDetalheRh</c>), com a contestação e o desfecho.</summary>
+/// <summary>Uma advertência inteira como o RH vê (<c>AdvertenciaDetalheRh</c>), com a contestação, o desfecho e quem do RH registrou (<c>registradaPor</c>, decisão do dono de 2026-11-17; só o RH vê).</summary>
 public sealed record AdvertenciaDetalheRh(
     int Id,
     DateOnly Data,
@@ -45,7 +45,8 @@ public sealed record AdvertenciaDetalheRh(
     DateTime? DataCienciaUtc,
     string? TextoContestacao,
     DateTime? DataContestacaoUtc,
-    DesfechoDaContestacao? DesfechoDaContestacao);
+    DesfechoDaContestacao? DesfechoDaContestacao,
+    FuncionarioResumo? RegistradaPor);
 
 /// <summary>Uma advertência inteira como o gestor vê (<c>AdvertenciaDetalheGestor</c>): a situação (inclusive <c>CONTESTADA</c>) mas nunca o texto da contestação nem o desfecho.</summary>
 public sealed record AdvertenciaDetalheGestor(
@@ -98,7 +99,7 @@ public sealed record AdvertenciaContestacaoComando(string Texto);
 /// <summary>A decisão é obrigatória no JSON: sem ela virava MANTER, e responder é irreversível (só uma contestada recebe resposta).</summary>
 public sealed record AdvertenciaRespostaComando([property: JsonRequired] DecisaoDaResposta Decisao, string Resposta);
 
-/// <summary>Uma advertência como veio do banco; o nome do gestor vem <c>null</c> quando foi o RH.</summary>
+/// <summary>Uma advertência como veio do banco; o nome do gestor vem <c>null</c> quando foi o RH. <c>RegistradaPor</c> é a pessoa do RH que registrou (<c>null</c> se o gestor registrou ou se é anterior à coluna); só o detalhe do RH o devolve.</summary>
 public sealed record AdvertenciaLida(
     int Id,
     DateOnly Data,
@@ -110,7 +111,8 @@ public sealed record AdvertenciaLida(
     string? GestorNome,
     DateTime? CienciaEmUtc,
     string? TextoContestacao,
-    DateTime? ContestacaoEmUtc);
+    DateTime? ContestacaoEmUtc,
+    FuncionarioResumo? RegistradaPor);
 
 /// <summary>Quem consulta e por qual porta: a própria pessoa (só as dela), o gestor (só as da equipe dele, <c>null</c> sem equipe é nenhuma) ou o RH (todas).</summary>
 public sealed record EscopoDeAdvertencias(PapelNaConsulta Papel, int FuncionarioId, EquipeDoGestor? Equipe);

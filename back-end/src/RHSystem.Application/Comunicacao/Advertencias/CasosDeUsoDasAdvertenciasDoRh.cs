@@ -168,7 +168,7 @@ public sealed class RegistrarAdvertenciaDoRhCasoDeUso(IEscopoDoUsuario escopo, I
             gestorId = gestor;
         }
 
-        var id = await registrador.RegistrarAsync(pessoa, gestorId, null, corpo.DataDoOcorrido, corpo.Tipo, campos!, false, ct);
+        var id = await registrador.RegistrarAsync(pessoa, gestorId, escopo.FuncionarioId, null, corpo.DataDoOcorrido, corpo.Tipo, campos!, false, ct);
         return MapeadorDaAdvertencia.DetalheRh((await consulta.ObterAsync(id, doRh, ct)).OuNaoEncontrado());
     }
 }

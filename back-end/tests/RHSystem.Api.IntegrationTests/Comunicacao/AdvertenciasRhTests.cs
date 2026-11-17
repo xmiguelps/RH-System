@@ -747,4 +747,84 @@ public class AdvertenciasRhTests(MySqlFixture mysql)
         await (await RegistrarAsync(api, pessoa, Registro(motivo: ""))).AfirmarConformeAoContratoAsync("registrarAdvertencia"); // 400
         await (await RegistrarAsync(api, int.MaxValue, Registro())).AfirmarConformeAoContratoAsync("registrarAdvertencia"); // 404
     }
+
+    // ---------------------------------------------------------------- quem do RH registrou (decisão do dono, 2026-11-17)
+
+    [Fact]
+    public async Task O_detalhe_do_RH_mostra_quem_do_RH_registrou_nos_dois_jeitos_de_registrar()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var rh = api.Elenco.Rh;
+
+        var emNomeDoGestor = await CorpoAsync(await RegistrarAsync(api, pessoa, Registro(aplicadaPor: "GESTOR_DO_COLABORADOR", data: "2026-10-03")));
+        var emNomeDoRh = await CorpoAsync(await RegistrarAsync(api, pessoa, Registro(aplicadaPor: "RH", data: "2026-10-04")));
+
+        foreach (var criada in new[] { emNomeDoGestor, emNomeDoRh })
+        {
+            var id = criada.GetProperty("id").GetInt32();
+            var detalhe = await CorpoAsync(await (await RhAsync(api)).GetAsync($"{Rota}/{id}"));
+            foreach (var fonte in new[] { criada, detalhe })
+            {
+                var registradaPor = fonte.GetProperty("registradaPor");
+                Assert.Equal((rh.FuncionarioId, rh.Nome), (registradaPor.GetProperty("id").GetInt32(), registradaPor.GetProperty("nome").GetString()));
+            }
+
+            Assert.Equal(rh.FuncionarioId.ToString(), await TextoAsync(api, $"SELECT ID_FUNCIONARIO_RH FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id}"));
+        }
+
+        // "aplicada por" continua sendo o que a pessoa vê: o gestor num e "RH" sem nome no outro
+        Assert.Equal(("GESTOR", "RH"), (emNomeDoGestor.GetProperty("aplicadaPor").GetProperty("tipo").GetString(), emNomeDoRh.GetProperty("aplicadaPor").GetProperty("tipo").GetString()));
+    }
+
+    [Fact]
+    public async Task Registrada_pelo_gestor_ou_semeada_antes_da_coluna_o_detalhe_do_RH_traz_registradaPor_nulo()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var gestor = await ClienteDeAsync(api, setor.GestorFuncionarioId);
+        var peloGestor = (await CorpoAsync(await PostAsync(gestor, $"/api/gestor/equipe/{pessoa}/advertencias", Registro()))).GetProperty("id").GetInt32();
+        var antiga = await SemearAsync(api, pessoa, "2026-09-20");
+
+        foreach (var id in new[] { peloGestor, antiga })
+        {
+            var detalhe = await CorpoAsync(await (await RhAsync(api)).GetAsync($"{Rota}/{id}"));
+            Assert.Equal(JsonValueKind.Null, detalhe.GetProperty("registradaPor").ValueKind);
+            Assert.Null(await TextoAsync(api, $"SELECT ID_FUNCIONARIO_RH FROM ADVERTENCIAS WHERE ID_ADVERTENCIA = {id}"));
+        }
+    }
+
+    [Fact]
+    public async Task Quem_registrou_so_aparece_para_o_RH_nunca_na_lista_do_RH_no_gestor_nem_na_pessoa()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var id = (await CorpoAsync(await RegistrarAsync(api, pessoa, Registro()))).GetProperty("id").GetInt32();
+
+        var listaDoRh = await ListarAsync(api, $"ano=2026&funcionarioId={pessoa}");
+        var doGestor = await CorpoAsync(await (await ClienteDeAsync(api, setor.GestorFuncionarioId)).GetAsync($"/api/gestor/advertencias/{id}"));
+        var daPessoa = await CorpoAsync(await (await ClienteDeAsync(api, pessoa)).GetAsync("/api/eu/advertencias"));
+
+        Assert.False(listaDoRh.GetProperty("itens").EnumerateArray().First(a => a.GetProperty("id").GetInt32() == id).TryGetProperty("registradaPor", out _));
+        Assert.False(doGestor.TryGetProperty("registradaPor", out _));
+        Assert.All(daPessoa.GetProperty("itens").EnumerateArray(), a => Assert.False(a.TryGetProperty("registradaPor", out _)));
+    }
+
+    [Fact]
+    public async Task Responder_a_contestacao_mantem_o_registradaPor_do_detalhe()
+    {
+        var api = await ApiAsync();
+        var setor = await NovoSetorAsync(api);
+        var (pessoa, _) = await NovoMembroAsync(api, setor);
+        var id = (await CorpoAsync(await RegistrarAsync(api, pessoa, Registro()))).GetProperty("id").GetInt32();
+        await Sql.ExecutarAsync(api.Conexao, $"UPDATE ADVERTENCIAS SET STATUS_ADVERTENCIA = 'CONTESTADA', TEXTO_CONTESTACAO = 'Não foi assim, posso explicar.', DATA_CONTESTACAO = '2026-10-06 10:00:00' WHERE ID_ADVERTENCIA = {id}");
+
+        var resposta = await PostAsync(await RhAsync(api), $"{Rota}/{id}/resposta", new { decisao = "MANTER", resposta = "Mantida: os registros de ponto confirmam." });
+
+        Assert.Equal(200, (int)resposta.StatusCode);
+        Assert.Equal(api.Elenco.Rh.FuncionarioId, (await CorpoAsync(resposta)).GetProperty("registradaPor").GetProperty("id").GetInt32());
+    }
 }
