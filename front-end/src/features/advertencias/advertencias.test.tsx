@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Esquema } from '../../shared/api/tipos'
 import { exemploDoContrato } from '../../shared/teste/exemploDoContrato'
 import { capturar, problema } from '../../test/capturar'
 import { escolherOpcao } from '../../test/formulario'
@@ -187,6 +188,36 @@ describe('Advertencias do RH (tela 14) e o detalhe', { timeout: 15000 }, () => {
     responder.conforme()
   })
 
+  describe('quem do RH registrou (registradaPor, contrato 0.3.0)', () => {
+    const DETALHE = exemploDoContrato<Esquema<'AdvertenciaDetalheRh'>>('obterAdvertencia')
+    async function abrirDetalhe(corpo: Esquema<'AdvertenciaDetalheRh'>) {
+      capturar('obterAdvertencia', { corpo })
+      const tela = await abrirAdvertenciasDoRh()
+      await tela.user.click(
+        await screen.findByRole('button', {
+          name: 'Abrir a advertência de Vanessa Lima de 15/09/2026',
+        }),
+      )
+      return screen.findByRole('dialog', { name: 'Advertência de 15/09/2026' })
+    }
+
+    it('o detalhe do RH mostra "Registrada por" com o nome de quem do RH registrou', async () => {
+      const painel = await abrirDetalhe({
+        ...DETALHE,
+        registradaPor: { id: 1, nome: 'Ana Souza', ativo: true },
+      })
+      const linha = await within(painel).findByText('Registrada por')
+      expect(linha.closest('div')).toHaveTextContent('Registrada por')
+      expect(linha.closest('div')).toHaveTextContent('Ana Souza')
+    })
+
+    it('registradaPor nulo (o gestor registrou, ou advertencia antiga) nao mostra a linha', async () => {
+      const painel = await abrirDetalhe({ ...DETALHE, registradaPor: null })
+      await within(painel).findByRole('region', { name: 'Contestação' })
+      expect(within(painel).queryByText('Registrada por')).toBeNull()
+    })
+  })
+
   it('422 ADVERTENCIA_NAO_ESTA_CONTESTADA mostra o detail', async () => {
     capturar(
       'responderContestacaoDeAdvertencia',
@@ -311,6 +342,25 @@ describe('Registrar advertencia do RH (telas 15 e 11)', { timeout: 20000 }, () =
       await within(painel).findByText('O gestor não pode advertir a si mesmo.'),
     ).toBeInTheDocument()
   })
+
+  it.each(['antesDaAdmissao', 'semGestor'] as const)(
+    '422 %s (contrato 0.3.0) mostra o texto do contrato dentro do painel e mantem o que foi preenchido',
+    async (nome) => {
+      capturar('registrarAdvertencia', problemaDoContrato('registrarAdvertencia', 422, nome))
+      const { user, painel } = await abrirNovaDoRh()
+      await user.type(within(painel).getByRole('combobox', { name: 'Colaborador' }), 'Bru')
+      await user.click(await screen.findByRole('option', { name: /Bruno Lima/ }))
+      await preencherMotivoEDescricao(user, painel)
+      await user.click(screen.getByRole('button', { name: 'Registrar advertência' }))
+      const detalhe = exemploDoContrato<{ detail: string }>(
+        'registrarAdvertencia',
+        422,
+        nome,
+      ).detail
+      expect(await within(painel).findByText(detalhe)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Registrar advertência' })).toBeEnabled()
+    },
+  )
 
   it('aba da ficha (11): a lista da pessoa, "Abrir" sem caminho e o painel com o colaborador travado', async () => {
     const lista = capturar('listarAdvertenciasDoFuncionario')

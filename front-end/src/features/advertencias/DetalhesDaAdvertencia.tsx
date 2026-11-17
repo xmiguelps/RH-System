@@ -133,6 +133,15 @@ export function PainelDetalheDaAdvertenciaRh({
       ) : (
         <div className="flex flex-col gap-5">
           <CamposDaAdvertencia advertencia={a} />
+          {/* só o detalhe do RH traz quem do RH registrou (decisão do dono, contrato 0.3.0) */}
+          {a.registradaPor && (
+            <dl>
+              <div className="flex flex-col gap-1">
+                <dt className="text-tabela text-texto-suave">Registrada por</dt>
+                <dd className="text-corpo text-texto">{a.registradaPor.nome}</dd>
+              </div>
+            </dl>
+          )}
           {a.textoContestacao && (
             <section
               aria-label="Contestação"
