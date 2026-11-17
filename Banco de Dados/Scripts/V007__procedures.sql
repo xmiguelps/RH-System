@@ -1641,16 +1641,17 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nao e possivel cadastrar holerite de competencia futura.';
     END IF;
 
-    -- Leitura com trava: ve o que outra sessao acabou de gravar (a leitura comum olharia a foto do comeco da transacao).
+    -- Leitura SEM trava, de proposito: com FOR UPDATE, quando a pessoa ainda nao tem holerite, o banco travaria o INTERVALO do indice, e
+    -- duas pessoas diferentes publicando ao mesmo tempo esperariam uma pela outra no INSERT (erro 1213). A mesma pessoa ja esta serializada
+    -- pela trava de FUNCIONARIOS acima; como esta e a primeira leitura comum da transacao, ela ja ve o que a outra sessao acabou de gravar.
     SELECT ID_HOLERITE INTO V_EXISTE
       FROM HOLERITES
      WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO
        AND ANO = P_ANO
        AND MES = P_MES
-       AND TIPO_HOLERITE = P_TIPO_HOLERITE
+       AND TIPO_HOLERITE = P_TIPO_HOLERITE COLLATE utf8mb4_unicode_ci
      ORDER BY VERSAO DESC
-     LIMIT 1
-     FOR UPDATE;
+     LIMIT 1;
 
     IF V_EXISTE IS NOT NULL THEN
         SIGNAL SQLSTATE '45000'
@@ -1729,11 +1730,13 @@ BEGIN
 
     START TRANSACTION;
 
-    -- A linha do holerite nao muda nunca; o que serializa e a trava da pessoa, tomada antes de olhar a maior versao.
+    -- A linha do holerite nao muda nunca; o que serializa e a trava da pessoa, tomada antes de olhar a maior versao. Esta leitura usa
+    -- FOR SHARE (trava so a linha, pela chave primaria) para NAO abrir a foto da transacao antes da trava da pessoa.
     SELECT ID_FUNCIONARIO, ANO, MES, TIPO_HOLERITE, VERSAO
       INTO V_ID_FUNCIONARIO, V_ANO, V_MES, V_TIPO, V_VERSAO
       FROM HOLERITES
-     WHERE ID_HOLERITE = P_ID_HOLERITE;
+     WHERE ID_HOLERITE = P_ID_HOLERITE
+     FOR SHARE;
 
     IF V_ID_FUNCIONARIO IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Holerite nao encontrado.';
@@ -1744,16 +1747,16 @@ BEGIN
      WHERE ID_FUNCIONARIO = V_ID_FUNCIONARIO
      FOR UPDATE;
 
-    -- Leitura com trava: ve a versao que outra sessao acabou de gravar (a leitura comum olharia a foto do comeco da transacao).
+    -- Primeira leitura comum da transacao, ja com a pessoa travada: ve a versao que outra sessao acabou de gravar. Sem FOR UPDATE, para
+    -- nao travar intervalo do indice (ver SP_PUBLICAR_HOLERITE).
     SELECT VERSAO INTO V_MAIOR_VERSAO
       FROM HOLERITES
      WHERE ID_FUNCIONARIO = V_ID_FUNCIONARIO
        AND ANO = V_ANO
        AND MES = V_MES
-       AND TIPO_HOLERITE = V_TIPO
+       AND TIPO_HOLERITE = V_TIPO COLLATE utf8mb4_unicode_ci
      ORDER BY VERSAO DESC
-     LIMIT 1
-     FOR UPDATE;
+     LIMIT 1;
 
     IF V_VERSAO <> V_MAIOR_VERSAO THEN
         SIGNAL SQLSTATE '45000'
@@ -2163,12 +2166,15 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Beneficio nao encontrado.';
     END IF;
 
+    -- Leitura SEM trava, de proposito: com FOR UPDATE, quando a pessoa ainda nao tem linha deste beneficio, o banco travaria o INTERVALO
+    -- do indice, e duas pessoas diferentes pedindo ao mesmo tempo esperariam uma pela outra no INSERT (erro 1213). A mesma pessoa ja esta
+    -- serializada pela trava de FUNCIONARIOS (que SP_DECIDIR_BENEFICIO tambem toma); esta e a primeira leitura comum da transacao, entao
+    -- ja ve o que a outra sessao acabou de gravar.
     SELECT ID_BENEFICIO_FUNCIONARIOS, STATUS_PEDIDO, BENEFICIO_ATIVO
       INTO V_ID_ADESAO, V_STATUS, V_BENEFICIO_ATIVO
       FROM BENEFICIOS_FUNCIONARIOS
      WHERE ID_FUNCIONARIO = P_ID_FUNCIONARIO
-       AND ID_BENEFICIO = P_ID_BENEFICIO
-     FOR UPDATE;
+       AND ID_BENEFICIO = P_ID_BENEFICIO;
 
     IF V_STATUS = 'PENDENTE' OR (V_STATUS = 'APROVADO' AND V_BENEFICIO_ATIVO = TRUE) THEN
         SIGNAL SQLSTATE '45000'
