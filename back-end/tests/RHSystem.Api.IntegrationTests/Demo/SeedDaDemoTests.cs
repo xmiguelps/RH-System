@@ -18,14 +18,14 @@ public class SeedDaDemoTests(MySqlFixture mysql)
     {
         var api = await ApiAsync(mysql);
 
-        Assert.Equal((12L, 12L, 2L, 3L), (
+        Assert.Equal((13L, 13L, 2L, 3L), (
             await ContarAsync(api, "SELECT COUNT(*) FROM FUNCIONARIOS"),
             await ContarAsync(api, "SELECT COUNT(*) FROM USUARIOS"),
             await ContarAsync(api, "SELECT COUNT(*) FROM GESTORES"),
             await ContarAsync(api, "SELECT COUNT(*) FROM SETORES")));
-        Assert.Equal(0L, await ContarAsync(api, $"SELECT COUNT(*) FROM FUNCIONARIOS WHERE EMAIL_CORPORATIVO NOT LIKE '%@{Dominio}'"));
-        Assert.Equal(12L, await ContarAsync(api, "SELECT COUNT(DISTINCT MATRICULA) FROM FUNCIONARIOS WHERE MATRICULA REGEXP '^[0-9]{5}$'"));
-        Assert.Equal(12L, await ContarAsync(api, "SELECT ULTIMO_VALOR FROM SEQUENCIAS WHERE NOME = 'MATRICULA'"));
+        Assert.Equal(["gibertoni.passos@gmail.com"], await Sql.ColunaAsync(api.Conexao, $"SELECT EMAIL_CORPORATIVO FROM FUNCIONARIOS WHERE EMAIL_CORPORATIVO NOT LIKE '%@{Dominio}'")); // o único e-mail de fora é o do dono do projeto (veja o teste dele abaixo)
+        Assert.Equal(13L, await ContarAsync(api, "SELECT COUNT(DISTINCT MATRICULA) FROM FUNCIONARIOS WHERE MATRICULA REGEXP '^[0-9]{5}$'"));
+        Assert.Equal(13L, await ContarAsync(api, "SELECT ULTIMO_VALOR FROM SEQUENCIAS WHERE NOME = 'MATRICULA'"));
         Assert.Equal(0L, await ContarAsync(api, "SELECT COUNT(*) FROM HOLERITES"));
         Assert.Equal(0L, await ContarAsync(api, "SELECT COUNT(*) FROM AUDITORIA_EVENTOS"));
     }
@@ -63,7 +63,7 @@ public class SeedDaDemoTests(MySqlFixture mysql)
 
         await RodarOSeedAsync(conexao, DateOnly.Parse(hoje), Dominio);
 
-        Assert.Equal(12L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM FUNCIONARIOS"));
+        Assert.Equal(13L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM FUNCIONARIOS"));
         Assert.Equal(4L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM FERIAS"));
         Assert.Equal(1L, await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM PAGAMENTOS_EXCECOES"));
     }
@@ -162,7 +162,7 @@ public class SeedDaDemoTests(MySqlFixture mysql)
         var erro = await Assert.ThrowsAsync<InvalidOperationException>(() => RodarOSeedAsync(conexao, Hoje, Dominio));
 
         Assert.Contains("O seed falhou", erro.Message, StringComparison.Ordinal);
-        Assert.Equal((12L, 8L), (await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM FUNCIONARIOS"), await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM CARGOS")));
+        Assert.Equal((13L, 8L), (await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM FUNCIONARIOS"), await Sql.ContarAsync(conexao, "SELECT COUNT(*) FROM CARGOS")));
     }
 
     [Theory]
@@ -200,6 +200,26 @@ public class SeedDaDemoTests(MySqlFixture mysql)
     }
 
     [Fact]
+    public async Task O_dono_do_projeto_esta_no_elenco_com_o_nome_e_o_email_reais_na_equipe_do_Rafael_e_entra_com_a_senha_da_demo()
+    {
+        var api = await ApiAsync(mysql);
+
+        var ficha = await Sql.ColunaAsync(api.Conexao, "SELECT CONCAT_WS('|', f.NOME, f.EMAIL_CORPORATIVO, c.NOME_CARGO, s.NOME_SETOR, n.NOME_NIVEL_ACESSO, g.ID_FUNCIONARIO = r.ID_FUNCIONARIO, f.ATIVO) " +
+            "FROM FUNCIONARIOS f JOIN CARGOS c ON c.ID_CARGO = f.ID_CARGO JOIN SETORES s ON s.ID_SETOR = f.ID_SETOR JOIN NIVEIS_DE_ACESSO n ON n.ID_NIVEL_ACESSO = f.ID_NIVEL_ACESSO " +
+            "JOIN GESTORES g ON g.ID_GESTOR = f.ID_GESTOR JOIN FUNCIONARIOS r ON r.EMAIL_CORPORATIVO = '" + Email("rafael.costa") + "' WHERE f.NOME = 'Miguel Passos'");
+        Assert.Equal(["Miguel Passos|gibertoni.passos@gmail.com|Desenvolvedor|Tecnologia|Funcionario|1|1"], ficha); // funcionário de Tecnologia, com o Rafael como gestor
+        // o resto da ficha continua inventado: o CPF passa pelo trigger (dígitos válidos) e o telefone é de um número fora de uso
+        Assert.Equal(["30009502734|11900000013"], await Sql.ColunaAsync(api.Conexao, "SELECT CONCAT(d.CPF, '|', d.TELEFONE) FROM FUNCIONARIOS_DETALHES d JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = d.ID_FUNCIONARIO WHERE f.NOME = 'Miguel Passos'"));
+        var cliente = api.CreateClient();
+        var login = await cliente.PostAsJsonAsync("/api/auth/entrar", new { email = "gibertoni.passos@gmail.com", senha = Senha });
+        Assert.Equal(200, (int)login.StatusCode);
+        // vive como as outras pessoas da demo: ponto dos dois meses, os benefícios que todos têm e o treinamento obrigatório esperando
+        Assert.True(await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM PONTOS p JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = p.ID_FUNCIONARIO WHERE f.NOME = 'Miguel Passos'") > 40);
+        Assert.Equal(2L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM BENEFICIOS_FUNCIONARIOS bf JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = bf.ID_FUNCIONARIO WHERE f.NOME = 'Miguel Passos'"));
+        Assert.Equal(1L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM TREINAMENTOS_FUNCIONARIOS tf JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = tf.ID_FUNCIONARIO WHERE f.NOME = 'Miguel Passos' AND tf.STATUS_TREINAMENTO = 'INSCRITO'"));
+    }
+
+    [Fact]
     public async Task O_painel_do_gestor_mostra_a_equipe_e_o_pedido_de_ferias_esperando()
     {
         var api = await ApiAsync(mysql);
@@ -208,7 +228,7 @@ public class SeedDaDemoTests(MySqlFixture mysql)
         var painel = await GetAsync(gestor, "/api/gestor/painel");
 
         Assert.Equal("Tecnologia", painel.GetProperty("setor").GetProperty("nome").GetString());
-        Assert.Equal(3, painel.GetProperty("totalPessoas").GetInt32()); // Lucas, Camila e Diego (a Júlia ainda não começou: não é da equipe de hoje)
+        Assert.Equal(4, painel.GetProperty("totalPessoas").GetInt32()); // Lucas, Camila, Diego e o Miguel (a Júlia ainda não começou: não é da equipe de hoje)
         var ferias = painel.GetProperty("aguardandoAprovacao").GetProperty("ferias").EnumerateArray().ToList();
         Assert.Equal(["Lucas Pereira"], ferias.Select(f => f.GetProperty("funcionario").GetProperty("nome").GetString()!));
         Assert.Equal("2026.2", painel.GetProperty("avaliacao").GetProperty("ciclo").GetString()); // a avaliação de desempenho espera o gestor avaliar a equipe

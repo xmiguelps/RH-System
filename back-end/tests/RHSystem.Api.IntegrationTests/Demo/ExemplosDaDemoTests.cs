@@ -29,18 +29,18 @@ public class ExemplosDaDemoTests(MySqlFixture mysql)
     private static EnviadorDeExemplos Enviador(ApiFactory api, string senha = Senha) => new(api.CreateClient(), Hoje, Dominio, senha);
 
     [Fact]
-    public async Task Os_holerites_de_exemplo_chegam_para_as_onze_pessoas_ativas_nos_dois_meses_anteriores()
+    public async Task Os_holerites_de_exemplo_chegam_para_as_doze_pessoas_ativas_nos_dois_meses_anteriores()
     {
         var api = await ApiAsync(mysql);
 
         var relatorio = await Enviador(api).EnviarAsync();
 
-        Assert.Equal(22, relatorio.HoleritesEnviados); // onze pessoas ativas, agosto e setembro de 2026
+        Assert.Equal(24, relatorio.HoleritesEnviados); // doze pessoas ativas, agosto e setembro de 2026
         Assert.Equal((0, 0), (relatorio.HoleritesQueJaExistiam, relatorio.HoleritesRecusados));
         Assert.Empty(relatorio.Avisos);
-        Assert.Equal(22L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM HOLERITES"));
-        Assert.Equal(11L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(DISTINCT ID_FUNCIONARIO) FROM HOLERITES WHERE ANO = 2026 AND MES = 8 AND TIPO_HOLERITE = 'MENSAL'"));
-        Assert.Equal(11L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(DISTINCT ID_FUNCIONARIO) FROM HOLERITES WHERE ANO = 2026 AND MES = 9 AND TIPO_HOLERITE = 'MENSAL'"));
+        Assert.Equal(24L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM HOLERITES"));
+        Assert.Equal(12L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(DISTINCT ID_FUNCIONARIO) FROM HOLERITES WHERE ANO = 2026 AND MES = 8 AND TIPO_HOLERITE = 'MENSAL'"));
+        Assert.Equal(12L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(DISTINCT ID_FUNCIONARIO) FROM HOLERITES WHERE ANO = 2026 AND MES = 9 AND TIPO_HOLERITE = 'MENSAL'"));
         Assert.Equal(0L, await Sql.ContarAsync(api.Conexao, $"SELECT COUNT(*) FROM HOLERITES h JOIN FUNCIONARIOS f ON f.ID_FUNCIONARIO = h.ID_FUNCIONARIO WHERE f.EMAIL_CORPORATIVO = '{Email("julia.andrade")}'")); // quem ainda não começou não recebe
     }
 
@@ -91,8 +91,8 @@ public class ExemplosDaDemoTests(MySqlFixture mysql)
 
         var segunda = await Enviador(api).EnviarAsync();
 
-        Assert.Equal((0, 22, 0, 0, 0), (segunda.HoleritesEnviados, segunda.HoleritesQueJaExistiam, segunda.HoleritesRecusados, segunda.AtestadosEnviados, segunda.AtestadosValidados));
-        Assert.Equal(22L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM HOLERITES"));
+        Assert.Equal((0, 24, 0, 0, 0), (segunda.HoleritesEnviados, segunda.HoleritesQueJaExistiam, segunda.HoleritesRecusados, segunda.AtestadosEnviados, segunda.AtestadosValidados));
+        Assert.Equal(24L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM HOLERITES"));
         Assert.Equal(1L, await Sql.ContarAsync(api.Conexao, "SELECT COUNT(*) FROM ATESTADOS"));
     }
 
@@ -116,7 +116,7 @@ public class ExemplosDaDemoTests(MySqlFixture mysql)
 
         var relatorio = await Enviador(api).EnviarAsync();
 
-        Assert.Equal((21, 1), (relatorio.HoleritesEnviados, relatorio.HoleritesRecusados));
+        Assert.Equal((23, 1), (relatorio.HoleritesEnviados, relatorio.HoleritesRecusados));
         var aviso = Assert.Single(relatorio.Avisos);
         Assert.Contains("Bruno Azevedo", aviso);
         Assert.Contains("08/2026", aviso);
