@@ -17,6 +17,18 @@
 | 2026-11-02 | `D5-3` | **Deixar como está:** o gestor **não** vê formulário encerrado na lista da tela 57. | `fichas\fatia-5.md`, tela 57 (`listarFormulariosDaEquipe`); sem caminho para o estado "anônimo encerrado" do gestor, só trate a resposta se ela chegar |
 | 2026-11-02 | `D-F4-5` | **Manter** o botão "Lembrar quem não viu" do aviso (tela 27); o e-mail entrou na lista fechada do contrato (`CONVENCOES.md`, seção 12, versão 0.2.1); **sem limite** de lembretes por aviso. **Não é mais provisório.** | `fichas\fatia-4.md`, tela 27 (`lembrarQuemNaoViuAviso`): construa normalmente e **não** anote "usa provisório" |
 | 2026-11-02 | `D5-4` | **Manter** o botão "Lembrar quem falta" do gestor (tela 57). **Não é mais provisório.** | `fichas\fatia-5.md`, tela 57 (`lembrarQuemFaltaNaEquipe`): construa normalmente e **não** anote "usa provisório" |
+| 2026-11-18 | `D-benef` | **A:** o cadastro de colaborador (tela 02) começa com **todos os benefícios desmarcados** (o que o contrato diz). | tela 02; `criarFuncionario` (`beneficioIds`) |
+| 2026-11-18 | `D-editar-inativo` | **A:** "Editar dados" aparece **também para quem está inativo**. | tela 03; `editarFuncionario` |
+| 2026-11-18 | `D-F4-1` | **Manter** "Agendar para uma data" no envio de holerite (também no "Substituir" e no lote), embora o Figma não a desenhe. | tela 08; `enviarHolerite` |
+| 2026-11-18 | `D-F4-3` | **"Fale com o RH" fica em texto simples, sem link** (o contrato não tem destino). Se um dia houver e-mail do RH na configuração da empresa, vira link. | telas 36, 43 e 49 |
+| 2026-11-18 | `D-F4-4` | **Manter** o botão "Enviar holerites em lote" na lista de colaboradores, ao lado de "Adicionar colaborador". | tela 01; `enviarHoleritesEmLote` |
+| 2026-11-18 | `D5-2` | **A:** "Encerrou em ..." mostra o dia de `encerradoEmUtc` (pode dar um dia depois do prazo do print). | tela 16; `listarFormulariosRh` |
+| 2026-11-18 | `D6-4` | **A:** **sem botão** "Incluir no onboarding" na ficha; a inclusão só acontece pela caixa do cadastro, da importação e da readmissão. | tela 03; `incluirFuncionarioNoOnboarding` (fica fora da cobertura) |
+| 2026-11-18 | `D-F7-1` | **A:** o gestor **não** ganha lista das sugestões de outra data; vê na aba Férias da ficha. | tela 51; `listarFeriasDaEquipe` (sem tela para `SUGESTAO_DE_DATA`) |
+| 2026-11-18 | `D-F7-2` | **A:** "Pagamento" fica dentro de **Cadastros**, ao lado de "Empresa". | tela 7.4; `/rh/cadastros/pagamento` |
+| 2026-11-18 | `D-V-contraste` | **B:** cores abaixo do mínimo de contraste **escurecidas** (`primaria-media` #217878, `borda-campo` #7a9591, número da bolinha do menu em `text-texto`). **Manda sobre os valores de `04-visual.md`.** | `index.css`; `shared/ui/Bolinha.tsx`; `app/contraste.test.tsx` |
+| 2026-11-18 | `D-V-avaliacao-encerrada` | **B:** "Ver minhas respostas" de avaliação **já encerrada** fica **sem o atalho** (a API não traz o avaliado na lista). | Meus formulários; `listarMeusFormularios` |
+| 2026-11-18 | `D-V-token-na-url` | **Mantido:** o código do link de definir senha fica no endereço da página (o site manda `Referrer-Policy: no-referrer`, o link vale uma vez e recarregar a página continua funcionando). | `/definir-senha?token=...` |
 
 ## Modelo de uma dúvida
 
@@ -52,18 +64,6 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
 
 | Código | Nasce em | O que fazer enquanto o dono não responder (o padrão) |
 |---|---|---|
-| `D-benef` | `fatia-1b-telas.md`, Task 2, passo 6 (tela 02, benefícios já marcados no cadastro); o conteúdo está em "Dúvidas conhecidas desta fatia" do mesmo arquivo | Todos os benefícios **desmarcados** (o que o contrato diz): quem cadastra marca os que valem. |
-| `D-editar-inativo` | `fatia-1b-telas.md`, Task 3, parte D, passo D5 (tela 03, "Editar dados" para quem está inativo); o conteúdo está no mesmo arquivo | "Editar dados" aparece **também para quem está inativo**. |
-| `D-F4-1` | `fichas\fatia-4.md`, seção "4b. Dúvidas já conhecidas" (tela 08, modal "Enviar holerite") | Construa a terceira opção, "Agendar para uma data" (o contrato a permite; o Figma não a desenha). |
-| `D-F4-3` | `fichas\fatia-4.md`, seção 4b (telas 36, 49 e 43: link "Fale com o RH") | Mostre como texto simples, **sem link** (o contrato não tem rota nem endereço para isso). |
-| `D-F4-4` | `fichas\fatia-4.md`, seção 4b (envio de holerites em lote, `enviarHoleritesEmLote`, sem tela) | Um botão "Enviar holerites em lote" ao lado de "Adicionar colaborador" na lista de colaboradores (tela 01), que abre a tela descrita em `telas\fatia-4.md`. |
-| `D5-2` | `fichas\fatia-5.md`, seção "10. Decisões do dono de 2026-11-02 e dúvidas já conhecidas" (tela 16, "Encerrou em ...") | Mostre o dia de `encerradoEmUtc` (pode dar um dia depois do prazo que o PNG mostra). |
-| `D6-4` | `fichas\fatia-6.md`, seção 10 (incluir no onboarding uma pessoa já cadastrada, a partir da ficha da tela 03; `incluirFuncionarioNoOnboarding`) | **Sem botão**: a rota fica na exclusão da cobertura. |
-| `D-F7-1` | `fichas\fatia-7.md`, seção "9. Decisão do dono sobre o menu e dúvidas que a sessão já pode registrar" (tela 51, sugestões de outra data) | Deixe assim: o gestor só vê as sugestões que aguardam resposta na aba Férias da ficha da pessoa. |
-| `D-F7-2` | `fichas\fatia-7.md`, seção 9 (tela 7.4, "Pagamento") | Siga o contrato: monte "Pagamento" dentro de Cadastros, ao lado de "Empresa". |
-| `D-V-contraste` | vistoria do front-end (2026-11-17): cores do Figma abaixo de 4,5:1 (`primaria-media` sobre fundo claro, `borda-campo` 1,47:1, número da bolinha do menu 4,2:1) | **Seguir o Figma** e registrar; não mexo em `index.css`. |
-| `D-V-avaliacao-encerrada` | vistoria (2026-11-17): "Ver minhas respostas" de uma avaliação já encerrada não tem de onde tirar o `avaliadoId` | Sem o atalho; a pessoa vê o que a lista dela mostra. |
-| `D-V-token-na-url` | vistoria (2026-11-17): o link de definir senha deixa o `token` no endereço | **Mantido**: o site manda `Referrer-Policy: no-referrer`, o link vale uma vez e recarregar a página quebraria o formulário. |
 | `D-F8-1` | `fichas\fatia-8.md`, seção "9. Dúvidas que a sessão pode registrar" (roteiro da demo) | Descreva os quatro fluxos no roteiro; o dono corta. |
 | `D-F8-2` | `fichas\fatia-8.md`, seção 9 (plano B da demo) | Se a API cair, mostre as telas pelo servidor de desenvolvimento com os dados de `ELENCO.md`, avisando a banca. |
 | `D-F8-3` | `fichas\fatia-8.md`, seção 9 (resolução do projetor) | Projete para 1366 px, com piso de 1280 px (`04-visual.md`, seção 9). |
@@ -72,7 +72,7 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
 
 ## Dúvidas
 
-### D-benef · Benefícios já marcados no cadastro de colaborador · aberta
+### D-benef · Benefícios já marcados no cadastro de colaborador · respondida
 
 - **Registrada em:** 2026-11-03 14:20 (F1b·T2·S6)
 - **Bloqueia:** não
@@ -91,10 +91,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo com todos desmarcados.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: todos os benefícios desmarcados no cadastro.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D-editar-inativo · "Editar dados" para quem está inativo · aberta
+### D-editar-inativo · "Editar dados" para quem está inativo · respondida
 
 - **Registrada em:** 2026-11-03 14:55 (F1b·T3·D5)
 - **Bloqueia:** não
@@ -113,10 +113,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo com "Editar dados" aparecendo também para inativo.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: quem está inativo pode ter os dados editados.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D-F4-1 · Opção "Agendar para uma data" no modal Enviar holerite · aberta
+### D-F4-1 · Opção "Agendar para uma data" no modal Enviar holerite · respondida
 
 - **Registrada em:** 2026-11-04 02:30 (F4, passo 4)
 - **Bloqueia:** não
@@ -135,10 +135,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: a opção está construída e testada.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: Manter a opção "Agendar para uma data".
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D-F4-3 · Destino do link "Fale com o RH" · aberta
+### D-F4-3 · Destino do link "Fale com o RH" · respondida
 
 - **Registrada em:** 2026-11-04 02:30 (F4, passos 3 e 5)
 - **Bloqueia:** não
@@ -157,10 +157,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: o texto aparece sem link.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: Texto simples, sem link.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D-F4-4 · De onde se abre o envio de holerites em lote · aberta
+### D-F4-4 · De onde se abre o envio de holerites em lote · respondida
 
 - **Registrada em:** 2026-11-04 02:30 (F4, passo 4)
 - **Bloqueia:** não
@@ -179,10 +179,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: está construído assim e testado.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: O dono perguntou se fazia sentido o botão na lista de colaboradores. Expliquei que não existe tela de Holerites para o RH (o item "Holerites" do menu é pessoal) e que a lista é o único lugar com "todas as pessoas"; a alternativa seria um item novo no menu do RH, fora do Figma. Decidiu manter na lista.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D5-2 · "Encerrou em ..." na lista de formulários · aberta
+### D5-2 · "Encerrou em ..." na lista de formulários · respondida
 
 - **Registrada em:** 2026-11-04 (F5, bloco 1)
 - **Bloqueia:** não
@@ -201,10 +201,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: mostro o dia de encerradoEmUtc (A). Muda um dia na tela.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: a lista mostra o dia em que o sistema encerrou (`encerradoEmUtc`).
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. Pode dar um dia depois do prazo que o print mostra. (linha em "Decisões do dono".)
 
-### D6-4 · Incluir no onboarding uma pessoa já cadastrada, a partir da ficha · aberta
+### D6-4 · Incluir no onboarding uma pessoa já cadastrada, a partir da ficha · respondida
 
 - **Registrada em:** 2026-11-04 (F6, bloco 7)
 - **Bloqueia:** não
@@ -223,10 +223,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo sem o botão.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: sem botão; só pela caixa do cadastro, da importação e da readmissão.
+- **O que mudou por causa da resposta:** Nada no código: `incluirFuncionarioNoOnboarding` continua na exclusão da cobertura. (linha em "Decisões do dono".)
 
-### D-F7-1 · O gestor não tem lista das sugestões de outra data que ainda esperam resposta · aberta
+### D-F7-1 · O gestor não tem lista das sugestões de outra data que ainda esperam resposta · respondida
 
 - **Registrada em:** 2026-11-17 (F7, bloco 7a)
 - **Bloqueia:** não
@@ -245,10 +245,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo sem o bloco.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: não precisa; a aba Férias da ficha basta.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D-F7-2 · "Pagamento" dentro de Cadastros · aberta
+### D-F7-2 · "Pagamento" dentro de Cadastros · respondida
 
 - **Registrada em:** 2026-11-17 (F7, bloco 7c)
 - **Bloqueia:** não
@@ -267,10 +267,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: ficou em Cadastros.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: manter "Pagamento" dentro de Cadastros.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
-### D-V-contraste · Cores do Figma abaixo do contraste recomendado · aberta
+### D-V-contraste · Cores do Figma abaixo do contraste recomendado · respondida
 
 - **Registrada em:** 2026-11-17 (vistoria do front-end)
 - **Bloqueia:** não
@@ -289,10 +289,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo o Figma.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: B: escurecer as cores abaixo do mínimo.
+- **O que mudou por causa da resposta:** Medi os pares: `primaria-media` (#247b7b) dava 4,43:1 sobre os fundos #e6f4f3 e #eef2f1 e passou a #217878 (4,6:1 ou mais em todos os fundos claros); `borda-campo` (#c9d8d6, 1,47:1) passou a #7a9591 (3,2:1; para borda de componente o mínimo da WCAG é 3:1, não 4,5:1); o número da bolinha do menu (4,22:1) passou a usar a cor de texto escura (7,5:1). Teste novo `app/contraste.test.tsx` e âncoras de `tokens.test.ts` atualizadas. `04-visual.md` continua com os valores do Figma (não é editável por aqui): esta decisão manda sobre ele. (linha em "Decisões do dono".)
 
-### D-V-avaliacao-encerrada · "Ver minhas respostas" de uma avaliação encerrada · aberta
+### D-V-avaliacao-encerrada · "Ver minhas respostas" de uma avaliação encerrada · respondida
 
 - **Registrada em:** 2026-11-17 (vistoria do front-end)
 - **Bloqueia:** não
@@ -311,10 +311,10 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo sem o atalho.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: B: ficar sem o atalho.
+- **O que mudou por causa da resposta:** Nada no código. A API não passa a trazer o avaliado; o contrato segue em 0.3.0. (linha em "Decisões do dono".)
 
-### D-V-token-na-url · O link de definir senha deixa o token no endereço · decidida (mantido)
+### D-V-token-na-url · O link de definir senha deixa o token no endereço · respondida (mantido)
 
 - **Registrada em:** 2026-11-17 (vistoria do front-end)
 - **Bloqueia:** não
@@ -333,8 +333,8 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: mantido.
   ```
 
-- **Resposta do dono:** (vazio)
-- **O que mudou por causa da resposta:** (vazio)
+- **Resposta do dono:** 2026-11-18: A: manter como está.
+- **O que mudou por causa da resposta:** Nada no código: é o que já estava construído. (linha em "Decisões do dono".)
 
 ### D-F8-1 · Quais fluxos entram no roteiro da demo · aberta
 
@@ -355,7 +355,7 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: o roteiro traz todos, numerados.
   ```
 
-- **Resposta do dono:** (vazio)
+- **Resposta do dono:** 2026-11-18: O dono pediu para deixar pendente por enquanto. Continua aberta.
 - **O que mudou por causa da resposta:** (vazio)
 
 ### D-F8-2 · Plano B da demo · aberta
@@ -377,7 +377,7 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: o roteiro descreve o plano B com o aviso.
   ```
 
-- **Resposta do dono:** (vazio)
+- **Resposta do dono:** 2026-11-18: O dono não tem preferência por enquanto; vale o padrão (descrever o plano B com o aviso). Continua aberta.
 - **O que mudou por causa da resposta:** (vazio)
 
 ### D-F8-3 · Resolução do projetor · aberta
@@ -399,5 +399,5 @@ Só estão aqui as que **continuam abertas** (as respondidas estão em "Decisõe
   Enquanto isso: sigo com 1366×768 como referência.
   ```
 
-- **Resposta do dono:** (vazio)
+- **Resposta do dono:** 2026-11-18: O dono ainda não sabe a resolução; vale 1366×768 como referência até ele confirmar. Continua aberta.
 - **O que mudou por causa da resposta:** (vazio)

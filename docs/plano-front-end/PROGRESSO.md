@@ -8,7 +8,7 @@
 
 - **Fatia · tarefa · passo:** fatias 0 a 8 concluídas (a 7 e a 8 em 2026-11-17); falta só a pessoa conferir ao lado do print (lista no relatório final)
 - **Próximo passo exato:** nenhum do front: o `Relatório final` abaixo está escrito; a conferência visual e a de 1366×768 são da pessoa e não bloqueiam
-- **Branch:** `feat/front-fatia-8` (as fatias 0 a 7 e a leva de ajustes do contrato 0.3.0 já estão na `main`: PR #18 e #19); repositório `C:\Users\User\dev\RH-System`
+- **Branch:** `feat/front-contraste` (fechamento das dúvidas e contraste, 2026-11-18; as fatias 0 a 8 e os ajustes do contrato 0.3.0 já estão na `main`: PR #18, #19 e #20); repositório `C:\Users\User\dev\RH-System`
 - **Autorização de Git:** o dono autorizou abrir, aprovar e integrar cada PR (`gh pr merge --squash --admin`); commits em português sem acento, sem coautor
 - **Node (`node -v`):** v24.13.1 neste computador (o `engines` pede `^22.22.2 || ^24.15.0`: avisa na instalação, mas tudo roda)
 - **Versão do contrato em uso (`info.version`):** 0.3.0
@@ -330,12 +330,14 @@ O dono autorizou rodar o back-end completo no computador para provar o front (a 
 **Para a pessoa conferir (não bloqueia):**
 - **Ao lado do print** (61 telas, por fatia em `telas\fatia-8.md`): fatia 1: 01, 02, 03, 09, 10, 29, 30, 31, 52; fatia 3: 04, 12, 13, 33, 47, 54, 55, 56; fatia 4: 07, 08, 11, 14, 15, 27, 28, 36, 37, 38, 43, 49, 50, 53, 59, 60; fatia 5: 16 a 21, 39, 40, 57; fatia 6: 22 a 26, 41, 42, 58; fatia 7: 00, 05, 06, 32, 34, 35, 44, 45, 46, 48, 51. As telas sem print se conferem pela descrição em `telas\fatia-N.md` (lista em `telas\fatia-8.md`, seção 2).
 - **A 1366×768:** as rotas de "Roteiro da demo". Já passaram sem rolagem horizontal contra a API real; falta o olho da pessoa no projetor de verdade.
-- **Contraste e menu:** o menu do RH rola por dentro a 768 px de altura; alguns pares de cor do Figma ficam abaixo de 4,5:1 (`D-V-contraste`).
+- **Contraste e menu:** o menu do RH rola por dentro a 768 px de altura. As cores abaixo do mínimo de contraste foram **escurecidas em 2026-11-18** por decisão do dono (`D-V-contraste`): `primaria-media` #217878, `borda-campo` #7a9591 e o número da bolinha do menu em texto escuro; confira ao lado do print que a diferença visual ficou aceitável (`04-visual.md` ainda cita os valores do Figma).
 
 **Roteiros de integração que já podem ser rodados (e por quem):** todos os da seção "Pendente de integração" estão com a API real disponível (back-end completo): a pessoa ou o dono roda cada roteiro no ambiente dele. Os que dependem do ambiente do dono: o captcha Turnstile (chave do site), o envio de e-mail para fora e o armazenamento do Azure.
 
 **Provisórios que continuam abertos** (`contrato\PROVISORIOS.md`) e as telas que dependem deles: regras de férias do protótipo (34, 35, 06, 51, 7.2), campo "Quantos dias" do abono (35, 06), prazo da sugestão de data (34), lista de parentescos (44, 45), tipo `BENEFICIOS` nas pendências (00, 7.5), modelo e número do certificado (41, 42), recorrência, proteção e retenção do link público de formulário, formato do lote de holerites, o que muda depois de publicar um treinamento e o formato da exportação para a folha (12).
 
-**Dúvidas ainda sem resposta** (`DUVIDAS.md`; o texto pronto de cada uma está lá): `D6-4` (incluir no onboarding uma pessoa já cadastrada), `D-F7-1` (lista das sugestões de data), `D-F7-2` ("Pagamento" em Cadastros), `D-F8-1` (quais fluxos entram no roteiro), `D-F8-2` (plano B da demo), `D-F8-3` (resolução do projetor), `D-V-contraste`, `D-V-avaliacao-encerrada` e `D-V-token-na-url` (mantido).
+**Dúvidas ainda sem resposta** (`DUVIDAS.md`; o texto pronto de cada uma está lá): `D-F8-1` (quais fluxos entram no roteiro; o dono deixou pendente), `D-F8-2` (plano B da demo; sem preferência, vale o padrão) e `D-F8-3` (resolução do projetor; ele ainda não sabe, vale 1366×768). **As outras 12 foram respondidas pelo dono em 2026-11-18** e estão na tabela "Decisões do dono": `D-benef`, `D-editar-inativo`, `D-F4-1`, `D-F4-3`, `D-F4-4`, `D5-2`, `D6-4`, `D-F7-1`, `D-F7-2`, `D-V-contraste` (cores escurecidas), `D-V-avaliacao-encerrada` e `D-V-token-na-url`. Só `D-V-contraste` mudou código; nas demais ficou como estava construído.
+
+**Acabamentos da vistoria que o dono decidiu não fazer (2026-11-18):** avisar antes de sair de um assistente preenchido, nova tentativa quando a página do certificado leva 429, `role="status"` nos esqueletos e telas vazias, e barra de progresso no envio de arquivo grande (o `fetch` não mede envio; exigiria trocar a forma de enviar).
 
 **Registrado fora do escopo do front:** o `engines` do `package.json` pede Node `^22.22.2 || ^24.15.0` e este computador tem o 24.13.1 (avisa, mas roda); a revisão dos scripts `V001` a `V007` com o grupo, o ensaio e o ambiente no Azure são do dono.
